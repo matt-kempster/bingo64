@@ -195,7 +195,8 @@ void print_text_fmt_int(s32 x, s32 y, const char *str, s32 n) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -246,7 +247,8 @@ void print_text(s32 x, s32 y, const char *str) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -404,7 +406,8 @@ void print_text_centered(s32 x, s32 y, const char *str) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -521,7 +524,7 @@ s8 char_to_glyph_index(char a) {
  * Adds an individual glyph to be rendered.
  */
 void add_glyph_texture(s8 glyphIndex) {
-    u32 *glyphs = segmented_to_virtual(seg2_hud_lut);
+    const u8 *const *glyphs = segmented_to_virtual(main_hud_lut);
 
     gDPPipeSync(gDisplayListHead++);
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[glyphIndex]);
@@ -552,149 +555,16 @@ void clip_to_bounds(s32 *x, s32 *y) {
  * Renders the glyph that's set at the given position.
  */
 void render_textrect(s32 x, s32 y, s32 pos) {
-    int sp34 = x + pos * 12;
-    int sp30 = 224 - y;
-    int sp2C;
-    int sp28;
+    s32 rectBaseX = x + pos * 12;
+    s32 rectBaseY = 224 - y;
+    s32 rectX;
+    s32 rectY;
 
-    clip_to_bounds(&sp34, &sp30);
-    sp2C = sp34;
-    sp28 = sp30;
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 16) << 2, (sp28 + 16) << 2, 0,
-                        0, 0, 1024, 1024);
-}
-
-static void render_large_text(int x, int y, int pos) {
-    int sp34 = x + pos * 24;
-    int sp30 = 224 - y;
-    int sp2C;
-    int sp28;
-
-    clip_to_bounds(&sp34, &sp30);
-    sp2C = sp34;
-    sp28 = sp30;
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 32) << 2, (sp28 + 32) << 2, 0,
-                        0, 0, 512, 512);
-}
-
-static void render_vertical_line(int x, int y, int pos) {
-    int sp34 = x + 1 + pos * 12;
-    int sp30 = 226 - y;
-    int sp2C;
-    int sp28;
-    int height = 170;
-
-    clip_to_bounds(&sp34, &sp30);
-    sp2C = sp34;
-    sp28 = sp30;
-
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, 1, 0, 0, 0, ENVIRONMENT, 0, 0,
-                      0, 1);
-
-    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 0);
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 6) << 2, (sp28 + height) << 2,
-                        0, 0, 0, 32, 32);
-
-    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 0);
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 6 - 1) << 2,
-                        (sp28 + height - 1) << 2, 0, 0, 0, 32, 32);
-
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0,
-                      TEXEL0);
-}
-
-u8 tiny_text_convert_ascii(char c) {
-    if (c >= 'A' && c <= 'Z') {
-        return (c - 0x37);
-    }
-
-    if (c >= 'a' && c <= 'z') {
-        return (c - 0x3D);
-    }
-
-    if (c >= '0' && c <= '9') {
-        return (c - 0x30);
-    }
-
-    if (c == ' ') {
-        return 0x9E;
-    }
-    if (c == '\'') {
-        return 0x3E;
-    }
-    if (c == '!') {
-        return 0xF2;
-    }
-    if (c == '-') {
-        return 0x9F;
-    }
-    if (c == '.') {
-        // return 0x24;
-        return 0x3F;
-    }
-    if (c == ',') {
-        return 0x6F;
-    }
-    if (c == '\n') {
-        return 0xFE;
-    }
-    if (c == ':') {
-        return 0xE6;
-    }
-    if (c == '(') {
-        return 0xE1;
-    }
-    if (c == ')') {
-        return 0xE3;
-    }
-
-    return c; // lol idk
-}
-
-static void render_tiny_text(struct TextLabel *text) {
-    int i;
-
-    for (i = 0; i < text->length; i++) {
-        text->buffer[i] = tiny_text_convert_ascii(text->buffer[i]);
-    }
-    text->buffer[text->length] = 0xFF;
-    PrintRegularTextButTiny(text->x, text->y, text->buffer);
-}
-
-static void render_not_tiny_text(struct TextLabel *text) {
-    int i;
-
-    for (i = 0; i < text->length; i++) {
-        text->buffer[i] = tiny_text_convert_ascii(text->buffer[i]);
-    }
-    text->buffer[text->length] = 0xFF;
-    PrintGenericText(text->x, text->y, text->buffer);
-}
-
-static void render_horizontal_line(int x, int y, int pos) {
-    int sp34 = x + pos * 12;
-    int sp30 = 226 - y;
-    int sp2C;
-    int sp28;
-    int length = 167;
-
-    clip_to_bounds(&sp34, &sp30);
-    sp2C = sp34;
-    sp28 = sp30;
-    // gSPTextureRectangleFlip(gDisplayListHead++, sp2C << 2, sp28 << 2,
-    //                         (sp2C + length) << 2, (sp28 + 15) << 2, 0, 0, 0, 4096, 0x10);
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, 1, 0, 0, 0, ENVIRONMENT, 0, 0,
-                      0, 1);
-
-    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 0);
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + length) << 2, (sp28 + 6) << 2,
-                        0, 0, 0, 1024, 1024);
-
-    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 0);
-    gSPTextureRectangle(gDisplayListHead++, sp2C + 1 << 2, sp28 + 1 << 2, (sp2C + length - 1) << 2,
-                        (sp28 + 6 - 1) << 2, 0, 0, 0, 1024, 1024);
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0,
-                      TEXEL0);
+    clip_to_bounds(&rectBaseX, &rectBaseY);
+    rectX = rectBaseX;
+    rectY = rectBaseY;
+    gSPTextureRectangle(gDisplayListHead++, rectX << 2, rectY << 2, (rectX + 15) << 2,
+                        (rectY + 15) << 2, G_TX_RENDERTILE, 0, 0, 4 << 10, 1 << 10);
 }
 
 /**
@@ -723,31 +593,9 @@ void render_text_labels(void) {
         return;
     }
 
-    //!!!! This is incredibly fragile!
-    // It assumes the not tiny text comes before the tiny text in the order of
-    // a frame. Look here first if something breaks.
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
-    for (i = 0; i < sTextLabelsCount; i++) {
-        if (sTextLabels[i]->size == 3) {
-            render_not_tiny_text(sTextLabels[i]);
-        }
-    }
-    // dl_add_new_scale_matrix(MENU_MTX_PUSH, 0.5, 0.5, 1.0f);
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_end);
-    gSPDisplayList(gDisplayListHead++, my_fancy_custom_text_dl);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
-
-    for (i = 0; i < sTextLabelsCount; i++) {
-        if (sTextLabels[i]->size == -1) {
-            render_tiny_text(sTextLabels[i]);
-        }
-    }
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_end);
-
-    guOrtho(mtx, 0.0f, 320.0f, 0.0f, 240.0f, -10.0f, 10.0f, 1.0f);
-    gSPPerspNormalize((Gfx *) (gDisplayListHead++), 0x0000FFFF);
-    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx), G_MTX_PROJECTION | G_MTX_LOAD);
+    guOrtho(mtx, 0.0f, SCREEN_WIDTH, 0.0f, SCREEN_HEIGHT, -10.0f, 10.0f, 1.0f);
+    gSPPerspNormalize((Gfx *) (gDisplayListHead++), 0xFFFF);
+    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx), G_MTX_PROJECTION | G_MTX_LOAD | G_MTX_NOPUSH);
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
 
     for (i = 0; i < sTextLabelsCount; i++) {
@@ -784,7 +632,7 @@ void render_text_labels(void) {
             }
         }
 
-        mem_pool_free(D_8033A124, (void *)sTextLabels[i]);
+        mem_pool_free(gEffectsMemoryPool, sTextLabels[i]);
     }
 
     gSPDisplayList(gDisplayListHead++, dl_hud_img_end);

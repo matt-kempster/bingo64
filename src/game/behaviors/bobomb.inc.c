@@ -23,7 +23,7 @@ void bhv_bobomb_init(void) {
 
 void func_802E5B7C(void) {
     if (((o->oBehParams >> 8) & 0x1) == 0) {
-        ObjSpawnYellowCoins(o, 1);
+        obj_spawn_yellow_coins(o, 1);
         o->oBehParams = 0x100;
         set_object_respawn_info_bits(o, 1);
         bingo_update(BINGO_UPDATE_KILLED_BOBOMB);
@@ -74,13 +74,13 @@ void BobombPatrolLoop(void) {
     sp22 = o->header.gfx.unk38.animFrame;
     o->oForwardVel = 5.0;
 
-    collisionFlags = ObjectStep();
-    if ((ObjLeaveIfMarioIsNearHome(o, o->oHomeX, o->oHomeY, o->oHomeZ, 400) == 1)
-        && (func_802E46C0(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == 1)) {
+    collisionFlags = object_step();
+    if ((obj_return_home_if_safe(o, o->oHomeX, o->oHomeY, o->oHomeZ, 400) == 1)
+        && (obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == 1)) {
         o->oBobombFuseLit = 1;
         o->oAction = BOBOMB_ACT_CHASE_MARIO;
     }
-    ObjCheckFloorDeath(collisionFlags, D_803600E0);
+    obj_check_floor_death(collisionFlags, sObjFloor);
 }
 
 void BobombChaseMarioLoop(void) {
@@ -90,18 +90,18 @@ void BobombChaseMarioLoop(void) {
     sp1a = ++o->header.gfx.unk38.animFrame;
     o->oForwardVel = 20.0;
 
-    collisionFlags = ObjectStep();
+    collisionFlags = object_step();
 
     if (sp1a == 5 || sp1a == 16)
-        PlaySound2(SOUND_OBJECT_BOBOMBWALK);
+        PlaySound2(SOUND_OBJ_BOBOMB_WALK);
 
     obj_turn_toward_object(o, gMarioObject, 16, 0x800);
-    ObjCheckFloorDeath(collisionFlags, D_803600E0);
+    obj_check_floor_death(collisionFlags, sObjFloor);
 }
 
 void BobombLaunchedLoop(void) {
     s16 collisionFlags = 0;
-    collisionFlags = ObjectStep();
+    collisionFlags = object_step();
     if ((collisionFlags & 0x1) == 1)
         o->oAction = BOBOMB_ACT_EXPLODE; /* bit 0 */
 }
@@ -125,7 +125,7 @@ void GenericBobombFreeLoop(void) {
             break;
 
         case BOBOMB_ACT_LAVA_DEATH:
-            if (ObjLavaDeath() == 1)
+            if (obj_lava_death() == 1)
                 create_respawner(MODEL_BLACK_BOBOMB, bhvBobomb, 3000);
             break;
 
@@ -152,7 +152,7 @@ void StationaryBobombFreeLoop(void) {
             break;
 
         case BOBOMB_ACT_LAVA_DEATH:
-            if (ObjLavaDeath() == 1)
+            if (obj_lava_death() == 1)
                 create_respawner(MODEL_BLACK_BOBOMB, bhvBobomb, 3000);
             break;
 
@@ -266,7 +266,7 @@ void bhv_bobomb_loop(void) {
                 == 0) /* oBobombFuseTimer % 2 or oBobombFuseTimer % 8 */
                 spawn_object(o, MODEL_SMOKE, bhvBobombFuseSmoke);
 
-            PlaySound(SOUND_CH6_BOBOMBLITFUSE);
+            PlaySound(SOUND_AIR_BOBOMB_LIT_FUSE);
 
             o->oBobombFuseTimer++;
         }
@@ -296,10 +296,10 @@ void BobombBuddyIdleLoop(void) {
     o->oBobombBuddyPosYCopy = o->oPosY;
     o->oBobombBuddyPosZCopy = o->oPosZ;
 
-    collisionFlags = ObjectStep();
+    collisionFlags = object_step();
 
     if ((sp1a == 5) || (sp1a == 16))
-        PlaySound2(SOUND_OBJECT_BOBOMBWALK);
+        PlaySound2(SOUND_OBJ_BOBOMB_WALK);
 
     if (o->oDistanceToMario < 1000.0f)
         o->oMoveAngleYaw = approach_s16_symmetric(o->oMoveAngleYaw, o->oAngleToMario, 0x140);
@@ -308,20 +308,25 @@ void BobombBuddyIdleLoop(void) {
         o->oAction = BOBOMB_BUDDY_ACT_TURN_TO_TALK;
 }
 
-// sp30 = arg0
-// sp34 = arg1
-
-void BobombBuddyCannonLoop(s16 arg0, s16 arg1) {
-    struct Object *sp2c;
-    s16 sp2a, sp28;
+/**
+ * Function for the Bob-omb Buddy cannon guy.
+ * dialogFirstText is the first dialogID called when Bob-omb Buddy 
+ * starts to talk to Mario to prepare the cannon(s) for him.
+ * Then the camera goes to the nearest cannon, to play the "prepare cannon" cutscene
+ * dialogSecondText is called after Bob-omb Buddy has the cannon(s) ready and
+ * then tells Mario that is "Ready for blastoff".
+ */
+void BobombBuddyCannonLoop(s16 dialogFirstText, s16 dialogSecondText) {
+    struct Object *cannonClosed;
+    s16 buddyText, cutscene;
 
     switch (o->oBobombBuddyCannonStatus) {
         case BOBOMB_BUDDY_CANNON_UNOPENED:
-            sp2a = func_8028F8E0(162, o, arg0);
-            if (sp2a != 0) {
+            buddyText = cutscene_object_with_dialog(CUTSCENE_DIALOG, o, dialogFirstText);
+            if (buddyText != 0) {
                 save_file_set_cannon_unlocked();
-                sp2c = obj_nearest_object_with_behavior(bhvCannonClosed);
-                if (sp2c != 0)
+                cannonClosed = obj_nearest_object_with_behavior(bhvCannonClosed);
+                if (cannonClosed != 0)
                     o->oBobombBuddyCannonStatus = BOBOMB_BUDDY_CANNON_OPENING;
                 else
                     o->oBobombBuddyCannonStatus = BOBOMB_BUDDY_CANNON_STOP_TALKING;
@@ -329,15 +334,15 @@ void BobombBuddyCannonLoop(s16 arg0, s16 arg1) {
             break;
 
         case BOBOMB_BUDDY_CANNON_OPENING:
-            sp2c = obj_nearest_object_with_behavior(bhvCannonClosed);
-            sp28 = func_8028F9E8(150, sp2c);
-            if (sp28 == -1)
+            cannonClosed = obj_nearest_object_with_behavior(bhvCannonClosed);
+            cutscene = cutscene_object(CUTSCENE_PREPARE_CANNON, cannonClosed);
+            if (cutscene == -1)
                 o->oBobombBuddyCannonStatus = BOBOMB_BUDDY_CANNON_OPENED;
             break;
 
         case BOBOMB_BUDDY_CANNON_OPENED:
-            sp2a = func_8028F8E0(162, o, arg1);
-            if (sp2a != 0)
+            buddyText = cutscene_object_with_dialog(CUTSCENE_DIALOG, o, dialogSecondText);
+            if (buddyText != 0)
                 o->oBobombBuddyCannonStatus = BOBOMB_BUDDY_CANNON_STOP_TALKING;
             break;
 
@@ -359,7 +364,7 @@ void BobombBuddyTalkLoop(void) {
 
         switch (o->oBobombBuddyRole) {
             case BOBOMB_BUDDY_ROLE_ADVICE:
-                if (func_8028F8E0(162, o, o->oBehParams2ndByte) != BOBOMB_BUDDY_BP_STYPE_GENERIC) {
+                if (cutscene_object_with_dialog(CUTSCENE_DIALOG, o, o->oBehParams2ndByte) != BOBOMB_BUDDY_BP_STYPE_GENERIC) {
                     set_mario_npc_dialog(0);
 
                     o->activeFlags &= ~0x20; /* bit 5 */
@@ -371,9 +376,9 @@ void BobombBuddyTalkLoop(void) {
 
             case BOBOMB_BUDDY_ROLE_CANNON:
                 if (gCurrCourseNum == COURSE_BOB)
-                    BobombBuddyCannonLoop(4, 105);
+                    BobombBuddyCannonLoop(DIALOG_004, DIALOG_105);
                 else
-                    BobombBuddyCannonLoop(47, 106);
+                    BobombBuddyCannonLoop(DIALOG_047, DIALOG_106);
                 break;
         }
     }
@@ -382,13 +387,13 @@ void BobombBuddyTalkLoop(void) {
 void BobombBuddyTurnToTalkLoop(void) {
     s16 sp1e = o->header.gfx.unk38.animFrame;
     if ((sp1e == 5) || (sp1e == 16))
-        PlaySound2(SOUND_OBJECT_BOBOMBWALK);
+        PlaySound2(SOUND_OBJ_BOBOMB_WALK);
 
     o->oMoveAngleYaw = approach_s16_symmetric(o->oMoveAngleYaw, o->oAngleToMario, 0x1000);
     if ((s16) o->oMoveAngleYaw == (s16) o->oAngleToMario)
         o->oAction = BOBOMB_BUDDY_ACT_TALK;
 
-    PlaySound2(SOUND_ACTION_UNKNOWN45B);
+    PlaySound2(SOUND_ACTION_READ_SIGN);
 }
 
 void BobombBuddyActionLoop(void) {
@@ -406,7 +411,7 @@ void BobombBuddyActionLoop(void) {
             break;
     }
 
-    SetObjectVisibility(o, 3000);
+    set_object_visibility(o, 3000);
 }
 
 void bhv_bobomb_buddy_loop(void) {

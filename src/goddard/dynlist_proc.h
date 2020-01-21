@@ -13,7 +13,7 @@ typedef void *DynId;
 /// as the id can be either a number or a string.
 /// @{
 #define DynIdAsStr(id) ((char *)(id))
-#define DynIdAsInt(id) ((u32)(id))
+#define DynIdAsInt(id) ((u32)(uintptr_t)(id))
 #define AsDynId(unk)   ((DynId)(unk))
 /// @}
 /// @}
@@ -78,7 +78,7 @@ extern void d_get_scale(struct GdVec3f*);
 extern void d_set_world_pos(f32, f32, f32);
 extern void d_get_world_pos(struct GdVec3f *);
 extern void d_set_scale(f32, f32, f32);
-extern void d_add_valptr(DynId, u32, s32, u32);
+extern void d_add_valptr(DynId, u32, s32, size_t);
 extern void d_add_valproc(union ObjVarVal * (*)(union ObjVarVal *, union ObjVarVal));
 extern void d_set_flags(s32);
 extern void d_set_parm_f(enum DParmF, f32);

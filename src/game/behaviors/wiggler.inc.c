@@ -1,10 +1,10 @@
 
 /**
- * Behavior for bhvWiggler and bhvWigglerBodyPart.
- * The bhvWiggler object controls the wiggler's behavior, and physically manifests
- * as the wiggler's head. The bhvWigglerBodyPart objects represent the 3 tail body
+ * Behavior for bhvWigglerHead and bhvWigglerBody.
+ * The bhvWigglerHead object controls the wiggler's behavior, and physically manifests
+ * as the wiggler's head. The bhvWigglerBody objects represent the 3 tail body
  * parts, numbered 1 closest to the head, and 3 at the end of the tail.
- * Processing order is bhvWiggler, then bhvWigglerBodyPart 1, 2, then 3.
+ * Processing order is bhvWigglerHead, then bhvWigglerBody 1, 2, then 3.
  */
 
 /**
@@ -55,7 +55,7 @@ static u8 sWigglerAttackHandlers[] = {
 static f32 sWigglerSpeeds[] = { 2.0f, 40.0f, 30.0f, 16.0f };
 
 /**
- * Update function for bhvWigglerBodyPart.
+ * Update function for bhvWigglerBody.
  * Set object position and angle based on wiggler segment data and avoid falling
  * through the floor.
  * Tangible if the wiggler is not in the shrinking action, but does nothing on
@@ -142,7 +142,7 @@ static void wiggler_init_segments(void) {
         // Spawn each body part
         for (i = 1; i <= 3; i++) {
             bodyPart =
-                spawn_object_relative(i, 0, 0, 0, o, MODEL_WIGGLER_BODY_PART, bhvWigglerBodyPart);
+                spawn_object_relative(i, 0, 0, 0, o, MODEL_WIGGLER_BODY, bhvWigglerBody);
             if (bodyPart != NULL) {
                 func_8029EE20(bodyPart, wiggler_seg5_anims_0500C874, 0);
                 bodyPart->header.gfx.unk38.animFrame = (23 * i) % 26 - 1;
@@ -224,13 +224,14 @@ static void wiggler_act_walk(void) {
 
         // If Mario is positioned below the wiggler, assume he entered through the
         // lower cave entrance, so don't display text.
-        if (gMarioObject->oPosY < o->oPosY || obj_update_dialog_unk2(2, 0, 0xA2, 0x96) != 0) {
+        if (gMarioObject->oPosY < o->oPosY || obj_update_dialog_with_cutscene(2, 0, CUTSCENE_DIALOG, DIALOG_150) != 0) {
             o->oWigglerTextStatus = WIGGLER_TEXT_STATUS_COMPLETED_DIALOG;
         }
     } else {
         //! Every object's health is initially 2048, and wiggler's doesn't change
         //  to 4 until after this runs the first time. It indexes out of bounds
-        //  and uses the value 113762.3 for one frame on US.
+        //  and uses the value 113762.3 for one frame on US. This is fixed down
+        //  below in bhv_wiggler_update if AVOID_UB is defined.
         obj_forward_vel_approach(sWigglerSpeeds[o->oHealth - 1], 1.0f);
 
         if (o->oWigglerWalkAwayFromWallTimer != 0) {
@@ -286,7 +287,7 @@ static void wiggler_act_walk(void) {
  */
 static void wiggler_act_jumped_on(void) {
     // Text to show on first, second, and third attack.
-    s32 attackText[3] = { 0x98, 0xA8, 0x97 };
+    s32 attackText[3] = { DIALOG_152, DIALOG_168, DIALOG_151 };
 
     // Shrink until the squish speed becomes 0, then unisquish
     if (approach_f32_ptr(&o->oWigglerSquishSpeed, 0.0f, 0.05f)) {
@@ -300,7 +301,7 @@ static void wiggler_act_jumped_on(void) {
     // defeated) or go back to walking
     if (o->header.gfx.scale[1] >= 4.0f) {
         if (o->oTimer > 30) {
-            if (obj_update_dialog_unk2(2, 0, 0xA2, attackText[o->oHealth - 2]) != 0) {
+            if (obj_update_dialog_with_cutscene(2, 0, CUTSCENE_DIALOG, attackText[o->oHealth - 2]) != 0) {
                 // Because we don't want the wiggler to disappear after being
                 // defeated, we leave its health at 1
                 if (--o->oHealth == 1) {
@@ -311,7 +312,7 @@ static void wiggler_act_jumped_on(void) {
                     o->oMoveAngleYaw = o->oFaceAngleYaw;
 
                     if (o->oHealth == 2) {
-                        PlaySound2(SOUND_WIGGLER_JUMP);
+                        PlaySound2(SOUND_OBJ_WIGGLER_JUMP);
                         o->oForwardVel = 10.0f;
                         o->oVelY = 70.0f;
                     }
@@ -349,7 +350,7 @@ static void wiggler_act_knockback(void) {
 static void wiggler_act_shrink(void) {
     if (o->oTimer >= 20) {
         if (o->oTimer == 20) {
-            PlaySound2(SOUND_EMEMY_DEFEAT_SHRINK);
+            PlaySound2(SOUND_OBJ_ENEMY_DEFEAT_SHRINK);
         }
 
         // 4 is the default scale, so shrink to 1/4 of regular size
@@ -385,19 +386,23 @@ static void wiggler_act_fall_through_floor(void) {
  * Stop and enter the jumped on action.
  */
 void wiggler_jumped_on_attack_handler(void) {
-    PlaySound2(SOUND_WIGGLER_ATTACKED);
+    PlaySound2(SOUND_OBJ_WIGGLER_ATTACKED);
     o->oAction = WIGGLER_ACT_JUMPED_ON;
     o->oForwardVel = o->oVelY = 0.0f;
     o->oWigglerSquishSpeed = 0.4f;
 }
 
 /**
- * Update function for bhvWiggler.
+ * Update function for bhvWigglerHead.
  */
 void bhv_wiggler_update(void) {
     // PARTIAL_UPDATE
 
     if (o->oAction == WIGGLER_ACT_UNINITIALIZED) {
+#ifdef AVOID_UB
+        // See comment in wiggler_act_walk
+        o->oHealth = 4;
+#endif
         wiggler_init_segments();
     } else {
         if (o->oAction == WIGGLER_ACT_FALL_THROUGH_FLOOR) {
@@ -409,7 +414,7 @@ void bhv_wiggler_update(void) {
             func_8029ED98(0, o->oWigglerWalkAnimSpeed);
             if (o->oWigglerWalkAnimSpeed != 0.0f) {
                 func_802F9378(0, 13,
-                              o->oHealth >= 4 ? SOUND_WIGGLER_LOW_PITCH : SOUND_WIGGLER_HIGH_PITCH);
+                              o->oHealth >= 4 ? SOUND_OBJ_WIGGLER_LOW_PITCH : SOUND_OBJ_WIGGLER_HIGH_PITCH);
             } else {
                 func_8029F6F0();
             }

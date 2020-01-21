@@ -17,6 +17,7 @@
 #include "level_update.h"
 #include "audio/external.h"
 #include "seq_ids.h"
+#include "dialog_ids.h"
 #include "save_file.h"
 #include "area.h"
 #include "engine/graph_node.h"
@@ -36,17 +37,18 @@
 #include "ingame_menu.h"
 #include "room.h"
 #include "rendering_graph_node.h"
+#include "level_table.h"
 
 #define o gCurrentObject
 
 // BSS
 s16 D_8035FF10;
 
-struct Struct8032F24A {
+struct WFRotatingPlatformData {
     s16 pad;
-    s16 unk0;
-    void *unk1;
-    s16 unk2;
+    s16 scale;
+    const Collision *collisionData;
+    s16 collisionDistance;
 };
 
 struct Struct8032F34C {
@@ -54,7 +56,7 @@ struct Struct8032F34C {
     s16 bridgeRelativeStartingXorZ;
     s16 platformWidth;
     s16 model;
-    void *segAddr;
+    const void *segAddr;
 };
 
 struct Struct8032F698 {
@@ -70,7 +72,7 @@ struct Struct802C0DF0 {
     u8 unk1;
     u8 unk2;
     u8 model;
-    void *behavior;
+    const BehaviorScript *behavior;
 };
 
 struct Struct8032FE4C {
@@ -98,18 +100,18 @@ extern s8 gDoorAdjacentRooms[][2];
 extern u8 inside_castle_seg7_collision_ddd_warp_2[];
 extern u8 inside_castle_seg7_collision_ddd_warp[];
 extern s32 gDialogResponse;
-extern s32 gCutsceneActive;
-extern u8 gCutsceneNumber;
+extern s32 gObjCutsceneDone;
+extern u8 gRecentCutscene;
 extern s8 *D_8032F96C[];
-extern u32 bowser_seg6_unkmoveshorts_060576FC[];
-extern u32 blue_fish_seg3_anims_0301C2B0[];
-extern u32 cyan_fish_seg6_anims_0600E264[];
-extern u32 blue_fish_seg3_anims_0301C2B0[];
+extern s16 bowser_seg6_unkmoveshorts_060576FC[];
+extern struct Animation *blue_fish_seg3_anims_0301C2B0[];
+extern struct Animation *cyan_fish_seg6_anims_0600E264[];
+extern struct Animation *blue_fish_seg3_anims_0301C2B0[];
 
 void func_802A8D18(f32, f32, s32);
 
 s32 mario_moving_fast_enough_to_make_piranha_plant_bite(void);
-void func_802C49E0(void);
+void obj_set_secondary_camera_focus(void);
 
 s32 D_8032F0C0[] = { SAVE_FLAG_HAVE_WING_CAP, SAVE_FLAG_HAVE_METAL_CAP, SAVE_FLAG_HAVE_VANISH_CAP };
 
@@ -186,7 +188,7 @@ void func_802AA618(s32 sp18, s32 sp1C, f32 sp20) {
 #include "behaviors/breakable_box.inc.c"
 
 // not sure what this is doing here. not in a behavior file.
-s32 Geo18_802B1BB0(s32 run, UNUSED struct GraphNode *node, Mat4 mtx) {
+Gfx *Geo18_802B1BB0(s32 run, UNUSED struct GraphNode *node, Mat4 mtx) {
     Mat4 sp20;
     struct Object *sp1C;
 
@@ -198,7 +200,7 @@ s32 Geo18_802B1BB0(s32 run, UNUSED struct GraphNode *node, Mat4 mtx) {
             func_8029EA0C(sp1C->prevObj);
         }
     }
-    return 0;
+    return NULL;
 }
 
 #include "behaviors/heave_ho.inc.c"
@@ -244,7 +246,7 @@ void func_802B2328(
 #include "behaviors/lll_volcano_flames.inc.c"
 #include "behaviors/lll_hexagonal_ring.inc.c"
 #include "behaviors/lll_sinking_rectangle.inc.c"
-#include "behaviors/lll_tilting_platform.inc.c"
+#include "behaviors/tilting_inverted_pyramid.inc.c"
 #include "behaviors/koopa_shell.inc.c"
 #include "behaviors/tox_box.inc.c"
 #include "behaviors/piranha_plant.inc.c"

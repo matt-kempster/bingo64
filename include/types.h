@@ -5,6 +5,7 @@
 // have an appropriate header.
 
 #include <ultra64.h>
+#include "macros.h"
 
 struct Controller
 {
@@ -28,6 +29,15 @@ typedef s16 Vec4s[4];
 
 typedef f32 Mat4[4][4];
 
+typedef uintptr_t GeoLayout;
+typedef uintptr_t LevelScript;
+typedef s16 Movtex;
+typedef s16 MacroObject;
+typedef s16 Collision;
+typedef s16 Trajectory;
+typedef s16 PaintingData;
+typedef uintptr_t BehaviorScript;
+
 enum SpTaskState {
     SPTASK_STATE_NOT_STARTED,
     SPTASK_STATE_RUNNING,
@@ -50,9 +60,6 @@ struct VblankHandler
     OSMesg msg;
 };
 
-// NOTE: Since ObjectNode is the first member of Object, it is difficult to determine
-// whether some of these pointers point to ObjectNode or Object.
-
 #define ANIM_FLAG_NOLOOP     (1 << 0) // 0x01
 #define ANIM_FLAG_FORWARD    (1 << 1) // 0x02
 #define ANIM_FLAG_2          (1 << 2) // 0x04
@@ -69,10 +76,12 @@ struct Animation {
     /*0x06*/ s16 unk06;
     /*0x08*/ s16 unk08;
     /*0x0A*/ s16 unk0A;
-    /*0x0C*/ void *values;
-    /*0x10*/ void *index;
+    /*0x0C*/ const s16 *values;
+    /*0x10*/ const u16 *index;
     /*0x14*/ u32 length; // only used with Mario animations to determine how much to load. 0 otherwise.
 };
+
+#define ANIMINDEX_NUMPARTS(animindex) (sizeof(animindex) / sizeof(u16) / 6 - 1)
 
 struct GraphNode
 {
@@ -96,7 +105,6 @@ struct GraphNodeObject_sub
     /*0x10 0x48*/ s32 animAccel;
 };
 
-// TODO this is the first member of ObjectNode/Object
 struct GraphNodeObject
 {
     /*0x00*/ struct GraphNode node;
@@ -119,6 +127,9 @@ struct ObjectNode
     struct ObjectNode *prev;
 };
 
+// NOTE: Since ObjectNode is the first member of Object, it is difficult to determine
+// whether some of these pointers point to ObjectNode or Object.
+
 struct Object
 {
     /*0x000*/ struct ObjectNode header;
@@ -136,21 +147,35 @@ struct Object
         s32 asS32[0x50];
         s16 asS16[0x50][2];
         f32 asF32[0x50];
-        void *asVoidP[0x50];
+#if !IS_64_BIT
         s16 *asS16P[0x50];
         s32 *asS32P[0x50];
-        u32 *asAnims[0x50];
+        struct Animation **asAnims[0x50];
         struct Waypoint *asWaypoint[0x50];
         struct ChainSegment *asChainSegment[0x50];
         struct Object *asObject[0x50];
         struct Surface *asSurface[0x50];
         void *asVoidPtr[0x50];
-        struct Object *asObjPtr[0x50];
+        const void *asConstVoidPtr[0x50];
+#endif
     } rawData;
-    /*0x1C8*/ u32 unk1C8;
-    /*0x1CC*/ u32 *behScript;
+#if IS_64_BIT
+    union {
+        s16 *asS16P[0x50];
+        s32 *asS32P[0x50];
+        struct Animation **asAnims[0x50];
+        struct Waypoint *asWaypoint[0x50];
+        struct ChainSegment *asChainSegment[0x50];
+        struct Object *asObject[0x50];
+        struct Surface *asSurface[0x50];
+        void *asVoidPtr[0x50];
+        const void *asConstVoidPtr[0x50];
+    } ptrData;
+#endif
+    /*0x1C8*/ u32 unused1;
+    /*0x1CC*/ const BehaviorScript *behScript;
     /*0x1D0*/ u32 stackIndex;
-    /*0x1D4*/ u32 stack[8];
+    /*0x1D4*/ uintptr_t stack[8];
     /*0x1F4*/ s16 unk1F4;
     /*0x1F6*/ s16 respawnInfoType;
     /*0x1F8*/ f32 hitboxRadius;
@@ -158,8 +183,8 @@ struct Object
     /*0x200*/ f32 hurtboxRadius;
     /*0x204*/ f32 hurtboxHeight;
     /*0x208*/ f32 hitboxDownOffset;
-    /*0x20C*/ void *behavior;
-    /*0x210*/ u32 unk210;
+    /*0x20C*/ const BehaviorScript *behavior;
+    /*0x210*/ u32 unused2;
     /*0x214*/ struct Object *platform;
     /*0x218*/ void *collisionData;
     /*0x21C*/ Mat4 transform;
@@ -218,19 +243,26 @@ struct MarioBodyState
     /*0x0C*/ Vec3s unkC;
     /*0x12*/ Vec3s unk12;
     /*0x18*/ Vec3f unk18;
-    u8 padding[4]; // what is this?
+    u8 padding[4];
+};
+
+struct OffsetSizePair
+{
+    u32 offset;
+    u32 size;
 };
 
 struct MarioAnimDmaRelatedThing
 {
-    u32 unk0;
-    u32 unk4;
+    u32 count;
+    u8 *srcAddr;
+    struct OffsetSizePair anim[1]; // dynamic size
 };
 
 struct MarioAnimation
 {
     struct MarioAnimDmaRelatedThing *animDmaTable;
-    u32 currentDma;
+    u8 *currentAnimAddr;
     struct Animation *targetAnim;
     u8 padding[4];
 };
@@ -243,7 +275,7 @@ struct MarioState
     /*0x08*/ u32 particleFlags;
     /*0x0C*/ u32 action;
     /*0x10*/ u32 prevAction;
-    /*0x14*/ u32 stepSound;
+    /*0x14*/ u32 terrainSoundAddend;
     /*0x18*/ u16 actionState;
     /*0x1A*/ u16 actionTimer;
     /*0x1C*/ u32 actionArg;
@@ -277,7 +309,7 @@ struct MarioState
     /*0x88*/ struct Object *marioObj;
     /*0x8C*/ struct SpawnInfo *spawnInfo;
     /*0x90*/ struct Area *area;
-    /*0x94*/ struct CameraPlayerStatus *statusForCamera;
+    /*0x94*/ struct PlayerCameraState *statusForCamera;
     /*0x98*/ struct MarioBodyState *marioBodyState;
     /*0x9C*/ struct Controller *controller;
     /*0xA0*/ struct MarioAnimation *animation;
@@ -297,12 +329,6 @@ struct MarioState
     /*0xBC*/ f32 peakHeight;
     /*0xC0*/ f32 quicksandDepth;
     /*0xC4*/ f32 unkC4;
-};
-
-struct StructGeo802D2360
-{
-    s32 unk0;
-    s32 *unk4;
 };
 
 #endif
