@@ -1,6 +1,7 @@
 #include <ultra64.h>
 #include <macros.h>
-#include <config.h>
+#include <stdio.h>
+
 #include "gd_types.h"
 #include "gd_macros.h"
 #include "gd_main.h"
@@ -110,7 +111,7 @@ static struct GdVec3f sGrabCords;             ///< x, y grabbable point near cur
  * Set the ambient light color and turn on G_CULL_BACK.
  */
 void setup_lights(void) {
-    set_light_num(2);
+    set_light_num(NUMLIGHTS_2);
     gd_setproperty(GD_PROP_AMB_COLOUR, 0.5f, 0.5f, 0.5f);
     gd_setproperty(GD_PROP_CULLING, 1.0f, 0.0f, 0.0f); // set G_CULL_BACK
     return;
@@ -209,7 +210,7 @@ void draw_shape(struct ObjShape *shape, s32 flag, f32 c, f32 d, f32 e, // "sweep
         sUseSelectedColor = TRUE;
         sSelectedColour = gd_get_colour(colorIdx);
         if (sSelectedColour != NULL) {
-            func_801A086C(-1, sSelectedColour, 64);
+            func_801A086C(-1, sSelectedColour, GD_MTL_LIGHTS);
         } else {
             fatal_print("Draw_shape(): Bad colour");
         }
@@ -309,7 +310,7 @@ void draw_light(struct ObjLight *light) {
 void draw_material(struct ObjMaterial *mtl) {
     s32 mtlType = mtl->type; // 24
 
-    if (mtlType == GD_MTL_UNK16) {
+    if (mtlType == GD_MTL_SHINE_DL) {
         if (sPhongLight != NULL && sPhongLight->unk30 > 0.0f) {
             if (gViewUpdateCamera != NULL) {
                 func_801A0478(mtl->gddlNumber, gViewUpdateCamera, &sPhongLight->position,
@@ -318,13 +319,13 @@ void draw_material(struct ObjMaterial *mtl) {
                 fatal_printf("draw_material() no active camera for phong");
             }
         } else {
-            mtlType = GD_MTL_UNK04;
+            mtlType = GD_MTL_BREAK;
         }
     }
     if (sUseSelectedColor == FALSE) {
         func_801A086C(mtl->gddlNumber, &mtl->Kd, mtlType);
     } else {
-        func_801A086C(mtl->gddlNumber, sSelectedColour, GD_MTL_UNK64);
+        func_801A086C(mtl->gddlNumber, sSelectedColour, GD_MTL_LIGHTS);
     }
 }
 
@@ -350,12 +351,12 @@ void check_face_bad_vtx(struct ObjFace *face) {
     for (i = 0; i < face->vtxCount; i++) {
         vtx = face->vertices[i];
         // These seem to be checks against bad conversions, or an outdated vertex structure..?
-        if ((s32) vtx == 39) {
+        if ((uintptr_t) vtx == 39) {
             gd_printf("bad1\n");
             return;
         }
-        if ((s32) vtx->gbiVerts == 0x3F800000) {
-            fatal_printf("bad2 %x,%d,%d,%d\n", (u32) vtx, vtx->unk3C, vtx->id, vtx->header.type);
+        if ((uintptr_t) vtx->gbiVerts == 0x3F800000) {
+            fatal_printf("bad2 %x,%d,%d,%d\n", (u32) (uintptr_t) vtx, vtx->scaleFactor, vtx->id, vtx->header.type);
         }
     }
 }
@@ -769,25 +770,23 @@ void drawscene(enum SceneType process, struct ObjGroup *interactables, struct Ob
     sUnreadShapeFlag = 0;
     sUpdateViewState.unreadCounter = 0;
     restart_timer("draw1");
-    set_gd_mtx_parameters(5); // G_MTX_PROJECTION | G_MTX_MUL | G_MTX_NOPUSH;
+    set_gd_mtx_parameters(G_MTX_PROJECTION | G_MTX_MUL | G_MTX_PUSH);
     if (sUpdateViewState.view->unk38 == 1) {
-        // guPerspective
-        func_801A3C8C(sUpdateViewState.view->clipping.z,
+        gd_create_perspective_matrix(sUpdateViewState.view->clipping.z,
                       sUpdateViewState.view->lowerRight.x / sUpdateViewState.view->lowerRight.y,
                       sUpdateViewState.view->clipping.x, sUpdateViewState.view->clipping.y);
     } else {
-        // guOrtho
-        func_801A3AF0(
+        gd_create_ortho_matrix(
             -sUpdateViewState.view->lowerRight.x / 2.0, sUpdateViewState.view->lowerRight.x / 2.0,
             -sUpdateViewState.view->lowerRight.y / 2.0, sUpdateViewState.view->lowerRight.y / 2.0,
             sUpdateViewState.view->clipping.x, sUpdateViewState.view->clipping.y);
     }
 
     if (lightgrp != NULL) {
-        set_gd_mtx_parameters(6); // G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
+        set_gd_mtx_parameters(G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_PUSH);
         apply_to_obj_types_in_group(OBJ_TYPE_LIGHTS | OBJ_TYPE_PARTICLES,
                                     (applyproc_t) apply_obj_draw_fn, lightgrp);
-        set_gd_mtx_parameters(5);
+        set_gd_mtx_parameters(G_MTX_PROJECTION | G_MTX_MUL | G_MTX_PUSH);
     }
 
     if (gViewUpdateCamera != NULL) {
@@ -797,8 +796,8 @@ void drawscene(enum SceneType process, struct ObjGroup *interactables, struct Ob
     }
 
     setup_lights();
-    set_gd_mtx_parameters(6);
-    push_idn_mtx_cur_gddl();
+    set_gd_mtx_parameters(G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_PUSH);
+    idn_mtx_push_gddl();
     sSceneProcessType = process;
 
     if ((sNumActiveLights = sUpdateViewState.view->flags & VIEW_LIGHT)) {
@@ -843,7 +842,7 @@ void nop_obj_draw(UNUSED struct GdObj *nop) {
 void draw_shape_faces(struct ObjShape *shape) {
     sUpdateViewState.mtlDlNum = 0;
     sUpdateViewState.unreadCounter = 0;
-    func_801A2374(FALSE);
+    gddl_is_loading_stub_dl(FALSE);
     sUnreadShapeFlag = (s32) shape->flag & 1;
     func_801A02B8(shape->unk58);
     if (shape->gdDls[gGdFrameBuf] != 0) {
@@ -1004,7 +1003,7 @@ void apply_obj_draw_fn(struct GdObj *obj) {
  * Count input `ObjLight` as an active light, if it wasn't already counted.
  */
 void register_light(struct ObjLight *light) {
-    func_801A0324(light->id);
+    set_light_id(light->id);
     gd_setproperty(GD_PROP_LIGHTING, 2.0f, 0.0f, 0.0f);
     if (light->flags & LIGHT_NEW_UNCOUNTED) {
         sNumActiveLights++;
@@ -1047,7 +1046,7 @@ void Proc8017A980(struct ObjLight *light) {
         }
         sp24 *= sp20;
     }
-    func_801A0324(light->id);
+    set_light_id(light->id);
     gd_setproperty(GD_PROP_DIFUSE_COLOUR, light->diffuse.r * sp24, light->diffuse.g * sp24,
                    light->diffuse.b * sp24);
     gd_setproperty(GD_PROP_LIGHT_DIR, sLightPositionCache[light->id].x,
@@ -1117,7 +1116,12 @@ void unref_8017AEDC(struct ObjGroup *grp) {
  * @bug Nothing is returned if the DL is created
  * @note Contains string literals that suggest a removed `printf` call
  */
-s32 create_shape_gddl(struct ObjShape *s) {
+#ifdef AVOID_UB
+void
+#else
+s32
+#endif
+create_shape_gddl(struct ObjShape *s) {
     struct ObjShape *shape = s; // 24
     s32 shapedl;                // 20
     UNUSED s32 enddl;           // 1C
@@ -1125,7 +1129,11 @@ s32 create_shape_gddl(struct ObjShape *s) {
     create_shape_mtl_gddls(shape);
     shapedl = gd_startdisplist(7);
     if (shapedl == 0) {
+#ifdef AVOID_UB
+        return;
+#else
         return -1;
+#endif
     }
 
     setup_lights();
@@ -1133,7 +1141,7 @@ s32 create_shape_gddl(struct ObjShape *s) {
     if (shape->unk3C == 0) {
         draw_shape_faces(shape);
     }
-    enddl = gd_end_dl();
+    enddl = gd_enddlsplist_parent();
     shape->gdDls[0] = shapedl;
     shape->gdDls[1] = shapedl;
 
@@ -1142,10 +1150,6 @@ s32 create_shape_gddl(struct ObjShape *s) {
     } else {
         printf("Generated 'UNKNOWN' (%d) display list ok.(%d)\n", shapedl, enddl);
     }
-
-#if BUGFIX_GODDARD_MISSING_RETURN
-    return shapedl;
-#endif
 }
 
 /**
@@ -1259,7 +1263,7 @@ void find_thisface_verts(struct ObjFace *face, struct ObjGroup *verts) {
             if (link->obj->type == OBJ_TYPE_VERTICES || link->obj->type == OBJ_TYPE_PARTICLES) {
                 // it seems that the vertices in a face are first pointer-sized indices
                 // to a given vertix or particle link in the second argument's group.
-                if (linkVtxIdx++ == (u32) face->vertices[i]) {
+                if (linkVtxIdx++ == (u32) (uintptr_t) face->vertices[i]) {
                     break;
                 }
             }
@@ -1511,7 +1515,7 @@ void update_view(struct ObjView *view) {
     }
 
     border_active_view();
-    gd_end_dl();
+    gd_enddlsplist_parent();
     imout();
     return;
 }

@@ -4,6 +4,8 @@
 #include "types.h"
 #include "area.h"
 
+#include "course_table.h"
+
 #define EEPROM_SIZE 0x200
 #define NUM_SAVE_FILES 4
 
@@ -32,6 +34,13 @@ struct SaveFile
     u8 courseCoinScores[COURSE_STAGES_COUNT];
 
     struct SaveBlockSignature signature;
+};
+
+enum SaveFileIndex {
+    SAVE_FILE_A,
+    SAVE_FILE_B,
+    SAVE_FILE_C,
+    SAVE_FILE_D
 };
 
 struct MainMenuSaveData

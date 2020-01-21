@@ -31,7 +31,7 @@ void func_802E70DC(void) {
     f32 normalX = sinRoll * cosPitch;
     f32 normalY = cosPitch * cosRoll;
     f32 normalZ = sinPitch;
-    ObjOrientGraph(o, normalX, normalY, normalZ);
+    obj_orient_graph(o, normalX, normalY, normalZ);
 }
 
 void bhv_whirlpool_loop(void) {
@@ -57,7 +57,7 @@ void bhv_whirlpool_loop(void) {
         gEnvFxBubbleConfig[ENVFX_STATE_PARTICLECOUNT] = 0;
     }
 
-    PlaySound(SOUND_ENVIRONMENT_WATER);
+    PlaySound(SOUND_ENV_WATER);
 
     func_802E70A8();
 }
@@ -71,5 +71,5 @@ void bhv_jet_stream_loop(void) {
     } else
         gEnvFxBubbleConfig[ENVFX_STATE_PARTICLECOUNT] = 0;
 
-    PlaySound(SOUND_ENVIRONMENT_WATER);
+    PlaySound(SOUND_ENV_WATER);
 }

@@ -72,7 +72,7 @@ void get_act_name(char *buf, enum CourseNum course, s32 star) {
 }
 
 void get_level_name(char *buf, enum CourseNum course) {
-    void **levelNameTbl = segmented_to_virtual(seg2_level_name_table);
+    void **levelNameTbl = segmented_to_virtual(seg2_course_name_table);
     u8 *levelName = segmented_to_virtual(levelNameTbl[course - 1]);
     reverse_encode_str(levelName, buf);
 }

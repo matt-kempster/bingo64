@@ -5,7 +5,7 @@
 #include "math_util.h"
 #include "surface_collision.h"
 
-extern s16 gArctanTable[];
+#include "trig_tables.inc.c"
 
 // Variables for a spline curve animation (used for the flight path in the grand star cutscene)
 Vec4s *gSplineKeyframe;
@@ -568,6 +568,11 @@ void mtxf_mul_vec3s(Mat4 mtx, Vec3s b) {
  * and no crashes occur.
  */
 void mtxf_to_mtx(Mtx *dest, Mat4 src) {
+#ifdef AVOID_UB
+    // Avoid type-casting which is technically UB by calling the equivalent
+    // guMtxF2L function. This helps little-endian systems, as well.
+    guMtxF2L(src, dest);
+#else
     s32 asFixedPoint;
     register s32 i;
     register s16 *a3 = (s16 *) dest;      // all integer parts stored in first 16 bytes
@@ -579,6 +584,7 @@ void mtxf_to_mtx(Mtx *dest, Mat4 src) {
         *a3++ = GET_HIGH_S16_OF_32(asFixedPoint); // integer part
         *t0++ = GET_LOW_S16_OF_32(asFixedPoint);  // fraction part
     }
+#endif
 }
 
 /**
@@ -619,6 +625,7 @@ void get_pos_from_transform_mtx(Vec3f dest, Mat4 objMtx, Mat4 camMtx) {
 /**
  * Take the vector starting at 'from' pointed at 'to' an retrieve the length
  * of that vector, as well as the yaw and pitch angles.
+ * Basically it converts the direction to spherical coordinates.
  */
 void vec3f_get_dist_and_angle(Vec3f from, Vec3f to, f32 *dist, s16 *pitch, s16 *yaw) {
     register f32 x = to[0] - from[0];

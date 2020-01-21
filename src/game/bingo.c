@@ -11,7 +11,7 @@
 #include "save_file.h"
 #include "bingo.h"
 #include "ingame_menu.h"
-#include "file_select.h"
+#include "menu/file_select.h"
 #include "engine/behavior_script.h"
 #include "level_update.h"
 #include "audio_defines.h"
@@ -41,11 +41,11 @@ void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveSt
     switch (state) {
         case BINGO_STATE_COMPLETE:
             // SetSound(SOUND_CH8_UNK6A, D_803320E0);
-            play_sound(SOUND_CH8_RIGHTANSWER, gDefaultSoundArgs);
+            play_sound(SOUND_GENERAL2_RIGHT_ANSWER, gDefaultSoundArgs);
             break;
         case BINGO_STATE_FAILED_IN_THIS_COURSE:
             // SetSound(SOUND_MENU_CAMERABUZZ, D_803320E0);
-            play_sound(SOUND_MENU_CAMERABUZZ, gDefaultSoundArgs);
+            play_sound(SOUND_MENU_CAMERA_BUZZ, gDefaultSoundArgs);
             break;
     }
     objective->state = state;

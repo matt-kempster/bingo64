@@ -34,6 +34,9 @@ extern Vec3s gVec3sOne;
 // Whether the node type has a function pointer of type GraphNodeFunc
 #define GRAPH_NODE_TYPE_FUNCTIONAL            0x100
 
+// Type used for Bowser and an unused geo function in obj_behaviors.c
+#define GRAPH_NODE_TYPE_400                   0x400				
+
 // The discriminant for different types of geo nodes
 #define GRAPH_NODE_TYPE_ROOT                  0x001
 #define GRAPH_NODE_TYPE_ORTHO_PROJECTION      0x002
@@ -76,7 +79,7 @@ extern Vec3s gVec3sOne;
 // - for GEO_CONTEXT_CREATE it is the AllocOnlyPool from which the node was allocated
 // - for GEO_CONTEXT_RENDER or GEO_CONTEXT_HELD_OBJ it is the top of the float matrix stack with type Mat4
 // - for GEO_CONTEXT_AREA_* it is the root geo node
-typedef s32 (*GraphNodeFunc)(s32 callContext, struct GraphNode *node, void *context);
+typedef Gfx *(*GraphNodeFunc)(s32 callContext, struct GraphNode *node, void *context);
 
 /** An extension of a graph node that includes a function pointer.
  *  Many graph node types have an update function that gets called
@@ -181,22 +184,23 @@ struct GraphNodeSwitchCase
     /*0x1E*/ s16 selectedCase;
 };
 
-/** GraphNode that specifies the location and aim of the camera.
- *  When the roll is 0, the up vector is (0, 1, 0).
+/**
+ * GraphNode that specifies the location and aim of the camera.
+ * When the roll is 0, the up vector is (0, 1, 0).
  */
 struct GraphNodeCamera
 {
     /*0x00*/ struct FnGraphNode fnNode;
     /*0x18*/ union {
-        // When the node is created, a preset is assigned to the node.
-        // Later in geo_camera_preset_and_pos a LevelCamera is allocated,
-        // the preset is passed to the struct, and the field is overridden
+        // When the node is created, a mode is assigned to the node.
+        // Later in geo_camera_main a Camera is allocated,
+        // the mode is passed to the struct, and the field is overridden
         // by a pointer to the struct. Gotta save those 4 bytes.
-        s32 preset;
-        struct LevelCamera *levelCamera;
+        s32 mode;
+        struct Camera *camera;
     } config;
-    /*0x1C*/ Vec3f from;
-    /*0x28*/ Vec3f to;
+    /*0x1C*/ Vec3f pos;
+    /*0x28*/ Vec3f focus;
     /*0x34*/ void *matrixPtr; // pointer to look-at matrix of this camera as a Mat4
     /*0x38*/ s16 roll; // roll in look at matrix. Doesn't account for light direction unlike rollScreen.
     /*0x3A*/ s16 rollScreen; // rolls screen while keeping the light direction consistent
@@ -342,8 +346,8 @@ struct GraphNodeBackground
 struct GraphNodeHeldObject
 {
     /*0x00*/ struct FnGraphNode fnNode;
-    /*0x18*/ s32 unused;
-    /*0x1C*/ struct GraphNodeObject *objNode; // assumed type
+    /*0x18*/ s32 playerIndex;
+    /*0x1C*/ struct Object *objNode;
     /*0x20*/ Vec3s translation;
 };
 
@@ -386,7 +390,7 @@ struct GraphNodeObject *init_graph_node_object(struct AllocOnlyPool *pool, struc
     struct GraphNode *sp20, Vec3f pos, Vec3s angle, Vec3f scale);
 struct GraphNodeCullingRadius *init_graph_node_culling_radius(struct AllocOnlyPool *pool, struct GraphNodeCullingRadius *sp1c,
     s16 sp22);
-struct GraphNodeAnimatedPart *init_graph_node_animated_part(struct AllocOnlyPool *pool, struct GraphNodeAnimatedPart * graphNode,
+struct GraphNodeAnimatedPart *init_graph_node_animated_part(struct AllocOnlyPool *pool, struct GraphNodeAnimatedPart *graphNode,
     s32 drawingLayer, void *displayList, Vec3s relativePos);
 struct GraphNodeBillboard *init_graph_node_billboard(struct AllocOnlyPool *pool,
     struct GraphNodeBillboard *graphNode, s32 drawingLayer, void *displayList, Vec3s sp28);
@@ -401,7 +405,7 @@ struct GraphNodeGenerated *init_graph_node_generated(struct AllocOnlyPool *pool,
 struct GraphNodeBackground *init_graph_node_background(struct AllocOnlyPool *pool, struct GraphNodeBackground *sp1c,
     u16 sp22, GraphNodeFunc sp24, s32 sp28);
 struct GraphNodeHeldObject *init_graph_node_held_object(struct AllocOnlyPool *pool, struct GraphNodeHeldObject *sp1c,
-    s32 sp20, Vec3s sp24, GraphNodeFunc sp28, s32 sp2c);
+    struct Object *objNode, Vec3s translation, GraphNodeFunc nodeFunc, s32 playerIndex);
 
 struct GraphNode *geo_add_child(struct GraphNode *, struct GraphNode *);
 struct GraphNode *geo_remove_child(struct GraphNode *);
@@ -413,8 +417,8 @@ void geo_call_global_function_nodes(struct GraphNode *graphNode, s32 sp1c);
 void geo_reset_object_node(struct GraphNodeObject *sp20);
 void geo_obj_init(struct GraphNodeObject *sp18, void *sp1c, Vec3f sp20, Vec3s sp24);
 void geo_obj_init_spawninfo(struct GraphNodeObject *sp18, struct SpawnInfo *sp1c);
-void geo_obj_init_animation(struct GraphNodeObject *, void *);
-void geo_obj_init_animation_accel(struct GraphNodeObject *sp30, void *sp34, u32 sp38);
+void geo_obj_init_animation(struct GraphNodeObject *graphNode, struct Animation **animPtrAddr);
+void geo_obj_init_animation_accel(struct GraphNodeObject *graphNode, struct Animation **animPtrAddr, u32 animAccel);
 
 s32 retrieve_animation_index(s32 a0, u16 **a1);
 

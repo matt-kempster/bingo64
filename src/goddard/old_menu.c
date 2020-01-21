@@ -1,5 +1,7 @@
 #include <ultra64.h>
 #include <macros.h>
+#include <stdio.h>
+
 #include "gd_types.h"
 #include "old_menu.h"
 #include "objects.h"
@@ -28,8 +30,8 @@ static struct ObjGadget *sCurGadgetPtr;
 void func_8018BCB8(struct ObjGadget *);
 
 /* 239EC0 -> 239F78 */
-void get_objvalue(union ObjVarVal *dst, enum ValPtrType type, void *base, s32 offset) {
-    union ObjVarVal *objAddr = (void *) ((u32) base + offset);
+void get_objvalue(union ObjVarVal *dst, enum ValPtrType type, void *base, size_t offset) {
+    union ObjVarVal *objAddr = (void *) ((u8 *) base + offset);
 
     switch (type) {
         case OBJ_VALUE_INT:
@@ -68,7 +70,7 @@ void cat_grp_name_to_buf(struct ObjGroup *group) {
     char buf[0x100]; // sp18
 
     if (group->debugPrint == 1) {
-        sprintf(buf, "| %s %%x%d", group->name, (u32) group);
+        sprintf(buf, "| %s %%x%d", group->name, (u32) (uintptr_t) group);
         gd_strcat(sMenuStrBuf, buf); // gd_strcat?
     }
 }
@@ -124,8 +126,8 @@ struct ObjGadget *make_gadget(UNUSED s32 a0, s32 a1) {
 }
 
 /* 23A32C -> 23A3E4 */
-void set_objvalue(union ObjVarVal *src, enum ValPtrType type, void *base, s32 offset) {
-    union ObjVarVal *dst = (void *) ((u32) base + offset);
+void set_objvalue(union ObjVarVal *src, enum ValPtrType type, void *base, size_t offset) {
+    union ObjVarVal *dst = (void *) ((u8 *) base + offset);
     switch (type) {
         case OBJ_VALUE_INT:
             dst->i = src->i;

@@ -52,14 +52,13 @@ void bhv_big_bully_init(void) {
 }
 
 void BullyCheckMarioCollision(void) {
-    if (o->oInteractStatus & INT_STATUS_INTERACTED) /* bit 15 */
-    {
+    if (o->oInteractStatus & INT_STATUS_INTERACTED) {
         if (o->oBehParams2ndByte == BULLY_BP_SIZE_SMALL)
-            PlaySound2(SOUND_CH9_UNK1C);
+            PlaySound2(SOUND_OBJ2_BULLY_ATTACKED);
         else
-            PlaySound2(SOUND_CH9_UNK57);
+            PlaySound2(SOUND_OBJ2_LARGE_BULLY_ATTACKED);
 
-        o->oInteractStatus &= ~INT_STATUS_INTERACTED; /* bit 15 */
+        o->oInteractStatus &= ~INT_STATUS_INTERACTED;
         o->oAction = BULLY_ACT_KNOCKBACK;
         o->oFlags &= ~0x8; /* bit 3 */
         SetObjAnimation(3);
@@ -145,9 +144,9 @@ void PlayBullyStompingSound(void) {
         case BULLY_ACT_PATROL:
             if (sp26 == 0 || sp26 == 12) {
                 if (o->oBehParams2ndByte == BULLY_BP_SIZE_SMALL)
-                    PlaySound2(SOUND_OBJECT_BULLYWALK);
+                    PlaySound2(SOUND_OBJ_BULLY_WALK);
                 else
-                    PlaySound2(SOUND_OBJECT_BULLYWALKING);
+                    PlaySound2(SOUND_OBJ_BULLY_WALKING);
             }
             break;
 
@@ -155,9 +154,9 @@ void PlayBullyStompingSound(void) {
         case BULLY_ACT_BACK_UP:
             if (sp26 == 0 || sp26 == 5) {
                 if (o->oBehParams2ndByte == BULLY_BP_SIZE_SMALL)
-                    PlaySound2(SOUND_OBJECT_BULLYWALK);
+                    PlaySound2(SOUND_OBJ_BULLY_WALK);
                 else
-                    PlaySound2(SOUND_OBJECT_BULLYWALKING);
+                    PlaySound2(SOUND_OBJ_BULLY_WALKING);
             }
             break;
     }
@@ -165,10 +164,10 @@ void PlayBullyStompingSound(void) {
 
 void BullyStep(void) {
     s16 collisionFlags = 0;
-    collisionFlags = ObjectStep();
+    collisionFlags = object_step();
     BullyBackUpCheck(collisionFlags);
     PlayBullyStompingSound();
-    ObjCheckFloorDeath(collisionFlags, D_803600E0);
+    obj_check_floor_death(collisionFlags, sObjFloor);
 
     if (o->oBullySubtype & BULLY_STYPE_CHILL) {
         if (o->oPosY < 1030.0f)
@@ -179,9 +178,9 @@ void BullyStep(void) {
 void BullySpawnCoin(void) {
     struct Object *coin = spawn_object(o, MODEL_YELLOW_COIN, bhvMovingYellowCoin);
 #ifdef VERSION_JP
-    PlaySound2(SOUND_GENERAL_COINSPURT);
+    PlaySound2(SOUND_GENERAL_COIN_SPURT);
 #else
-    PlaySound2(SOUND_GENERAL_COINSPURT_2);
+    PlaySound2(SOUND_GENERAL_COIN_SPURT_2);
 #endif
     coin->oForwardVel = 10.0f;
     coin->oVelY = 100.0f;
@@ -190,7 +189,7 @@ void BullySpawnCoin(void) {
 }
 
 void BullyLavaDeath(void) {
-    if (ObjLavaDeath() == 1) {
+    if (obj_lava_death() == 1) {
         if (o->oBehParams2ndByte == BULLY_BP_SIZE_SMALL) {
             if (o->oBullySubtype == BULLY_STYPE_MINION)
                 o->parentObj->oBullyKBTimerAndMinionKOCounter++;
@@ -224,7 +223,7 @@ void bhv_bully_loop(void) {
         case BULLY_ACT_PATROL:
             o->oForwardVel = 5.0;
 
-            if (ObjLeaveIfMarioIsNearHome(o, o->oHomeX, o->oPosY, o->oHomeZ, 800) == 1) {
+            if (obj_return_home_if_safe(o, o->oHomeX, o->oPosY, o->oHomeZ, 800) == 1) {
                 o->oAction = BULLY_ACT_CHASE_MARIO;
                 SetObjAnimation(1);
             }
@@ -256,7 +255,7 @@ void bhv_bully_loop(void) {
             break;
     }
 
-    SetObjectVisibility(o, 3000);
+    set_object_visibility(o, 3000);
 }
 
 // sp38 = arg0
@@ -284,7 +283,7 @@ void bhv_big_bully_with_minions_init(void) {
 }
 
 void BigBullyWithMinionsLavaDeath(void) {
-    if (ObjLavaDeath() == 1) {
+    if (obj_lava_death() == 1) {
         func_802A3004();
         create_star(3700.0f, 600.0f, -5500.0f);
     }
@@ -307,7 +306,7 @@ void bhv_big_bully_with_minions_loop(void) {
         case BULLY_ACT_PATROL:
             o->oForwardVel = 5.0;
 
-            if (ObjLeaveIfMarioIsNearHome(o, o->oHomeX, o->oPosY, o->oHomeZ, 1000) == 1) {
+            if (obj_return_home_if_safe(o, o->oHomeX, o->oPosY, o->oHomeZ, 1000) == 1) {
                 o->oAction = BULLY_ACT_CHASE_MARIO;
                 SetObjAnimation(1);
             }
@@ -344,13 +343,13 @@ void bhv_big_bully_with_minions_loop(void) {
             break;
 
         case BULLY_ACT_ACTIVATE_AND_FALL:
-            collisionFlags = ObjectStep();
+            collisionFlags = object_step();
             if ((collisionFlags & 0x9) == 0x9) /* bits 0 and 3 */
                 o->oAction = BULLY_ACT_PATROL;
 
             if (collisionFlags == 1) {
-                PlaySound2(SOUND_OBJECT_THWOMP);
-                func_8027F440(1, o->oPosX, o->oPosY, o->oPosZ);
+                PlaySound2(SOUND_OBJ_THWOMP);
+                set_camera_shake_from_point(SHAKE_POS_SMALL, o->oPosX, o->oPosY, o->oPosZ);
                 func_802A3004();
             }
 

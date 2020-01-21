@@ -3,6 +3,8 @@
 
 #include <ultra64.h>
 
+#include "course_table.h"
+
 struct ABCData {
     enum CourseNum course;
     s32 star;

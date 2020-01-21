@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+// TODO: join this together with object_helpers.h
+
 #define WAYPOINT_FLAGS_END -1
 #define WAYPOINT_FLAGS_INITIALIZED 0x8000
 #define WAYPOINT_MASK_00FF 0x00FF
@@ -41,7 +43,7 @@ void func_802A3470(void);
 extern s32 obj_is_mario_on_platform(void);
 // extern ? obj_shake_y_until(?);
 s32 func_802A362C(s32);
-s32 obj_call_action_function(void(*[])(void));
+void obj_call_action_function(void(*[])(void));
 // extern ? func_802A36D8(?);
 // extern ? Unknown802A3750(?);
 s32 func_802A377C(s32);
@@ -52,10 +54,10 @@ extern void bhv_init_room(void); // 802A3978
 extern void obj_enable_rendering_if_mario_in_room(void);
 s32 obj_set_hitbox_and_die_if_attacked(struct ObjectHitbox*,s32,s32);
 void func_802A3C98(f32 sp18, s32 sp1C);
-void set_object_collision_data(struct Object*,void*);
+void set_object_collision_data(struct Object*, const void*);
 void obj_if_hit_wall_bounce_away(void);
 s32 obj_hide_if_mario_far_away_y(f32);
-// extern ? Geo18_802A45E4(?);
+extern Gfx *Geo18_802A45E4(s32 run, struct GraphNode *node, UNUSED f32 mtx[4][4]);
 // extern ? Unknown802A3E84(?);
 s32 obj_is_hidden(struct Object*);
 extern void enable_time_stop(void);
@@ -65,12 +67,12 @@ void clear_time_stop_flags(s32);
 s32 func_802A3FF8(f32,f32,s32);
 extern s32 obj_is_mario_in_range_and_ready_to_speak(f32 sp18, f32 sp1C);
 // extern ? obj_end_dialog(?);
-s32 obj_update_dialog_unk1(s32,s32,s32,s32);
-s32 obj_update_dialog_unk2(s32 arg0, s32 dialogFlags, s32 dialogID, s32 arg3);
+s32 obj_update_dialog(s32 arg0, s32 dialogFlags, s32 dialogID, s32 unused);
+s32 obj_update_dialog_with_cutscene(s32 arg0, s32 dialogFlags, s32 cutsceneTable, s32 dialogID);
 s32 obj_has_model(u16);
 extern void obj_align_gfx_with_floor(void);
 // extern ? mario_is_within_rectangle(?);
-s32 ShakeScreen(s32);
+void ShakeScreen(s32 shake);
 extern s32 attack_collided_non_mario_object(struct Object *obj);
 s32 obj_was_attacked_or_ground_pounded(void);
 void copy_object_behavior_params(struct Object*,struct Object*);

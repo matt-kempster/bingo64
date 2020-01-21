@@ -1,18 +1,19 @@
-#ifndef _AUDIO_INTERNAL_H
-#define _AUDIO_INTERNAL_H
+#ifndef AUDIO_INTERNAL_H
+#define AUDIO_INTERNAL_H
 
 #include <ultra64.h>
 
 #include "types.h"
 
 #define SEQUENCE_PLAYERS 3
+#define LAYERS_MAX       4
 #define CHANNELS_MAX     16
 
 #define NO_LAYER ((struct SequenceChannelLayer *)(-1))
 
-#define MUTE_BEHAVIOR_80 0x80
-#define MUTE_BEHAVIOR_40 0x40
-#define MUTE_BEHAVIOR_20 0x20
+#define MUTE_BEHAVIOR_STOP_SCRIPT 0x80 // stop processing sequence/channel scripts
+#define MUTE_BEHAVIOR_STOP_NOTES 0x40  // prevent further notes from playing
+#define MUTE_BEHAVIOR_SOFTEN 0x20      // lower volume, by default to half
 
 #define SEQUENCE_PLAYER_STATE_0 0
 #define SEQUENCE_PLAYER_STATE_FADE_OUT 1
@@ -151,7 +152,7 @@ struct Instrument
 struct Drum
 {
     u8 releaseRate;
-    u8 unk1;
+    u8 pan;
     u8 loaded;
     struct AudioBankSound sound;
     struct AdsrEnvelope *envelope;
@@ -191,7 +192,7 @@ struct SequencePlayer
     /*0x003*/ u8 noteAllocPolicy;
     /*0x004*/ u8 muteBehavior;
     /*0x005*/ u8 seqId;
-    /*0x006*/ u8 anyBank[1]; // must be an array to get a comparison
+    /*0x006*/ u8 defaultBank[1]; // must be an array to get a comparison
     // to match; other u8's might also be part of that array
     /*0x007*/ u8 loadingBankId;
     /*0x008*/ u8 loadingBankNumInstruments;
@@ -220,8 +221,8 @@ struct SequencePlayer
     /*0x11C*/ OSIoMesg bankDmaIoMesg;
     /*0x130*/ u8 *bankDmaCurrMemAddr;
     /*0x134*/ struct AudioBank *loadingBank;
-    /*0x138*/ u32 bankDmaCurrDevAddr;
-    /*0x13C*/ s32 bankDmaRemaining;
+    /*0x138*/ uintptr_t bankDmaCurrDevAddr;
+    /*0x13C*/ ssize_t bankDmaRemaining;
 }; // size = 0x140
 
 struct AdsrSettings
@@ -260,7 +261,7 @@ struct SequenceChannel
     /*0x00*/ u8 enabled : 1;
     /*0x00*/ u8 finished : 1;
     /*0x00*/ u8 stopScript : 1;
-    /*0x00*/ u8 unk0b10 : 1;
+    /*0x00*/ u8 stopSomething2 : 1; // sets SequenceChannelLayer.stopSomething
     /*0x00*/ u8 hasInstrument : 1;
     /*0x00*/ u8 stereoHeadsetEffects : 1;
     /*0x00*/ u8 largeNotes : 1; // notes specify duration and velocity
@@ -292,7 +293,7 @@ struct SequenceChannel
     /*0x38*/ struct SequenceChannelLayer *layerUnused; // never read
     /*0x3C*/ struct Instrument *instrument;
     /*0x40*/ struct SequencePlayer *seqPlayer;
-    /*0x44*/ struct SequenceChannelLayer *layers[4];
+    /*0x44*/ struct SequenceChannelLayer *layers[LAYERS_MAX];
     /*0x54*/ s8 soundScriptIO[8]; // bridge between sound script and audio lib. For player 2,
     // [0] contains enabled, [4] contains sound ID, [5] contains reverb adjustment
     /*0x5C*/ struct M64ScriptState scriptState;
@@ -304,9 +305,9 @@ struct SequenceChannelLayer // Maybe SequenceTrack?
 {
     /*0x00*/ u8 enabled : 1;
     /*0x00*/ u8 finished : 1;
-    /*0x00*/ u8 unk0b20 : 1;
-    /*0x00*/ u8 unk0b10 : 1;
-    /*0x01*/ u8 unk1;
+    /*0x00*/ u8 stopSomething : 1; // ?
+    /*0x00*/ u8 continuousNotes : 1; // keep the same note for consecutive notes with the same sound
+    /*0x01*/ u8 status;
     /*0x02*/ u8 noteDuration; // set to 0x80
     /*0x03*/ u8 portamentoTargetNote;
     /*0x04*/ struct Portamento portamento;
@@ -337,14 +338,14 @@ struct SequenceChannelLayer // Maybe SequenceTrack?
 struct Note
 {
     /*0x00*/ u8 enabled : 1;
-    /*0x00*/ u8 unk0b40 : 1;
-    /*0x00*/ u8 unk0b20 : 1;
-    /*0x00*/ u8 unk0b10 : 1;
-    /*0x00*/ u8 unk0b8 : 1;
+    /*0x00*/ u8 needsInit : 1;
+    /*0x00*/ u8 restart : 1;
+    /*0x00*/ u8 finished : 1;
+    /*0x00*/ u8 envMixerNeedsInit : 1;
     /*0x00*/ u8 stereoStrongRight : 1;
     /*0x00*/ u8 stereoStrongLeft : 1;
     /*0x00*/ u8 stereoHeadsetEffects : 1;
-    /*0x01*/ u8 usesStereo;
+    /*0x01*/ u8 usesHeadsetPanEffects;
     /*0x02*/ u8 unk2;
     /*0x03*/ u8 sampleDmaIndex;
     /*0x04*/ u8 priority;
@@ -357,15 +358,15 @@ struct Note
     /*0x0E*/ u16 headsetPanLeft;
     /*0x10*/ u16 prevHeadsetPanRight;
     /*0x12*/ u16 prevHeadsetPanLeft;
-    /*0x14*/ s32 unk14;
+    /*0x14*/ s32 samplePosInt;
     /*0x18*/ f32 portamentoFreqScale;
     /*0x1C*/ f32 vibratoFreqScale;
-    /*0x20*/ u16 unk20;
+    /*0x20*/ u16 samplePosFrac;
     /*0x24*/ struct AudioBankSound *sound;
     /*0x28*/ struct SequenceChannelLayer *prevParentLayer;
     /*0x2C*/ struct SequenceChannelLayer *parentLayer;
     /*0x30*/ struct SequenceChannelLayer *wantedParentLayer;
-    /*0x34*/ struct SubStruct_func_80318F04 *unk34; // or s16*
+    /*0x34*/ struct NoteSynthesisBuffers *synthesisBuffers;
     /*0x38*/ f32 frequency;
     /*0x3C*/ u16 targetVolLeft;
     /*0x3E*/ u16 targetVolRight;
@@ -383,25 +384,24 @@ struct Note
     /*    */ u8 pad2[0xc];
 }; // size = 0xC0
 
-//this is probably just an array with a bunch of indexes
-struct SubStruct_func_80318F04
+struct NoteSynthesisBuffers
 {
-    s16 unk00[0x10];
-    s16 unk20[0x10];
-    s16 unk40[0x28];
-    s16 unk90[0x10];
-    s16 unkB0[0x20];
-    s16 unkF0[0x10];
+    s16 adpcmdecState[0x10];
+    s16 finalResampleState[0x10];
+    s16 mixEnvelopeState[0x28];
+    s16 panResampleState[0x10];
+    s16 panSamplesBuffer[0x20];
+    s16 dummyResampleState[0x10];
     s16 samples[0x40];
 };
 
-struct Struct80332190
+struct AudioSessionSettings
 {
     /*0x00*/ u32 frequency;
     /*0x04*/ u8 maxSimultaneousNotes;
-    /*0x05*/ u8 unk5; // stored to D_802212A2, always 1
-    /*0x06*/ u16 unk6; // memory requirement of some sort
-    /*0x08*/ u16 unk8; // gain? stored to D_802211B0.unk4
+    /*0x05*/ u8 reverbDownsampleRate; // always 1
+    /*0x06*/ u16 reverbWindowSize;
+    /*0x08*/ u16 reverbGain;
     /*0x0A*/ u16 volume;
     /*0x0C*/ u32 persistentSeqMem;
     /*0x10*/ u32 persistentBankMem;
@@ -409,4 +409,4 @@ struct Struct80332190
     /*0x18*/ u32 temporaryBankMem;
 }; // size = 0x1C
 
-#endif /* _AUDIO_INTERNAL_H */
+#endif /* AUDIO_INTERNAL_H */

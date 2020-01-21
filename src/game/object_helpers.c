@@ -24,6 +24,8 @@
 #include "interaction.h"
 #include "object_list_processor.h"
 #include "room.h"
+#include "level_table.h"
+#include "dialog_ids.h"
 
 #include "object_helpers.h"
 #include "object_helpers2.h"
@@ -40,7 +42,7 @@ extern void func_8029EA0C(struct Object *);
 extern void translate_object_local(struct Object *, s16, s16);
 extern void copy_object_pos(struct Object *, struct Object *);
 extern void copy_object_angle(struct Object *, struct Object *);
-extern struct Object *obj_find_nearest_object_with_behavior(void *, f32 *);
+extern struct Object *obj_find_nearest_object_with_behavior(const BehaviorScript *, f32 *);
 extern void obj_move_y(f32, f32, f32);
 static s32 clear_move_flag(u32 *, s32);
 extern void func_802AA618(s32, s32, f32);
@@ -63,7 +65,7 @@ Gfx *Geo18_8029D890(s32 run, UNUSED struct GraphNode *node, f32 mtx[4][4]) {
     return NULL;
 }
 
-Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED s32 sp48) {
+Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED void *context) {
     Gfx *sp3C, *sp38;
     struct Object *sp34;
     struct GraphNodeGenerated *sp30;
@@ -78,8 +80,7 @@ Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED s32 sp48) {
         sp2C = (struct GraphNodeGenerated *) node;
 
         if (gCurGraphNodeHeldObject) {
-            sp34 = (struct Object *)
-                       gCurGraphNodeHeldObject->objNode; // TODO: change this to object pointer?
+            sp34 = gCurGraphNodeHeldObject->objNode;
         }
 
         sp28 = sp34->oOpacity;
@@ -107,11 +108,11 @@ Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED s32 sp48) {
 #ifdef VERSION_JP
             if (sp30->parameter == 10) {
                 if (gDebugInfo[DEBUG_PAGE_ENEMYINFO][3]) {
-                    gDPSetAlphaCompare(sp38++, 3);
+                    gDPSetAlphaCompare(sp38++, G_AC_DITHER);
                 }
             } else {
                 if (sp34->activeFlags & ACTIVE_FLAG_UNK7) {
-                    gDPSetAlphaCompare(sp38++, 3);
+                    gDPSetAlphaCompare(sp38++, G_AC_DITHER);
                 }
             }
 #else // gDebugInfo accesses were removed in all non-JP versions.
@@ -123,13 +124,13 @@ Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED s32 sp48) {
             // one.
             if (sp30->parameter != 10) {
                 if (sp34->activeFlags & ACTIVE_FLAG_UNK7) {
-                    gDPSetAlphaCompare(sp38++, 3);
+                    gDPSetAlphaCompare(sp38++, G_AC_DITHER);
                 }
             }
 #endif
         }
 
-        gDPSetEnvColor(sp38++, 0xFF, 0xFF, 0xFF, sp28);
+        gDPSetEnvColor(sp38++, 255, 255, 255, sp28);
         gSPEndDisplayList(sp38);
     }
 
@@ -142,7 +143,11 @@ Gfx *Geo18_8029D924(s32 run, struct GraphNode *node, UNUSED s32 sp48) {
  * executor passes the 3rd argument to a function that doesn't declare it. This is
  * undefined behavior, but harmless in practice due to the o32 calling convention.
  */
-s32 geo_switch_anim_state(s32 run, struct GraphNode *node) {
+#ifdef AVOID_UB
+Gfx *geo_switch_anim_state(s32 run, struct GraphNode *node, UNUSED void *context) {
+#else
+Gfx *geo_switch_anim_state(s32 run, struct GraphNode *node) {
+#endif
     struct Object *obj;
     struct GraphNodeSwitchCase *switchCase;
 
@@ -153,8 +158,8 @@ s32 geo_switch_anim_state(s32 run, struct GraphNode *node) {
         // cast the pointer.
         switchCase = (struct GraphNodeSwitchCase *) node;
 
-        if (gCurGraphNodeHeldObject != 0) {
-            obj = (struct Object *) gCurGraphNodeHeldObject->objNode;
+        if (gCurGraphNodeHeldObject != NULL) {
+            obj = gCurGraphNodeHeldObject->objNode;
         }
 
         // if the case is greater than the number of cases, set to 0 to avoid overflowing
@@ -167,11 +172,15 @@ s32 geo_switch_anim_state(s32 run, struct GraphNode *node) {
         switchCase->selectedCase = obj->oAnimState;
     }
 
-    return 0;
+    return NULL;
 }
 
 //! @bug Same issue as geo_switch_anim_state.
-s32 geo_switch_area(s32 run, struct GraphNode *node) {
+#ifdef AVOID_UB
+Gfx *geo_switch_area(s32 run, struct GraphNode *node, UNUSED void *context) {
+#else
+Gfx *geo_switch_area(s32 run, struct GraphNode *node) {
+#endif
     s16 sp26;
     struct Surface *sp20;
     UNUSED struct Object *sp1C =
@@ -200,7 +209,7 @@ s32 geo_switch_area(s32 run, struct GraphNode *node) {
         switchCase->selectedCase = 0;
     }
 
-    return 0;
+    return NULL;
 }
 
 void func_8029D558(Mat4 a0, struct Object *a1) {
@@ -266,7 +275,7 @@ void func_8029D704(Mat4 a0, Mat4 a1, Mat4 a2) {
     a0[3][3] = 1.0f;
 }
 
-void set_object_held_state(struct Object *obj, void *heldBehavior) {
+void set_object_held_state(struct Object *obj, const BehaviorScript *heldBehavior) {
     obj->parentObj = o;
 
     if (obj->oFlags & OBJ_FLAG_HOLDABLE) {
@@ -302,7 +311,7 @@ f32 dist_between_objects(struct Object *obj1, struct Object *obj2) {
     return sqrtf(dx * dx + dy * dy + dz * dz);
 }
 
-void obj_obj_forward_vel_approach_upward(f32 target, f32 increment) {
+void obj_forward_vel_approach_upward(f32 target, f32 increment) {
     if (o->oForwardVel >= target) {
         o->oForwardVel = target;
     } else {
@@ -456,7 +465,8 @@ void set_object_angle(struct Object *a0, s16 pitch, s16 yaw, s16 roll) {
  * Spawns an object at an absolute location with a specified angle.
  */
 struct Object *spawn_object_abs_with_rot(struct Object *parent, s16 uselessArg, u32 model,
-                                         void *behavior, s16 x, s16 y, s16 z, s16 rx, s16 ry, s16 rz) {
+                                         const BehaviorScript *behavior,
+                                         s16 x, s16 y, s16 z, s16 rx, s16 ry, s16 rz) {
     // 'uselessArg' is unused in the function spawn_object_at_origin()
     struct Object *newObj = spawn_object_at_origin(parent, uselessArg, model, behavior);
     set_object_pos(newObj, x, y, z);
@@ -470,7 +480,8 @@ struct Object *spawn_object_abs_with_rot(struct Object *parent, s16 uselessArg, 
  * The rz argument is never used, and the z offset is used for z-rotation instead. This is most likely
  * a copy-paste typo by one of the programmers.
  */
-struct Object *spawn_object_rel_with_rot(struct Object *parent, u32 model, void *behavior, s16 xOff,
+struct Object *spawn_object_rel_with_rot(struct Object *parent, u32 model,
+                                         const BehaviorScript *behavior, s16 xOff,
                                          s16 yOff, s16 zOff, s16 rx, s16 ry, UNUSED s16 rz) {
     struct Object *newObj = spawn_object_at_origin(parent, 0, model, behavior);
     newObj->oFlags |= OBJ_FLAG_TRANSFORM_RELATIVE_TO_PARENT;
@@ -480,7 +491,7 @@ struct Object *spawn_object_rel_with_rot(struct Object *parent, u32 model, void 
     return newObj;
 }
 
-struct Object *Unknown8029E330(struct Object *sp20, s32 model, void *sp28) {
+struct Object *Unknown8029E330(struct Object *sp20, s32 model, const BehaviorScript *sp28) {
     struct Object *sp1C = spawn_object(sp20, model, sp28);
     sp1C->oFlags |= OBJ_FLAG_0020 | OBJ_FLAG_0800;
     return sp1C;
@@ -526,11 +537,11 @@ struct Object *spawn_water_splash(struct Object *parent, struct WaterSplashParam
 }
 
 struct Object *spawn_object_at_origin(struct Object *parent, UNUSED s32 unusedArg, u32 model,
-                                      void *behavior) {
+                                      const BehaviorScript *behavior) {
     struct Object *obj;
-    u32 *behaviorAddr;
+    const BehaviorScript *behaviorAddr;
 
-    behaviorAddr = (u32 *) segmented_to_virtual(behavior);
+    behaviorAddr = segmented_to_virtual(behavior);
     obj = create_object(behaviorAddr);
 
     obj->parentObj = parent;
@@ -543,7 +554,7 @@ struct Object *spawn_object_at_origin(struct Object *parent, UNUSED s32 unusedAr
     return obj;
 }
 
-struct Object *spawn_object(struct Object *parent, s32 model, void *behavior) {
+struct Object *spawn_object(struct Object *parent, s32 model, const BehaviorScript *behavior) {
     struct Object *obj;
 
     obj = spawn_object_at_origin(parent, 0, model, behavior);
@@ -553,7 +564,7 @@ struct Object *spawn_object(struct Object *parent, s32 model, void *behavior) {
 }
 
 struct Object *try_to_spawn_object(s16 offsetY, f32 scale, struct Object *parent, s32 model,
-                                   void *behavior) {
+                                   const BehaviorScript *behavior) {
     struct Object *obj;
 
     if (gFreeObjectList.next != NULL) {
@@ -566,7 +577,7 @@ struct Object *try_to_spawn_object(s16 offsetY, f32 scale, struct Object *parent
     }
 }
 
-struct Object *spawn_object_with_scale(struct Object *parent, s32 model, void *behavior, f32 scale) {
+struct Object *spawn_object_with_scale(struct Object *parent, s32 model, const BehaviorScript *behavior, f32 scale) {
     struct Object *obj;
 
     obj = spawn_object_at_origin(parent, 0, model, behavior);
@@ -583,7 +594,7 @@ static void build_relative_object_transform(struct Object *obj) {
 
 struct Object *spawn_object_relative(s16 behaviorParam, s16 relativePosX, s16 relativePosY,
                                      s16 relativePosZ, struct Object *parent, s32 model,
-                                     void *behavior) {
+                                     const BehaviorScript *behavior) {
     struct Object *obj = spawn_object_at_origin(parent, 0, model, behavior);
 
     copy_object_pos_and_angle(obj, parent);
@@ -598,7 +609,7 @@ struct Object *spawn_object_relative(s16 behaviorParam, s16 relativePosX, s16 re
 
 struct Object *spawn_object_relative_with_scale(s16 behaviorParam, s16 relativePosX, s16 relativePosY,
                                                 s16 relativePosZ, f32 scale, struct Object *parent,
-                                                s32 model, void *behavior) {
+                                                s32 model, const BehaviorScript *behavior) {
     struct Object *obj;
 
     obj = spawn_object_relative(behaviorParam, relativePosX, relativePosY, relativePosZ, parent, model,
@@ -646,7 +657,7 @@ void func_8029EA0C(struct Object *a0) {
 }
 
 void Unknown8029EA34(struct Object *sp20, u32 sp24) {
-    u32 *sp1C;
+    struct Animation **sp1C;
 
     sp1C = o->oAnimations;
     geo_obj_init_animation(&sp20->header.gfx, sp24 + sp1C);
@@ -727,25 +738,25 @@ void obj_scale(f32 scale) {
 }
 
 void SetObjAnimation(s32 arg0) {
-    u32 *sp1C = o->oAnimations;
+    struct Animation **sp1C = o->oAnimations;
     geo_obj_init_animation(&o->header.gfx, sp1C + arg0);
 }
 
 void set_obj_animation_and_sound_state(s32 arg0) {
-    u32 *sp1C = o->oAnimations;
+    struct Animation **sp1C = o->oAnimations;
     geo_obj_init_animation(&o->header.gfx, sp1C + arg0);
     o->oSoundStateID = arg0;
 }
 
 void func_8029ED98(u32 a0, f32 a1) {
-    u32 *sp1C = o->oAnimations;
+    struct Animation **sp1C = o->oAnimations;
     s32 sp18 = (s32)(a1 * 65536.0f);
     geo_obj_init_animation_accel(&o->header.gfx, sp1C + a0, sp18);
     o->oSoundStateID = a0;
 }
 
-void func_8029EE20(struct Object *a0, u32 *a1, u32 a2) {
-    u32 *sp1C = a1;
+void func_8029EE20(struct Object *a0, struct Animation **a1, u32 a2) {
+    struct Animation **sp1C = a1;
     a0->oAnimations = a1;
     geo_obj_init_animation(&a0->header.gfx, sp1C + a2);
     a0->oSoundStateID = a2;
@@ -815,7 +826,7 @@ void obj_set_facing_to_move_angles(struct Object *a0) {
     a0->oFaceAngleRoll = a0->oMoveAngleRoll;
 }
 
-u32 get_object_list_from_behavior(u32 *behavior) {
+u32 get_object_list_from_behavior(const BehaviorScript *behavior) {
     u32 objectList;
 
     // If the first behavior command is "begin", then get the object list header
@@ -829,7 +840,7 @@ u32 get_object_list_from_behavior(u32 *behavior) {
     return objectList;
 }
 
-struct Object *obj_nearest_object_with_behavior(void *behavior) {
+struct Object *obj_nearest_object_with_behavior(const BehaviorScript *behavior) {
     struct Object *obj;
     f32 dist;
 
@@ -838,7 +849,7 @@ struct Object *obj_nearest_object_with_behavior(void *behavior) {
     return obj;
 }
 
-f32 obj_dist_to_nearest_object_with_behavior(void *behavior) {
+f32 obj_dist_to_nearest_object_with_behavior(const BehaviorScript *behavior) {
     struct Object *obj;
     f32 dist;
 
@@ -850,8 +861,8 @@ f32 obj_dist_to_nearest_object_with_behavior(void *behavior) {
     return dist;
 }
 
-struct Object *obj_find_nearest_object_with_behavior(void *behavior, f32 *dist) {
-    u32 *behaviorAddr = (u32 *) segmented_to_virtual(behavior);
+struct Object *obj_find_nearest_object_with_behavior(const BehaviorScript *behavior, f32 *dist) {
+    uintptr_t *behaviorAddr = segmented_to_virtual(behavior);
     struct Object *closestObj = NULL;
     struct Object *obj;
     struct ObjectNode *listHead;
@@ -901,8 +912,8 @@ s32 count_unimportant_objects(void) {
     return count;
 }
 
-s32 count_objects_with_behavior(void *behavior) {
-    u32 *behaviorAddr = (u32 *) segmented_to_virtual(behavior);
+s32 count_objects_with_behavior(const BehaviorScript *behavior) {
+    uintptr_t *behaviorAddr = segmented_to_virtual(behavior);
     struct ObjectNode *listHead = &gObjectLists[get_object_list_from_behavior(behaviorAddr)];
     struct ObjectNode *obj = listHead->next;
     s32 count = 0;
@@ -918,8 +929,8 @@ s32 count_objects_with_behavior(void *behavior) {
     return count;
 }
 
-struct Object *obj_find_nearby_held_actor(void *behavior, f32 maxDist) {
-    u32 *behaviorAddr = (u32 *) segmented_to_virtual(behavior);
+struct Object *obj_find_nearby_held_actor(const BehaviorScript *behavior, f32 maxDist) {
+    const BehaviorScript *behaviorAddr = segmented_to_virtual(behavior);
     struct ObjectNode *listHead;
     struct Object *obj;
     struct Object *foundObj;
@@ -1474,15 +1485,15 @@ s32 are_objects_collided(struct Object *obj1, struct Object *obj2) {
     return FALSE;
 }
 
-void obj_set_behavior(void *behavior) {
+void obj_set_behavior(const BehaviorScript *behavior) {
     o->behavior = segmented_to_virtual(behavior);
 }
 
-void set_object_behavior(struct Object *obj, void *behavior) {
+void set_object_behavior(struct Object *obj, const BehaviorScript *behavior) {
     obj->behavior = segmented_to_virtual(behavior);
 }
 
-s32 obj_has_behavior(u32 *behavior) {
+s32 obj_has_behavior(const BehaviorScript *behavior) {
     if (o->behavior == segmented_to_virtual(behavior)) {
         return TRUE;
     } else {
@@ -1490,7 +1501,7 @@ s32 obj_has_behavior(u32 *behavior) {
     }
 }
 
-s32 object_has_behavior(struct Object *obj, u32 *behavior) {
+s32 object_has_behavior(struct Object *obj, const BehaviorScript *behavior) {
     if (obj->behavior == segmented_to_virtual(behavior)) {
         return TRUE;
     } else {
@@ -1578,8 +1589,8 @@ void obj_shake_y(f32 amount) {
     }
 }
 
-void func_802A11B4(UNUSED struct Object *a0, s32 a1) {
-    gPlayerStatusForCamera->unk1C[1] = (s16) a1;
+void obj_start_cam_event(UNUSED struct Object *obj, s32 cameraEvent) {
+    gPlayerCameraState->cameraEvent = (s16) cameraEvent;
     gSecondCameraFocus = o;
 }
 
@@ -1603,7 +1614,8 @@ void obj_set_hurtbox_radius_and_height(f32 radius, f32 height) {
     o->hurtboxHeight = height;
 }
 
-static void spawn_object_loot_coins(struct Object *obj, s32 numCoins, f32 sp30, void *coinBehavior,
+static void spawn_object_loot_coins(struct Object *obj, s32 numCoins, f32 sp30,
+                                    const BehaviorScript *coinBehavior,
                                     s16 posJitter, s16 model) {
     s32 i;
     f32 spawnHeight;
@@ -1625,7 +1637,7 @@ static void spawn_object_loot_coins(struct Object *obj, s32 numCoins, f32 sp30, 
         coin = spawn_object(obj, model, coinBehavior);
         translate_object_xz_random(coin, posJitter);
         coin->oPosY = spawnHeight;
-        coin->oUnknownUnk110_F32 = sp30;
+        coin->oCoinUnk110 = sp30;
     }
 }
 
@@ -2056,7 +2068,7 @@ f32 random_f32_around_zero(f32 diameter) {
     return RandomFloat() * diameter - diameter / 2.0f;
 }
 
-f32 scale_object_random(struct Object *obj, f32 rangeLength, f32 minScale) {
+void scale_object_random(struct Object *obj, f32 rangeLength, f32 minScale) {
     f32 scale = RandomFloat() * rangeLength + minScale;
     scale_object_xyz(obj, scale, scale, scale);
 }
@@ -2240,34 +2252,34 @@ void BehDustSmokeLoop(void) {
     o->oPosY += o->oVelY;
     o->oPosZ += o->oVelZ;
 
-    if (o->oUnknownUnkF4_S32 == 10) {
+    if (o->oSmokeTimer == 10) {
         mark_object_for_deletion(o);
     }
 
-    o->oUnknownUnkF4_S32++;
+    o->oSmokeTimer++;
 }
 
 static void nop_802A3294(void) {
 }
 
 s32 func_802A32A4(s8 *a0) {
-    o->oUnk1AC_VPTR = a0;
-    o->oUnk1B0 = 0;
+    o->oToxBoxUnk1AC = a0;
+    o->oToxBoxUnk1B0 = 0;
 
-    return *(s8 *) o->oUnk1AC_VPTR;
+    return *(s8 *) o->oToxBoxUnk1AC;
 }
 
 s32 func_802A32E0(void) {
     s8 spF;
-    s8 *sp8 = o->oUnk1AC_VPTR;
-    s32 sp4 = o->oUnk1B0 + 1;
+    s8 *sp8 = o->oToxBoxUnk1AC;
+    s32 sp4 = o->oToxBoxUnk1B0 + 1;
 
     if (sp8[sp4] != -1) {
         spF = sp8[sp4];
-        o->oUnk1B0++;
+        o->oToxBoxUnk1B0++;
     } else {
         spF = sp8[0];
-        o->oUnk1B0 = 0;
+        o->oToxBoxUnk1B0 = 0;
     }
 
     return spF;
@@ -2334,14 +2346,14 @@ s32 func_802A362C(s32 a0) {
     return 0;
 }
 
-s32 obj_call_action_function(void (*actionFunctions[])(void)) {
+void obj_call_action_function(void (*actionFunctions[])(void)) {
     void (*actionFunction)(void) = actionFunctions[o->oAction];
     actionFunction();
 }
 
 static struct Object *func_802A36D8(s32 sp20, s32 sp24) {
-    struct Object *sp1C = spawn_object(o, MODEL_STAR, bhvUnused080C);
-    sp1C->oUnk1B0 = sp24;
+    struct Object *sp1C = spawn_object(o, MODEL_STAR, bhvSpawnedStarNoLevelExit);
+    sp1C->oSparkleSpawnUnk1B0 = sp24;
     sp1C->oBehParams = o->oBehParams;
     sp1C->oBehParams2ndByte = sp20;
 
@@ -2486,7 +2498,7 @@ void func_802A3C98(f32 sp18, s32 sp1C) {
     }
 }
 
-void set_object_collision_data(struct Object *obj, void *segAddr) {
+void set_object_collision_data(struct Object *obj, const void *segAddr) {
     obj->collisionData = segmented_to_virtual(segAddr);
 }
 
@@ -2584,7 +2596,7 @@ static void obj_end_dialog(s32 dialogFlags, s32 dialogResult) {
     }
 }
 
-s32 obj_update_dialog_unk1(s32 arg0, s32 dialogFlags, s32 dialogID, UNUSED s32 unusedArg) {
+s32 obj_update_dialog(s32 actionArg, s32 dialogFlags, s32 dialogID, UNUSED s32 unused) {
     s32 dialogResponse = 0;
     UNUSED s32 doneTurning = TRUE;
 
@@ -2616,26 +2628,26 @@ s32 obj_update_dialog_unk1(s32 arg0, s32 dialogFlags, s32 dialogID, UNUSED s32 u
 #endif
 
         case DIALOG_UNK1_INTERRUPT_MARIO_ACTION:
-            if (set_mario_npc_dialog(arg0) == 2) {
+            if (set_mario_npc_dialog(actionArg) == 2) {
                 o->oDialogState++;
             }
             break;
 
         case DIALOG_UNK1_BEGIN_DIALOG:
-            if (dialogFlags & DIALOG_UNK1_FLAG_2) {
-                func_802D8050(dialogID);
-            } else if (dialogFlags & DIALOG_UNK1_FLAG_1) {
-                func_802D7F90(dialogID);
+            if (dialogFlags & DIALOG_UNK1_FLAG_RESPONSE) {
+                create_dialog_box_with_response(dialogID);
+            } else if (dialogFlags & DIALOG_UNK1_FLAG_DEFAULT) {
+                create_dialog_box(dialogID);
             }
             o->oDialogState++;
             break;
 
         case DIALOG_UNK1_AWAIT_DIALOG:
-            if (dialogFlags & DIALOG_UNK1_FLAG_2) {
+            if (dialogFlags & DIALOG_UNK1_FLAG_RESPONSE) {
                 if (gDialogResponse != 0) {
                     obj_end_dialog(dialogFlags, gDialogResponse);
                 }
-            } else if (dialogFlags & DIALOG_UNK1_FLAG_1) {
+            } else if (dialogFlags & DIALOG_UNK1_FLAG_DEFAULT) {
                 if (get_dialog_id() == -1) {
                     obj_end_dialog(dialogFlags, 3);
                 }
@@ -2661,7 +2673,7 @@ s32 obj_update_dialog_unk1(s32 arg0, s32 dialogFlags, s32 dialogID, UNUSED s32 u
     return dialogResponse;
 }
 
-s32 obj_update_dialog_unk2(s32 arg0, s32 dialogFlags, s32 dialogID, s32 arg3) {
+s32 obj_update_dialog_with_cutscene(s32 actionArg, s32 dialogFlags, s32 cutsceneTable, s32 dialogID) {
     s32 dialogResponse = 0;
     s32 doneTurning = TRUE;
 
@@ -2701,7 +2713,7 @@ s32 obj_update_dialog_unk2(s32 arg0, s32 dialogFlags, s32 dialogID, s32 arg3) {
                 }
             }
 
-            if (set_mario_npc_dialog(arg0) == 2 && doneTurning) {
+            if (set_mario_npc_dialog(actionArg) == 2 && doneTurning) {
                 o->oDialogResponse = 0;
                 o->oDialogState++;
             } else {
@@ -2710,12 +2722,12 @@ s32 obj_update_dialog_unk2(s32 arg0, s32 dialogFlags, s32 dialogID, s32 arg3) {
             break;
 
         case DIALOG_UNK2_AWAIT_DIALOG:
-            if (dialogID == 0xA1) {
-                if ((o->oDialogResponse = func_8028F9A4(dialogID, o)) != 0) {
+            if (cutsceneTable == CUTSCENE_CAP_SWITCH_PRESS) {
+                if ((o->oDialogResponse = cutscene_object_without_dialog(cutsceneTable, o)) != 0) {
                     o->oDialogState++;
                 }
             } else {
-                if ((o->oDialogResponse = func_8028F8E0(dialogID, o, arg3)) != 0) {
+                if ((o->oDialogResponse = cutscene_object_with_dialog(cutsceneTable, o, dialogID)) != 0) {
                     o->oDialogState++;
                 }
             }
@@ -2779,8 +2791,8 @@ s32 mario_is_within_rectangle(s16 minX, s16 maxX, s16 minZ, s16 maxZ) {
     return TRUE;
 }
 
-s32 ShakeScreen(s32 sp18) {
-    func_8027F440(sp18, o->oPosX, o->oPosY, o->oPosZ);
+void ShakeScreen(s32 shake) {
+    set_camera_shake_from_point(shake, o->oPosX, o->oPosY, o->oPosZ);
 }
 
 s32 attack_collided_non_mario_object(struct Object *obj) {
@@ -2840,7 +2852,7 @@ void func_802A4AEC(s32 sp18) {
 
 s32 obj_check_grabbed_mario(void) {
     if (o->oInteractStatus & INT_STATUS_GRABBED_MARIO) {
-        o->oUnknownUnk88 = 1;
+        o->oKingBobombUnk88 = 1;
         obj_become_intangible();
         return TRUE;
     }

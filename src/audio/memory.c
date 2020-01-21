@@ -10,44 +10,44 @@
 
 #define ALIGN16(val) (((val) + 0xF) & ~0xF)
 
-struct Struct803161E0 {
+struct PoolSplit {
     u32 wantSeq;
     u32 wantBank;
     u32 wantUnused;
     u32 wantCustom;
 }; // size = 0x10
 
-struct U32Pair {
+struct PoolSplit2 {
     u32 wantPersistent;
     u32 wantTemporary;
 }; // size = 0x8
 
-s16 D_802212A0;
-s8 D_802212A2;
-u8 D_802212A3;
+s16 gVolume;
+s8 gReverbDownsampleRate;
+u8 sReverbDownsampleRateLog; // never read
 
-struct SoundAllocPool D_802212A8;
-struct SoundAllocPool gSoundPool;
-struct SoundAllocPool D_802212C8;
+struct SoundAllocPool gAudioSessionPool;
+struct SoundAllocPool gAudioInitPool;
+struct SoundAllocPool gNotesAndBuffersPool;
 u8 sAudioMemoryPad[0x20]; // probably two unused pools
-struct SoundAllocPool D_802212F8;
-struct SoundAllocPool D_80221308;
-struct SoundAllocPool D_80221318;
+struct SoundAllocPool gSeqAndBankPool;
+struct SoundAllocPool gPersistentCommonPool;
+struct SoundAllocPool gTemporaryCommonPool;
 struct SoundMultiPool gSeqLoadedPool;
 struct SoundMultiPool gBankLoadedPool;
 struct SoundMultiPool gUnusedLoadedPool;
 
-struct Struct803161E0 D_80221898;
-struct U32Pair D_802218A8;
-struct Struct803161E0 D_802218B0;
-struct Struct803161E0 D_802218C0;
+struct PoolSplit sSessionPoolSplit;
+struct PoolSplit2 sSeqAndBankPoolSplit;
+struct PoolSplit sPersistentCommonPoolSplit;
+struct PoolSplit sTemporaryCommonPoolSplit;
 
 u8 gBankLoadStatus[0x40];
 u8 gSeqLoadStatus[0x100];
 
 u8 gAudioUnusedBuffer[0x1000];
 
-extern s32 D_80226D6C;
+extern s32 gMaxAudioCmds;
 
 void reset_bank_and_seq_load_status(void) {
     s32 i;
@@ -108,19 +108,19 @@ void *soundAlloc(struct SoundAllocPool *pool, u32 size) {
     return start;
 }
 
-void func_80316094(struct SoundAllocPool *pool, void *arg1, u32 arg2) {
-    pool->cur = pool->start = (u8 *) (((u32) arg1 + 0xf) & -0x10);
-    pool->size = arg2;
+void sound_alloc_pool_init(struct SoundAllocPool *pool, void *memAddr, u32 size) {
+    pool->cur = pool->start = (u8 *) ALIGN16((uintptr_t) memAddr);
+    pool->size = size;
     pool->unused = 0;
 }
 
-void func_803160B4(struct PersistentPool *persistent) {
+void persistent_pool_clear(struct PersistentPool *persistent) {
     persistent->pool.unused = 0;
     persistent->pool.cur = persistent->pool.start;
     persistent->numEntries = 0;
 }
 
-void func_803160C8(struct TemporaryPool *temporary) {
+void temporary_pool_clear(struct TemporaryPool *temporary) {
     temporary->pool.unused = 0;
     temporary->pool.cur = temporary->pool.start;
     temporary->nextSide = 0;
@@ -135,43 +135,43 @@ void unused_803160F8(struct SoundAllocPool *pool) {
     pool->cur = pool->start;
 }
 
-void func_80316108(s32 arg0) {
-    func_80316094(&gSoundPool, gAudioHeap, arg0);
-    func_80316094(&D_802212A8, gAudioHeap + arg0, gAudioHeapSize - arg0);
+void sound_init_main_pools(s32 sizeForAudioInitPool) {
+    sound_alloc_pool_init(&gAudioInitPool, gAudioHeap, sizeForAudioInitPool);
+    sound_alloc_pool_init(&gAudioSessionPool, gAudioHeap + sizeForAudioInitPool, gAudioHeapSize - sizeForAudioInitPool);
 }
 
-void func_80316164(struct Struct803161E0 *a) {
-    D_802212A8.cur = D_802212A8.start;
-    func_80316094(&D_802212C8, soundAlloc(&D_802212A8, a->wantSeq), a->wantSeq);
-    func_80316094(&D_802212F8, soundAlloc(&D_802212A8, a->wantCustom), a->wantCustom);
+void session_pools_init(struct PoolSplit *a) {
+    gAudioSessionPool.cur = gAudioSessionPool.start;
+    sound_alloc_pool_init(&gNotesAndBuffersPool, soundAlloc(&gAudioSessionPool, a->wantSeq), a->wantSeq);
+    sound_alloc_pool_init(&gSeqAndBankPool, soundAlloc(&gAudioSessionPool, a->wantCustom), a->wantCustom);
 }
 
-void func_803161E0(struct U32Pair *a) {
-    D_802212F8.cur = D_802212F8.start;
-    func_80316094(&D_80221308, soundAlloc(&D_802212F8, a->wantPersistent), a->wantPersistent);
-    func_80316094(&D_80221318, soundAlloc(&D_802212F8, a->wantTemporary), a->wantTemporary);
+void seq_and_bank_pool_init(struct PoolSplit2 *a) {
+    gSeqAndBankPool.cur = gSeqAndBankPool.start;
+    sound_alloc_pool_init(&gPersistentCommonPool, soundAlloc(&gSeqAndBankPool, a->wantPersistent), a->wantPersistent);
+    sound_alloc_pool_init(&gTemporaryCommonPool, soundAlloc(&gSeqAndBankPool, a->wantTemporary), a->wantTemporary);
 }
 
-void func_8031625C(struct Struct803161E0 *a) {
-    D_80221308.cur = D_80221308.start;
-    func_80316094(&gSeqLoadedPool.persistent.pool, soundAlloc(&D_80221308, a->wantSeq), a->wantSeq);
-    func_80316094(&gBankLoadedPool.persistent.pool, soundAlloc(&D_80221308, a->wantBank), a->wantBank);
-    func_80316094(&gUnusedLoadedPool.persistent.pool, soundAlloc(&D_80221308, a->wantUnused),
+void persistent_pools_init(struct PoolSplit *a) {
+    gPersistentCommonPool.cur = gPersistentCommonPool.start;
+    sound_alloc_pool_init(&gSeqLoadedPool.persistent.pool, soundAlloc(&gPersistentCommonPool, a->wantSeq), a->wantSeq);
+    sound_alloc_pool_init(&gBankLoadedPool.persistent.pool, soundAlloc(&gPersistentCommonPool, a->wantBank), a->wantBank);
+    sound_alloc_pool_init(&gUnusedLoadedPool.persistent.pool, soundAlloc(&gPersistentCommonPool, a->wantUnused),
                   a->wantUnused);
-    func_803160B4(&gSeqLoadedPool.persistent);
-    func_803160B4(&gBankLoadedPool.persistent);
-    func_803160B4(&gUnusedLoadedPool.persistent);
+    persistent_pool_clear(&gSeqLoadedPool.persistent);
+    persistent_pool_clear(&gBankLoadedPool.persistent);
+    persistent_pool_clear(&gUnusedLoadedPool.persistent);
 }
 
-void func_80316318(struct Struct803161E0 *a) {
-    D_80221318.cur = D_80221318.start;
-    func_80316094(&gSeqLoadedPool.temporary.pool, soundAlloc(&D_80221318, a->wantSeq), a->wantSeq);
-    func_80316094(&gBankLoadedPool.temporary.pool, soundAlloc(&D_80221318, a->wantBank), a->wantBank);
-    func_80316094(&gUnusedLoadedPool.temporary.pool, soundAlloc(&D_80221318, a->wantUnused),
+void temporary_pools_init(struct PoolSplit *a) {
+    gTemporaryCommonPool.cur = gTemporaryCommonPool.start;
+    sound_alloc_pool_init(&gSeqLoadedPool.temporary.pool, soundAlloc(&gTemporaryCommonPool, a->wantSeq), a->wantSeq);
+    sound_alloc_pool_init(&gBankLoadedPool.temporary.pool, soundAlloc(&gTemporaryCommonPool, a->wantBank), a->wantBank);
+    sound_alloc_pool_init(&gUnusedLoadedPool.temporary.pool, soundAlloc(&gTemporaryCommonPool, a->wantUnused),
                   a->wantUnused);
-    func_803160C8(&gSeqLoadedPool.temporary);
-    func_803160C8(&gBankLoadedPool.temporary);
-    func_803160C8(&gUnusedLoadedPool.temporary);
+    temporary_pool_clear(&gSeqLoadedPool.temporary);
+    temporary_pool_clear(&gBankLoadedPool.temporary);
+    temporary_pool_clear(&gUnusedLoadedPool.temporary);
 }
 
 static void unused_803163D4() {
@@ -366,40 +366,37 @@ void *get_bank_or_seq(struct SoundMultiPool *arg0, s32 arg1, s32 id) {
     }
 }
 
-void func_803168CC(void) {
-    D_802211B0.unk4 -= D_802211B0.unk4 / 4;
+void decrease_reverb_gain(void) {
+    gSynthesisReverb.reverbGain -= gSynthesisReverb.reverbGain / 4;
 }
 
 /**
  * Waits until a specified number of audio frames have been created
  */
 void wait_for_audio_frames(s32 frames) {
-    gActiveAudioFrames = 0;
-    // Sound thread will update gActiveAudioFrames
-    while (gActiveAudioFrames < frames) { /* spin */
+    gAudioFrameCount = 0;
+    // Sound thread will update gAudioFrameCount
+    while (gAudioFrameCount < frames) {
+        // spin
     }
 }
 
-#ifdef NON_MATCHING
-#define frames s1
-void func_80316928(struct Struct80332190 *arg0) {
-    // Wrong regalloc, and a lui which is too far up.
-    s32 sp2C;
+void audio_reset_session(struct AudioSessionSettings *preset) {
+    s8 updatesPerFrame;
     s16 *mem;
-    s32 i; // s0
+    s32 reverbWindowSize;
+    s32 i;
     s32 j;
     s32 k;
     s32 persistentMem;
     s32 temporaryMem;
     s32 totalMem;
     s32 wantMisc;
-    s32 s1;
-    s8 temp8;
-    s32 size;
-    UNUSED s32 temp;
+    s32 frames;
+    s32 remainingDmas;
 
     if (gAudioLoadLock != AUDIO_LOCK_UNINITIALIZED) {
-        func_803168CC();
+        decrease_reverb_gain();
         for (i = 0; i < gMaxSimultaneousNotes; i++) {
             if (gNotes[i].enabled && gNotes[i].adsr.state != ADSR_STATE_DISABLED) {
                 gNotes[i].adsr.fadeOutVel = 0x8000 / gAudioUpdatesPerFrame;
@@ -412,7 +409,7 @@ void func_80316928(struct Struct80332190 *arg0) {
         for (;;) {
             wait_for_audio_frames(1);
             frames++;
-            if (frames > 8 * 30) {
+            if (frames > 4 * 60) {
                 // Break after 4 seconds
                 break;
             }
@@ -428,16 +425,21 @@ void func_80316928(struct Struct80332190 *arg0) {
             }
         }
 
-        func_803168CC();
+        // Wait for the reverb to finish as well
+        decrease_reverb_gain();
         wait_for_audio_frames(3);
+
+        // The audio interface is double buffered; thus, we have to take the
+        // load lock for 2 frames for the buffers to free up before we can
+        // repurpose memory. Make that 3 frames, just in case.
         gAudioLoadLock = AUDIO_LOCK_LOADING;
         wait_for_audio_frames(3);
 
-        s1 = gCurrAudioFrameDmaCount;
-        while (s1 > 0) {
+        remainingDmas = gCurrAudioFrameDmaCount;
+        while (remainingDmas > 0) {
             for (i = 0; i < gCurrAudioFrameDmaCount; i++) {
                 if (osRecvMesg(&gCurrAudioFrameDmaQueue, NULL, OS_MESG_NOBLOCK) == 0)
-                    s1--;
+                    remainingDmas--;
             }
         }
         gCurrAudioFrameDmaCount = 0;
@@ -450,115 +452,109 @@ void func_80316928(struct Struct80332190 *arg0) {
     }
 
     gSampleDmaNumListItems = 0;
-    sp2C = arg0->unk6;
-    gAiFrequency = osAiSetFrequency(arg0->frequency);
-    gMaxSimultaneousNotes = arg0->maxSimultaneousNotes;
-    size = gAiFrequency / 60;
-    D_80226D74 = ALIGN16(size);
-    D_802212A2 = arg0->unk5;
+    reverbWindowSize = preset->reverbWindowSize;
+    gAiFrequency = osAiSetFrequency(preset->frequency);
+    gMaxSimultaneousNotes = preset->maxSimultaneousNotes;
+    gSamplesPerFrameTarget = ALIGN16(gAiFrequency / 60);
+    gReverbDownsampleRate = preset->reverbDownsampleRate;
 
-    switch (D_802212A2) {
+    switch (gReverbDownsampleRate) {
         case 1:
-            D_802212A3 = 0;
+            sReverbDownsampleRateLog = 0;
             break;
         case 2:
-            D_802212A3 = 1;
+            sReverbDownsampleRateLog = 1;
             break;
         case 4:
-            D_802212A3 = 2;
+            sReverbDownsampleRateLog = 2;
             break;
         case 8:
-            D_802212A3 = 3;
+            sReverbDownsampleRateLog = 3;
             break;
         case 16:
-            D_802212A3 = 4;
+            sReverbDownsampleRateLog = 4;
             break;
         default:
-            D_802212A3 = 0;
+            sReverbDownsampleRateLog = 0;
     }
 
-    D_802212A2 = arg0->unk5;
-    D_802212A0 = arg0->volume;
-    gMinAiBufferLength = D_80226D74 - 0x10;
-    temp8 = D_80226D74 / 160 + 1;
-    gAudioUpdatesPerFrame = temp8;
+    gReverbDownsampleRate = preset->reverbDownsampleRate;
+    gVolume = preset->volume;
+    gMinAiBufferLength = gSamplesPerFrameTarget - 0x10;
+    updatesPerFrame = gSamplesPerFrameTarget / 160 + 1;
+    gAudioUpdatesPerFrame = gSamplesPerFrameTarget / 160 + 1;
+
     // Compute conversion ratio from the internal unit tatums/tick to the
     // external beats/minute (JP) or tatums/minute (US). In practice this is
     // 300 on JP and 14360 on US.
 #ifdef VERSION_JP
-    gTempoInternalToExternal = temp8 * 3600 / gTatumsPerBeat;
+    gTempoInternalToExternal = updatesPerFrame * 3600 / gTatumsPerBeat;
 #else
-    gTempoInternalToExternal = (u32)(temp8 * 2880000.0f / gTatumsPerBeat / 16.713f);
+    gTempoInternalToExternal = (u32)(updatesPerFrame * 2880000.0f / gTatumsPerBeat / 16.713f);
 #endif
-    D_80226D6C = gMaxSimultaneousNotes * 20 * temp8 + 320;
-    persistentMem = arg0->persistentBankMem + arg0->persistentSeqMem;
-    temporaryMem = arg0->temporaryBankMem + arg0->temporarySeqMem;
+
+    gMaxAudioCmds = gMaxSimultaneousNotes * 20 * updatesPerFrame + 320;
+    persistentMem = DOUBLE_SIZE_ON_64_BIT(preset->persistentBankMem + preset->persistentSeqMem);
+    temporaryMem = DOUBLE_SIZE_ON_64_BIT(preset->temporaryBankMem + preset->temporarySeqMem);
     totalMem = persistentMem + temporaryMem;
-    // (the address of D_802212A8.size is lui'd too far up)
-    wantMisc = D_802212A8.size - totalMem - 0x100;
-    D_80221898.wantSeq = wantMisc;
-    D_80221898.wantCustom = totalMem;
-    func_80316164(&D_80221898);
-    D_802218A8.wantPersistent = persistentMem;
-    D_802218A8.wantTemporary = temporaryMem;
-    func_803161E0(&D_802218A8);
-    D_802218B0.wantSeq = arg0->persistentSeqMem;
-    D_802218B0.wantBank = arg0->persistentBankMem;
-    D_802218B0.wantUnused = 0;
-    func_8031625C(&D_802218B0);
-    D_802218C0.wantSeq = arg0->temporarySeqMem;
-    D_802218C0.wantBank = arg0->temporaryBankMem;
-    D_802218C0.wantUnused = 0;
-    func_80316318(&D_802218C0);
+    wantMisc = gAudioSessionPool.size - totalMem - 0x100;
+    sSessionPoolSplit.wantSeq = wantMisc;
+    sSessionPoolSplit.wantCustom = totalMem;
+    session_pools_init(&sSessionPoolSplit);
+    sSeqAndBankPoolSplit.wantPersistent = persistentMem;
+    sSeqAndBankPoolSplit.wantTemporary = temporaryMem;
+    seq_and_bank_pool_init(&sSeqAndBankPoolSplit);
+    sPersistentCommonPoolSplit.wantSeq = DOUBLE_SIZE_ON_64_BIT(preset->persistentSeqMem);
+    sPersistentCommonPoolSplit.wantBank = DOUBLE_SIZE_ON_64_BIT(preset->persistentBankMem);
+    sPersistentCommonPoolSplit.wantUnused = 0;
+    persistent_pools_init(&sPersistentCommonPoolSplit);
+    sTemporaryCommonPoolSplit.wantSeq = DOUBLE_SIZE_ON_64_BIT(preset->temporarySeqMem);
+    sTemporaryCommonPoolSplit.wantBank = DOUBLE_SIZE_ON_64_BIT(preset->temporaryBankMem);
+    sTemporaryCommonPoolSplit.wantUnused = 0;
+    temporary_pools_init(&sTemporaryCommonPoolSplit);
     reset_bank_and_seq_load_status();
 
     for (j = 0; j < 2; j++) {
-        gAudioCmdBuffers[j] = soundAlloc(&D_802212C8, D_80226D6C * 8);
+        gAudioCmdBuffers[j] = soundAlloc(&gNotesAndBuffersPool, gMaxAudioCmds * sizeof(u64));
     }
 
-    gNotes = soundAlloc(&D_802212C8, gMaxSimultaneousNotes * sizeof(struct Note));
+    gNotes = soundAlloc(&gNotesAndBuffersPool, gMaxSimultaneousNotes * sizeof(struct Note));
     note_init_all();
     init_note_free_list();
 
-    if (sp2C == 0) {
-        D_802211B0.unk1 = 0;
+    if (reverbWindowSize == 0) {
+        gSynthesisReverb.useReverb = 0;
     } else {
-        D_802211B0.unk1 = 8;
-        D_802211B0.unk14.unk00 = soundAlloc(&D_802212C8, sp2C * 2);
-        D_802211B0.unk14.unk04 = soundAlloc(&D_802212C8, sp2C * 2);
-        D_802211B0.unk8 = 0;
-        D_802211B0.unkC = 0;
-        D_802211B0.unk3 = 0;
-        D_802211B0.unk10 = sp2C;
-        D_802211B0.unk4 = arg0->unk8;
-        D_802211B0.unk2 = 2;
-        if (D_802212A2 != 1) {
-            D_802211B0.unk0 = 1;
-            D_802211B0.unk6 = 0x8000 / D_802212A2;
-            D_802211B0.unk1C = soundAlloc(&D_802212C8, 32);
-            D_802211B0.unk20 = soundAlloc(&D_802212C8, 32);
-            D_802211B0.unk24 = soundAlloc(&D_802212C8, 32);
-            D_802211B0.unk28 = soundAlloc(&D_802212C8, 32);
+        gSynthesisReverb.useReverb = 8;
+        gSynthesisReverb.ringBuffer.left = soundAlloc(&gNotesAndBuffersPool, reverbWindowSize * 2);
+        gSynthesisReverb.ringBuffer.right = soundAlloc(&gNotesAndBuffersPool, reverbWindowSize * 2);
+        gSynthesisReverb.nextRingBufferPos = 0;
+        gSynthesisReverb.unkC = 0;
+        gSynthesisReverb.curFrame = 0;
+        gSynthesisReverb.bufSizePerChannel = reverbWindowSize;
+        gSynthesisReverb.reverbGain = preset->reverbGain;
+        gSynthesisReverb.framesLeftToIgnore = 2;
+        if (gReverbDownsampleRate != 1) {
+            gSynthesisReverb.resampleFlags = A_INIT;
+            gSynthesisReverb.resampleRate = 0x8000 / gReverbDownsampleRate;
+            gSynthesisReverb.resampleStateLeft = soundAlloc(&gNotesAndBuffersPool, 16 * sizeof(s16));
+            gSynthesisReverb.resampleStateRight = soundAlloc(&gNotesAndBuffersPool, 16 * sizeof(s16));
+            gSynthesisReverb.unk24 = soundAlloc(&gNotesAndBuffersPool, 16 * sizeof(s16));
+            gSynthesisReverb.unk28 = soundAlloc(&gNotesAndBuffersPool, 16 * sizeof(s16));
             for (i = 0; i < gAudioUpdatesPerFrame; i++) {
-                mem = soundAlloc(&D_802212C8, 0x280);
-                D_802211B0.unk2C[0][i].unk4 = mem;
-                D_802211B0.unk2C[0][i].unk8 = mem + 0xA0;
-                mem = soundAlloc(&D_802212C8, 0x280);
-                D_802211B0.unk2C[1][i].unk4 = mem;
-                D_802211B0.unk2C[1][i].unk8 = mem + 0xA0;
+                mem = soundAlloc(&gNotesAndBuffersPool, DEFAULT_LEN_2CH);
+                gSynthesisReverb.items[0][i].toDownsampleLeft = mem;
+                gSynthesisReverb.items[0][i].toDownsampleRight = mem + 0xA0;
+                mem = soundAlloc(&gNotesAndBuffersPool, DEFAULT_LEN_2CH);
+                gSynthesisReverb.items[1][i].toDownsampleLeft = mem;
+                gSynthesisReverb.items[1][i].toDownsampleRight = mem + 0xA0;
             }
         }
     }
 
-    func_8031758C(gMaxSimultaneousNotes);
+    init_sample_dma_buffers(gMaxSimultaneousNotes);
     osWritebackDCacheAll();
     if (gAudioLoadLock != AUDIO_LOCK_UNINITIALIZED) {
         gAudioLoadLock = AUDIO_LOCK_NOT_LOADING;
     }
 }
-
-#elif defined(VERSION_JP)
-GLOBAL_ASM("asm/non_matchings/func_80316928_jp.s")
-#else
-GLOBAL_ASM("asm/non_matchings/func_80316928_us.s")
-#endif

@@ -7,15 +7,15 @@
 // Format:
 // - frequency
 // - max number of simultaneous notes
-// - unk5 (chunk size/discretization step?)
-// - unk6 (some memory req)
-// - unk8 (gain?)
+// - reverb downsample rate (makes the ring buffer be downsampled to save memory)
+// - reverb window size (ring buffer size, length affects reverb delay)
+// - reverb gain (0 = min reverb, 32767 = max reverb, 32769 to 65535 = louder and louder...)
 // - volume
 // - memory used for persistent sequences
 // - memory used for persistent banks
 // - memory used for temporary sequences
 // - memory used for temporary banks
-struct Struct80332190 D_80332190[18] = {
+struct AudioSessionSettings gAudioSessionPresets[18] = {
 #ifdef VERSION_JP
     { 32000, 16, 1, 0x0800, 0x2FFF, 0x7FFF, 0x3900, 0x6000, 0x4400, 0x2A00 },
     { 32000, 16, 1, 0x0A00, 0x47FF, 0x7FFF, 0x3900, 0x6000, 0x4400, 0x2A00 },
@@ -131,9 +131,9 @@ u8 gDefaultShortNoteDurationTable[16] = {
 s8 gVibratoCurve[16] = { 0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120 };
 
 struct AdsrEnvelope gDefaultEnvelope[] = {
-    { 4, 32000 },    // go from 0 to 32000 over the course of 16ms
-    { 1000, 32000 }, // stay there for 4.16 seconds
-    { ADSR_HANG, 0 } // then continue staying there
+    { BSWAP16(4), BSWAP16(32000) },    // go from 0 to 32000 over the course of 16ms
+    { BSWAP16(1000), BSWAP16(32000) }, // stay there for 4.16 seconds
+    { BSWAP16(ADSR_HANG), 0 } // then continue staying there
 };
 
 s16 sSineWave[0x40] = {
@@ -366,8 +366,8 @@ f32 gVolRampingRhs128[128] = {
 
 s16 gTatumsPerBeat = TATUMS_PER_BEAT;
 s8 gUnusedCount80333EE8 = 16;
-s32 gAudioHeapSize = 0x31150;
-s32 D_80333EF0 = 0x2500;
+s32 gAudioHeapSize = DOUBLE_SIZE_ON_64_BIT(0x31150);
+s32 D_80333EF0 = DOUBLE_SIZE_ON_64_BIT(0x2500);
 volatile s32 gAudioLoadLock = AUDIO_LOCK_UNINITIALIZED;
 s8 sUnused8033EF8 = 24;
 
@@ -375,16 +375,16 @@ s8 sUnused8033EF8 = 24;
 struct CtlEntry *gCtlEntries;
 s32 gAiFrequency;
 u32 D_80226D68;
-s32 D_80226D6C;
+s32 gMaxAudioCmds;
 
 s32 gMaxSimultaneousNotes;
-s32 D_80226D74;
+s32 gSamplesPerFrameTarget;
 s32 gMinAiBufferLength;
 s16 gTempoInternalToExternal;
 s8 gAudioUpdatesPerFrame;
 s8 gSoundMode;
 
-volatile s32 gActiveAudioFrames;
+volatile s32 gAudioFrameCount;
 volatile s32 gCurrAudioFrameDmaCount;
 
 s32 gAudioTaskIndex;
@@ -402,4 +402,4 @@ s16 gAiBufferLengths[NUMAIBUFFERS];
 u32 gUnused80226E58[0x10];
 u16 gUnused80226E98[0x10];
 
-u32 D_80226EB8;
+u32 gAudioRandom;

@@ -12,6 +12,7 @@
 #include "level_update.h"
 #include "spawn_object.h"
 #include "object_list_processor.h"
+#include "level_table.h"
 
 /**
  * An unused linked list struct that seems to have been replaced by ObjectNode.
@@ -245,9 +246,12 @@ static struct Object *allocate_object(struct ObjectNode *objList) {
 
     for (i = 0; i < 0x50; i++) {
         obj->rawData.asU32[i] = 0;
+#if IS_64_BIT
+        obj->ptrData.asVoidPtr[i] = NULL;
+#endif
     }
 
-    obj->unk1C8 = 0;
+    obj->unused1 = 0;
     obj->stackIndex = 0;
     obj->unk1F4 = 0;
 
@@ -256,7 +260,7 @@ static struct Object *allocate_object(struct ObjectNode *objList) {
     obj->hurtboxRadius = 0.0f;
     obj->hurtboxHeight = 0.0f;
     obj->hitboxDownOffset = 0.0f;
-    obj->unk210 = 0;
+    obj->unused2 = 0;
 
     obj->platform = NULL;
     obj->collisionData = NULL;
@@ -307,11 +311,11 @@ static void snap_object_to_floor(struct Object *obj) {
  * Spawn an object at the origin with the behavior script at virtual address
  * behScript.
  */
-struct Object *create_object(u32 *behScript) {
+struct Object *create_object(const BehaviorScript *behScript) {
     s32 objListIndex;
     struct Object *obj;
     struct ObjectNode *objList;
-    void *behavior = (void *) behScript;
+    const BehaviorScript *behavior = behScript;
 
     // If the first behavior script command is "begin <object list>", then
     // extract the object list from it

@@ -17,6 +17,8 @@
 #define ICON_COMPLETE "O"
 #define ICON_FAILED ":"
 
+#include "course_table.h"
+
 // Global bingo state information
 extern s32 gBingoInitialized;
 extern u32 gBingoInitialSeed;
@@ -106,7 +108,6 @@ static s32 update_type_matches_enemy_type(
         (update == BINGO_UPDATE_KILLED_BOBOMB && type == ENEMY_TYPE_BOBOMB)
     );
 }
-
 
 struct StarObjectiveData
 {
