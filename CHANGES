@@ -1,0 +1,132 @@
+Refresh #5
+1.) mem_error_screen.inc.c updated for C (#775)
+2.) updated patch_libultra_math to work directly on libultra.a (#781)
+3.) Enhancement: Debug boxes (#783)
+4.) Label effects MemoryPool (#784)
+5.) Use full-width characters for JP text and rename mislabeled stuff (#772)
+6.) Small asset extraction fixes (#785)
+7.) Fix incremental asset extraction after the last PR (#790)
+8.) Labelled behavior script commands, tidied up behavior scripts and ren…
+9.) Document camera.c (#741)
+10.) Fix a HMC texture asset (#795)
+11.) Fix UB in angle conversion for paintings. Needed for pc-port. (#796)
+12.) Fix PSS texture assets (#801)
+13.) Fix some camera typos (#802)
+
+Refresh #4
+1.) Label screen_transition.c (#737)
+2.) Revamp macros (#738)
+3.) Simplify the cake makefile logic (#739)
+4.) Move zbuffer to C (#742)
+5.) Audio blob endian/64-bit fixes (#740)
+6.) Ub fixes (#745)
+7.) process_level_music_dynamics: slightly better stack and regalloc (#746)
+8.) move level order specific definitions out to levels/level_defines.h (#743)
+9.) Renamed some mislabelled sound effects (#748)
+10.) Very minor white space fixes in Mario.c (#752)
+11.) Renamed GRAVITY to OBJ_PHYSICS (#755)
+12.) Use defined macros instead of literal values for interactions in behavior_data.c (#754)
+13.) iQue Player console detection + full support (#756) 
+14.) Fix Goddard Mario head for little endian etc. (#757) 
+15.) Small bits of audio doc (#749)
+16.) Update diff script (#750) 
+17.) Nicer format for course/dialog text, enum for dialog IDs (#753) 
+18.) first-diff: store most recent mtime during check (#759)
+19.) Use Lights1 struct for light values (#760)
+20.) Detect mips64-elf in diff.py (#761) 
+21.) Name display lists in gd renderer.c (#764) 
+22.) Document a variety of PU type crashes. (#765) 
+23.) Label object_behaviors. (#716) 
+24.) Update swoop.inc.c (#767) 
+25.) Label tilting_pyramid.inc.c (#768) 
+26.) Label red_coin.inc.c (#770) 
+27.) Use more level defines (#758) 
+28.) Named Mario actions 6, 7, and 8 and noted causes of hands-free holding glitch (#769)
+
+Refresh #3
+1.) Small bits of sound sample labelling
+2.) Append 'b' to fopen calls in n64graphics to satisfy Windows
+3.) Document synthesis.c and abi.h
+4.) Remove gbi_old.h and use gbi.h instead for F3D_OLD
+5.) Fix and change most values used by f3d commands
+6.) Convert actors to C
+7.) Make extract_assets.py fail on bad baserom
+8.) Fix some (pragma-ignored) warnings
+9.) Convert trig tables and data/ buffers into C
+10.) Document intro behaviors and some of camera.c
+11.) Match dma_sample_data
+12.) Convert levels, bin, text, goddard_tex_dl to C
+13.) Remove .bss size hardcoding
+14.) Add mips64 fallback and alt dump option to diff.sh
+15.) Convert behavior_data to C
+16.) Get rid of the enum in behavior_data.
+17.) Change more values used by f3d commands
+18.) Document game/skybox.c
+19.) Actors levels fixup
+20.) Convert Mario animations to C (kind of)
+22.) generate skybox data from 248x248 images
+23.) 64-bit fixes
+24.) Move demo data to C
+25.) Change uintptr_t to GeoLayout for actors
+26.) Move libc includes to include/libc/
+
+Refresh #2a (hotfix)
+Changes from Refresh #2:
+
+1.) Fixed text Makefile dependencies"
+
+Refresh #2
+Changes from Refresh #1:
+
+1.) Label src/game/behaviors/boo.inc.c
+2.) Verify half of audio_defines.h
+3.) Label ingame_menu.c and some dialog stuff
+4.) Improve handle_dialog_text_and_pages EU non-matching
+5.) Fix texture format for water splash/sparkle
+6.) Merge ucode.bin and ucode_unk.bin
+7.) 64-bit fixes
+8.) [AUDIO] Match func_80316928
+9.) Documented bug in Tuxie's mother's code 
+10.) [AUDIO] Slightly closer matching for process_level_music_dynamics
+11.) Name channel scripts in sequence 0
+12.) Nicer error message when sha1sum doesn't match
+13.) Refactor object fields
+14.) Document file_select.c
+15.) Document star_select.c
+16.) Add uncompressed string support to textconv
+17.) Document main_menu geo and leveldata
+18.) Document hud.c and rename char textures
+19.) Correct gSPTextureRectangle values
+20.) Linker script wildcard
+     - Fixes "undefined reference to x in discarded section y" linker errors.
+     - Also means that you no longer have to add linker script entries for source files.
+21.) Reference qemu-irix package and add project structure
+     - Installing qemu-irix is as simple as installing the provided Debian package on the GitHub "Releases" tab
+       (https://github.com/n64decomp/qemu-irix).
+     - Old qemu-irix installs are unaffected by this change, and it is still possible to install qemu-irix with the older method.
+
+Refresh #1
+Changes from initial release:
+
+1.) More README cleanups and documentation
+2.) Fix .gitignore in tools/
+3.) More README cleanups and corrections
+4.) oUnk190 -> oInteractionSubtype
+5.) Normalize line endings
+6.) Replace bank_sets.s by sequences.json + build magic
+7.) Fix tabledesign in .gitignore
+8.) Cleaned and documented arrays in audio/
+9.) Change minimum Python 3 requirement in README.md to 3.6
+10.) Remove whitespace in ingame_menu.c, save_file.c, and star_select.c
+11.) Documentation comment style fixed
+12.) sm64.map -> sm64.version.map (ex: sm64.us.map)
+13.) Decompile EU versions of HUD and obj behaviors
+14.) Label ukiki.inc.c and ukiki_cage.inc.c
+15.) Add missing OS header includes
+16.) Fix alignment issue in model_ids.h
+17.) A bunch of behavior changes:
+     a.) Made styles consistent with function names (ex: BehBehaviorLoop -> beh_behavior_loop)
+     b.) Split obj_behaviors_2.c into multiple .inc.c files in behaviors/
+     c.) bhvHauntedRoomCheck -> bhvCoffinManager
+18.) Update README.md notes on WSL and add links
+19.) Added tidy.sh and also bracing around single-line ifs and loops
