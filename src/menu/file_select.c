@@ -1400,6 +1400,7 @@ void bhv_menu_button_manager_loop(void) {
             break;
         case MENU_BUTTON_SEED_RETURN:
             return_to_main_menu(MENU_BUTTON_SOUND_MODE, sMainMenuButtons[MENU_BUTTON_SEED_RETURN]);
+            break;
         case MENU_BUTTON_STEREO:
             return_to_main_menu(MENU_BUTTON_SOUND_MODE, sMainMenuButtons[MENU_BUTTON_STEREO]);
             break;
