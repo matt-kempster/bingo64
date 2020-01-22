@@ -30,7 +30,7 @@ void bhv_controllable_platform_sub_loop(void) {
             if (gMarioObject->platform == o) {
                 D_80331694 = o->oBehParams2ndByte;
                 o->oAction = 1;
-                PlaySound2(SOUND_GENERAL_SWITCH3);
+                PlaySound2(SOUND_GENERAL_MOVING_PLATFORM_SWITCH);
             }
             break;
 
@@ -71,11 +71,11 @@ void bhv_controllable_platform_init(void) {
 }
 
 void func_802F3F80(s8 sp1B) {
-    o->oUnknownUnkF8_S32 = sp1B;
+    o->oControllablePlatformUnkF8 = sp1B;
     o->oTimer = 0;
     D_80331694 = 5;
 
-    PlaySound2(SOUND_GENERAL_QUIETPOUND1);
+    PlaySound2(SOUND_GENERAL_QUIET_POUND1);
 }
 
 void func_802F3FD8(s8 sp1B, s8 sp1C[3], Vec3f sp20, UNUSED Vec3f sp24, Vec3f sp28) {
@@ -105,25 +105,25 @@ void func_802F3FD8(s8 sp1B, s8 sp1C[3], Vec3f sp20, UNUSED Vec3f sp24, Vec3f sp2
 
     if (!is_point_within_radius_of_mario(o->oPosX, o->oPosY, o->oPosZ, 400)) {
         D_80331694 = 6;
-        o->oUnknownUnk100_S32 = 1;
+        o->oControllablePlatformUnk100 = 1;
         o->oTimer = 0;
     }
 }
 
 void func_802F4230(void) {
-    if (o->oUnknownUnkF8_S32 == 1 || o->oUnknownUnkF8_S32 == 2) {
+    if (o->oControllablePlatformUnkF8 == 1 || o->oControllablePlatformUnkF8 == 2) {
         o->oFaceAnglePitch = sins(o->oTimer * 0x1000) * 182.04444 * 10.0;
-        o->oPosY = o->oUnknownUnkFC_F32 + sins(o->oTimer * 0x2000) * 20.0f;
+        o->oPosY = o->oControllablePlatformUnkFC + sins(o->oTimer * 0x2000) * 20.0f;
     } else {
         o->oFaceAngleRoll = sins(o->oTimer * 0x1000) * 182.04444 * 10.0;
-        o->oPosY = o->oUnknownUnkFC_F32 + sins(o->oTimer * 0x2000) * 20.0f;
+        o->oPosY = o->oControllablePlatformUnkFC + sins(o->oTimer * 0x2000) * 20.0f;
     }
 
     if (o->oTimer == 32) {
-        D_80331694 = o->oUnknownUnkF8_S32;
+        D_80331694 = o->oControllablePlatformUnkF8;
         o->oFaceAnglePitch = 0;
         o->oFaceAngleRoll = 0;
-        o->oPosY = o->oUnknownUnkFC_F32;
+        o->oPosY = o->oControllablePlatformUnkFC;
     }
 }
 
@@ -167,33 +167,33 @@ void bhv_controllable_platform_loop(void) {
 
         case 1:
             o->oVelZ = 10.0f;
-            sp54[0] = func_802E478C(sp48, o->oPosX + 250.0, o->oPosY, o->oPosZ + 300.0, 50.0f);
-            sp54[1] = func_802E478C(sp3C, o->oPosX, o->oPosY, o->oPosZ + 300.0, 50.0f);
-            sp54[2] = func_802E478C(sp30, o->oPosX - 250.0, o->oPosY, o->oPosZ + 300.0, 50.0f);
+            sp54[0] = obj_find_wall_displacement(sp48, o->oPosX + 250.0, o->oPosY, o->oPosZ + 300.0, 50.0f);
+            sp54[1] = obj_find_wall_displacement(sp3C, o->oPosX, o->oPosY, o->oPosZ + 300.0, 50.0f);
+            sp54[2] = obj_find_wall_displacement(sp30, o->oPosX - 250.0, o->oPosY, o->oPosZ + 300.0, 50.0f);
             func_802F3FD8(2, sp54, sp48, sp3C, sp30);
             break;
 
         case 2:
             o->oVelZ = -10.0f;
-            sp54[0] = func_802E478C(sp48, o->oPosX + 250.0, o->oPosY, o->oPosZ - 300.0, 50.0f);
-            sp54[1] = func_802E478C(sp3C, o->oPosX, o->oPosY, o->oPosZ - 300.0, 50.0f);
-            sp54[2] = func_802E478C(sp30, o->oPosX - 250.0, o->oPosY, o->oPosZ - 300.0, 50.0f);
+            sp54[0] = obj_find_wall_displacement(sp48, o->oPosX + 250.0, o->oPosY, o->oPosZ - 300.0, 50.0f);
+            sp54[1] = obj_find_wall_displacement(sp3C, o->oPosX, o->oPosY, o->oPosZ - 300.0, 50.0f);
+            sp54[2] = obj_find_wall_displacement(sp30, o->oPosX - 250.0, o->oPosY, o->oPosZ - 300.0, 50.0f);
             func_802F3FD8(1, sp54, sp48, sp3C, sp30);
             break;
 
         case 3:
             o->oVelX = 10.0f;
-            sp54[0] = func_802E478C(sp48, o->oPosX + 300.0, o->oPosY, o->oPosZ + 250.0, 50.0f);
-            sp54[1] = func_802E478C(sp3C, o->oPosX + 300.0, o->oPosY, o->oPosZ, 50.0f);
-            sp54[2] = func_802E478C(sp30, o->oPosX + 300.0, o->oPosY, o->oPosZ - 250.0, 50.0f);
+            sp54[0] = obj_find_wall_displacement(sp48, o->oPosX + 300.0, o->oPosY, o->oPosZ + 250.0, 50.0f);
+            sp54[1] = obj_find_wall_displacement(sp3C, o->oPosX + 300.0, o->oPosY, o->oPosZ, 50.0f);
+            sp54[2] = obj_find_wall_displacement(sp30, o->oPosX + 300.0, o->oPosY, o->oPosZ - 250.0, 50.0f);
             func_802F3FD8(4, sp54, sp48, sp3C, sp30);
             break;
 
         case 4:
             o->oVelX = -10.0f;
-            sp54[0] = func_802E478C(sp48, o->oPosX - 300.0, o->oPosY, o->oPosZ + 250.0, 50.0f);
-            sp54[1] = func_802E478C(sp3C, o->oPosX - 300.0, o->oPosY, o->oPosZ, 50.0f);
-            sp54[2] = func_802E478C(sp30, o->oPosX - 300.0, o->oPosY, o->oPosZ - 250.0, 50.0f);
+            sp54[0] = obj_find_wall_displacement(sp48, o->oPosX - 300.0, o->oPosY, o->oPosZ + 250.0, 50.0f);
+            sp54[1] = obj_find_wall_displacement(sp3C, o->oPosX - 300.0, o->oPosY, o->oPosZ, 50.0f);
+            sp54[2] = obj_find_wall_displacement(sp30, o->oPosX - 300.0, o->oPosY, o->oPosZ - 250.0, 50.0f);
             func_802F3FD8(3, sp54, sp48, sp3C, sp30);
             break;
 
@@ -203,7 +203,7 @@ void bhv_controllable_platform_loop(void) {
             break;
 
         case 6:
-            if (ObjFlickerAndDisappear(o, 150))
+            if (obj_flicker_and_disappear(o, 150))
                 spawn_object_abs_with_rot(o, 0, MODEL_HMC_METAL_PLATFORM, bhvControllablePlatform,
                                           o->oHomeX, o->oHomeY, o->oHomeZ, 0, 0, 0);
             break;
@@ -213,5 +213,5 @@ void bhv_controllable_platform_loop(void) {
     o->oPosX += o->oVelX;
     o->oPosZ += o->oVelZ;
     if (D_80331694 != 0 && D_80331694 != 6)
-        PlaySound(SOUND_ENVIRONMENT_ELEVATOR2);
+        PlaySound(SOUND_ENV_ELEVATOR2);
 }

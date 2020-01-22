@@ -23,6 +23,34 @@
 #include "skybox.h"
 #include "interaction.h"
 #include "object_list_processor.h"
+#include "dialog_ids.h"
+
+#define TOAD_STAR_1_REQUIREMENT 12
+#define TOAD_STAR_2_REQUIREMENT 25
+#define TOAD_STAR_3_REQUIREMENT 35
+
+#define TOAD_STAR_1_DIALOG DIALOG_082
+#define TOAD_STAR_2_DIALOG DIALOG_076
+#define TOAD_STAR_3_DIALOG DIALOG_083
+
+#define TOAD_STAR_1_DIALOG_AFTER DIALOG_154
+#define TOAD_STAR_2_DIALOG_AFTER DIALOG_155
+#define TOAD_STAR_3_DIALOG_AFTER DIALOG_156
+
+enum ToadMessageStates {
+    TOAD_MESSAGE_FADED,
+    TOAD_MESSAGE_OPAQUE,
+    TOAD_MESSAGE_OPACIFYING,
+    TOAD_MESSAGE_FADING,
+    TOAD_MESSAGE_TALKING
+};
+
+enum UnlockDoorStarStates {
+    UNLOCK_DOOR_STAR_RISING,
+    UNLOCK_DOOR_STAR_WAITING,
+    UNLOCK_DOOR_STAR_SPAWNING_PARTICLES,
+    UNLOCK_DOOR_STAR_DONE
+};
 
 static s8 D_8032CDF0[7] = { 0x01, 0x02, 0x01, 0x00, 0x01, 0x02, 0x01 };
 static s8 D_8032CDF8[] = { 0x0a, 0x0c, 0x10, 0x18, 0x0a, 0x0a, 0x0a, 0x0e, 0x14, 0x1e,
@@ -80,21 +108,21 @@ static void bhvToadMessage_opaque(void) {
 }
 
 static void bhvToadMessage_talking(void) {
-    if (obj_update_dialog_unk2(3, 1, 162, gCurrentObject->oToadMessageDialogNum) != 0) {
+    if (obj_update_dialog_with_cutscene(3, 1, CUTSCENE_DIALOG, gCurrentObject->oToadMessageDialogId) != 0) {
         gCurrentObject->oToadMessageRecentlyTalked = 1;
         gCurrentObject->oToadMessageState = TOAD_MESSAGE_FADING;
-        switch (gCurrentObject->oToadMessageDialogNum) {
+        switch (gCurrentObject->oToadMessageDialogId) {
             case TOAD_STAR_1_DIALOG:
-                gCurrentObject->oToadMessageDialogNum = TOAD_STAR_1_DIALOG_AFTER;
-                bhv_spawn_star_objects(0);
+                gCurrentObject->oToadMessageDialogId = TOAD_STAR_1_DIALOG_AFTER;
+                bhv_spawn_star_no_level_exit(0);
                 break;
             case TOAD_STAR_2_DIALOG:
-                gCurrentObject->oToadMessageDialogNum = TOAD_STAR_2_DIALOG_AFTER;
-                bhv_spawn_star_objects(1);
+                gCurrentObject->oToadMessageDialogId = TOAD_STAR_2_DIALOG_AFTER;
+                bhv_spawn_star_no_level_exit(1);
                 break;
             case TOAD_STAR_3_DIALOG:
-                gCurrentObject->oToadMessageDialogNum = TOAD_STAR_3_DIALOG_AFTER;
-                bhv_spawn_star_objects(2);
+                gCurrentObject->oToadMessageDialogId = TOAD_STAR_3_DIALOG_AFTER;
+                bhv_spawn_star_no_level_exit(2);
                 break;
         }
     }
@@ -138,31 +166,31 @@ void bhvToadMessage_loop(void) {
 void bhvToadMessage_init(void) {
     s32 saveFlags = save_file_get_flags();
     s32 starCount = save_file_get_total_star_count(gCurrSaveFileNum - 1, 0, 24);
-    s32 dialogNum = (gCurrentObject->oBehParams >> 24) & 0xFF;
+    s32 dialogId = (gCurrentObject->oBehParams >> 24) & 0xFF;
     s32 enoughStars = TRUE;
 
-    switch (dialogNum) {
+    switch (dialogId) {
         case TOAD_STAR_1_DIALOG:
             enoughStars = (starCount >= TOAD_STAR_1_REQUIREMENT);
             if (saveFlags & (1 << 24)) {
-                dialogNum = TOAD_STAR_1_DIALOG_AFTER;
+                dialogId = TOAD_STAR_1_DIALOG_AFTER;
             }
             break;
         case TOAD_STAR_2_DIALOG:
             enoughStars = (starCount >= TOAD_STAR_2_REQUIREMENT);
             if (saveFlags & (1 << 25)) {
-                dialogNum = TOAD_STAR_2_DIALOG_AFTER;
+                dialogId = TOAD_STAR_2_DIALOG_AFTER;
             }
             break;
         case TOAD_STAR_3_DIALOG:
             enoughStars = (starCount >= TOAD_STAR_3_REQUIREMENT);
             if (saveFlags & (1 << 26)) {
-                dialogNum = TOAD_STAR_3_DIALOG_AFTER;
+                dialogId = TOAD_STAR_3_DIALOG_AFTER;
             }
             break;
     }
     if (enoughStars) {
-        gCurrentObject->oToadMessageDialogNum = dialogNum;
+        gCurrentObject->oToadMessageDialogId = dialogId;
         gCurrentObject->oToadMessageRecentlyTalked = 0;
         gCurrentObject->oToadMessageState = TOAD_MESSAGE_FADED;
         gCurrentObject->oOpacity = 81;
@@ -218,7 +246,7 @@ void bhvUnlockDoorStar_loop(void) {
             gCurrentObject->oMoveAngleYaw +=
                 gCurrentObject->oUnlockDoorStarYawVel; // Apply yaw velocity
             if (++gCurrentObject->oUnlockDoorStarTimer == 30) {
-                play_sound(SOUND_MENU_STARSOUND,
+                play_sound(SOUND_MENU_STAR_SOUND,
                            gCurrentObject->header.gfx.cameraToObject); // Play final sound
                 obj_hide();                                            // Hide the object
                 gCurrentObject->oUnlockDoorStarTimer = 0;
@@ -246,7 +274,7 @@ void bhvUnlockDoorStar_loop(void) {
     // This means that the code will execute when the star completes a full revolution.
     if (prevYaw > (s16) gCurrentObject->oMoveAngleYaw) {
         play_sound(
-            SOUND_GENERAL_SHORTSTAR,
+            SOUND_GENERAL_SHORT_STAR,
             gCurrentObject->header.gfx.cameraToObject); // Play a sound every time the star spins once
     }
 }
@@ -285,7 +313,7 @@ Gfx *Geo18_802770A4(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     return sp28;
 }
 
-s32 geo_switch_mario_stand_run(s32 callContext, struct GraphNode *node, UNUSED Mat4 *mtx) {
+Gfx *geo_switch_mario_stand_run(s32 callContext, struct GraphNode *node, UNUSED Mat4 *mtx) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
     struct MarioBodyState *sp0 = &gBodyStates[switchCase->numCases];
 
@@ -293,10 +321,10 @@ s32 geo_switch_mario_stand_run(s32 callContext, struct GraphNode *node, UNUSED M
         // assign result. 0 if moving, 1 if stationary.
         switchCase->selectedCase = ((sp0->action & ACT_FLAG_STATIONARY) == FALSE);
     }
-    return 0;
+    return NULL;
 }
 
-s32 geo_switch_mario_eyes(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
+Gfx *geo_switch_mario_eyes(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
     struct MarioBodyState *sp8 = &gBodyStates[switchCase->numCases];
     s16 sp6;
@@ -313,7 +341,7 @@ s32 geo_switch_mario_eyes(s32 callContext, struct GraphNode *node, UNUSED Mat4 *
             switchCase->selectedCase = sp8->eyeState - 1;
         }
     }
-    return 0;
+    return NULL;
 }
 
 Gfx *Geo18_80277294(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
@@ -342,11 +370,11 @@ Gfx *Geo18_802773A4(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
 
     if (callContext == GEO_CONTEXT_RENDER) {
         struct GraphNodeRotation *sp20 = (struct GraphNodeRotation *) node->next;
-        u8 *sp1C = (u8 *) gCurGraphNodeCamera->config.levelCamera;
+        struct Camera *camera = gCurGraphNodeCamera->config.camera;
 
-        if (*sp1C == 6) {
-            sp20->rotation[0] = gPlayerStatusForCamera->unk16[1];
-            sp20->rotation[2] = gPlayerStatusForCamera->unk16[0];
+        if (camera->mode == CAMERA_MODE_C_UP) {
+            sp20->rotation[0] = gPlayerCameraState->headRotation[1];
+            sp20->rotation[2] = gPlayerCameraState->headRotation[0];
         } else if (action & 0x20000000) {
             sp20->rotation[0] = sp28->unk12[1];
             sp20->rotation[1] = sp28->unk12[2];
@@ -359,7 +387,7 @@ Gfx *Geo18_802773A4(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     return NULL;
 }
 
-s32 geo_switch_mario_hand(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
+Gfx *geo_switch_mario_hand(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
     struct MarioBodyState *sp0 = &gBodyStates[0];
 
@@ -374,7 +402,7 @@ s32 geo_switch_mario_hand(s32 callContext, struct GraphNode *node, UNUSED Mat4 *
             }
         }
     }
-    return 0;
+    return NULL;
 }
 
 Gfx *Geo18_802775CC(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
@@ -396,17 +424,17 @@ Gfx *Geo18_802775CC(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     return NULL;
 }
 
-s32 geo_switch_mario_cap_effect(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
+Gfx *geo_switch_mario_cap_effect(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
     struct MarioBodyState *sp0 = &gBodyStates[switchCase->numCases];
 
     if (callContext == GEO_CONTEXT_RENDER) {
         switchCase->selectedCase = sp0->modelState >> 8;
     }
-    return 0;
+    return NULL;
 }
 
-s32 geo_switch_mario_cap_on_off(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
+Gfx *geo_switch_mario_cap_on_off(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNode *next = node->next;
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
     struct MarioBodyState *sp4 = &gBodyStates[switchCase->numCases];
@@ -424,7 +452,7 @@ s32 geo_switch_mario_cap_on_off(s32 callContext, struct GraphNode *node, UNUSED 
             next = next->next;
         }
     }
-    return 0;
+    return NULL;
 }
 
 Gfx *Geo18_80277824(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
@@ -449,27 +477,27 @@ Gfx *Geo18_80277824(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
 }
 
 Gfx *geo_switch_mario_hand_grab_pos(s32 callContext, struct GraphNode *b, Mat4 *c) {
-    struct Struct8027795C *sp2C = (struct Struct8027795C *) b;
+    struct GraphNodeHeldObject *sp2C = (struct GraphNodeHeldObject *) b;
     Mat4 *sp28 = c;
-    struct MarioState *sp24 = &gMarioStates[sp2C->unk18];
+    struct MarioState *sp24 = &gMarioStates[sp2C->playerIndex];
 
     if (callContext == GEO_CONTEXT_RENDER) {
-        sp2C->unk1C = 0;
+        sp2C->objNode = NULL;
         if (sp24->heldObj != NULL) {
-            sp2C->unk1C = sp24->heldObj;
+            sp2C->objNode = sp24->heldObj;
             switch (sp24->marioBodyState->grabPos) {
                 case GRAB_POS_LIGHT_OBJ:
                     if (sp24->action & ACT_FLAG_THROWING) {
-                        vec3s_set(sp2C->unk20, 50, 0, 0);
+                        vec3s_set(sp2C->translation, 50, 0, 0);
                     } else {
-                        vec3s_set(sp2C->unk20, 50, 0, 110);
+                        vec3s_set(sp2C->translation, 50, 0, 110);
                     }
                     break;
                 case GRAB_POS_HEAVY_OBJ:
-                    vec3s_set(sp2C->unk20, 145, -173, 180);
+                    vec3s_set(sp2C->translation, 145, -173, 180);
                     break;
                 case GRAB_POS_BOWSER:
-                    vec3s_set(sp2C->unk20, 80, -270, 1260);
+                    vec3s_set(sp2C->translation, 80, -270, 1260);
                     break;
             }
         }

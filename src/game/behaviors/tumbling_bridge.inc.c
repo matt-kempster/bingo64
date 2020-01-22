@@ -1,9 +1,9 @@
 // tumbling_bridge.c.inc
 
-extern u8 wf_seg7_collision_tumbling_bridge[];
-extern u8 bbh_seg7_collision_07026B1C[];
-extern u8 lll_seg7_collision_0701D21C[];
-extern u8 bitfs_seg7_collision_07015288[];
+#include "levels/wf/header.h"
+#include "levels/bbh/header.h"
+#include "levels/lll/header.h"
+#include "levels/bitfs/header.h"
 
 struct Struct8032F34C sTumblingBridgeParams[] = {
     { 9, -512, 0x80, MODEL_WF_TUMBLING_BRIDGE_PART, wf_seg7_collision_tumbling_bridge },
@@ -17,7 +17,7 @@ void bhv_tumbling_bridge_platform_loop(void) {
         case 0:
             if (gMarioObject->platform == o) {
                 o->oAction++;
-                o->OBJECT_FIELD_S32(0x1B) = RandomSign() * 0x80;
+                o->oTumblingBridgeUnkF4 = RandomSign() * 0x80;
             }
             break;
         case 1:
@@ -31,7 +31,7 @@ void bhv_tumbling_bridge_platform_loop(void) {
             if (o->oAngleVelPitch < 0x400)
                 o->oAngleVelPitch += 0x80;
             if (o->oAngleVelRoll > -0x400 && o->oAngleVelRoll < 0x400)
-                o->oAngleVelRoll += o->OBJECT_FIELD_S32(0x1B); // acceleraration?
+                o->oAngleVelRoll += o->oTumblingBridgeUnkF4; // acceleration?
             o->oGravity = -3.0f;
             obj_rotate_face_angle_using_vel();
             obj_move_using_fvel_and_gravity();

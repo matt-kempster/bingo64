@@ -11,7 +11,7 @@ void bhv_yoshi_init(void) {
     o->oBuoyancy = 1.3f;
     o->oInteractionSubtype = INT_SUBTYPE_NPC;
 
-    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, 0, 24) < 120 || D_80331508 == 1) {
+    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, 0, 24) < 120 || sYoshiDead == TRUE) {
         o->activeFlags = 0;
     }
 }
@@ -21,14 +21,14 @@ void yoshi_walk_loop(void) {
     s16 sp24 = o->header.gfx.unk38.animFrame;
 
     o->oForwardVel = 10.0f;
-    sp26 = ObjectStep();
+    sp26 = object_step();
     o->oMoveAngleYaw = approach_s16_symmetric(o->oMoveAngleYaw, o->oYoshiTargetYaw, 0x500);
-    if (IsPointCloseToObject(o, o->oHomeX, 3174.0f, o->oHomeZ, 200))
+    if (is_point_close_to_object(o, o->oHomeX, 3174.0f, o->oHomeZ, 200))
         o->oAction = YOSHI_ACT_IDLE;
 
     SetObjAnimation(1);
     if (sp24 == 0 || sp24 == 15)
-        PlaySound2(SOUND_GENERAL_YOSHIWALK);
+        PlaySound2(SOUND_GENERAL_YOSHI_WALK);
 
     if (o->oInteractStatus == INT_STATUS_INTERACTED)
         o->oAction = YOSHI_ACT_TALK;
@@ -63,7 +63,8 @@ void yoshi_idle_loop(void) {
         o->oAction = YOSHI_ACT_TALK;
 
     // Credits; Yoshi appears at this position overlooking the castle near the end of the credits
-    if (gPlayerStatusForCamera->unk1C[1] == 11 || gPlayerStatusForCamera->unk1C[1] == 12) {
+    if (gPlayerCameraState->cameraEvent == CAM_EVENT_START_ENDING ||
+        gPlayerCameraState->cameraEvent == CAM_EVENT_START_END_WAVING) {
         o->oAction = YOSHI_ACT_CREDITS;
         o->oPosX = -1798.0f;
         o->oPosY = 3174.0f;
@@ -76,7 +77,7 @@ void yoshi_talk_loop(void) {
         SetObjAnimation(0);
         if (set_mario_npc_dialog(1) == 2) {
             o->activeFlags |= 0x20;
-            if (func_8028F8E0(162, o, 161)) {
+            if (cutscene_object_with_dialog(CUTSCENE_DIALOG, o, DIALOG_161)) {
                 o->activeFlags &= ~0x20;
                 o->oInteractStatus = 0;
                 o->oHomeX = sYoshiHomeLocations[2];
@@ -96,15 +97,15 @@ void yoshi_walk_and_jump_off_roof_loop(void) {
     s16 sp26 = o->header.gfx.unk38.animFrame;
 
     o->oForwardVel = 10.0f;
-    ObjectStep();
+    object_step();
     SetObjAnimation(1);
     if (o->oTimer == 0)
-        func_8028F9E8(173, o);
+        cutscene_object(CUTSCENE_STAR_SPAWN, o);
 
     o->oMoveAngleYaw = approach_s16_symmetric(o->oMoveAngleYaw, o->oYoshiTargetYaw, 0x500);
-    if (IsPointCloseToObject(o, o->oHomeX, 3174.0f, o->oHomeZ, 200)) {
+    if (is_point_close_to_object(o, o->oHomeX, 3174.0f, o->oHomeZ, 200)) {
         SetObjAnimation(2);
-        PlaySound2(SOUND_GENERAL_ENEMYALERT1);
+        PlaySound2(SOUND_GENERAL_ENEMY_ALERT1);
         o->oForwardVel = 50.0f;
         o->oVelY = 40.0f;
         o->oMoveAngleYaw = -0x3FFF;
@@ -112,7 +113,7 @@ void yoshi_walk_and_jump_off_roof_loop(void) {
     }
 
     if (sp26 == 0 || sp26 == 15) {
-        PlaySound2(SOUND_GENERAL_YOSHIWALK);
+        PlaySound2(SOUND_GENERAL_YOSHI_WALK);
     }
 }
 
@@ -122,8 +123,8 @@ void yoshi_finish_jumping_and_despawn_loop(void) {
     o->oVelY -= 2.0;
     if (o->oPosY < 2100.0f) {
         set_mario_npc_dialog(0);
-        gCutsceneActive = 1;
-        D_80331508 = 1;
+        gObjCutsceneDone = TRUE;
+        sYoshiDead = 1;
         o->activeFlags = 0;
     }
 }
@@ -132,14 +133,14 @@ void yoshi_give_present_loop(void) {
     s32 sp1C = gGlobalTimer;
 
     if (gHudDisplay.lives == 100) {
-        play_sound(SOUND_GENERAL_1UP, gDefaultSoundArgs);
+        play_sound(SOUND_GENERAL_COLLECT_1UP, gDefaultSoundArgs);
         gSpecialTripleJump = 1;
         o->oAction = YOSHI_ACT_WALK_JUMP_OFF_ROOF;
         return;
     }
 
     if ((sp1C & 0x03) == 0) {
-        play_sound(SOUND_MENU_YOSHIGAINLIVES, gDefaultSoundArgs);
+        play_sound(SOUND_MENU_YOSHI_GAIN_LIVES, gDefaultSoundArgs);
         gMarioState->numLives++;
     }
 }

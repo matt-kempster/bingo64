@@ -1,13 +1,15 @@
 #include <ultra64.h>
+#include <stdio.h>
 
 #include "sm64.h"
+#include "prevent_bss_reordering.h"
 #include "audio/external.h"
 #include "game.h"
 #include "memory.h"
 #include "sound_init.h"
 #include "profiler.h"
 #include "game.h"
-#include "buffers.h"
+#include "buffers/buffers.h"
 #include "segments.h"
 #include "main.h"
 
@@ -124,7 +126,7 @@ void AllocPool(void) {
     void *end = (void *) SEG_POOL_END;
 
     main_pool_init(start, end);
-    D_8033A124 = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
+    gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 }
 
 void create_thread(OSThread *thread, OSId id, void (*entry)(void *), void *arg, void *sp, OSPri pri) {
@@ -319,7 +321,7 @@ void thread3_main(UNUSED void *arg) {
         OSMesg msg;
 
         osRecvMesg(&gIntrMesgQueue, &msg, OS_MESG_BLOCK);
-        switch ((u32) msg) {
+        switch ((uintptr_t) msg) {
             case MESG_VI_VBLANK:
                 handle_vblank();
                 break;
@@ -362,7 +364,7 @@ void SendMessage(OSMesg *msg) {
 void dispatch_audio_sptask(struct SPTask *spTask) {
     if (sAudioEnabled != 0 && spTask != NULL) {
         osWritebackDCacheAll();
-        osSendMesg(&gSPTaskMesgQueue, (OSMesg) spTask, OS_MESG_NOBLOCK);
+        osSendMesg(&gSPTaskMesgQueue, spTask, OS_MESG_NOBLOCK);
     }
 }
 

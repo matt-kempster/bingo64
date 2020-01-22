@@ -24,7 +24,7 @@ OUTPUT_ARCH (mips)
 #define MIO0_SEG(name, segAddr) \
    BEGIN_SEG(name##_mio0, segAddr) \
    { \
-      BUILD_DIR/mio0/name.mio0.o(.data); \
+      BUILD_DIR/bin/name.mio0.o(.data); \
       . = ALIGN(0x10); \
    } \
    END_SEG(name##_mio0)
@@ -32,7 +32,7 @@ OUTPUT_ARCH (mips)
 #define MIO0_EU_SEG(name, segAddr) \
    BEGIN_SEG(name##_mio0, segAddr) \
    { \
-      BUILD_DIR/mio0/eu/name.mio0.o(.data); \
+      BUILD_DIR/bin/eu/name.mio0.o(.data); \
       . = ALIGN(0x10); \
    } \
    END_SEG(name##_mio0)
@@ -40,21 +40,27 @@ OUTPUT_ARCH (mips)
 #define STANDARD_LEVEL(name) \
    BEGIN_SEG(name##_segment_7, 0x07000000) \
    { \
-      BUILD_DIR/bin/name/header.o(.seg07); \
+      BUILD_DIR/levels/name/leveldata.mio0.o(.data); \
+      . = ALIGN(0x10); \
    } \
    END_SEG(name##_segment_7) \
    BEGIN_SEG(name, 0x0E000000) \
    { \
-      BUILD_DIR/bin/name/header.o(.level); \
+      BUILD_DIR/levels/name/script.o(.data); \
+      BUILD_DIR/levels/name/geo.o(.data); \
    } \
    END_SEG(name)
 
 #define STANDARD_OBJECTS(name, segAddr, geoAddr) \
-   MIO0_SEG(name, segAddr) \
+   BEGIN_SEG(name##_mio0, segAddr) \
+   { \
+      BUILD_DIR/actors/name.mio0.o(.data); \
+      . = ALIGN(0x10); \
+   } \
+   END_SEG(name##_mio0) \
    BEGIN_SEG(name##_geo, geoAddr) \
    { \
-      BUILD_DIR/actors/name##_geo.o(.geo); \
-      . = ALIGN(0x10); \
+      BUILD_DIR/actors/name##_geo.o(.data); \
    } \
    END_SEG(name##_geo)
 
@@ -64,10 +70,15 @@ SECTIONS
 
    BEGIN_SEG(boot, 0x04000000)
    {
-      BUILD_DIR/data/rom_header.o(.text);
+      BUILD_DIR/asm/rom_header.o(.text);
       BUILD_DIR/asm/boot.o(.text);
    }
    END_SEG(boot)
+
+   . = 0x80000400;
+   BEGIN_NOLOAD(zbuffer) {
+      BUILD_DIR/src/buffers/zbuffer.o(.bss*);
+   }
 
    /* lib/src/__osDevMgrMain.c and lib/src/osCreateViManager.c contain infinite
     * loops compiled without -g, which cause the return statements and the .o
@@ -163,6 +174,8 @@ SECTIONS
       BUILD_DIR/src/game/object_collision.o(.text);
       BUILD_DIR/src/game/spawn_object.o(.text);
 #endif
+      BUILD_DIR/src/game*.o(.text);
+      BUILD_DIR/src/audio*.o(.text);
 #if VERSION_US
       . += 0x40;
 #endif
@@ -270,6 +283,7 @@ SECTIONS
       BUILD_DIR/libultra.a:__osGetCause.o(.text);
       BUILD_DIR/libultra.a:__osAtomicDec.o(.text);
       BUILD_DIR/libultra.a:guLookAtRef.o(.text); /* Fast3DEX2 only */
+      BUILD_DIR/libultra.a:*.o(.text);
       BUILD_DIR/lib/rsp.o(.text);
       /* data */
       BUILD_DIR/src/game/crash_screen.o(.data*);
@@ -322,8 +336,10 @@ SECTIONS
       BUILD_DIR/src/game/hud.o(.data*);
       BUILD_DIR/src/game/obj_behaviors.o(.data*);
       BUILD_DIR/src/game/obj_behaviors_2.o(.data*);
+      BUILD_DIR/src/game*.o(.data*);
       BUILD_DIR/src/audio/external.o(.data*);
       BUILD_DIR/src/audio/data.o(.data*);
+      BUILD_DIR/src/audio*.o(.data*);
       BUILD_DIR/libultra.a:osCreateViManager.o(.data*);
       BUILD_DIR/libultra.a:osCreatePiManager.o(.data*);
       BUILD_DIR/libultra.a:osInitialize.o(.data*);
@@ -341,7 +357,8 @@ SECTIONS
       BUILD_DIR/libultra.a:osViData.o(.data*);
       BUILD_DIR/libultra.a:kdebugserver.o(.data*);
       BUILD_DIR/libultra.a:__osSyncPutChars.o(.data*);
-      BUILD_DIR/libultra.a:guRotateF.o(.data);
+      BUILD_DIR/libultra.a:guRotateF.o(.data*);
+      BUILD_DIR/libultra.a:*.o(.data*);
       /* rodata */
       BUILD_DIR/src/game/crash_screen.o(.rodata*);
       BUILD_DIR/src/game/main.o(.rodata*);
@@ -394,12 +411,14 @@ SECTIONS
       BUILD_DIR/src/game/hud.o(.rodata*);
       BUILD_DIR/src/game/obj_behaviors.o(.rodata*);
       BUILD_DIR/src/game/obj_behaviors_2.o(.rodata*);
+      BUILD_DIR/src/game*.o(.rodata*);
       BUILD_DIR/src/audio/synthesis.o(.rodata*);
       BUILD_DIR/src/audio/memory.o(.rodata*);
       BUILD_DIR/src/audio/playback.o(.rodata*);
       BUILD_DIR/src/audio/effects.o(.rodata*);
       BUILD_DIR/src/audio/seqplayer.o(.rodata*);
       BUILD_DIR/src/audio/external.o(.rodata*);
+      BUILD_DIR/src/audio*.o(.rodata*);
       BUILD_DIR/libultra.a:guPerspectiveF.o(.rodata*);
       BUILD_DIR/libultra.a:llconv.o(.rodata*);
       BUILD_DIR/libultra.a:cosf.o(.rodata*);
@@ -412,6 +431,7 @@ SECTIONS
       BUILD_DIR/libultra.a:_Ldtob.o(.rodata*);
       BUILD_DIR/libultra.a:osSetIntMask.o(.rodata*);
       BUILD_DIR/libultra.a:guLookAtRef.o(.rodata*); /* Fast3DEX2 only */
+      BUILD_DIR/libultra.a:*.o(.rodata*);
       BUILD_DIR/lib/rsp.o(.rodata*);
    }
    END_SEG(main)
@@ -462,6 +482,7 @@ SECTIONS
       BUILD_DIR/src/game/hud.o(.bss*);
       BUILD_DIR/src/game/obj_behaviors.o(.bss*);
       BUILD_DIR/src/game/obj_behaviors_2.o(.bss*);
+      BUILD_DIR/src/game*.o(.bss*);
       BUILD_DIR/src/audio/external.o(.bss*);
       BUILD_DIR/libultra.a:osSetEventMesg.o(.bss*);
       BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.bss*);
@@ -477,8 +498,11 @@ SECTIONS
       BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.bss*);
       BUILD_DIR/libultra.a:osEepromWrite.o(.bss*);
       BUILD_DIR/libultra.a:kdebugserver.o(.bss*);
+      BUILD_DIR/libultra.a:*.o(.bss*);
    }
    END_NOLOAD(main)
+   _mainSegmentNoloadSizeLo = SIZEOF (.main.noload) & 0xffff;
+   _mainSegmentNoloadSizeHi = SIZEOF (.main.noload) >> 16;
 
    ASSERT((. <= SEG_ENGINE), "Error: main segment extended into engine.")
 
@@ -493,21 +517,23 @@ SECTIONS
       BUILD_DIR/src/engine/surface_load.o(.text);
       BUILD_DIR/src/engine/behavior_script.o(.text);
       BUILD_DIR/src/engine/rand.o(.text);
+      BUILD_DIR/src/engine*.o(.text);
       /* data */
       BUILD_DIR/src/engine/graph_node.o(.data*);
       BUILD_DIR/src/engine/graph_node_manager.o(.data*);
       BUILD_DIR/src/engine/math_util.o(.data*);
-      BUILD_DIR/data/trig_tables.o(.data*);
       BUILD_DIR/src/engine/geo_layout.o(.data*);
       BUILD_DIR/src/engine/level_script.o(.data*);
       BUILD_DIR/src/engine/behavior_script.o(.data*);
       BUILD_DIR/src/engine/rand.o(.data*);
+      BUILD_DIR/src/engine*.o(.data*);
       /* rodata */
       BUILD_DIR/src/engine/math_util.o(.rodata*);
       BUILD_DIR/src/engine/level_script.o(.rodata*);
       BUILD_DIR/src/engine/surface_collision.o(.rodata*);
       BUILD_DIR/src/engine/surface_load.o(.rodata*);
       BUILD_DIR/src/engine/rand.o(.rodata*);
+      BUILD_DIR/src/engine*.o(.rodata*);
    }
    END_SEG(engine)
    BEGIN_NOLOAD(engine)
@@ -519,6 +545,7 @@ SECTIONS
       BUILD_DIR/src/engine/surface_load.o(.bss*);
       BUILD_DIR/src/engine/behavior_script.o(.bss*);
       BUILD_DIR/src/engine/rand.o(.bss*);
+      BUILD_DIR/src/engine*.o(.bss*);
    }
    END_NOLOAD(engine)
 
@@ -527,7 +554,7 @@ SECTIONS
    . = SEG_FRAMEBUFFERS;
    BEGIN_NOLOAD(framebuffers)
    {
-      BUILD_DIR/data/framebuffers.o(.bss*);
+      BUILD_DIR/src/buffers/framebuffers.o(.bss*);
    }
    END_NOLOAD(framebuffers)
 
@@ -537,7 +564,7 @@ SECTIONS
 
    BEGIN_SEG(entry, 0x10000000)
    {
-      BUILD_DIR/levels/entry.o(.level);
+      BUILD_DIR/levels/entry.o(.data);
    }
    END_SEG(entry)
 
@@ -578,17 +605,18 @@ SECTIONS
    /* use segmented addressing for behaviors */
    BEGIN_SEG(behavior, 0x13000000)
    {
-      BUILD_DIR/data/behavior_data.o(.behavior);
+      BUILD_DIR/data/behavior_data.o(.data);
    }
    END_SEG(behavior)
 
    /* 0x8016F000 21D7D0-255EC0 [386F0] */
    BEGIN_SEG(goddard, SEG_GODDARD)
    {
-      BUILD_DIR/src/game/level_select_menu.o(.text);
-      BUILD_DIR/src/game/intro_geo.o(.text);
-      BUILD_DIR/src/game/file_select.o(.text);
-      BUILD_DIR/src/game/star_select.o(.text);
+      BUILD_DIR/src/menu/level_select_menu.o(.text);
+      BUILD_DIR/src/menu/intro_geo.o(.text);
+      BUILD_DIR/src/menu/file_select.o(.text);
+      BUILD_DIR/src/menu/star_select.o(.text);
+      BUILD_DIR/src/menu*.o(.text);
       BUILD_DIR/libgoddard.a:gd_main.o(.text);
       BUILD_DIR/libgoddard.a:gd_memory.o(.text);
       BUILD_DIR/libgoddard.a:sfx.o(.text);
@@ -604,14 +632,17 @@ SECTIONS
       BUILD_DIR/libgoddard.a:gd_math.o(.text);
       BUILD_DIR/libgoddard.a:shape_helper.o(.text);
       BUILD_DIR/libgoddard.a:renderer.o(.text);
+      BUILD_DIR/libgoddard.a:*.o(.text);
       /* data, rodata, per file */
-      BUILD_DIR/src/game/level_select_menu.o(.data*);
-      BUILD_DIR/src/game/level_select_menu.o(.rodata*);
-      BUILD_DIR/src/game/intro_geo.o(.data*);
-      BUILD_DIR/src/game/file_select.o(.data*);
-      BUILD_DIR/src/game/file_select.o(.rodata*);
-      BUILD_DIR/src/game/star_select.o(.data*);
-      BUILD_DIR/src/game/star_select.o(.rodata*);
+      BUILD_DIR/src/menu/level_select_menu.o(.data*);
+      BUILD_DIR/src/menu/level_select_menu.o(.rodata*);
+      BUILD_DIR/src/menu/intro_geo.o(.data*);
+      BUILD_DIR/src/menu/file_select.o(.data*);
+      BUILD_DIR/src/menu/file_select.o(.rodata*);
+      BUILD_DIR/src/menu/star_select.o(.data*);
+      BUILD_DIR/src/menu/star_select.o(.rodata*);
+      BUILD_DIR/src/menu*.o(.data*);
+      BUILD_DIR/src/menu*.o(.rodata*);
       /* goddard subsystem data */
       BUILD_DIR/libgoddard.a:gd_main.o(.data*);
       BUILD_DIR/libgoddard.a:draw_objects.o(.data*);
@@ -622,8 +653,6 @@ SECTIONS
       BUILD_DIR/libgoddard.a:joints.o(.data*);
       BUILD_DIR/libgoddard.a:shape_helper.o(.data*);
       BUILD_DIR/libgoddard.a:renderer.o(.data*);
-      /* goddard texture and DLs */
-      BUILD_DIR/data/goddard_tex_dl.o(.rodata*);
       /* goddard subsystem rodata */
       BUILD_DIR/libgoddard.a:gd_main.o(.rodata*);
       BUILD_DIR/libgoddard.a:gd_memory.o(.rodata*);
@@ -643,9 +672,10 @@ SECTIONS
    END_SEG(goddard)
    BEGIN_NOLOAD(goddard)
    {
-      BUILD_DIR/src/game/intro_geo.o(.bss*);
-      BUILD_DIR/src/game/file_select.o(.bss*);
-      BUILD_DIR/src/game/star_select.o(.bss*);
+      BUILD_DIR/src/menu/intro_geo.o(.bss*);
+      BUILD_DIR/src/menu/file_select.o(.bss*);
+      BUILD_DIR/src/menu/star_select.o(.bss*);
+      BUILD_DIR/src/menu*.o(.bss*);
       BUILD_DIR/libgoddard.a:gd_main.o(.bss*);
       BUILD_DIR/libgoddard.a:gd_memory.o(.bss*);
       BUILD_DIR/libgoddard.a:sfx.o(.bss*);
@@ -660,6 +690,7 @@ SECTIONS
       BUILD_DIR/libgoddard.a:skin.o(.bss*);
       BUILD_DIR/libgoddard.a:shape_helper.o(.bss*);
       BUILD_DIR/libgoddard.a:renderer.o(.bss*);
+      BUILD_DIR/libgoddard.a:*.o(.bss*);
    }
    END_NOLOAD(goddard)
 
@@ -668,14 +699,16 @@ SECTIONS
    . = SEG_BUFFERS;
    BEGIN_NOLOAD(buffers)
    {
-      BUILD_DIR/src/game/buffers.o(.bss*);
+      BUILD_DIR/src/buffers/buffers.o(.bss*);
       BUILD_DIR/src/audio/globals_start.o(.bss*);
       BUILD_DIR/src/audio/synthesis.o(.bss*);
       BUILD_DIR/src/audio/memory.o(.bss*);
       BUILD_DIR/src/audio/load.o(.bss*);
       BUILD_DIR/src/audio/data.o(.bss*);
       BUILD_DIR/src/audio/globals_end.o(.bss*);
-      BUILD_DIR/data/gfx_output_buffer.o(.bss*);
+      BUILD_DIR/src/audio*.o(.bss*);
+      . = ALIGN(0x1000);
+      BUILD_DIR/src/buffers/gfx_output_buffer.o(.bss*);
    }
    END_NOLOAD(buffers)
 
@@ -688,12 +721,14 @@ SECTIONS
    /* 0x268020 0x268020-0 [0] */
    BEGIN_SEG(intro, 0x14000000)
    {
-      BUILD_DIR/bin/intro/header.o(.level);
+      BUILD_DIR/levels/intro/script.o(.data);
+      BUILD_DIR/levels/intro/geo.o(.data);
    }
    END_SEG(intro)
    BEGIN_SEG(intro_segment_7, 0x07000000)
    {
-      BUILD_DIR/bin/intro/header.o(.seg07);
+      BUILD_DIR/levels/intro/leveldata.mio0.o(.data);
+      . = ALIGN(0x10);
    }
    END_SEG(intro_segment_7)
 
@@ -718,6 +753,8 @@ SECTIONS
       BUILD_DIR/libgoddard.a:anim_group_2.o(.data);
       BUILD_DIR/libgoddard.a:dynlist_test_cube.o(.rodata);
       BUILD_DIR/libgoddard.a:dynlist_unused.o(.rodata);
+      BUILD_DIR/libgoddard.a:*.o(.data);
+      BUILD_DIR/libgoddard.a:*.o(.rodata);
    }
    END_SEG(gd_dynlists)
 
@@ -725,18 +762,20 @@ SECTIONS
 
    BEGIN_SEG(menu, 0x14000000)
    {
-      BUILD_DIR/bin/menu/header.o(.level);
+      BUILD_DIR/levels/menu/script.o(.data);
+      BUILD_DIR/levels/menu/geo.o(.data);
    }
    END_SEG(menu)
    BEGIN_SEG(menu_segment_7, 0x07000000)
    {
-      BUILD_DIR/bin/menu/header.o(.seg07);
+      BUILD_DIR/levels/menu/leveldata.mio0.o(.data);
+      . = ALIGN(0x10);
    }
    END_SEG(menu_segment_7)
 
    BEGIN_SEG(scripts, 0x15000000)
    {
-      BUILD_DIR/levels/scripts.o(.level);
+      BUILD_DIR/levels/scripts.o(.data);
    }
    END_SEG(scripts)
 
@@ -766,57 +805,27 @@ SECTIONS
    MIO0_SEG(inside, 0x09000000)
    MIO0_SEG(effect, 0x0B000000)
 
-   STANDARD_LEVEL(bbh)
-   STANDARD_LEVEL(ccm)
-   STANDARD_LEVEL(castle_inside)
-   STANDARD_LEVEL(hmc)
-   STANDARD_LEVEL(ssl)
-   STANDARD_LEVEL(bob)
-   STANDARD_LEVEL(sl)
-   STANDARD_LEVEL(wdw)
-   STANDARD_LEVEL(jrb)
-   STANDARD_LEVEL(thi)
-   STANDARD_LEVEL(ttc)
-   STANDARD_LEVEL(rr)
-   STANDARD_LEVEL(castle_grounds)
-   STANDARD_LEVEL(bitdw)
-   STANDARD_LEVEL(vcutm)
-   STANDARD_LEVEL(bitfs)
-   STANDARD_LEVEL(sa)
-   STANDARD_LEVEL(bits)
-   STANDARD_LEVEL(lll)
-   STANDARD_LEVEL(ddd)
-   STANDARD_LEVEL(wf)
-   STANDARD_LEVEL(ending)
-   STANDARD_LEVEL(castle_courtyard)
-   STANDARD_LEVEL(pss)
-   STANDARD_LEVEL(cotmc)
-   STANDARD_LEVEL(totwc)
-   STANDARD_LEVEL(bowser_1)
-   STANDARD_LEVEL(wmotr)
-   STANDARD_LEVEL(bowser_2)
-   STANDARD_LEVEL(bowser_3)
-   STANDARD_LEVEL(ttm)
+#define STUB_LEVEL(_0, _1, _2, _3, _4, _5, _6, _7, _8)
+#define DEFINE_LEVEL(_0, _1, _2, folder, _4, _5, _6, _7, _8, _9, _10) STANDARD_LEVEL(folder)
+
+   #include "levels/level_defines.h"
+
+#undef STUB_LEVEL
+#undef DEFINE_LEVEL
 
    /* 4E9FA0-? [?] */
    BEGIN_SEG(assets, __romPos)
    {
       BUILD_DIR/assets/mario_anim_data.o(.data);
-      . = ALIGN(0x10);
       BUILD_DIR/assets/demo_data.o(.data);
-      . = ALIGN(0x10);
       gSoundDataADSR = .;
       BUILD_DIR/sound/sound_data.ctl.o(.data);
-      . = ALIGN(0x10);
       gSoundDataRaw = .;
       BUILD_DIR/sound/sound_data.tbl.o(.data);
-      . = ALIGN(0x10);
       gMusicData = .;
       BUILD_DIR/sound/sequences.bin.o(.data);
-      . = ALIGN(0x10);
       gBankSetsData = .;
       BUILD_DIR/sound/bank_sets.o(.data);
-      . = ALIGN(0x10);
    }
    END_SEG(assets)
 

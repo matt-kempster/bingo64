@@ -19,7 +19,7 @@ void ActionActivateCapSwitch1(void) {
     if (obj_is_mario_on_platform()) {
         save_file_set_flags(D_8032F0C0[o->oBehParams2ndByte]);
         o->oAction = 2;
-        PlaySound2(SOUND_GENERAL_EXPLOSION);
+        PlaySound2(SOUND_GENERAL_ACTIVATE_CAP_SWITCH);
     }
 }
 
@@ -28,12 +28,12 @@ void ActionActivateCapSwitch2(void) {
     if (o->oTimer < 5) {
         func_802A3398(2, 4, 0.5f, 0.1f);
         if (o->oTimer == 4) {
-            ShakeScreen(1);
+            ShakeScreen(SHAKE_POS_SMALL);
             func_802A3004();
             spawn_triangle_break_particles(60, 139, 0.3f, o->oBehParams2ndByte);
         }
     } else {
-        sp1C = obj_update_dialog_unk2(1, 12, 161, 0);
+        sp1C = obj_update_dialog_with_cutscene(1, 0x0C, CUTSCENE_CAP_SWITCH_PRESS, 0);
         if (sp1C)
             o->oAction = 3;
     }

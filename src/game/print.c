@@ -195,7 +195,8 @@ void print_text_fmt_int(s32 x, s32 y, const char *str, s32 n) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -246,7 +247,8 @@ void print_text(s32 x, s32 y, const char *str) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -272,7 +274,7 @@ void print_text_tiny(int x, int y, const char *str) {
     int len = 0;
     int srcIndex = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 60)) == NULL) {
         return;
     }
 
@@ -296,7 +298,7 @@ void print_text_not_tiny(int x, int y, const char *str) {
     int len = 0;
     int srcIndex = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 150))
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 150))
         == NULL) {
         return;
     }
@@ -321,7 +323,7 @@ void print_text_large(int x, int y, const char *str) {
     int len = 0;
     int srcIndex = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 60)) == NULL) {
         return;
     }
 
@@ -344,7 +346,7 @@ void print_vertical_line(int x, int y) {
     char c = 0;
     int len = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 60)) == NULL) {
         return;
     }
 
@@ -361,7 +363,7 @@ void print_hand(int x, int y) {
     char c = 0;
     int len = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 60)) == NULL) {
         return;
     }
 
@@ -378,7 +380,7 @@ void print_horizontal_line(int y) {
     char c = 0;
     int len = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 60)) == NULL) {
         return;
     }
 
@@ -404,7 +406,8 @@ void print_text_centered(s32 x, s32 y, const char *str) {
     s32 srcIndex = 0;
 
     // Don't continue if there is no memory to do so.
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(D_8033A124, 60)) == NULL) {
+    if ((sTextLabels[sTextLabelsCount] = mem_pool_alloc(gEffectsMemoryPool,
+                                                        sizeof(struct TextLabel))) == NULL) {
         return;
     }
 
@@ -521,7 +524,7 @@ s8 char_to_glyph_index(char a) {
  * Adds an individual glyph to be rendered.
  */
 void add_glyph_texture(s8 glyphIndex) {
-    u32 *glyphs = segmented_to_virtual(seg2_hud_lut);
+    const u8 *const *glyphs = segmented_to_virtual(main_hud_lut);
 
     gDPPipeSync(gDisplayListHead++);
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[glyphIndex]);
@@ -548,20 +551,21 @@ void clip_to_bounds(s32 *x, s32 *y) {
         *y = TEXRECT_MAX_Y;
     }
 }
+
 /**
  * Renders the glyph that's set at the given position.
  */
 void render_textrect(s32 x, s32 y, s32 pos) {
-    int sp34 = x + pos * 12;
-    int sp30 = 224 - y;
-    int sp2C;
-    int sp28;
+    s32 rectBaseX = x + pos * 12;
+    s32 rectBaseY = 224 - y;
+    s32 rectX;
+    s32 rectY;
 
-    clip_to_bounds(&sp34, &sp30);
-    sp2C = sp34;
-    sp28 = sp30;
-    gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 16) << 2, (sp28 + 16) << 2, 0,
-                        0, 0, 1024, 1024);
+    clip_to_bounds(&rectBaseX, &rectBaseY);
+    rectX = rectBaseX;
+    rectY = rectBaseY;
+    gSPTextureRectangle(gDisplayListHead++, rectX << 2, rectY << 2, (rectX + 16) << 2,
+                        (rectY + 16) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
 }
 
 static void render_large_text(int x, int y, int pos) {
@@ -658,7 +662,7 @@ static void render_tiny_text(struct TextLabel *text) {
         text->buffer[i] = tiny_text_convert_ascii(text->buffer[i]);
     }
     text->buffer[text->length] = 0xFF;
-    PrintRegularTextButTiny(text->x, text->y, text->buffer);
+    print_generic_string_but_tiny(text->x, text->y, text->buffer);
 }
 
 static void render_not_tiny_text(struct TextLabel *text) {
@@ -668,7 +672,7 @@ static void render_not_tiny_text(struct TextLabel *text) {
         text->buffer[i] = tiny_text_convert_ascii(text->buffer[i]);
     }
     text->buffer[text->length] = 0xFF;
-    PrintGenericText(text->x, text->y, text->buffer);
+    print_generic_string(text->x, text->y, text->buffer);
 }
 
 static void render_horizontal_line(int x, int y, int pos) {
@@ -709,7 +713,7 @@ void render_text_labels(void) {
 
     // TODO: add gbBingoCompleted check.
     if (gPlayer1Controller->buttonDown & L_TRIG && gHudDisplay.flags != HUD_DISPLAY_NONE) {
-        ShadeScreen();
+        shade_screen();
     }
 
     if (sTextLabelsCount == 0) {
@@ -726,7 +730,7 @@ void render_text_labels(void) {
     //!!!! This is incredibly fragile!
     // It assumes the not tiny text comes before the tiny text in the order of
     // a frame. Look here first if something breaks.
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_begin);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
     for (i = 0; i < sTextLabelsCount; i++) {
         if (sTextLabels[i]->size == 3) {
@@ -734,7 +738,7 @@ void render_text_labels(void) {
         }
     }
     // dl_add_new_scale_matrix(MENU_MTX_PUSH, 0.5, 0.5, 1.0f);
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_end);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
     gSPDisplayList(gDisplayListHead++, my_fancy_custom_text_dl);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
 
@@ -743,7 +747,7 @@ void render_text_labels(void) {
             render_tiny_text(sTextLabels[i]);
         }
     }
-    gSPDisplayList(gDisplayListHead++, dl_ia8_text_end);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 
     guOrtho(mtx, 0.0f, 320.0f, 0.0f, 240.0f, -10.0f, 10.0f, 1.0f);
     gSPPerspNormalize((Gfx *) (gDisplayListHead++), 0x0000FFFF);
@@ -784,7 +788,7 @@ void render_text_labels(void) {
             }
         }
 
-        mem_pool_free(D_8033A124, (void *)sTextLabels[i]);
+        mem_pool_free(gEffectsMemoryPool, (void *)sTextLabels[i]);
     }
 
     gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
