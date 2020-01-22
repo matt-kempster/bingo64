@@ -13,7 +13,7 @@
 #include "bingo_ui.h"
 #include "bingo_descriptions.h"
 #include "ingame_menu.h"
-#include "file_select.h"
+#include "menu/file_select.h"
 #include "engine/behavior_script.h"
 #include "level_update.h"
 #include "strcpy.h"

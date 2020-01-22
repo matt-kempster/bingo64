@@ -21,22 +21,22 @@
 #define DEBUG_ASSERT(exp)
 #endif
 
-// Use these macros in places where aliasing is used to split a variable into
-// smaller parts
-#if ENDIAN_IND
+// Pointer casting is technically UB, and avoiding it gets rid of endian issues
+// as well as a nice side effect.
+#ifdef AVOID_UB
 #define GET_HIGH_U16_OF_32(var) ((u16)((var) >> 16))
 #define GET_HIGH_S16_OF_32(var) ((s16)((var) >> 16))
 #define GET_LOW_U16_OF_32(var) ((u16)((var) & 0xFFFF))
 #define GET_LOW_S16_OF_32(var) ((s16)((var) & 0xFFFF))
-#define SET_HIGH_U16_OF_32(var, val) ((var) = ((var) & 0xFFFF) | ((val) << 16))
-#define SET_HIGH_S16_OF_32(var, val) ((var) = ((var) & 0xFFFF) | ((val) << 16))
+#define SET_HIGH_U16_OF_32(var, x) ((var) = ((var) & 0xFFFF) | ((x) << 16))
+#define SET_HIGH_S16_OF_32(var, x) ((var) = ((var) & 0xFFFF) | ((x) << 16))
 #else
 #define GET_HIGH_U16_OF_32(var) (((u16 *)&(var))[0])
 #define GET_HIGH_S16_OF_32(var) (((s16 *)&(var))[0])
 #define GET_LOW_U16_OF_32(var) (((u16 *)&(var))[1])
 #define GET_LOW_S16_OF_32(var) (((s16 *)&(var))[1])
-#define SET_HIGH_U16_OF_32(var, val) ((((u16 *)&(var))[0]) = (val))
-#define SET_HIGH_S16_OF_32(var, val) ((((s16 *)&(var))[0]) = (val))
+#define SET_HIGH_U16_OF_32(var, x) ((((u16 *)&(var))[0]) = (x))
+#define SET_HIGH_S16_OF_32(var, x) ((((s16 *)&(var))[0]) = (x))
 #endif
 
 // Layers
@@ -122,8 +122,8 @@
 #define MARIO_TELEPORTING               0x00000080
 #define MARIO_UNKNOWN_08                0x00000100
 #define MARIO_UNKNOWN_13                0x00002000
-#define MARIO_ENVIRONMENT_NOISE_PLAYED  0x00010000
-#define MARIO_ACTION_NOISE_PLAYED       0x00020000
+#define MARIO_ACTION_SOUND_PLAYED       0x00010000
+#define MARIO_MARIO_SOUND_PLAYED        0x00020000
 #define MARIO_UNKNOWN_18                0x00040000
 #define MARIO_PUNCHING                  0x00100000
 #define MARIO_KICKING                   0x00200000
@@ -176,9 +176,9 @@
 #define ACT_SLEEPING                   0x0C000203 // (0x003 | ACT_FLAG_STATIONARY | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
 #define ACT_WAKING_UP                  0x0C000204 // (0x004 | ACT_FLAG_STATIONARY | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
 #define ACT_PANTING                    0x0C400205 // (0x005 | ACT_FLAG_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
-#define ACT_UNKNOWN_006                0x08000206 // (0x006 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
-#define ACT_UNKNOWN_007                0x08000207 // (0x007 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
-#define ACT_UNKNOWN_008                0x08000208 // (0x008 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
+#define ACT_HOLD_PANTING_UNUSED        0x08000206 // (0x006 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
+#define ACT_HOLD_IDLE                  0x08000207 // (0x007 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
+#define ACT_HOLD_HEAVY_IDLE            0x08000208 // (0x008 | ACT_FLAG_STATIONARY | ACT_FLAG_PAUSE_EXIT)
 #define ACT_STANDING_AGAINST_WALL      0x0C400209 // (0x009 | ACT_FLAG_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
 #define ACT_COUGHING                   0x0C40020A // (0x00A | ACT_FLAG_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
 #define ACT_SHIVERING                  0x0C40020B // (0x00B | ACT_FLAG_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_ALLOW_FIRST_PERSON | ACT_FLAG_PAUSE_EXIT)
@@ -414,11 +414,6 @@
 #define ACT_PICKING_UP_BOWSER          0x00000390 // (0x190 | ACT_FLAG_STATIONARY)
 #define ACT_HOLDING_BOWSER             0x00000391 // (0x191 | ACT_FLAG_STATIONARY)
 #define ACT_RELEASING_BOWSER           0x00000392 // (0x192 | ACT_FLAG_STATIONARY)
-
-// convert a virtual address to physical.
-#define VIRTUAL_TO_PHYSICAL(addr)    ((u32)(addr) & 0x1FFFFFFF)
-// convert a physical address to virtual.
-#define PHYSICAL_TO_VIRTUAL(addr)    ((u32)(addr) | 0x80000000)
 
 /*
  this input mask is unused by the controller,

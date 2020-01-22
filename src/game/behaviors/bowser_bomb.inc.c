@@ -10,12 +10,12 @@ void bhv_bowser_bomb_loop(void) {
     if (o->oInteractStatus & INTERACT_MR_BLIZZARD) /* bit 21 */
     {
         spawn_object(o, MODEL_BOWSER_FLAMES, bhvBowserBombExplosion);
-        create_sound_spawner(SOUND_GENERAL_EXPLOSION5);
-        func_8027F440(3, o->oPosX, o->oPosY, o->oPosZ);
+        create_sound_spawner(SOUND_GENERAL_BOWSER_BOMB_EXPLOSION);
+        set_camera_shake_from_point(SHAKE_POS_LARGE, o->oPosX, o->oPosY, o->oPosZ);
         o->activeFlags = 0;
     }
 
-    SetObjectVisibility(o, 7000);
+    set_object_visibility(o, 7000);
 }
 
 void bhv_bowser_bomb_explosion_loop(void) {

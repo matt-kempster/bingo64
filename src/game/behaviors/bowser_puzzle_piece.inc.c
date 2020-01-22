@@ -84,7 +84,8 @@ static struct BowserPuzzlePiece sBowserPuzzlePieces[] = {
 /**
  * Spawn a single puzzle piece.
  */
-void bhv_lll_bowser_puzzle_spawn_piece(s16 model, void *behavior, f32 xOffset, f32 zOffset,
+void bhv_lll_bowser_puzzle_spawn_piece(s16 model, const BehaviorScript *behavior,
+                                       f32 xOffset, f32 zOffset,
                                        s8 initialAction, s8 *actionList) {
     struct Object *puzzlePiece = spawn_object(o, model, behavior);
     puzzlePiece->oPosX += xOffset;
@@ -199,7 +200,7 @@ void bhv_lll_bowser_puzzle_piece_move(f32 xOffset, f32 zOffset, s32 duration, UN
     } else {
         // On frame 20, play the shifting sound.
         if (o->oTimer == 20)
-            PlaySound2(SOUND_BOWSER_PUZZLE_PIECE_MOVE);
+            PlaySound2(SOUND_OBJ2_BOWSER_PUZZLE_PIECE_MOVE);
 
         // For the number of frames specified by duration, move the piece.
         if (o->oTimer < duration + 20) {

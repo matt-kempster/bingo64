@@ -31,8 +31,8 @@ s16 gCurrCourseNum;
 s16 gCurrActNum;
 s16 gCurrAreaIndex;
 s16 gSavedCourseNum;
-s16 D_8033A75E;
-s16 D_8033A760;
+s16 gPauseScreenMode;
+s16 gSaveOptSelectIndex;
 
 struct SpawnInfo *gMarioSpawnInfo = &gPlayerSpawnInfos[0];
 struct GraphNode **gLoadedGraphNodes = D_8033A160;
@@ -50,7 +50,7 @@ u8 gWarpTransBlue = 0;
 s16 gCurrSaveFileNum = 1;
 s16 gCurrLevelNum = 1;
 
-void *D_8032CE9C[] = {
+const BehaviorScript *D_8032CE9C[] = {
     bhvDoorWarp, bhvStar,    bhvExitPodiumWarp, bhvWarp,    bhvWarpPipe, bhvFadingWarp, bhvWarps60,
     bhvWarps64,  bhvWarps68, bhvWarps6C,        bhvWarps70, bhvWarps74,  bhvWarps78,    bhvWarps94,
     bhvWarps7C,  bhvWarps80, bhvWarps88,        bhvWarps84, bhvWarps8C,  bhvWarps90,
@@ -115,7 +115,7 @@ void print_intro_text(void) {
 
 u32 get_mario_spawn_type(struct Object *o) {
     s32 i;
-    void *behavior = virtual_to_segmented(0x13, o->behavior);
+    const BehaviorScript *behavior = virtual_to_segmented(0x13, o->behavior);
 
     for (i = 0; i < 20; i++) {
         if (D_8032CE9C[i] == behavior) {
@@ -196,7 +196,7 @@ void func_8027A7C4(void) {
     if (gCurrentArea != NULL) {
         geo_call_global_function_nodes(gCurrentArea->unk04, GEO_CONTEXT_AREA_UNLOAD);
         gCurrentArea = NULL;
-        gWarpTransition.isActive = 0;
+        gWarpTransition.isActive = FALSE;
     }
 
     for (i = 0; i < 8; i++) {
@@ -233,7 +233,7 @@ void func_8027A998(void) {
 
         gCurrentArea->flags = 0;
         gCurrentArea = NULL;
-        gWarpTransition.isActive = 0;
+        gWarpTransition.isActive = FALSE;
     }
 }
 
@@ -296,42 +296,42 @@ void play_transition(s16 transType, s16 time, u8 red, u8 green, u8 blue) {
         red = gWarpTransRed, green = gWarpTransGreen, blue = gWarpTransBlue;
     }
 
-    if (transType < 8) {
+    if (transType < 8) { // if transition is RGB
         gWarpTransition.data.red = red;
         gWarpTransition.data.green = green;
         gWarpTransition.data.blue = blue;
-    } else {
+    } else { // if transition is textured
         gWarpTransition.data.red = red;
         gWarpTransition.data.green = green;
         gWarpTransition.data.blue = blue;
 
-        // Both the start and end circles are always located in the middle of the screen.
+        // Both the start and end textured transition are always located in the middle of the screen.
         // If you really wanted to, you could place the start at one corner and the end at
         // the opposite corner. This will make the transition image look like it is moving
         // across the screen.
-        gWarpTransition.data.startCircleX = 160;
-        gWarpTransition.data.startCircleY = 120;
-        gWarpTransition.data.endCircleX = 160;
-        gWarpTransition.data.endCircleY = 120;
+        gWarpTransition.data.startTexX = SCREEN_WIDTH / 2;
+        gWarpTransition.data.startTexY = SCREEN_HEIGHT / 2;
+        gWarpTransition.data.endTexX = SCREEN_WIDTH / 2;
+        gWarpTransition.data.endTexY = SCREEN_HEIGHT / 2;
 
-        gWarpTransition.data.unk10 = 0;
+        gWarpTransition.data.texTimer = 0;
 
         if (transType & 1) // Is the image fading in?
         {
-            gWarpTransition.data.startCircleRadius = 320;
+            gWarpTransition.data.startTexRadius = SCREEN_WIDTH;
             if (transType >= 0x0F) {
-                gWarpTransition.data.endCircleRadius = 16;
+                gWarpTransition.data.endTexRadius = 16;
             } else {
-                gWarpTransition.data.endCircleRadius = 0;
+                gWarpTransition.data.endTexRadius = 0;
             }
         } else // The image is fading out. (Reverses start & end circles)
         {
             if (transType >= 0x0E) {
-                gWarpTransition.data.startCircleRadius = 16;
+                gWarpTransition.data.startTexRadius = 16;
             } else {
-                gWarpTransition.data.startCircleRadius = 0;
+                gWarpTransition.data.startTexRadius = 0;
             }
-            gWarpTransition.data.endCircleRadius = 320;
+            gWarpTransition.data.endTexRadius = SCREEN_WIDTH;
         }
     }
 }
@@ -352,32 +352,33 @@ void render_game(void) {
 
         gSPViewport(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(&D_8032CF00));
 
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                      240 - BORDER_HEIGHT);
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                      SCREEN_HEIGHT - BORDER_HEIGHT);
+
         bingo_update(BINGO_UPDATE_TIMER_FRAME);
         render_hud();
 
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, 320, 240);
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         render_text_labels();
         do_cutscene_handler();
         print_displaying_credits_entry();
-        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                      240 - BORDER_HEIGHT);
-        D_8033A75E = func_802DCD98();
+        gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                      SCREEN_HEIGHT - BORDER_HEIGHT);
+        gPauseScreenMode = render_menus_and_dialogs();
 
-        if (D_8033A75E != 0) {
-            D_8033A760 = D_8033A75E;
+        if (gPauseScreenMode != 0) {
+            gSaveOptSelectIndex = gPauseScreenMode;
         }
-
+        
         if (D_8032CE78 != NULL) {
             make_viewport_clip_rect(D_8032CE78);
         } else
-            gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, 320,
-                          240 - BORDER_HEIGHT);
+            gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
+                          SCREEN_HEIGHT - BORDER_HEIGHT);
 
         if (gWarpTransition.isActive) {
             if (gWarpTransDelay == 0) {
-                gWarpTransition.isActive = !func_802CC108(0, gWarpTransition.type, gWarpTransition.time,
+                gWarpTransition.isActive = !render_screen_transition(0, gWarpTransition.type, gWarpTransition.time,
                                                           &gWarpTransition.data);
                 if (!gWarpTransition.isActive) {
                     if (gWarpTransition.type & 1) {
