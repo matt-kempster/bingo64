@@ -79,6 +79,7 @@ u8 bingo_check_win() {
     return 0;
 }
 
+s32 sFadeIn = TRUE;
 void bingo_update(enum BingoObjectiveUpdate update) {
     s32 i;
     sBingoCurrUpdate = update;
@@ -96,6 +97,16 @@ void bingo_update(enum BingoObjectiveUpdate update) {
 
     if (update == BINGO_UPDATE_TIMER_FRAME && !gbBingoCompleted) {
         gbGlobalBingoTimer++;
+
+        if (gbGlobalBingoTimer % 480 == 0) {
+            if (sFadeIn == TRUE) {
+                sFadeIn = FALSE;
+                play_transition(WARP_TRANSITION_FADE_INTO_COLOR, 14, 0, 0, 0);
+            } else {
+                sFadeIn = TRUE;
+                play_transition(WARP_TRANSITION_FADE_FROM_COLOR, 14, 0, 0, 0);
+            }
+        }
     }
 
     // Timer updates can never result in bingo being won
