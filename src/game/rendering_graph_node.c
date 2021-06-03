@@ -12,34 +12,6 @@
 #include "rendering_graph_node.h"
 
 
-const Vtx triangle_verts[] = {
-    {{{   768,   -972,  -3327}, 0, { -1516,   1496}, {0xfc, 0x26, 0x88, 0xff}}},
-    {{{   768,  -1074,  -3429}, 0, { -1516,   1700}, {0xf4, 0x6e, 0xc4, 0xff}}},
-    {{{ -3071,  -1125,  -3071}, 0, {  6146,    986}, {0xb7, 0x3e, 0xae, 0xff}}},
-};
-
-const Gfx red_triangle[] = {
-    gsDPPipeSync(),
-    gsDPSetCombineMode(G_CC_DECALRGBA, G_CC_DECALRGBA),
-    gsSPClearGeometryMode(G_LIGHTING | G_CULL_BACK),
-
-    gsDPSetPrimColor(255, 255, 255, 0, 0, 255),
-    gsDPSetEnvColor(255, 0, 0, 0),
-
-    gsSPVertex(triangle_verts, 3, 0),
-    gsSP1Triangle(0, 1, 2, 0x0),
-
-    gsDPPipeSync(),
-    gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
-    gsSPSetGeometryMode(G_LIGHTING | G_CULL_BACK),
-    gsSPEndDisplayList(),
-};
-
-void render_a_triangle() {
-    gSPDisplayList(gDisplayListHead++, red_triangle);
-}
-
-
 /**
  * This file contains the code that processes the scene graph for rendering.
  * The scene graph is responsible for drawing everything except the HUD / text boxes.
@@ -158,6 +130,46 @@ u16 gAreaUpdateCounter = 0;
 LookAt lookAt;
 #endif
 
+
+// const Vtx triangle_verts[] = {
+//     {{{   768,   -972,  -3327}, 0, { -1516,   1496}, {0xfc, 0x26, 0x88, 0xff}}},
+//     {{{   768,  -1074,  -3429}, 0, { -1516,   1700}, {0xf4, 0x6e, 0xc4, 0xff}}},
+//     {{{ -3071,  -1125,  -3071}, 0, {  6146,    986}, {0xb7, 0x3e, 0xae, 0xff}}},
+// };
+
+// const Gfx red_triangle[] = {
+//     gsDPPipeSync(),
+//     gsSPClearGeometryMode(G_LIGHTING | G_CULL_BACK),
+//     gsDPSetRenderMode(G_RM_ZB_XLU_DECAL, G_RM_ZB_XLU_DECAL),
+//     gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
+
+//     gsDPSetPrimColor(0, 0, 255, 0, 0, 200),
+
+//     gsSPVertex(triangle_verts, 3, 0),
+//     gsSP1Triangle(0, 1, 2, 0x0),
+
+//     gsDPPipeSync(),
+//     gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
+//     gsSPSetGeometryMode(G_LIGHTING | G_CULL_BACK),
+//     gsSPEndDisplayList(),
+// };
+
+// void render_a_triangle() {
+//     s32 i;
+//     Mtx *mtx;
+
+//     mtx = alloc_display_list(sizeof(Mtx));
+
+//     //XXX: This is hacky. Ths camera's look-at matrix is stored in gMatStack[1], so this is a simple way
+//     //     of using it without reconstructing the matrix.
+//     mtxf_to_mtx(mtx, gMatStack[1]);
+//     gSPMatrix(gDisplayListHead++, mtx, G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+
+//     gSPDisplayList(gDisplayListHead++, red_triangle);
+//     gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+// }
+
+
 /**
  * Process a master list node.
  */
@@ -191,8 +203,10 @@ static void geo_process_master_list_sub(struct GraphNodeMasterList *node) {
                 currList = currList->next;
             }
         }
+        // if (i == 6) {
+        //     render_a_triangle();
+        // }
     }
-    render_a_triangle();
     if (enableZBuffer != 0) {
         gDPPipeSync(gDisplayListHead++);
         gSPClearGeometryMode(gDisplayListHead++, G_ZBUFFER);
@@ -1086,7 +1100,6 @@ void geo_process_root(struct GraphNodeRoot *node, Vp *b, Vp *c, s32 clearColor) 
         gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(gMatStackFixed[gMatStackIndex]),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gCurGraphNodeRoot = node;
-        // render_a_triangle();
         if (node->node.children != NULL) {
             geo_process_node_and_siblings(node->node.children);
         }

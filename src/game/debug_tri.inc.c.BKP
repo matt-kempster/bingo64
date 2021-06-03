@@ -1,0 +1,129 @@
+#include <ultra64.h>
+
+#include "sm64.h"
+#include "game/game_init.h"
+#include "game/geo_misc.h"
+#include "engine/math_util.h"
+
+#include "debug_tri.h"
+
+/**
+ * Internal struct containing tri info
+ */
+struct DebugTri {
+    Vec3s v1;
+    Vec3s v2;
+    Vec3s v3;
+};
+
+struct DebugTri *sTris[100];
+s16 sNumTris = 0;
+
+extern Mat4 gMatStack[32]; //XXX: Hack
+
+/**
+ * The debug triangles' transparency
+ */
+#define DBG_TRI_ALPHA 0x7F
+/**
+ * The debug triangles' color
+ */
+#define DBG_TRI_COL 0xFF, 0, 0, DBG_TRI_ALPHA
+
+/**
+ * Sets up the RCP for drawing the triangles
+ */
+static const Gfx dl_debug_tri_begin[] = {
+    gsDPPipeSync(),
+#if DBG_TRI_ALPHA < 0xFF
+    gsDPSetRenderMode(G_RM_ZB_XLU_DECAL, G_RM_NOOP2),
+#else
+    gsDPSetRenderMode(G_RM_ZB_OPA_DECAL, G_RM_NOOP2),
+#endif
+    gsSPClearGeometryMode(G_LIGHTING | G_CULL_BACK),
+    gsSPSetGeometryMode(G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH),
+    gsSPTexture(0, 0, 0, 0, G_OFF),
+    gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
+    gsSPEndDisplayList(),
+};
+
+/**
+ * Actually draws the tri
+ */
+static const Gfx dl_debug_draw_tri[] = {
+    gsSP1Triangle(0,  1,  2, 0x0),
+    gsSPEndDisplayList(),
+};
+
+/**
+ * Adds a tri to the list to be rendered this frame.
+ *
+ * If there are already MAX_DEBUG_TRIS triangles, does nothing.
+ */
+static void append_debug_tri(Vec3s v1, Vec3s v2, Vec3s v3)
+{
+    if (sNumTris >= 100 ||
+       (sTris[sNumTris] = mem_pool_alloc(gEffectsMemoryPool, sizeof(struct DebugTri))) == NULL) {
+        return;
+    }
+
+    vec3s_copy(sTris[sNumTris]->v1, v1);
+    vec3s_copy(sTris[sNumTris]->v2, v2);
+    vec3s_copy(sTris[sNumTris]->v3, v3);
+
+
+    ++sNumTris;
+}
+
+void debug_tri(Vec3s v1, Vec3s v2, Vec3s v3)
+{
+    append_debug_tri(v1, v2, v3);
+}
+
+static void render_tri(struct DebugTri *tri)
+{
+    Vtx *verts = alloc_display_list(3 * sizeof(Vtx));
+
+    if (verts != NULL) {
+
+        make_vertex(verts, 0, tri->v1[0], tri->v1[1], tri->v1[2], 0, 0, DBG_TRI_COL);
+        make_vertex(verts, 1, tri->v2[0], tri->v2[1], tri->v2[2], 0, 0, DBG_TRI_COL);
+        make_vertex(verts, 2, tri->v3[0], tri->v3[1], tri->v3[2], 0, 0, DBG_TRI_COL);
+        
+        gSPVertex(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(verts), 3, 0);
+
+        gSPDisplayList(gDisplayListHead++, dl_debug_draw_tri);
+    }
+}
+
+void render_debug_tris()
+{
+    s32 i;
+    Mtx *mtx;
+
+    if (sNumTris == 0) {
+        return;
+    }
+
+    mtx = alloc_display_list(sizeof(Mtx));
+    if (mtx == NULL) {
+        for (i = 0; i < sNumTris; ++i) {
+            mem_pool_free(gEffectsMemoryPool, sTris[i]);
+        }
+        sNumTris = 0;
+        return;
+    }
+
+    //XXX: This is hacky. Ths camera's look-at matrix is stored in gMatStack[1], so this is a simple way
+    //     of using it without reconstructing the matrix.
+    mtxf_to_mtx(mtx, gMatStack[1]);
+    gSPMatrix(gDisplayListHead++, mtx, G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gSPDisplayList(gDisplayListHead++, dl_debug_tri_begin);
+
+    for (i = 0; i < sNumTris; ++i) {
+        render_tri(sTris[i]);
+        mem_pool_free(gEffectsMemoryPool, sTris[i]);
+    }
+
+    sNumTris = 0;
+}

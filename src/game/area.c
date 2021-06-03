@@ -20,6 +20,7 @@
 #include "engine/geo_layout.h"
 #include "bingo.h"
 #include "save_file.h"
+#include "debug_box.h"
 
 struct SpawnInfo gPlayerSpawnInfos[1];
 struct GraphNode *D_8033A160[0x100];
@@ -350,6 +351,8 @@ void render_game(void) {
     bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
     if (gCurrentArea != NULL && !gWarpTransition.pauseRendering) {
         geo_process_root(gCurrentArea->unk04, D_8032CE74, D_8032CE78, gFBSetColor);
+
+        one_triangle_loop();
 
         gSPViewport(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(&D_8032CF00));
 
