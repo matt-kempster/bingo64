@@ -186,6 +186,51 @@ void iterate_surfaces_visual(s32 x, s32 z, Vtx *verts) {
     }
 }
 
+void all_triangles_visual(s32 x, s32 z, Vtx *verts) {
+    struct SurfaceNode *node = NULL;
+    struct Surface *surf;
+    s32 i, j;
+    s32 col[3] = { 0xFF, 0x00, 0x00 };
+
+    for (i = 0; i < 16; i++) {
+        for (j = 0; j < 16; j++) {
+            node = gStaticSurfacePartition[i][j][SPATIAL_PARTITION_FLOORS].next;
+            while (node != NULL) {
+                surf = node->surface;
+                node = node->next;
+
+                make_vertex(verts, gVisualSurfaceCount, surf->vertex1[0], surf->vertex1[1],
+                            surf->vertex1[2], 0, 0, col[0], col[1], col[2], 0x80);
+                make_vertex(verts, gVisualSurfaceCount + 1, surf->vertex2[0], surf->vertex2[1],
+                            surf->vertex2[2], 0, 0, col[0], col[1], col[2], 0x80);
+                make_vertex(verts, gVisualSurfaceCount + 2, surf->vertex3[0], surf->vertex3[1],
+                            surf->vertex3[2], 0, 0, col[0], col[1], col[2], 0x80);
+
+                gVisualSurfaceCount += 3;
+            }
+        }
+    }
+}
+
+s32 all_triangles_count() {
+    struct SurfaceNode *node = NULL;
+    struct Surface *surf;
+    s32 i, j;
+    s32 col[3] = { 0xFF, 0x00, 0x00 };
+    s32 count = 0;
+
+    for (i = 0; i < 16; i++) {
+        for (j = 0; j < 16; j++) {
+            node = gStaticSurfacePartition[i][j][SPATIAL_PARTITION_FLOORS].next;
+            while (node != NULL) {
+                count++;
+                node = node->next;
+            }
+        }
+    }
+    return count;
+}
+
 void one_triangle_visual(s32 x, s32 z, Vtx *verts) {
     struct SurfaceNode *node = NULL;
     struct Surface *surf;
@@ -342,6 +387,34 @@ void one_triangle_loop(void) {
     gSPMatrix(gDisplayListHead++, mtx, G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
 
     one_triangle_visual(gMarioState->pos[0], gMarioState->pos[2], verts);
+
+    visual_surface_display(verts);
+
+    gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+}
+
+void all_triangles_loop(void) {
+    Vtx *verts;
+    Mtx *mtx;
+
+    if (!gSurfaceNodesAllocated || !gSurfacesAllocated || !gMarioState->marioObj || !fDebug2)
+        return;
+
+    mtx = alloc_display_list(sizeof(Mtx));
+    verts = alloc_display_list((all_triangles_count() * 3) * sizeof(Vtx));
+
+    gVisualSurfaceCount = 0;
+
+    if (mtx == NULL || verts == NULL)
+        return;
+
+    mtxf_to_mtx(mtx, gMatStack[1]);
+
+    gSPDisplayList(gDisplayListHead++, dl_visual_surface);
+
+    gSPMatrix(gDisplayListHead++, mtx, G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+
+    all_triangles_visual(gMarioState->pos[0], gMarioState->pos[2], verts);
 
     visual_surface_display(verts);
 

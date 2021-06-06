@@ -53,7 +53,7 @@ s8 gDebugLevelSelect = 0;
 s8 D_8032C650 = 0;
 
 s8 gShowProfiler = FALSE;
-s8 gShowDebugText = FALSE;
+s8 gShowDebugText = 1;
 
 // unused
 void handle_debug_key_sequences(void) {

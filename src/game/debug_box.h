@@ -30,5 +30,6 @@ void debug_box_pos_rot(Vec3f pMin, Vec3f pMax, s16 yaw, s32 type);
 void render_debug_boxes(void);
 extern void visual_surface_loop(void);
 extern void one_triangle_loop(void);
+extern void all_triangles_loop(void);
 
 #endif /* DEBUG_BOX_H */
