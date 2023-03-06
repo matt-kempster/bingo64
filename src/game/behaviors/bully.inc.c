@@ -292,6 +292,9 @@ void bhv_big_bully_with_minions_init(void) {
 
 void BigBullyWithMinionsLavaDeath(void) {
     if (obj_lava_death() == 1) {
+        if (is_new_kill(BINGO_UPDATE_KILLED_BULLY, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_KILLED_BULLY);
+        }
         func_802A3004();
         create_star(3700.0f, 600.0f, -5500.0f);
     }
