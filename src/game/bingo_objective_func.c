@@ -254,8 +254,8 @@ s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum Bingo
     s32 old_count = 0;
     enum CourseNum course;
     if (update == BINGO_UPDATE_STAR) {
-        for (course = COURSE_BOB; course < COURSE_RR; course++) {
-            count += bingo_get_course_count(course - 1) > 0 ? 1 : 0;
+        for (course = COURSE_BOB; course <= COURSE_RR; course++) {
+            count += bingo_get_course_count(course) > 0 ? 1 : 0;
         }
         old_count = objective->data.collectableData.gotten;
         objective->data.collectableData.gotten = count;
