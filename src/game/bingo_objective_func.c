@@ -451,6 +451,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_generic_collectable(objective, update, BINGO_UPDATE_VANISH_CAP_BOX);
         case BINGO_OBJECTIVE_METAL_CAP_BOX:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_METAL_CAP_BOX);
+        case BINGO_OBJECTIVE_RECOVERY_HEART:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_RECOVERY_HEART);
         case BINGO_OBJECTIVE_AMPS:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_ZAPPED_BY_AMP);
         case BINGO_OBJECTIVE_KILL_GOOMBAS:

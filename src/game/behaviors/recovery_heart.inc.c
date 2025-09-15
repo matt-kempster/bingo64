@@ -1,4 +1,7 @@
 
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
+
 struct ObjectHitbox sRecoveryHeartHitbox = {
     /* interactType:      */ 0,
     /* downOffset:        */ 0,
@@ -12,11 +15,18 @@ struct ObjectHitbox sRecoveryHeartHitbox = {
 };
 
 void bhv_recovery_heart_loop(void) {
+    if (!o->oBingoId) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_RECOVERY_HEART, o->oPosX, o->oPosY, o->oPosZ);
+    }
     set_object_hitbox(o, &sRecoveryHeartHitbox);
     if (are_objects_collided(o, gMarioObject)) {
         if (o->oSpinningHeartPlayedSound == 0) {
             PlaySound2(SOUND_GENERAL_HEART_SPIN);
             o->oSpinningHeartPlayedSound += 1;
+        }
+
+        if (is_new_kill(BINGO_UPDATE_RECOVERY_HEART, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_RECOVERY_HEART);
         }
 
         o->oAngleVelYaw = (s32)(200.0f * gMarioStates[0].forwardVel) + 1000;
