@@ -1,0 +1,3 @@
+#ifndef HOST_STUB_FILE_SELECT_H
+#define HOST_STUB_FILE_SELECT_H
+#endif
