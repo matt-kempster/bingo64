@@ -1,0 +1,7 @@
+# From power-on: pass the seed screen with a random seed, walk toward the
+# castle, then hold L so the bingo board is visible for the last screenshot.
+# Frame numbers are stable because emulation is deterministic.
+150 155 START
+320 322 A
+420 480 STICK 0 80
+520 600 L

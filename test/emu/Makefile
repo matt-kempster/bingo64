@@ -1,0 +1,24 @@
+# Emulator smoke test for bingo64.
+#
+# Builds a scripted-input plugin for mupen64plus, boots the ROM headless,
+# and checks the screenshots. Needs the mupen64plus install (default
+# ~/opt/m64p/install) and its core sources for the plugin API headers.
+
+M64P_SRC ?= $(HOME)/opt/m64p/mupen64plus-core/src/api
+BUILD := build
+
+.PHONY: test plugin clean
+
+plugin: $(BUILD)/input_script.so
+
+$(BUILD):
+	mkdir -p $(BUILD)
+
+$(BUILD)/input_script.so: input_script.c | $(BUILD)
+	gcc -shared -fPIC -O2 -Wall -Wextra -I $(M64P_SRC) -o $@ $<
+
+test: plugin
+	python3 smoke_test.py
+
+clean:
+	rm -rf $(BUILD)

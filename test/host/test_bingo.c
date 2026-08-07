@@ -552,6 +552,15 @@ static void test_win_detection(void) {
 }
 
 int main(void) {
+    // BOARD_SEED=n prints that board instead of running tests. Handy for
+    // comparing against what the ROM shows on screen.
+    const char *seedArg = getenv("BOARD_SEED");
+    if (seedArg != NULL) {
+        generate_board((u32) strtoul(seedArg, NULL, 10));
+        dump_board(stdout);
+        return 0;
+    }
+
     RUN_TEST(test_mt19937_reference);
     RUN_TEST(test_same_seed_same_board);
     RUN_TEST(test_different_seed_different_board);
