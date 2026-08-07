@@ -7,7 +7,9 @@
 M64P_SRC ?= $(HOME)/opt/m64p/mupen64plus-core/src/api
 BUILD := build
 
-.PHONY: test plugin clean
+.PHONY: test test-smoke test-ram plugin clean
+
+test: test-smoke test-ram
 
 plugin: $(BUILD)/input_script.so
 
@@ -17,8 +19,12 @@ $(BUILD):
 $(BUILD)/input_script.so: input_script.c | $(BUILD)
 	gcc -shared -fPIC -O2 -Wall -Wextra -I $(M64P_SRC) -o $@ $<
 
-test: plugin
+test-smoke: plugin
 	python3 smoke_test.py
+
+# Needs the core built with DEBUGGER=1 for RAM reads.
+test-ram: plugin
+	xvfb-run -a python3 ram_test.py
 
 clean:
 	rm -rf $(BUILD)
