@@ -1,0 +1,25 @@
+00 type=03 class=2 icon=05 title="THIú6" course=13 star=5 hint="Enter Huge Island, use the shell, and use Chuckya to clip into the mountain."
+01 type=13 class=1 icon=18 title="SSLú5" course=8 toGet=4
+02 type=10 class=1 icon=12 title="SL 86" course=10 toGet=86
+03 type=24 class=1 icon=27 title="x12" toGet=12
+04 type=23 class=0 icon=20 title="x3" toGet=3
+05 type=37 class=1 icon=39 title="x8" toGet=8
+06 type=10 class=0 icon=12 title="LLL 36" course=7 toGet=36
+07 type=24 class=1 icon=27 title="x7" toGet=7
+08 type=08 class=2 icon=10 title="BOBú3" course=1 star=2
+09 type=06 class=1 icon=08 title="BOBú5" course=1 star=4 maxClicks=0
+10 type=13 class=1 icon=18 title="BitSú" course=18 toGet=0
+11 type=13 class=1 icon=18 title="SAú" course=24 toGet=0
+12 type=33 class=3 icon=35 title="x19" toGet=19
+13 type=26 class=1 icon=26 title="x7" toGet=7
+14 type=35 class=1 icon=37 title="x14" toGet=14
+15 type=38 class=1 icon=40 title="x11" toGet=11
+16 type=06 class=2 icon=08 title="RRú6" course=15 star=5 maxClicks=3
+17 type=10 class=1 icon=12 title="TTM 88" course=12 toGet=88
+18 type=17 class=0 icon=24 title="x3" toGet=3
+19 type=01 class=1 icon=03 title="THIú3" course=13 star=2 maxTime=2820
+20 type=10 class=0 icon=12 title="TTM 30" course=12 toGet=30
+21 type=06 class=1 icon=08 title="TTCú6" course=14 star=5 maxClicks=0
+22 type=09 class=1 icon=11 title="WFú4" course=2 star=3
+23 type=39 class=1 icon=41 title="x2" toGet=2
+24 type=20 class=2 icon=14 title="x10" toGet=10

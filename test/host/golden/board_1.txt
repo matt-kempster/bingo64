@@ -1,0 +1,25 @@
+00 type=10 class=0 icon=12 title="CCM 36" course=4 toGet=36
+01 type=26 class=1 icon=26 title="x9" toGet=9
+02 type=11 class=1 icon=16 title="LLL 6" course=7 toGet=6
+03 type=34 class=1 icon=36 title="x10" toGet=10
+04 type=12 class=2 icon=17 title="JRB 7" course=3 toGet=7
+05 type=06 class=1 icon=08 title="SSLú1" course=8 star=0 maxClicks=0
+06 type=27 class=2 icon=28 title="x20" toGet=20
+07 type=14 class=1 icon=19 title="7x 3c" toGetTotal=3 toGetEachCourse=7
+08 type=17 class=0 icon=24 title="x3" toGet=3
+09 type=37 class=1 icon=39 title="x4" toGet=4
+10 type=27 class=1 icon=28 title="x14" toGet=14
+11 type=11 class=1 icon=16 title="WMotR 3" course=23 toGet=3
+12 type=21 class=3 icon=15 title="x15" toGet=15
+13 type=09 class=1 icon=11 title="RRú7" course=15 star=6
+14 type=24 class=1 icon=27 title="x10" toGet=10
+15 type=00 class=1 icon=02 title="BitDWú" course=16 star=0
+16 type=23 class=0 icon=20 title="x4" toGet=4
+17 type=02 class=1 icon=04 title="TTCú4" course=14 star=3
+18 type=11 class=2 icon=16 title="CCM 5" course=4 toGet=5
+19 type=09 class=1 icon=11 title="BitFSú" course=17 star=0
+20 type=08 class=2 icon=10 title="THIú6" course=13 star=5
+21 type=28 class=1 icon=29 title="x10" toGet=10
+22 type=26 class=1 icon=26 title="x9" toGet=9
+23 type=21 class=1 icon=15 title="x4" toGet=4
+24 type=22 class=0 icon=21 title="x3" toGet=3
