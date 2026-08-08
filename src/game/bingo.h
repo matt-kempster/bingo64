@@ -41,6 +41,8 @@ enum BingoModifier {
 };
 
 extern enum BingoModifier gBingoStarSelected;
+extern enum BingoModifier gBingoStickyModifier[COURSE_STAGES_COUNT];
+extern s8 gBingoStickyActNum[COURSE_STAGES_COUNT];
 
 enum BingoObjectiveState
 {

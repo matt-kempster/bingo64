@@ -154,8 +154,12 @@ void render_bingo_modifier_star(void) {
     s32 xSpace = ROW_WIDTH / (BINGO_STARS_TOTAL_AMOUNT - 1);
     s32 xLeft = -(xSpace * (BINGO_STARS_TOTAL_AMOUNT - 1)) / 2;
 
-    // Zero this out every time we render the star select screen
-    gBingoStarSelected = BINGO_MODIFIER_NONE;
+    // Restore the modifier last confirmed for this course, if any.
+    if (COURSE_IS_MAIN_COURSE(gCurrCourseNum)) {
+        gBingoStarSelected = gBingoStickyModifier[gCurrCourseNum - 1];
+    } else {
+        gBingoStarSelected = BINGO_MODIFIER_NONE;
+    }
 
     for (i = 0; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
         sBingoStarSelectorModels[i] = spawn_object_abs_with_rot(
@@ -167,7 +171,7 @@ void render_bingo_modifier_star(void) {
         sBingoStarSelectorModels[i]->oStarSelectorType = STAR_SELECTOR_100_COINS;
     }
     #undef ROW_WIDTH
-    obj_enable_rendering_func(sBingoStarSelectorModels[0]);
+    obj_enable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
 }
 
 /**
@@ -230,6 +234,22 @@ void bhv_act_selector_init(void) {
     //! scenario by the code that shows the next uncollected star.
     if (sObtainedStars == 0) {
         sInitSelectedActNum = 1;
+    }
+
+    // Restore the act last confirmed for this course, if it is still
+    // selectable. sSelectableStarIndex counts selectable stars only, so
+    // mirror the selectability check from bhv_act_selector_loop.
+    if (COURSE_IS_MAIN_COURSE(gCurrCourseNum) && gBingoStickyActNum[gCurrCourseNum - 1] != 0) {
+        s8 stickyIndex = gBingoStickyActNum[gCurrCourseNum - 1] - 1;
+        if (stickyIndex < sVisibleStars
+            && ((stars & (1 << stickyIndex)) || stickyIndex + 1 == sInitSelectedActNum)) {
+            sSelectableStarIndex = 0;
+            for (i = 0; i < stickyIndex; i++) {
+                if ((stars & (1 << i)) || i + 1 == sInitSelectedActNum) {
+                    sSelectableStarIndex++;
+                }
+            }
+        }
     }
 
     // Render star selector objects
@@ -550,6 +570,10 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
             gDialogCourseActNum = sSelectedActIndex + 1;
             bingoClickGameActivate = 1;
             gStarSelectScreenActive = 0;
+            if (COURSE_IS_MAIN_COURSE(gCurrCourseNum)) {
+                gBingoStickyModifier[gCurrCourseNum - 1] = gBingoStarSelected;
+                gBingoStickyActNum[gCurrCourseNum - 1] = sSelectedActIndex + 1;
+            }
         }
     }
 

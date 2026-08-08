@@ -51,6 +51,11 @@ s32 gStarSelectScreenActive = 0;
 // Star Selector count models printed in the act selector menu.
 enum BingoModifier gBingoStarSelected = BINGO_MODIFIER_NONE;
 
+// Last-confirmed act selector choices, per course, so re-entering a level
+// restores them. Act 0 means "no choice saved yet".
+enum BingoModifier gBingoStickyModifier[COURSE_STAGES_COUNT] = { BINGO_MODIFIER_NONE };
+s8 gBingoStickyActNum[COURSE_STAGES_COUNT] = { 0 };
+
 struct BingoObjective gBingoObjectives[25];
 u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
 
@@ -195,8 +200,9 @@ void bingo_update(enum BingoObjectiveUpdate update) {
 
         // Put this here because, long story short, the bingo modifier
         // string renders before the game renders the stars; the star-rendering
-        // is what resets this back to NONE otherwise.
-        // TODO: be intelligent about retries
+        // is what resets this back to NONE otherwise. (On re-entry, the act
+        // selector restores the course's sticky choice from
+        // gBingoStickyModifier.)
         gBingoStarSelected = BINGO_MODIFIER_NONE;
     }
 
