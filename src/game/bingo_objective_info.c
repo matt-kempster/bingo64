@@ -164,6 +164,10 @@ ALIGNED8 static const u8 texture_hud_char_coin[] = {
 #include "textures/segment2/segment2.05800.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_splatoon[] = {
+#include "textures/segment2/custom/segment2.splatoon.rgba16.inc.c"
+};
+
 struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STAR, BINGO_ICON_STAR, { TEXT_SINGLE_STAR }, texture_hud_char_star },
     { BINGO_OBJECTIVE_STAR_TIMED, BINGO_ICON_STAR_TIMED, { TEXT_TIMED_STAR }, seg2_texture_timer },
@@ -177,6 +181,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STAR_DAREDEVIL, BINGO_ICON_STAR_DAREDEVIL, { TEXT_DAREDEVIL }, seg2_texture_daredevil },
     { BINGO_OBJECTIVE_RANDOM_RED_COINS, BINGO_ICON_RANDOM_RED_COINS, { TEXT_RANDOM_REDS }, seg2_texture_randomreds },
     { BINGO_OBJECTIVE_COIN, BINGO_ICON_COIN, { TEXT_COIN_LEVEL }, texture_hud_char_coin },
+    { BINGO_OBJECTIVE_SPLATOON, BINGO_ICON_SPLATOON, { TEXT_SPLATOON_LEVEL }, seg2_texture_splatoon },
     { BINGO_OBJECTIVE_1UPS_IN_LEVEL, BINGO_ICON_1UPS_IN_LEVEL, { TEXT_1UP_LEVEL }, seg2_texture_1up },
     { BINGO_OBJECTIVE_STARS_IN_LEVEL, BINGO_ICON_STARS_IN_LEVEL, { TEXT_STARS_LEVEL }, seg2_texture_allstarslevel },
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, BINGO_ICON_STARS_MULTIPLE_LEVELS, { TEXT_STARS_MULTI_LEVELS }, seg2_texture_lightning },

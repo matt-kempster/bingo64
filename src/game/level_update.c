@@ -647,6 +647,23 @@ struct WarpNode *get_painting_warp_node(void) {
     return warpNode;
 }
 
+// Test harnesses write a level number here from outside the game (via the
+// emulator debugger). Nothing in the game itself ever sets it. The warp acts
+// like stepping into that level's painting, so the star select screen still
+// appears for normal courses. See test/README.md.
+s32 gTestWarpRequest = 0;
+
+static void initiate_test_warp(void) {
+    s16 destLevel = gTestWarpRequest;
+    gTestWarpRequest = 0;
+
+    initiate_warp(destLevel, 1, 0x0A, 0);
+    play_transition_after_delay(WARP_TRANSITION_FADE_INTO_COLOR, 30, 255, 255, 255, 45);
+    level_set_transition(74, basic_update);
+    set_mario_action(gMarioState, ACT_DISAPPEARED, 0);
+    gMarioState->marioObj->header.gfx.node.flags &= ~0x0001;
+}
+
 /**
  * Check is mario has entered a painting, and if so, initiate a warp.
  */
@@ -986,6 +1003,11 @@ s32 play_mode_normal(void) {
 
     if (gCurrentArea != NULL) {
         update_camera(gCurrentArea->camera);
+    }
+
+    if (gTestWarpRequest != 0 && !gWarpTransition.isActive && sDelayedWarpOp == WARP_OP_NONE
+        && sWarpDest.type == WARP_TYPE_NOT_WARPING) {
+        initiate_test_warp();
     }
 
     initiate_painting_warp();

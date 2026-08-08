@@ -303,6 +303,23 @@ void get_star_timed_objective_desc(struct BingoObjective *obj, char *desc) {
     sprintf(desc, "Collect the star %s from %s in less than %s%s%s", revEncActName, revEncLevelName + 3,
             total_timestamp, suffix, rem_timestamp);
 }
+void get_splatoon_objective_desc(struct BingoObjective *obj, char *desc) {
+    char revEncLevelName[60];
+    char suffix[30];
+
+    get_level_name(revEncLevelName, obj->data.courseCollectableData.course);
+
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Remaining: %d",
+                obj->data.courseCollectableData.toGet - obj->data.courseCollectableData.gotten);
+    }
+
+    sprintf(desc, "Splatoon: ink %d tiles in %s%s", obj->data.courseCollectableData.toGet,
+            revEncLevelName + 3, suffix);
+}
+
 void get_coin_objective_desc(struct BingoObjective *obj, char *desc) {
     char revEncLevelName[60];
     char suffix[30];
@@ -637,6 +654,9 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_COIN:
             get_coin_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_SPLATOON:
+            get_splatoon_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_MULTICOIN:
             get_multicoin_objective_desc(objective, desc);

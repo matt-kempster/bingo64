@@ -17,6 +17,7 @@
 #include "audio_defines.h"
 #include "audio/external.h"
 #include "bingo_objective_func.h"
+#include "splatoon.h"
 #include "camera.h"
 #include "object_helpers.h"
 #include "behavior_data.h"
@@ -66,6 +67,8 @@ void disable_bingo_modifiers() {
     gBingoDaredevilActive = 0;
     gBingoClickGameActive = 0;
     gBingoClickCounter = -1;
+    gSplatoonEnabled = 0;
+    splatoon_clear();
 }
 
 void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveState state) {

@@ -1,0 +1,7 @@
+# Boot, warp to BOB star select (harness pokes the warp at 450).
+# Z wraps the bingo modifier selection backwards from NONE straight to
+# the last modifier (splatoon), then A enters the level with it active.
+150 155 START
+320 322 A
+570 572 Z
+700 702 A

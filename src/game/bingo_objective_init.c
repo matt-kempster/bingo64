@@ -534,6 +534,37 @@ s32 bingo_objective_coin_init(
     objective->data.courseCollectableData.gotten = 0;
 }
 
+s32 bingo_objective_splatoon_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    enum CourseNum course = random_main_course();
+    s32 pct;
+    s32 target;
+
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            pct = random_range_inclusive(10, 20);
+            break;
+        case BINGO_CLASS_HARD:
+            pct = random_range_inclusive(40, 55);
+            break;
+        case BINGO_CLASS_MEDIUM:
+        default:
+            pct = random_range_inclusive(25, 35);
+            break;
+    }
+
+    // Round to tens so the target reads cleanly on the board.
+    target = (get_floors_in_course(course) * pct / 100) / 10 * 10;
+    if (target < 20) {
+        target = 20;
+    }
+
+    objective->data.courseCollectableData.course = course;
+    objective->data.courseCollectableData.toGet = target;
+    objective->data.courseCollectableData.gotten = 0;
+}
+
 s32 bingo_objective_1ups_in_level_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
@@ -912,6 +943,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_coin_init(objective, class);
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
             return bingo_objective_1ups_in_level_init(objective, class);
+        case BINGO_OBJECTIVE_SPLATOON:
+            return bingo_objective_splatoon_init(objective, class);
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
             return bingo_objective_stars_in_level_init(objective, class);
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:

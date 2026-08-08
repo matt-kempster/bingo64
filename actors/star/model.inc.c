@@ -31,6 +31,10 @@ ALIGNED8 static const u8 star_seg3_texture_orange[] = {
 #include "actors/star/star_surface_orange_custom.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 star_seg3_texture_pink[] = {
+#include "actors/star/star_surface_pink_custom.rgba16.inc.c"
+};
+
 
 // 0x0302AEF0
 ALIGNED8 static const u8 star_seg3_texture_0302AEF0[] = {
@@ -158,6 +162,22 @@ const Gfx star_seg3_dl_gray[] = {
     gsDPSetEnvColor(255, 255, 255, 255), // may need to modify this for star fading
     gsDPSetCombineMode(G_CC_BLENDRGBFADEA, G_CC_BLENDRGBFADEA),
     gsDPLoadTextureBlock(star_seg3_texture_gray, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 64, 0, G_TX_WRAP | G_TX_NOMIRROR, G_TX_WRAP | G_TX_NOMIRROR, 5, 6, G_TX_NOLOD, G_TX_NOLOD), //! Dimensions loaded as 32x64 despite this texture having only 32x32 dimensions, harmless due to environment mapping (G_TEXTURE_GEN & gsSPTexture values)
+    gsSPTexture(0x07C0, 0x07C0, 0, G_TX_RENDERTILE, G_ON),
+    gsSPDisplayList(star_seg3_dl_0302B7B0),
+    gsDPPipeSync(),
+    gsSPTexture(0x07C0, 0x07C0, 0, G_TX_RENDERTILE, G_OFF),
+    gsSPClearGeometryMode(G_TEXTURE_GEN),
+    gsDPSetEnvColor(255, 255, 255, 255),
+    gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
+    gsSPEndDisplayList(),
+};
+
+const Gfx star_seg3_dl_pink[] = {
+    gsDPPipeSync(),
+    gsSPSetGeometryMode(G_TEXTURE_GEN),
+    gsDPSetEnvColor(255, 255, 255, 255), // may need to modify this for star fading
+    gsDPSetCombineMode(G_CC_BLENDRGBFADEA, G_CC_BLENDRGBFADEA),
+    gsDPLoadTextureBlock(star_seg3_texture_pink, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 64, 0, G_TX_WRAP | G_TX_NOMIRROR, G_TX_WRAP | G_TX_NOMIRROR, 5, 6, G_TX_NOLOD, G_TX_NOLOD), //! Dimensions loaded as 32x64 despite this texture having only 32x32 dimensions, harmless due to environment mapping (G_TEXTURE_GEN & gsSPTexture values)
     gsSPTexture(0x07C0, 0x07C0, 0, G_TX_RENDERTILE, G_ON),
     gsSPDisplayList(star_seg3_dl_0302B7B0),
     gsDPPipeSync(),

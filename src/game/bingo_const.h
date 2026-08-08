@@ -16,6 +16,7 @@ extern struct ABCData possibleABC[];
 extern s32 numPossibleABC;
 
 s32 get_1ups_in_level(enum CourseNum course);
+s32 get_floors_in_course(enum CourseNum course);
 s32 get_time_for_star(enum CourseNum course, s32 star);
 
 struct ClickInfo {

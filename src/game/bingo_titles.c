@@ -117,6 +117,7 @@ void get_objective_title(struct BingoObjective *objective) {
             get_star_objective_title(objective);
             break;
         case BINGO_OBJECTIVE_COIN:
+        case BINGO_OBJECTIVE_SPLATOON:
             get_coin_objective_title(objective);
             break;
         case BINGO_OBJECTIVE_MULTICOIN:

@@ -79,6 +79,9 @@ struct WarpDest {
 
 extern struct WarpDest sWarpDest;
 
+// Only test harnesses write this; see initiate_test_warp in level_update.c.
+extern s32 gTestWarpRequest;
+
 extern s16 D_80339EE0;
 extern s16 sDelayedWarpOp;
 extern s16 sDelayedWarpTimer;

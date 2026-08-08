@@ -24,6 +24,7 @@ struct ObjectiveWeight {
 
 struct ObjectiveWeight sWeightsEasy[] = {
     { BINGO_OBJECTIVE_COIN, 12, 2 },
+    { BINGO_OBJECTIVE_SPLATOON, 8, 1 },
     { BINGO_OBJECTIVE_STAR, 12, 3 },
     { BINGO_OBJECTIVE_LOSE_MARIO_HAT, 12, 1 },
     { BINGO_OBJECTIVE_BLJ, 12, 1 },
@@ -35,6 +36,7 @@ s32 sWeightsSizeEasy = sizeof(sWeightsEasy) / sizeof(struct ObjectiveWeight);
 
 struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_COIN, 12, NO_LIMIT },
+    { BINGO_OBJECTIVE_SPLATOON, 8, 2 },
     { BINGO_OBJECTIVE_STAR, 6, 2 },
     { BINGO_OBJECTIVE_KILL_GOOMBAS, 6, 2 },
     { BINGO_OBJECTIVE_KILL_BOBOMBS, 6, 2 },
@@ -72,6 +74,7 @@ s32 sWeightsSizeMedium = sizeof(sWeightsMedium) / sizeof(struct ObjectiveWeight)
 
 struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_STAR_TIMED, 12, 1 },
+    { BINGO_OBJECTIVE_SPLATOON, 8, 2 },
     { BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE, 12, 2 },
     { BINGO_OBJECTIVE_1UPS_IN_LEVEL, 12, 1 },
     { BINGO_OBJECTIVE_STARS_IN_LEVEL, 12, NO_LIMIT },
@@ -299,6 +302,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
                 || type1 == BINGO_OBJECTIVE_1UPS_IN_LEVEL
                 || type1 == BINGO_OBJECTIVE_STARS_IN_LEVEL
                 || type1 == BINGO_OBJECTIVE_RANDOM_RED_COINS
+                || type1 == BINGO_OBJECTIVE_SPLATOON
             )
             && (
                 obj1->data.courseCollectableData.course

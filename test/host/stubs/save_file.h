@@ -1,0 +1,3 @@
+#ifndef HOST_STUB_SAVE_FILE_H
+#define HOST_STUB_SAVE_FILE_H
+#endif

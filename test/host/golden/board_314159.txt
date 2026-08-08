@@ -1,0 +1,25 @@
+00 type=14 class=0 icon=42 title="THI 70" course=13 toGet=70
+01 type=10 class=1 icon=12 title="CCM 51" course=4 toGet=51
+02 type=37 class=1 icon=38 title="x3" toGet=3
+03 type=09 class=1 icon=11 title="BBHú1" course=5 star=0
+04 type=33 class=2 icon=34 title="x15" toGet=15
+05 type=18 class=1 icon=24 title="x3" toGet=3
+06 type=25 class=2 icon=27 title="x14" toGet=14
+07 type=09 class=1 icon=11 title="CCMú4" course=4 star=3
+08 type=24 class=0 icon=20 title="x4" toGet=4
+09 type=39 class=1 icon=40 title="x8" toGet=8
+10 type=38 class=1 icon=39 title="x4" toGet=4
+11 type=02 class=1 icon=04 title="TTCú6" course=14 star=5
+12 type=35 class=3 icon=36 title="x16" toGet=16
+13 type=27 class=1 icon=26 title="x7" toGet=7
+14 type=09 class=1 icon=11 title="TTMú5" course=12 star=4
+15 type=01 class=1 icon=03 title="BOBú1" course=1 star=0 maxTime=2760
+16 type=23 class=0 icon=21 title="x6" toGet=6
+17 type=32 class=1 icon=32 title="x9" toGet=9
+18 type=11 class=2 icon=16 title="BOB 3" course=1 toGet=3
+19 type=28 class=1 icon=28 title="x14" toGet=14
+20 type=27 class=2 icon=26 title="x7" toGet=7
+21 type=36 class=1 icon=37 title="x10" toGet=10
+22 type=31 class=1 icon=31 title="x7" toGet=7
+23 type=35 class=1 icon=36 title="x11" toGet=11
+24 type=21 class=0 icon=14 title="x4" toGet=4
