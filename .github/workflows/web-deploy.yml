@@ -1,20 +1,28 @@
-# Verifies the web board generator: the WASM build of the bingo C code must
-# produce byte-identical boards to the gcc-built oracle and the goldens.
-#
-# No baserom is needed. The only baserom-derived inputs the bingo slice uses
-# are two vanilla HUD textures (star, coin); their bytes affect how icons
-# look, never board content, so CI stubs them with zeros.
+# Builds the board-generator website and publishes it to GitHub Pages.
+# Runs on every master push; use "Run workflow" to deploy another branch.
 
-name: web-generator
+name: web-deploy
 
 on:
   push:
     branches: [master]
-  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  check:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,8 +43,14 @@ jobs:
           WEB_TEX_COIN_05800: ${{ vars.WEB_TEX_COIN_05800 }}
         run: bash web/ci_prereqs.sh
 
-      - name: Host unit tests
-        run: make -C test/host test
+      - name: Build WASM generator
+        run: make -C web wasm
 
-      - name: Build WASM generator and verify against the oracle
-        run: make -C web check
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

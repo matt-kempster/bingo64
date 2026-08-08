@@ -34,8 +34,6 @@ h1 {
   letter-spacing: 0.02em;
 }
 
-.tagline { margin: 6px 0 0; color: var(--dim); }
-
 h2 { font-size: 1.1rem; margin: 0 0 8px; }
 
 a { color: var(--accent-2); }
@@ -117,6 +115,7 @@ summary:hover { color: var(--text); }
   flex: 1 1 200px;
   max-width: 240px;
   min-height: 120px;
+  margin-top: 24px; /* header row (20px) + grid gap, to align with cell tops */
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -147,6 +146,8 @@ summary:hover { color: var(--text); }
 #board {
   display: grid;
   grid-template-columns: 1.2em repeat(5, minmax(86px, 110px));
+  /* Fixed header-row height so the detail panel can line up with the cells. */
+  grid-template-rows: 20px;
   gap: 4px;
   align-items: stretch;
 }

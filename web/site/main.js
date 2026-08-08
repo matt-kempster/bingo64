@@ -59,7 +59,13 @@ function generateBoard() {
   M.HEAPU8.fill(0, disabledPtr, disabledPtr + NUM_TYPES);
   for (const t of state.off) M.HEAPU8[disabledPtr + t] = 1;
   const ptr = M._gen_board_json(state.seed, state.target, disabledPtr);
-  return JSON.parse(M.UTF8ToString(ptr));
+  const board = JSON.parse(M.UTF8ToString(ptr));
+  // A fresh board's "Remaining: N" always repeats the count already stated
+  // in the sentence; drop it everywhere.
+  for (const cell of board.cells) {
+    cell.desc = cell.desc.replace(/\. Remaining: \d+/, '');
+  }
+  return board;
 }
 
 // Icon textures are 16x16 RGBA16 (5/5/5/1, big-endian), straight from the
@@ -231,9 +237,7 @@ function bingosyncGoals() {
         // with the objective's name from the options menu.
         name = `${OPTION_LABELS.get(cell.type) ?? '?'}: ${pretty(cell.title)}`;
       } else {
-        // A fresh board's "Remaining: N" always repeats the count already
-        // stated in the sentence; drop it for Bingosync.
-        name = cell.desc.replace(/\. Remaining: \d+/, '');
+        name = cell.desc;
       }
       return { name };
     }),
