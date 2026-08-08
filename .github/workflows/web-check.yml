@@ -1,0 +1,42 @@
+# Verifies the web board generator: the WASM build of the bingo C code must
+# produce byte-identical boards to the gcc-built oracle and the goldens.
+#
+# No baserom is needed. The only baserom-derived inputs the bingo slice uses
+# are two vanilla HUD textures (star, coin); their bytes affect how icons
+# look, never board content, so CI stubs them with zeros.
+
+name: web-generator
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libaudiofile-dev
+
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/opt/emsdk
+          ~/opt/emsdk/emsdk install latest
+          ~/opt/emsdk/emsdk activate latest
+
+      - name: Generate build prerequisites
+        env:
+          WEB_TEX_STAR_05C00: ${{ vars.WEB_TEX_STAR_05C00 }}
+          WEB_TEX_COIN_05800: ${{ vars.WEB_TEX_COIN_05800 }}
+        run: bash web/ci_prereqs.sh
+
+      - name: Host unit tests
+        run: make -C test/host test
+
+      - name: Build WASM generator and verify against the oracle
+        run: make -C web check

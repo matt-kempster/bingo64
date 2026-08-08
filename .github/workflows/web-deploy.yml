@@ -1,0 +1,56 @@
+# Builds the board-generator website and publishes it to GitHub Pages.
+# Runs on every master push; use "Run workflow" to deploy another branch.
+
+name: web-deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libaudiofile-dev
+
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/opt/emsdk
+          ~/opt/emsdk/emsdk install latest
+          ~/opt/emsdk/emsdk activate latest
+
+      - name: Generate build prerequisites
+        env:
+          WEB_TEX_STAR_05C00: ${{ vars.WEB_TEX_STAR_05C00 }}
+          WEB_TEX_COIN_05800: ${{ vars.WEB_TEX_COIN_05800 }}
+        run: bash web/ci_prereqs.sh
+
+      - name: Build WASM generator
+        run: make -C web wasm
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

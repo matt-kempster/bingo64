@@ -639,10 +639,37 @@ static void test_win_detection(void) {
 
 int main(void) {
     // BOARD_SEED=n prints that board instead of running tests. Handy for
-    // comparing against what the ROM shows on screen.
+    // comparing against what the ROM shows on screen, and used as the
+    // oracle by web/check.mjs. BOARD_TARGET=n (1, 2, 3, or 12) and
+    // BOARD_DISABLE=t1,t2,... (objective type numbers) set the same options
+    // the file select screen offers.
     const char *seedArg = getenv("BOARD_SEED");
     if (seedArg != NULL) {
+        const char *targetArg = getenv("BOARD_TARGET");
+        const char *disableArg = getenv("BOARD_DISABLE");
+        if (disableArg != NULL) {
+            char *end;
+            while (*disableArg != '\0') {
+                long type = strtol(disableArg, &end, 10);
+                if (end == disableArg) {
+                    break;
+                }
+                if (type >= 0 && type < BINGO_OBJECTIVE_TOTAL_AMOUNT) {
+                    gBingoObjectivesDisabled[type] = 1;
+                }
+                disableArg = (*end == ',') ? end + 1 : end;
+            }
+        }
         generate_board((u32) strtoul(seedArg, NULL, 10));
+        if (targetArg != NULL) {
+            // generate_board pins the target to 1; redo setup with the
+            // requested target, exactly like a fresh boot with that option.
+            save_or_restore_weights();
+            memset(gBingoObjectives, 0, sizeof(gBingoObjectives));
+            gbBingoTarget = (s32) strtol(targetArg, NULL, 10);
+            gbBingosCompleted = 0;
+            setup_bingo_objectives((u32) strtoul(seedArg, NULL, 10));
+        }
         dump_board(stdout);
         return 0;
     }
