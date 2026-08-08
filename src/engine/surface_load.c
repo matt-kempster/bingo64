@@ -14,6 +14,7 @@
 #include "game/mario.h"
 #include "game/object_list_processor.h"
 #include "game/room.h"
+#include "game/splatoon.h"
 #include "surface_load.h"
 
 s32 unused8038BE90;
@@ -541,6 +542,7 @@ void load_area_terrain(s16 index, s16 *data, s8 *surfaceRooms, s16 *macroObjects
     gSurfacesAllocated = 0;
 
     clear_static_surfaces();
+    splatoon_clear();
 
     // A while loop interating through each section of the level data. Sections of data
     // are prefixed by a terrain "type." This type is reused for surfaces as the surface
