@@ -37,16 +37,9 @@ void bhv_rando_star_init(void) {
     } else {
         o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_STAR_PURPLE];
     }
-    init_genrand(seedCopy);
-    for (sp1E = 0; sp1E < gCurrCourseNum + sp1F; sp1E++) {
-        // Here's something kind of nitpicky: I don't
-        // want the stars to appear in the same (x,y,z)
-        // position in two different courses in case peopl
-        // remember that e.g. two are right next to each other.
-        // So we call RandomU16() the same number of times as the
-        // current course.
-        seedCopy ^= RandomU16();
-    }
+    // Twist the seed per course and per star so no two courses (and no two
+    // stars) share positions players could memorize across games.
+    seedCopy ^= (u16) (gCurrCourseNum * 7919 + sp1F * 104729);
     o->oInteractionSubtype |= (INT_SUBTYPE_RANDO_STAR | INT_SUBTYPE_NO_EXIT);
 
     set_object_hitbox(o, &sCollectStarHitbox);

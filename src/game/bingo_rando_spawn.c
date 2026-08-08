@@ -215,47 +215,16 @@ AreaParamsArray *sLevelParams[] = {
     &ttmParams
 };
 
-static s32 random_area_in_level(s32 level) {
-    // I use hardcoded levels here for now because I'm evil and
-    // want you to suffer
-    switch (level) {
-        default:
-            return 1;
-        case 12: // LEVEL_JRB:
-            // Technically has the ship, but that's only sometimes
-            // accessible
-            return 1;
-        case 36: //LEVEL_TTM:
-            // Has 3 more for slide areas, but don't want to weigh those
-            // too heavily
-            if (RandomU16() % 4 == 0) {
-                return RandomU16() % 3 + 1;
-            } else {
-                return 1;
-            }
-        case 5: //LEVEL_CCM:
-        case 22: //LEVEL_LLL:
-        case 11: //LEVEL_WDW:
-            return RandomU16() % 2 + 1;
-        case 8: //LEVEL_SSL:
-            // Technically also has Eyerok room, but ignore that
-            return RandomU16() % 2 + 1;
-        case 13: //LEVEL_THI:
-            // Ignore wiggler
-            return RandomU16() % 2 + 1;
-        case 6: //LEVEL_CASTLE:
-            return RandomU16() % 3 + 1;
-    }
-}
-
 // Only uniform if used for floats. [min, max)
-static f32 get_val_in_range_uniform(f32 min, f32 max, u16 *seed) {
+// Draws from the global MT, which get_safe_position seeds; the old
+// self-feeding u16 scheme (reseed from the previous draw) collapsed into a
+// short cycle, so sparse-floor levels could search the same few candidate
+// positions forever and hang on level load.
+static f32 get_val_in_range_uniform(f32 min, f32 max) {
     if (min > max)
         return min;
 
-    init_genrand(*seed);
-    *seed = RandomU16();
-    return (*seed / (double) 0x10000 * (max - min)) + min;
+    return (RandomU16() / (double) 0x10000 * (max - min)) + min;
 }
 
 static f32 sWallCheckRaycasterSearchDist = WALL_CHECK_RAYCASTER_DEFAULT_SEARCH_DIST;
@@ -627,6 +596,8 @@ void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 ma
     struct Surface *lowFloor, *ceil, *highFloor;
     struct AreaParams *areaParams;
 
+    s32 tries = 0;
+
     if (gCurrLevelNum < 4 || sLevelParams[gCurrLevelNum - 4] == NULL) {
         pos[0] = 0;
         pos[1] = 5000;
@@ -634,8 +605,14 @@ void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 ma
         return;
     }
 
-    sAreaIndex = random_area_in_level(gCurrLevelNum);
+    // Collision queries only see the currently loaded area's surfaces, so
+    // the bounds must be that area's too.
+    sAreaIndex = gCurrAreaIndex;
     areaParams = &(*sLevelParams[gCurrLevelNum - 4])[sAreaIndex - 1];
+
+    // The search must not disturb gameplay RNG.
+    genrand_push();
+    init_genrand(*seed);
 
     // Apply this area's wall-check search distance.
     sWallCheckRaycasterSearchDist = areaParams->wallCheckRaycasterSearchDist;
@@ -681,10 +658,20 @@ void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 ma
     }
 
     while (TRUE) {
+        // Never freeze the console: after enough failed tries, give up and
+        // park the object high over the level origin.
+        if (++tries > 20000) {
+            pos[0] = 0;
+            pos[1] = 5000;
+            pos[2] = 0;
+            genrand_pop();
+            return;
+        }
+
         // Generate random position
-        pos[0] = get_val_in_range_uniform(minX, maxX, seed);
-        pos[1] = get_val_in_range_uniform(minY, maxY, seed);
-        pos[2] = get_val_in_range_uniform(minZ, maxZ, seed);
+        pos[0] = get_val_in_range_uniform(minX, maxX);
+        pos[1] = get_val_in_range_uniform(minY, maxY);
+        pos[2] = get_val_in_range_uniform(minZ, maxZ);
 
         lowFloorHeight = find_floor(pos[0], pos[1] + 20, pos[2], &lowFloor);
 
@@ -745,7 +732,7 @@ void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 ma
         if (maxHeight > maxY)
             maxHeight = maxY;
 
-        pos[1] = get_val_in_range_uniform(minHeight, maxHeight, seed);
+        pos[1] = get_val_in_range_uniform(minHeight, maxHeight);
 
         // Start checking if position is valid//
 
@@ -788,6 +775,7 @@ void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 ma
         if (!is_safe_near_walls(pos, killOnOob))
             continue;
 
+        genrand_pop();
         return;
     }
 }
