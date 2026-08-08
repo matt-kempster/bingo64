@@ -41,6 +41,9 @@
 
     <section id="boardWrap">
       <div id="board"></div>
+      <aside id="cellDetail">
+        <p class="detail-hint">Click a cell to see its objective here.</p>
+      </aside>
     </section>
 
     <details id="descriptionsBox">
@@ -59,7 +62,7 @@
         <label for="goalStyle">Goal text</label>
         <select id="goalStyle">
           <option value="desc">Full descriptions</option>
-          <option value="title">Short in-game titles</option>
+          <option value="title">Short: objective name + title</option>
         </select>
         <button id="copyGoals">Copy goals JSON</button>
       </div>

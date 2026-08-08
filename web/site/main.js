@@ -5,6 +5,7 @@ const M = await createModule();
 const NUM_TYPES = M._gen_num_objective_types();
 const VERSION = M.UTF8ToString(M._gen_version());
 const OPTIONS = JSON.parse(M.UTF8ToString(M._gen_options_json()));
+const OPTION_LABELS = new Map(OPTIONS.map((opt) => [opt.type, opt.label]));
 
 // 0xFA is the in-game filled-star glyph; titles carry it as U+00FA.
 const STAR_BYTE = 'ú';
@@ -98,10 +99,41 @@ function iconCanvas(icon) {
 // Rendering.
 
 let currentBoard = null;
+let selectedCell = -1;
+
+const coordOf = (i) => 'ABCDE'[i % 5] + (Math.floor(i / 5) + 1);
+
+function showCellDetail(i) {
+  const panel = $('cellDetail');
+  panel.replaceChildren();
+  if (i < 0) {
+    panel.appendChild(el('p', 'detail-hint', 'Click a cell to see its objective here.'));
+    return;
+  }
+  const cell = currentBoard.cells[i];
+  const head = el('div', 'detail-head');
+  head.appendChild(iconCanvas(cell.icon));
+  const heading = el('div');
+  heading.appendChild(el('div', 'detail-coord', coordOf(i)));
+  heading.appendChild(el('div', 'detail-title', pretty(cell.title)));
+  head.appendChild(heading);
+  panel.appendChild(head);
+  panel.appendChild(el('p', 'detail-desc', cell.desc));
+  panel.appendChild(el('p', 'detail-kind', OPTION_LABELS.get(cell.type) ?? ''));
+}
+
+function selectCell(i) {
+  selectedCell = selectedCell === i ? -1 : i;
+  const cells = $('board').querySelectorAll('.cell');
+  cells.forEach((node, idx) => node.classList.toggle('selected', idx === selectedCell));
+  showCellDetail(selectedCell);
+}
 
 function render() {
   currentBoard = generateBoard();
   writeHash();
+  selectedCell = -1;
+  showCellDetail(-1);
 
   $('seed').value = String(state.seed);
   $('target').value = String(state.target);
@@ -118,6 +150,7 @@ function render() {
     div.title = `${cols[i % 5]}${Math.floor(i / 5) + 1}: ${cell.desc}`;
     div.appendChild(iconCanvas(cell.icon));
     div.appendChild(el('div', 'cell-title', pretty(cell.title)));
+    div.addEventListener('click', () => selectCell(i));
     board.appendChild(div);
   });
 
@@ -191,7 +224,19 @@ async function copyText(text, message) {
 function bingosyncGoals() {
   const useTitle = $('goalStyle').value === 'title';
   return JSON.stringify(
-    currentBoard.cells.map((cell) => ({ name: useTitle ? pretty(cell.title) : cell.desc })),
+    currentBoard.cells.map((cell) => {
+      let name;
+      if (useTitle) {
+        // The bare in-game title ("x6") means nothing off-screen; pair it
+        // with the objective's name from the options menu.
+        name = `${OPTION_LABELS.get(cell.type) ?? '?'}: ${pretty(cell.title)}`;
+      } else {
+        // A fresh board's "Remaining: N" always repeats the count already
+        // stated in the sentence; drop it for Bingosync.
+        name = cell.desc.replace(/\. Remaining: \d+/, '');
+      }
+      return { name };
+    }),
   );
 }
 

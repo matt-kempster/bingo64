@@ -20,7 +20,7 @@ body {
 }
 
 header, main, footer {
-  max-width: 720px;
+  max-width: 860px;
   margin: 0 auto;
   padding: 0 16px;
 }
@@ -104,7 +104,45 @@ summary:hover { color: var(--text); }
 .option:hover { background: var(--panel-2); }
 .option .icon { width: 20px; height: 20px; }
 
-#boardWrap { display: flex; justify-content: center; margin: 16px 0; }
+#boardWrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+#cellDetail {
+  flex: 1 1 200px;
+  max-width: 240px;
+  min-height: 120px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  position: sticky;
+  top: 12px;
+}
+
+.detail-hint { margin: 0; color: var(--dim); font-size: 0.9rem; }
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.detail-head .icon { width: 32px; height: 32px; }
+
+.detail-coord { color: var(--accent); font-weight: 700; font-size: 0.8rem; }
+
+.detail-title { font-weight: 700; }
+
+.detail-desc { margin: 0 0 8px; font-size: 0.95rem; }
+
+.detail-kind { margin: 0; color: var(--dim); font-size: 0.85rem; }
 
 #board {
   display: grid;
@@ -132,10 +170,16 @@ summary:hover { color: var(--text); }
   gap: 4px;
   padding: 10px 4px 8px;
   min-height: 86px;
-  cursor: help;
+  cursor: pointer;
 }
 
 .cell:hover { border-color: var(--accent); background: var(--panel-2); }
+
+.cell.selected {
+  border-color: var(--accent);
+  background: var(--panel-2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
 
 .icon {
   width: 40px;
