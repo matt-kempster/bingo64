@@ -211,11 +211,13 @@ extern const GeoLayout star_red_geo[];
 extern const GeoLayout star_blue_geo[];
 extern const GeoLayout star_orange_geo[];
 extern const GeoLayout star_gray_geo[];
+extern const GeoLayout star_pink_geo[];
 extern const Gfx star_seg3_dl_green[];
 extern const Gfx star_seg3_dl_red[];
 extern const Gfx star_seg3_dl_blue[];
 extern const Gfx star_seg3_dl_orange[];
 extern const Gfx star_seg3_dl_gray[];
+extern const Gfx star_seg3_dl_pink[];
 
 // transparent_star
 extern const GeoLayout transparent_star_geo[];

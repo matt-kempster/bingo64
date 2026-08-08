@@ -79,6 +79,7 @@ const LevelScript level_main_scripts_entry[] = {
     LOAD_MODEL_FROM_GEO(MODEL_STAR_BLUE,               star_blue_geo),
     LOAD_MODEL_FROM_GEO(MODEL_STAR_GRAY,               star_gray_geo),
     LOAD_MODEL_FROM_GEO(MODEL_STAR_ORANGE,             star_orange_geo),
+    LOAD_MODEL_FROM_GEO(MODEL_STAR_PINK,               star_pink_geo),
 
     LOAD_MODEL_FROM_GEO(MODEL_TRANSPARENT_STAR,        transparent_star_geo),
     LOAD_MODEL_FROM_GEO(MODEL_WOODEN_SIGNPOST,         wooden_signpost_geo),

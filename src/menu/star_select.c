@@ -20,6 +20,7 @@
 #include "game/bingo.h"
 #include "game/bingo_tracking_star.h"
 #include "game/camera.h"
+#include "game/splatoon.h"
 
 /**
  * @file star_select.c
@@ -136,48 +137,36 @@ void render_100_coin_star(u8 stars) {
  * Renders the extra Bingo "modifier" star.
  */
 void render_bingo_modifier_star(void) {
+    // Indexed by enum BingoModifier.
+    static const u32 sBingoStarModels[BINGO_STARS_TOTAL_AMOUNT] = {
+        MODEL_STAR,        // BINGO_MODIFIER_NONE
+        MODEL_STAR_GREEN,  // BINGO_MODIFIER_GREEN_DEMON
+        MODEL_STAR_BLUE,   // BINGO_MODIFIER_REVERSE_JOYSTICK
+        MODEL_STAR_ORANGE, // BINGO_MODIFIER_ORDERED_RED_COINS
+        MODEL_STAR_GRAY,   // BINGO_MODIFIER_CLICK_GAME
+        MODEL_STAR_RED,    // BINGO_MODIFIER_DAREDEVIL
+        MODEL_STAR_PINK,   // BINGO_MODIFIER_SPLATOON
+    };
     s32 i;
+    // The row keeps a fixed total width and gets denser as modifiers are
+    // added, so it stays centered without manual position tuning.
+    #define ROW_WIDTH 750
+    s32 xSpace = ROW_WIDTH / (BINGO_STARS_TOTAL_AMOUNT - 1);
+    s32 xLeft = -(xSpace * (BINGO_STARS_TOTAL_AMOUNT - 1)) / 2;
+
     // Zero this out every time we render the star select screen
     gBingoStarSelected = BINGO_MODIFIER_NONE;
 
-    // TODO: Make this centered dynamically
-    // so I don't have to manually inspect it every
-    // time I add a bingo modifier
-    #define Y_POS 120
-    #define X_LEFT_POS -378
-    #define X_SPACE 150
-
-    sBingoStarSelectorModels[0] = spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR,
-                                                       bhvActSelectorStarType, X_LEFT_POS, Y_POS, -300, 0, 0, 0);
-
-    sBingoStarSelectorModels[BINGO_MODIFIER_GREEN_DEMON] =
-        spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR_GREEN,
-                                  bhvActSelectorStarType, X_LEFT_POS + X_SPACE * 1, Y_POS, -300, 0, 0, 0);
-
-    sBingoStarSelectorModels[BINGO_MODIFIER_REVERSE_JOYSTICK] =
-        spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR_BLUE,
-                                  bhvActSelectorStarTypeReversed, X_LEFT_POS + X_SPACE * 2, Y_POS, -300, 0, 0, 0);
-
-    sBingoStarSelectorModels[BINGO_MODIFIER_ORDERED_RED_COINS] =
-        spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR_ORANGE,
-                                  bhvActSelectorStarType, X_LEFT_POS + X_SPACE * 3, Y_POS, -300, 0, 0, 0);
-
-    sBingoStarSelectorModels[BINGO_MODIFIER_CLICK_GAME] =
-        spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR_GRAY,
-                                  bhvActSelectorStarType, X_LEFT_POS + X_SPACE * 4, Y_POS, -300, 0, 0, 0);
-
-    sBingoStarSelectorModels[BINGO_MODIFIER_DAREDEVIL] =
-        spawn_object_abs_with_rot(gCurrentObject, 0, MODEL_STAR_RED,
-                                  bhvActSelectorStarType, X_LEFT_POS + X_SPACE * 5, Y_POS, -300, 0, 0, 0);
-    #undef Y_POS
-    #undef X_LEFT_POS
-    #undef X_SPACE
-
     for (i = 0; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
+        sBingoStarSelectorModels[i] = spawn_object_abs_with_rot(
+            gCurrentObject, 0, sBingoStarModels[i],
+            i == BINGO_MODIFIER_REVERSE_JOYSTICK ? bhvActSelectorStarTypeReversed
+                                                 : bhvActSelectorStarType,
+            xLeft + xSpace * i, 120, -300, 0, 0, 0);
         sBingoStarSelectorModels[i]->oStarSelectorSize = 1.0;
         sBingoStarSelectorModels[i]->oStarSelectorType = STAR_SELECTOR_100_COINS;
-        // obj_disable_rendering_func(sBingoStarSelectorModels[i]);
     }
+    #undef ROW_WIDTH
     obj_enable_rendering_func(sBingoStarSelectorModels[0]);
 }
 
@@ -356,6 +345,11 @@ void bhv_act_selector_loop(void) {
     } else {
         gBingoDaredevilActive = 0;
     }
+    if (gBingoStarSelected == BINGO_MODIFIER_SPLATOON) {
+        gSplatoonEnabled = 1;
+    } else {
+        gSplatoonEnabled = 0;
+    }
 }
 
 /**
@@ -396,6 +390,7 @@ u8 gBingoTextReverseJoystick[] = { BINGO_REVERSE_JOYSTICK };
 u8 gBingoTextClickGame[] = { BINGO_CLICK_GAME };
 u8 gBingoTextDaredevil[] = { BINGO_DAREDEVIL_1HP };
 u8 gBingoTextRandomRedCoins[] = { BINGO_RANDOM_ROUTE_RED_COINS };
+u8 gBingoTextSplatoon[] = { BINGO_SPLATOON };
 
 /**
  * Print act selector strings, some with special checks.
@@ -477,6 +472,9 @@ static void print_act_selector_strings(void) {
             break;
         case BINGO_MODIFIER_ORDERED_RED_COINS:
             bingoModifierName = gBingoTextRandomRedCoins;
+            break;
+        case BINGO_MODIFIER_SPLATOON:
+            bingoModifierName = gBingoTextSplatoon;
             break;
     }
 

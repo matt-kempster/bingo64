@@ -494,6 +494,7 @@
 #define MODEL_STAR_BLUE                   0x99        // star_blue_geo
 #define MODEL_STAR_GRAY                   0x9A        // star_gray_geo
 #define MODEL_STAR_ORANGE                 0x9B        // star_orange_geo
+#define MODEL_STAR_PINK                   0x9D        // star_pink_geo (0x9C is burn smoke)
 
 // Bingo custom star colors go above here.
 
