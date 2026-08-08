@@ -144,6 +144,7 @@ void render_bingo_modifier_star(void) {
         MODEL_STAR_BLUE,   // BINGO_MODIFIER_REVERSE_JOYSTICK
         MODEL_STAR_ORANGE, // BINGO_MODIFIER_ORDERED_RED_COINS
         MODEL_STAR_GRAY,   // BINGO_MODIFIER_CLICK_GAME
+        MODEL_STAR_PURPLE, // BINGO_MODIFIER_RANDOM_STARS
         MODEL_STAR_RED,    // BINGO_MODIFIER_DAREDEVIL
         MODEL_STAR_PINK,   // BINGO_MODIFIER_SPLATOON
     };
@@ -339,6 +340,11 @@ void bhv_act_selector_loop(void) {
     } else {
         gBingoClickGameActive = 0;
     }
+    if (gBingoStarSelected == BINGO_MODIFIER_RANDOM_STARS) {
+        gBingoRandomStarsActive = 1;
+    } else {
+        gBingoRandomStarsActive = 0;
+    }
     if (gBingoStarSelected == BINGO_MODIFIER_DAREDEVIL) {
         gBingoDaredevilPrevHealth = gMarioState->health;
         gBingoDaredevilActive = 1;
@@ -391,6 +397,7 @@ u8 gBingoTextClickGame[] = { BINGO_CLICK_GAME };
 u8 gBingoTextDaredevil[] = { BINGO_DAREDEVIL_1HP };
 u8 gBingoTextRandomRedCoins[] = { BINGO_RANDOM_ROUTE_RED_COINS };
 u8 gBingoTextSplatoon[] = { BINGO_SPLATOON };
+u8 gBingoTextRandomStars[] = { BINGO_RANDOM_STARS };
 
 /**
  * Print act selector strings, some with special checks.
@@ -475,6 +482,9 @@ static void print_act_selector_strings(void) {
             break;
         case BINGO_MODIFIER_SPLATOON:
             bingoModifierName = gBingoTextSplatoon;
+            break;
+        case BINGO_MODIFIER_RANDOM_STARS:
+            bingoModifierName = gBingoTextRandomStars;
             break;
     }
 

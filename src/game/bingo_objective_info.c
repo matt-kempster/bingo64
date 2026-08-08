@@ -160,6 +160,11 @@ ALIGNED8 static const u8 seg2_texture_cannon[] = {
 #include "textures/segment2/custom/segment2.cannon.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_randostars[] = {
+#include "textures/segment2/custom/segment2.randostars.rgba16.inc.c"
+};
+
+
 ALIGNED8 static const u8 texture_hud_char_coin[] = {
 #include "textures/segment2/segment2.05800.rgba16.inc.c"
 };
@@ -178,6 +183,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STAR_CLICK_GAME, BINGO_ICON_STAR_CLICK_GAME, { TEXT_CLICK_GAME }, seg2_texture_rbutton },
     { BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK, BINGO_ICON_STAR_REVERSE_JOYSTICK, { TEXT_REVERSE_JOYSTICK }, seg2_texture_joystick },
     { BINGO_OBJECTIVE_STAR_GREEN_DEMON, BINGO_ICON_STAR_GREEN_DEMON, { TEXT_GREEN_DEMON }, seg2_texture_greendemon },
+    { BINGO_OBJECTIVE_RANDOM_STARS, BINGO_ICON_RANDOM_STARS, { TEXT_RANDOM_STARS }, seg2_texture_randostars },
     { BINGO_OBJECTIVE_STAR_DAREDEVIL, BINGO_ICON_STAR_DAREDEVIL, { TEXT_DAREDEVIL }, seg2_texture_daredevil },
     { BINGO_OBJECTIVE_RANDOM_RED_COINS, BINGO_ICON_RANDOM_RED_COINS, { TEXT_RANDOM_REDS }, seg2_texture_randomreds },
     { BINGO_OBJECTIVE_COIN, BINGO_ICON_COIN, { TEXT_COIN_LEVEL }, texture_hud_char_coin },

@@ -19,6 +19,9 @@
 static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_CCM_ROPEWAY_LIFT, /*pos*/ 531, -4430, 6426,    /*angle*/ 0,   0, 0, /*behParam*/ 0x07120000, /*beh*/ bhvPlatformOnTrack),
     OBJECT(/*model*/ MODEL_1UP, /*pos*/ -1512, 3560, -2305, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhv1upGreenDemon),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
     RETURN(),
 };
 

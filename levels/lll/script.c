@@ -36,6 +36,9 @@ static const LevelScript script_func_local_1[] = {
     // to redo the collision so they just added a new behavior for it.
     OBJECT(/*model*/ MODEL_LEVEL_GEOMETRY_0E, /*pos*/ -5115, 300, -3200, /*angle*/ 0,  90, 0, /*behParam*/ 0x00000000, /*beh*/ bhvLllHexagonalMesh),
     OBJECT(/*model*/ MODEL_1UP, /*pos*/ -3839, 1154, 6272, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhv1upGreenDemon),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
     RETURN(),
 };
 

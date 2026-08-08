@@ -438,6 +438,22 @@ s32 bingo_objective_star_random_reds_init(
     objective->data.starObjective.starIndex = star;
 }
 
+s32 bingo_objective_random_stars_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    enum CourseNum course;
+    switch (class) {
+        // TODO: Pick courses more intelligently. Many special courses
+        // and some main courses are simply too easy.
+        default:
+            course = random_range_inclusive(COURSE_MIN, COURSE_SA);
+            break;
+    }
+    objective->data.courseCollectableData.course = course;
+    objective->data.courseCollectableData.toGet = 3;
+    objective->data.courseCollectableData.gotten = 0;
+}
+
 void random_main_course_coins(enum BingoObjectiveClass class, enum CourseNum *course, s32 *coins) {
     switch (class) {
         default:
@@ -939,6 +955,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_star_daredevil_init(objective, class);
         case BINGO_OBJECTIVE_RANDOM_RED_COINS:
             return bingo_objective_star_random_reds_init(objective, class);
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+            return bingo_objective_random_stars_init(objective, class);
         case BINGO_OBJECTIVE_COIN:
             return bingo_objective_coin_init(objective, class);
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:

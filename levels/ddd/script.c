@@ -24,6 +24,9 @@ static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_NONE,         /*pos*/ -3071, -3000,   0, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhvChirpChirp),
     OBJECT(/*model*/ MODEL_DL_WHIRLPOOL, /*pos*/ -3174, -4915, 102, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhvWhirlpool),
     OBJECT(/*model*/ MODEL_1UP, /*pos*/ -3071, 4000, 500, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhv1upGreenDemon),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
     RETURN(),
 };
 

@@ -30,6 +30,9 @@ const LevelScript level_pss_entry[] = {
 
     AREA(/*index*/ 1, pss_geo_000100),
         OBJECT(/*model*/ MODEL_NONE, /*pos*/ 5632, 6751, -5631, /*angle*/ 0, 270, 0, /*behParam*/ 0x000A0000, /*beh*/ bhvWarps64),
+        OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+        OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+        OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
         WARP_NODE(/*id*/ 0x0A, /*destLevel*/ LEVEL_PSS, /*destArea*/ 0x01, /*destNode*/ 0x0A, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ 0xF3, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 0x01, /*destNode*/ 0x20, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ 0xF0, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 0x01, /*destNode*/ 0x26, /*flags*/ WARP_NO_CHECKPOINT),

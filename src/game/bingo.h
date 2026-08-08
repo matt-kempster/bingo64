@@ -20,6 +20,7 @@ extern s16 gbStarIndex;
 extern s32 gbCoinsJustGotten;
 extern u8 gBingoFullGameUnlocked;
 extern s32 gBingoReverseJoystickActive;
+extern s32 gBingoRandomStarsActive;
 extern s32 gBingoClickGameActive;
 extern s32 gBingoClickCounter;
 extern s16 gBingoClickGamePrevCameraSettings;
@@ -34,6 +35,7 @@ enum BingoModifier {
     BINGO_MODIFIER_REVERSE_JOYSTICK,
     BINGO_MODIFIER_ORDERED_RED_COINS,
     BINGO_MODIFIER_CLICK_GAME,
+    BINGO_MODIFIER_RANDOM_STARS,
     BINGO_MODIFIER_DAREDEVIL,
     BINGO_MODIFIER_SPLATOON,
     BINGO_MODIFIER_MAX = BINGO_MODIFIER_SPLATOON,
@@ -80,6 +82,8 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_STAR_GREEN_DEMON,
     BINGO_OBJECTIVE_STAR_DAREDEVIL,
     BINGO_OBJECTIVE_STAR_MAX = BINGO_OBJECTIVE_STAR_DAREDEVIL,
+    // Game-modifying, but not single stars:
+    BINGO_OBJECTIVE_RANDOM_STARS,
     // Per level:
     BINGO_OBJECTIVE_COIN,
     BINGO_OBJECTIVE_1UPS_IN_LEVEL,
@@ -139,6 +143,7 @@ enum BingoObjectiveIcon {
     BINGO_ICON_STAR_CLICK_GAME,
     BINGO_ICON_STAR_REVERSE_JOYSTICK,
     BINGO_ICON_STAR_GREEN_DEMON,
+    BINGO_ICON_RANDOM_STARS,
     BINGO_ICON_STAR_DAREDEVIL,
     BINGO_ICON_COIN,
     BINGO_ICON_MULTICOIN,
@@ -203,6 +208,8 @@ enum BingoObjectiveUpdate
 
     BINGO_COLLECTABLES_MAX = BINGO_UPDATE_DANGEROUS_WALL_KICK,
     // End collectables (TODO: migrate away from Update enum?)
+
+    BINGO_UPDATE_GOT_RANDOM_STAR,
 
     BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN,
     BINGO_UPDATE_LOST_HAT_KLEPTO = BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN,

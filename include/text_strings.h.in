@@ -170,6 +170,7 @@
 #define TEXT_CLICK_GAME _("The Click Game!")
 #define TEXT_DAREDEVIL _("Daredevil")
 #define TEXT_RANDOM_REDS _("Random Route Reds")
+#define TEXT_RANDOM_STARS _("3 Random Stars")
 #define TEXT_COIN_LEVEL _("Coins in Level")
 #define TEXT_TOTAL_COIN _("Total Coins")
 #define TEXT_1UP_LEVEL _("1-ups in Level")
@@ -291,6 +292,7 @@
 #define BINGO_RANDOM_ROUTE_RED_COINS _("RANDOM ROUTE RED COINS")
 #define BINGO_SPLATOON _("SPLATOON")
 #define TEXT_SPLATOON_LEVEL _("Splatoon Mode")
+#define BINGO_RANDOM_STARS _("3 RANDOM PURPLE STARS")
 
 // Camera Options
 #define TEXT_LAKITU_MARIO _("LAKITU + MARIO")

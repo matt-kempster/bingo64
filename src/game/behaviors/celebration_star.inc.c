@@ -28,12 +28,19 @@ void bhv_celebration_star_init(void) {
 #endif
 }
 
+#include "game/bingo_tracking_star.h"
 void CelebrationStarSpinAroundMarioLoop(void) {
     o->oPosX = o->oHomeX + sins(o->oMoveAngleYaw) * (f32)(o->oCelebStarDiameterOfRotation / 2);
     o->oPosZ = o->oHomeZ + coss(o->oMoveAngleYaw) * (f32)(o->oCelebStarDiameterOfRotation / 2);
     o->oPosY += 5.0f;
     o->oFaceAngleYaw += 0x1000;
     o->oMoveAngleYaw += 0x2000;
+
+    if (o->oTimer == 0) {
+        spawn_orange_number(
+            bingo_get_rando_star_count_course(gCurrCourseNum), 0, 10, 0
+        );
+    }
 
     if (o->oTimer == 40)
         o->oAction = CELEB_STAR_ACT_FACE_CAMERA;

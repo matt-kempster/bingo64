@@ -134,6 +134,17 @@ s32 objective_obtain_star_daredevil(struct BingoObjective *objective, enum Bingo
     }
 }
 
+s32 objective_obtain_random_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CourseCollectableData *data = &objective->data.courseCollectableData;
+
+    if (gBingoRandomStarsActive && update == BINGO_UPDATE_GOT_RANDOM_STAR) {
+        data->gotten = bingo_get_rando_star_count_course(data->course);
+        if (data->gotten >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        }
+    }
+}
+
 s32 objective_obtain_coins(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct CourseCollectableData *data = &objective->data.courseCollectableData;
 
@@ -429,6 +440,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_obtain_star_click_game(objective, update);
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
             return objective_obtain_star_daredevil(objective, update);
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+            return objective_obtain_random_stars(objective, update);
         case BINGO_OBJECTIVE_COIN:
             return objective_obtain_coins(objective, update);
         case BINGO_OBJECTIVE_SPLATOON:

@@ -18,8 +18,6 @@ void bhv_spawned_star_init(void) {
     if (!(o->oInteractionSubtype & INT_SUBTYPE_NO_EXIT))
         o->oBehParams = o->parentObj->oBehParams;
     sp24 = (o->oBehParams >> 24) & 0xFF;
-    // if(func_802A377C(sp24) & save_file_get_star_flags(gCurrSaveFileNum-1,gCurrCourseNum-1))
-    // wait lol, this might _actually_ be unused. oops.
     if (func_802A377C(sp24) & bingo_get_course_flags(gCurrCourseNum - 1)) {
         obj_set_model(MODEL_TRANSPARENT_STAR);
     }

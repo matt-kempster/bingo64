@@ -15,6 +15,60 @@ static struct ObjectHitbox sCollectStarHitbox = {
     /* hurtboxHeight:     */ 0,
 };
 
+#include "game/bingo_rando_spawn.h"
+#include "game/bingo.h"
+#include "engine/rand.h"
+void bhv_rando_star_init(void) {
+    Vec3s pos;
+    u16 seedCopy = gBingoInitialSeed;
+
+    s8 sp1F;
+    u8 sp1E;
+
+    if (!gBingoRandomStarsActive) {
+        mark_obj_for_deletion(o);
+        return;
+    }
+
+    sp1F = (o->oBehParams >> 24) & 0xFF;
+    sp1E = bingo_get_rando_star_status(gCurrCourseNum, sp1F);
+    if (sp1E) {
+        o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_TRANSPARENT_STAR];
+    } else {
+        o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_STAR_PURPLE];
+    }
+    init_genrand(seedCopy);
+    for (sp1E = 0; sp1E < gCurrCourseNum + sp1F; sp1E++) {
+        // Here's something kind of nitpicky: I don't
+        // want the stars to appear in the same (x,y,z)
+        // position in two different courses in case peopl
+        // remember that e.g. two are right next to each other.
+        // So we call RandomU16() the same number of times as the
+        // current course.
+        seedCopy ^= RandomU16();
+    }
+    o->oInteractionSubtype |= (INT_SUBTYPE_RANDO_STAR | INT_SUBTYPE_NO_EXIT);
+
+    set_object_hitbox(o, &sCollectStarHitbox);
+    get_safe_position(
+        o,
+        pos,
+        400.f,
+        700.f,
+        &seedCopy,
+        FLOOR_SAFE_HOVERING,
+        (
+            RAND_POSITION_FLAG_CAN_BE_UNDERWATER
+            | RAND_POSITION_FLAG_THI_A3_ABOVE_MESH
+            | RAND_POSITION_FLAG_SPAWN_BOTTOM_OF_SLIDE
+            | RAND_POSITION_FLAG_BBH_HMC_LIMITED_ROOMS
+        )
+    );
+    o->oPosX = pos[0];
+    o->oPosY = pos[1];
+    o->oPosZ = pos[2];
+}
+
 void bhv_collect_star_init(void) {
     s8 sp1F;
     u8 sp1E;
