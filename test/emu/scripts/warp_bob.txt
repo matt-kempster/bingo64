@@ -1,0 +1,5 @@
+# Boot to gameplay (same timing as boot_and_board.txt), then the harness
+# warps to BOB at frame 450. Star select is up by ~530; A picks star 1.
+150 155 START
+320 322 A
+700 702 A

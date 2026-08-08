@@ -8,6 +8,7 @@ features can be added or changed without hand-testing in an emulator.
 | Unit tests | `test/host` | ~2 s | The bingo logic is right |
 | Smoke test | `test/emu` (`make test-smoke`) | ~1 min | The ROM boots, plays, renders |
 | RAM test | `test/emu` (`make test-ram`) | ~1 min | The running ROM agrees with the unit-tested logic |
+| Warp test | `test/emu` (`make test-warp`) | ~1 min | Tests can jump straight into any course |
 
 ## Running
 
@@ -41,6 +42,27 @@ the ROM you just built.
 The RAM test looks up global variables in `build/us/sm64.us.map`, reads
 them out of emulated memory mid-run, and diffs the live board against the
 host generator's output for the same seed.
+
+## Warping into levels
+
+Walking from the castle to a course in an input script is slow and
+fragile. Instead the game has one test-only global, `gTestWarpRequest`
+(in `level_update.c`). Nothing in the game writes it; when a test
+harness pokes a level number into it through the emulator debugger, the
+game warps there through the same code as stepping into a painting. The
+star select screen appears as normal, so a script can pick any act —
+that is how act-specific objectives (click game, timed stars) can be
+reached directly.
+
+The recipe, from `warp_test.py` and `scripts/warp_bob.txt`: boot with
+the usual script, write the level number at frame 450, star select is up
+by ~530, an A press at frame 700 lands Mario in the course by ~720.
+Total: about 12 seconds of emulated time to be standing in any level.
+
+Levels are numbered by `levels/level_defines.h` order (BOB=9, CCM=5,
+WF=24). Poking works on every fresh build because addresses come from
+the linker map, which regenerates with the ROM — this is why RAM pokes
+are fine where savestates are not.
 
 ## Golden files, and when tests "fail" on purpose
 

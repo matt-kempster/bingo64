@@ -37,6 +37,8 @@ class Core:
         self.lib.DebugMemRead32.argtypes = [ctypes.c_uint]
         self.lib.DebugMemRead8.restype = ctypes.c_ubyte
         self.lib.DebugMemRead8.argtypes = [ctypes.c_uint]
+        self.lib.DebugMemWrite32.restype = None
+        self.lib.DebugMemWrite32.argtypes = [ctypes.c_uint, ctypes.c_uint]
 
         self._debug_cb = DEBUG_CB(self._on_debug)
         self._state_cb = STATE_CB(lambda ctx, p, v: None)
@@ -90,6 +92,9 @@ class Core:
 
     def read_u32(self, addr):
         return self.lib.DebugMemRead32(ctypes.c_uint(addr))
+
+    def write_u32(self, addr, value):
+        self.lib.DebugMemWrite32(ctypes.c_uint(addr), ctypes.c_uint(value & 0xFFFFFFFF))
 
     def read_s32(self, addr):
         v = self.read_u32(addr)
