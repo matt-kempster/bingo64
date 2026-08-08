@@ -6,19 +6,35 @@
 #include "area.h"
 #include "level_update.h"
 #include "memory.h"
-#include "geo_misc.h"
 #include "engine/math_util.h"
+#include "engine/graph_node.h"
 #include "engine/surface_collision.h"
 #include "engine/surface_load.h"
 
-// Splatoon mode. Every static floor triangle Mario stands on gets
-// remembered and drawn as translucent ink from then on. The rendering
-// approach (decal render mode, camera matrix from gMatStack[1]) comes
-// from the original `splatoon` branch's triangle-highlight experiments.
+// Splatoon mode. When Mario stands on a static floor triangle, the
+// level's own rendered geometry gets recolored: we walk the area's
+// display lists and tint every vertex that sits inside that collision
+// triangle's footprint. The paint costs no draw calls and no buffers —
+// the level itself is the ink. It naturally washes off when the level
+// data reloads.
 
 #define SPLATOON_MAX_TRIS 1000
 
-extern Mat4 gMatStack[32];
+// F3DEX display list opcodes (from PR/gbi.h, where G_ENDDL is defined
+// relative to G_IMMFIRST so we name the raw bytes here).
+#define OP_VTX 0x04
+#define OP_DL 0x06
+#define OP_MOVEMEM 0x03
+#define OP_ENDDL 0xB8
+
+// Marks a vertex whose normal has been converted to a baked color.
+// The flag field is unused padding in every SM64 vertex.
+#define BAKED_FLAG 0x5A17
+
+// Ink color, overwrites the terrain's baked vertex colors.
+#define INK_R 0xFF
+#define INK_G 0x40
+#define INK_B 0xA0
 
 s32 gSplatoonEnabled = 0;
 s32 gSplatoonPaintedCount = 0;
@@ -26,30 +42,25 @@ s32 gSplatoonTotalFloors = 0;
 
 static struct Surface *sPaintedSurfs[SPLATOON_MAX_TRIS];
 static struct Surface *sLastFloor = NULL;
+static s32 sBaked = 0;
 
-// Painted triangles live in these persistent buffers, not the per-frame
-// display list pool, so a well-painted level costs no pool memory.
-static Vtx sPaintVerts[SPLATOON_MAX_TRIS * 3];
-static Gfx sPaintGfx[SPLATOON_MAX_TRIS * 2 + 1];
+// Current material lights, tracked while walking display lists.
+static u8 sLightCol[3];
+static s8 sLightDir[3];
+static u8 sAmbCol[3];
 
-static const Gfx dl_splatoon_begin[] = {
-    gsDPPipeSync(),
-    gsDPSetRenderMode(G_RM_ZB_XLU_DECAL, G_RM_NOOP2),
-    gsSPClearGeometryMode(G_LIGHTING),
-    gsSPSetGeometryMode(G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH),
-    gsSPTexture(0, 0, 0, 0, G_OFF),
-    gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE),
-    gsSPEndDisplayList(),
-};
+// Each level display list gets wrapped so it renders with lighting off
+// (baked colors) without disturbing objects rendered after it.
+#define MAX_TRAMPOLINES 64
+static Gfx sTrampolines[MAX_TRAMPOLINES][4];
+static s32 sTrampolineCount = 0;
 
 void splatoon_clear(void) {
     gSplatoonPaintedCount = 0;
     gSplatoonTotalFloors = 0;
     sLastFloor = NULL;
-    {
-        Gfx *g = sPaintGfx;
-        gSPEndDisplayList(g);
-    }
+    sBaked = 0;
+    sTrampolineCount = 0;
 }
 
 static s32 splatoon_count_floors(void) {
@@ -69,10 +80,184 @@ static s32 splatoon_count_floors(void) {
     return count;
 }
 
+// Turns one lit vertex into a plain colored vertex: computes the same
+// ambient + diffuse * dot(normal, light) shade the RSP would, and
+// stores it as a baked color. After this the vertex is paintable.
+static void bake_vtx_array(Vtx *v, s32 n) {
+    s32 i, c;
+    f32 nx, ny, nz, lx, ly, lz, nlen, llen, dot;
+
+    lx = sLightDir[0];
+    ly = sLightDir[1];
+    lz = sLightDir[2];
+    llen = sqrtf(lx * lx + ly * ly + lz * lz);
+    if (llen < 0.001f) {
+        llen = 1.0f;
+    }
+
+    for (i = 0; i < n; i++) {
+        if (v[i].v.flag == BAKED_FLAG) {
+            continue;
+        }
+        nx = (s8) v[i].v.cn[0];
+        ny = (s8) v[i].v.cn[1];
+        nz = (s8) v[i].v.cn[2];
+        nlen = sqrtf(nx * nx + ny * ny + nz * nz);
+        if (nlen < 0.001f) {
+            nlen = 1.0f;
+        }
+        dot = (nx * lx + ny * ly + nz * lz) / (nlen * llen);
+        if (dot < 0.0f) {
+            dot = 0.0f;
+        }
+        for (c = 0; c < 3; c++) {
+            s32 col = sAmbCol[c] + (s32)(sLightCol[c] * dot);
+            v[i].v.cn[c] = col > 255 ? 255 : col;
+        }
+        v[i].v.flag = BAKED_FLAG;
+    }
+}
+
+// Tints every vertex in the array that lies on the surface's plane and
+// inside its triangle when seen from above. The small margins mean the
+// triangle's own corner vertices (which sit exactly on the edges) are
+// included, so shared vertices blend the ink into neighboring
+// triangles like soft ink edges.
+static void tint_vtx_array(Vtx *v, s32 n, struct Surface *surf) {
+    f32 x1 = surf->vertex1[0], z1 = surf->vertex1[2];
+    f32 x2 = surf->vertex2[0], z2 = surf->vertex2[2];
+    f32 x3 = surf->vertex3[0], z3 = surf->vertex3[2];
+    f32 denom = (z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3);
+    f32 x, y, z, planeDist, a, b, c;
+    s32 i;
+
+    if (denom > -0.001f && denom < 0.001f) {
+        return;
+    }
+
+    for (i = 0; i < n; i++) {
+        x = v[i].v.ob[0];
+        y = v[i].v.ob[1];
+        z = v[i].v.ob[2];
+
+        planeDist = surf->normal.x * x + surf->normal.y * y + surf->normal.z * z
+                    + surf->originOffset;
+        if (planeDist < -8.0f || planeDist > 8.0f) {
+            continue;
+        }
+
+        a = ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) / denom;
+        b = ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) / denom;
+        c = 1.0f - a - b;
+        if (a < -0.01f || b < -0.01f || c < -0.01f) {
+            continue;
+        }
+
+        if (v[i].v.flag != BAKED_FLAG) {
+            continue; // Still a lit vertex; recoloring would do nothing.
+        }
+        v[i].v.cn[0] = INK_R;
+        v[i].v.cn[1] = INK_G;
+        v[i].v.cn[2] = INK_B;
+    }
+}
+
+// Walks a display list. With surf == NULL this is the bake pass: track
+// each material's lights and convert lit vertices to baked colors.
+// With surf set, tint that triangle's vertices.
+static void walk_display_list(Gfx *dl, struct Surface *surf, s32 depth) {
+    u32 w0, w1;
+    u8 op;
+
+    if (dl == NULL || depth > 8) {
+        return;
+    }
+    for (;;) {
+        w0 = dl->words.w0;
+        w1 = dl->words.w1;
+        op = w0 >> 24;
+
+        if (op == OP_ENDDL) {
+            return;
+        }
+        if (op == OP_DL) {
+            Gfx *sub = segmented_to_virtual((void *) w1);
+            if (((w0 >> 16) & 0xFF) == G_DL_PUSH) {
+                walk_display_list(sub, surf, depth + 1);
+            } else {
+                dl = sub;
+                continue;
+            }
+        } else if (op == OP_VTX) {
+            s32 n = (w0 >> 10) & 0x3F;
+            Vtx *v = segmented_to_virtual((void *) w1);
+            if (surf != NULL) {
+                tint_vtx_array(v, n, surf);
+            } else {
+                bake_vtx_array(v, n);
+            }
+        } else if (op == OP_MOVEMEM && surf == NULL) {
+            u8 param = (w0 >> 16) & 0xFF;
+            if (param == G_MV_L0) {
+                u8 *light = segmented_to_virtual((void *) w1);
+                sLightCol[0] = light[0];
+                sLightCol[1] = light[1];
+                sLightCol[2] = light[2];
+                sLightDir[0] = (s8) light[8];
+                sLightDir[1] = (s8) light[9];
+                sLightDir[2] = (s8) light[10];
+            } else if (param == G_MV_L1) {
+                u8 *amb = segmented_to_virtual((void *) w1);
+                sAmbCol[0] = amb[0];
+                sAmbCol[1] = amb[1];
+                sAmbCol[2] = amb[2];
+            }
+        }
+        dl++;
+    }
+}
+
+// Finds every display list in the area's geo graph (skipping objects —
+// only the level's own geometry gets painted).
+static void walk_graph_node(struct GraphNode *firstNode, struct Surface *surf, s32 depth) {
+    struct GraphNode *node = firstNode;
+
+    if (firstNode == NULL || depth > 16) {
+        return;
+    }
+    do {
+        if (node->type == GRAPH_NODE_TYPE_DISPLAY_LIST) {
+            struct GraphNodeDisplayList *dlNode = (struct GraphNodeDisplayList *) node;
+            void *dl = dlNode->displayList;
+            s32 wrapped = dl >= (void *) sTrampolines
+                          && dl < (void *) (sTrampolines + MAX_TRAMPOLINES);
+
+            if (wrapped) {
+                // Already wrapped; the real list is inside the trampoline.
+                dl = (void *) ((Gfx *) dl)[1].words.w1;
+            }
+            if (dl != NULL) {
+                walk_display_list(segmented_to_virtual(dl), surf, 0);
+
+                if (surf == NULL && !wrapped && sTrampolineCount < MAX_TRAMPOLINES) {
+                    Gfx *g = sTrampolines[sTrampolineCount++];
+                    gSPClearGeometryMode(g++, G_LIGHTING);
+                    gSPDisplayList(g++, dl);
+                    gSPSetGeometryMode(g++, G_LIGHTING);
+                    gSPEndDisplayList(g);
+                    dlNode->displayList = sTrampolines[sTrampolineCount - 1];
+                }
+            }
+        }
+        if (node->type != GRAPH_NODE_TYPE_OBJECT_PARENT && node->children != NULL) {
+            walk_graph_node(node->children, surf, depth + 1);
+        }
+        node = node->next;
+    } while (node != firstNode);
+}
+
 static void splatoon_step(struct Surface *floor) {
     s32 i;
-    Vtx *v;
-    Gfx *g;
 
     if (floor == NULL || floor->object != NULL || floor == sLastFloor) {
         return;
@@ -91,49 +276,29 @@ static void splatoon_step(struct Surface *floor) {
         gSplatoonTotalFloors = splatoon_count_floors();
     }
 
-    i = gSplatoonPaintedCount++;
-    sPaintedSurfs[i] = floor;
+    sPaintedSurfs[gSplatoonPaintedCount++] = floor;
 
-    v = &sPaintVerts[i * 3];
-    make_vertex(v, 0, floor->vertex1[0], floor->vertex1[1], floor->vertex1[2], 0, 0,
-                0xFF, 0x40, 0xA0, 0xB4);
-    make_vertex(v, 1, floor->vertex2[0], floor->vertex2[1], floor->vertex2[2], 0, 0,
-                0xFF, 0x40, 0xA0, 0xB4);
-    make_vertex(v, 2, floor->vertex3[0], floor->vertex3[1], floor->vertex3[2], 0, 0,
-                0xE0, 0x30, 0x90, 0xB4);
-
-    g = &sPaintGfx[i * 2];
-    gSPVertex(g++, VIRTUAL_TO_PHYSICAL(v), 3, 0);
-    gSP1Triangle(g++, 0, 1, 2, 0);
-    gSPEndDisplayList(g);
+    if (gCurrentArea != NULL && gCurrentArea->unk04 != NULL) {
+        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, floor, 0);
+    }
 }
 
-// Called from render_game() right after the world is drawn, while the
-// z-buffer is still valid (the ink is a decal on top of the floor).
-void splatoon_render(void) {
-    Mtx *mtx;
-
-    if (!gSplatoonEnabled || gMarioState->marioObj == NULL) {
+void splatoon_update(void) {
+    if (!gSplatoonEnabled || gMarioState->marioObj == NULL || gCurrentArea == NULL) {
         return;
+    }
+
+    // First frame in this area with splatoon on: bake the level's
+    // lighting into its vertices so they become paintable.
+    if (!sBaked && gCurrentArea->unk04 != NULL) {
+        sLightCol[0] = sLightCol[1] = sLightCol[2] = 255;
+        sAmbCol[0] = sAmbCol[1] = sAmbCol[2] = 127;
+        sLightDir[0] = sLightDir[1] = sLightDir[2] = 40;
+        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, NULL, 0);
+        sBaked = 1;
     }
 
     if (!(gMarioState->action & ACT_FLAG_AIR)) {
         splatoon_step(gMarioState->floor);
     }
-
-    if (gSplatoonPaintedCount == 0) {
-        return;
-    }
-
-    mtx = alloc_display_list(sizeof(Mtx));
-    if (mtx == NULL) {
-        return;
-    }
-    mtxf_to_mtx(mtx, gMatStack[1]);
-
-    gSPDisplayList(gDisplayListHead++, dl_splatoon_begin);
-    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx),
-              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-    gSPDisplayList(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(sPaintGfx));
-    gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
 }
