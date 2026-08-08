@@ -21,6 +21,7 @@ ROM = os.path.join(REPO, "build", "us", "sm64.us.f3dex.z64")
 MAP = os.path.join(REPO, "build", "us", "sm64.us.map")
 
 LEVEL_BOB = 9
+LEVEL_CASTLE_GROUNDS = 16
 
 failures = []
 
@@ -64,7 +65,13 @@ def main():
         elif frame == 995:
             state["late"] = core.read_u32(syms["gSplatoonPaintedCount"])
             state["total"] = core.read_u32(syms["gSplatoonTotalFloors"])
-        elif frame >= 1005:
+        elif frame == 1005:
+            # Leave the course. Splatoon must not leak into the castle.
+            core.write_u32(syms["gTestWarpRequest"], LEVEL_CASTLE_GROUNDS)
+        elif frame == 1150:
+            state["exit_enabled"] = core.read_u32(syms["gSplatoonEnabled"])
+            state["exit_painted"] = core.read_u32(syms["gSplatoonPaintedCount"])
+        elif frame >= 1160:
             core.stop()
 
     core.run(on_frame)
@@ -81,6 +88,11 @@ def main():
           "total floor count looks wrong (%r)" % state["total"])
     check((state["late"] or 0) < (state["total"] or 1),
           "painted more floors than exist")
+    check(state.get("exit_enabled") == 0,
+          "splatoon leaked out of the course (enabled=%r after exit)"
+          % state.get("exit_enabled"))
+    check(state.get("exit_painted") == 0,
+          "paint survived course exit (painted=%r)" % state.get("exit_painted"))
 
     if failures:
         print("SPLATOON TEST FAILED (%d problems)" % len(failures))
