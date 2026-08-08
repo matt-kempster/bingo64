@@ -10,6 +10,7 @@ checked off in one place.
 ### Next release (v0.11a)
 
 - [ ] Bully count fix *(likely fixed by PR #4 — confirm and check off)*
+- [ ] Redraw the unique-deaths skull icon (current one is a placeholder)
 - [ ] Different game modes (easy, medium, hard, blind, classic bingo)
 - [ ] Rando stars bingo
 - [ ] On option select screen, use [R], [B], etc.
