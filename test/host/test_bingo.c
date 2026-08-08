@@ -7,6 +7,7 @@
 #include "bingo.h"
 #include "engine/rand.h"
 #include "harness.h"
+#include "splatoon.h"
 
 void setup_bingo_objectives(u32 seed);
 u8 bingo_check_win(void);
@@ -98,6 +99,7 @@ static void dump_cell(FILE *out, int i) {
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
         case BINGO_OBJECTIVE_RANDOM_RED_COINS:
+        case BINGO_OBJECTIVE_SPLATOON:
             fprintf(out, " course=%d toGet=%d",
                     o->data.courseCollectableData.course, o->data.courseCollectableData.toGet);
             break;
@@ -283,10 +285,11 @@ static void test_invariant_sweep(void) {
 //
 // KNOWN BUG: get_random_objective_type can pick an entry whose
 // usesRemaining is already 0 (when the random want_sum is 0), and the
-// counter then drops to -1, which means "no limit". So a few boards go
-// over budget today. This test pins down exactly how many, out of the
-// 2000 seeds below. When the bug gets fixed, set the number to 0.
-#define KNOWN_OVER_BUDGET_BOARDS 1
+// counter then drops to -1, which means "no limit". This test pins down
+// exactly how many boards go over budget, out of the 2000 seeds below.
+// The bug is still unfixed, but since the splatoon weights joined the
+// tables, none of these 2000 seeds happen to trigger it (was 1 before).
+#define KNOWN_OVER_BUDGET_BOARDS 0
 
 static void test_weight_budget(void) {
     s32 budget[BINGO_OBJECTIVE_TOTAL_AMOUNT];
@@ -414,6 +417,41 @@ static void test_sim_coin_objective(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 
     // Completion is sticky: a course change no longer resets it.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+static void test_sim_splatoon_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_SPLATOON;
+    o->data.courseCollectableData.course = 1;
+    o->data.courseCollectableData.toGet = 60;
+
+    // Painting in the wrong course does nothing.
+    gCurrCourseNum = 2;
+    gSplatoonPaintedCount = 40;
+    bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 0);
+
+    // Painting in the right course tracks the game's counter.
+    gCurrCourseNum = 1;
+    gSplatoonPaintedCount = 40;
+    bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 40);
+
+    // Leaving the course throws the progress away.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 0);
+
+    // Enough paint completes it.
+    gSplatoonPaintedCount = 60;
+    bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // Completion is sticky.
     bingo_update(BINGO_UPDATE_COURSE_CHANGED);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
@@ -569,6 +607,7 @@ int main(void) {
     RUN_TEST(test_weight_budget);
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
+    RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_kill_collectable);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);

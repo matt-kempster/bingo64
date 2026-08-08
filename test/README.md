@@ -75,6 +75,22 @@ finds each star by color, and asserts one star per `enum BingoModifier`
 entry, in enum order, evenly spaced, centered — so adding a modifier
 without a star (or breaking the row's layout) fails the test.
 
+## Splatoon
+
+Painted floors are tracked as (area, surface index) bits, so paint
+survives area transitions inside a course and the painted count never
+double-counts. The per-course floor totals hardcoded in
+`bingo_const.c` (`course_floors`) were counted from the level collision
+files with the same rule `surface_load.c` uses (a triangle is a floor
+when its normal's y exceeds 0.01); the splatoon test cross-checks BOB's
+621 against the live count in emulated RAM. If a level's collision ever
+changes, recount and update both.
+
+The RAM test's board dump decodes `enum BingoObjectiveType` by number
+(`ram_test.py` top constants) — inserting an enum entry shifts them, and
+the test fails with a field-name mismatch until the constants are
+updated to match.
+
 ## Golden files, and when tests "fail" on purpose
 
 Changing board generation at all (new objective type, new weights, RNG

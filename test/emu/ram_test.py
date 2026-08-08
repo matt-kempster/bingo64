@@ -39,9 +39,9 @@ STAR_PLAIN = (0, 2, 7, 8, 9)
 STAR_TIMED = 1
 STAR_ABC = (3, 4, 5)
 STAR_CLICK = 6
-COURSE_COLLECT = (10, 11, 12, 13)
-WALL_KICKS = 14
-BOWSER = 15
+COURSE_COLLECT = (10, 11, 12, 13, 14)  # 14 = splatoon
+WALL_KICKS = 15
+BOWSER = 16
 
 failures = []
 

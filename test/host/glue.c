@@ -67,6 +67,17 @@ void mark_object_for_deletion(struct Object *obj) {
     (void) obj;
 }
 
+// Splatoon lives in game/rendering code the tests don't build; the bingo
+// objective only reads the painted counter.
+s32 gSplatoonEnabled = 0;
+s32 gSplatoonPaintedCount = 0;
+s32 gSplatoonTotalFloors = 0;
+
+void splatoon_clear(void) {
+    gSplatoonPaintedCount = 0;
+    gSplatoonTotalFloors = 0;
+}
+
 // Same as the game's RandomU16 in behavior_script.c: low 16 bits of the
 // Mersenne Twister output.
 unsigned long genrand_int32(void);
