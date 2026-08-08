@@ -68,6 +68,7 @@ void disable_bingo_modifiers() {
     gBingoClickGameActive = 0;
     gBingoClickCounter = -1;
     gSplatoonEnabled = 0;
+    splatoon_clear();
 }
 
 void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveState state) {

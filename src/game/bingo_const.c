@@ -40,6 +40,31 @@ s32 get_1ups_in_level(enum CourseNum course) {
     return course_1ups[course - 1];
 }
 
+// Unique static floor triangles per main course, all areas summed.
+// Counted from the level collision data the same way surface_load
+// classifies floors (normal.y > 0.01); see test/README.md ("Splatoon").
+s32 course_floors[] = {
+    621,  // COURSE_BOB
+    241,  // COURSE_WF
+    564,  // COURSE_JRB
+    1003, // COURSE_CCM
+    693,  // COURSE_BBH
+    748,  // COURSE_HMC
+    1266, // COURSE_LLL
+    1297, // COURSE_SSL
+    301,  // COURSE_DDD
+    472,  // COURSE_SL
+    522,  // COURSE_WDW
+    1501, // COURSE_TTM
+    601,  // COURSE_THI
+    233,  // COURSE_TTC
+    1113, // COURSE_RR
+};
+
+s32 get_floors_in_course(enum CourseNum course) {
+    return course_floors[course - 1];
+}
+
 // https://docs.google.com/spreadsheets/d/1MDgm0yj5IJeqYMJlOdbKyIz66aX1Y3dYm79_wIePxY0/edit#gid=0
 // https://www.youtube.com/playlist?list=PLP0jCPw9IPWhdWX4Ae24hjdX2CH15GKTg
 

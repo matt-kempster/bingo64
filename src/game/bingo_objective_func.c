@@ -6,6 +6,7 @@
 
 #include "bingo_descriptions.h"
 #include "bingo_const.h"
+#include "splatoon.h"
 #include "bingo_objective_func.h"
 #include "bingo_objective_init.h"
 #include "bingo_tracking_star.h"
@@ -141,6 +142,20 @@ s32 objective_obtain_coins(struct BingoObjective *objective, enum BingoObjective
         data->gotten = 0;
     } else if (update == BINGO_UPDATE_COIN && gCurrCourseNum == data->course) {
         data->gotten += gbCoinsJustGotten;
+        if (data->gotten >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        }
+    }
+}
+
+s32 objective_splatoon(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CourseCollectableData *data = &objective->data.courseCollectableData;
+
+    if (update == BINGO_UPDATE_COURSE_CHANGED) {
+        objective->state = BINGO_STATE_NONE;
+        data->gotten = 0;
+    } else if (update == BINGO_UPDATE_SPLATOON_PAINTED && gCurrCourseNum == data->course) {
+        data->gotten = gSplatoonPaintedCount;
         if (data->gotten >= data->toGet) {
             set_objective_state(objective, BINGO_STATE_COMPLETE);
         }
@@ -411,6 +426,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_obtain_star_daredevil(objective, update);
         case BINGO_OBJECTIVE_COIN:
             return objective_obtain_coins(objective, update);
+        case BINGO_OBJECTIVE_SPLATOON:
+            return objective_splatoon(objective, update);
         case BINGO_OBJECTIVE_MULTICOIN:
             return objective_obtain_multicoin(objective, update);
         case BINGO_OBJECTIVE_MULTISTAR:
