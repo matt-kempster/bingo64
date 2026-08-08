@@ -13,6 +13,7 @@ M64CMD_ROM_CLOSE = 2
 M64CMD_EXECUTE = 5
 M64CMD_STOP = 6
 M64CMD_SET_FRAME_CALLBACK = 15
+M64CMD_TAKE_NEXT_SCREENSHOT = 16
 
 M64PLUGIN_RSP = 1
 M64PLUGIN_GFX = 2
@@ -89,6 +90,12 @@ class Core:
 
     def stop(self):
         self.lib.CoreDoCommand(M64CMD_STOP, 0, None)
+
+    def take_screenshot(self):
+        """Captures the next rendered frame as a PNG under
+        $XDG_DATA_HOME/mupen64plus/screenshot/ (set XDG_DATA_HOME before
+        constructing the Core to control where they land)."""
+        self.lib.CoreDoCommand(M64CMD_TAKE_NEXT_SCREENSHOT, 0, None)
 
     def read_u32(self, addr):
         return self.lib.DebugMemRead32(ctypes.c_uint(addr))

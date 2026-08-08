@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Checks splatoon mode: floors Mario walks over get painted.
 
-Boots, turns splatoon on by poking gSplatoonEnabled, warps to BOB, and
+Boots, warps to BOB, selects the splatoon bingo modifier on the star
+select screen (Z wraps the selection backwards from NONE to it), and
 walks around. The painted-triangle counter must grow as Mario moves, and
 the total-floors counter must be a sane level-sized number.
 
@@ -51,17 +52,13 @@ def main():
     core.load_rom(ROM)
     core.attach_standard_plugins(os.path.join(HERE, "build", "input_script.so"))
 
-    state = {"early": None, "late": None, "total": None}
+    state = {"enabled": None, "early": None, "late": None, "total": None}
 
     def on_frame(frame):
-        if frame == 100:
-            core.write_u32(syms["gSplatoonEnabled"], 1)
-        elif frame == 430:
-            # Castle grounds: nothing should be painted before the warp,
-            # because Mario has not moved and splatoon starts fresh.
-            pass
-        elif frame == 450:
+        if frame == 450:
             core.write_u32(syms["gTestWarpRequest"], LEVEL_BOB)
+        elif frame == 740:
+            state["enabled"] = core.read_u32(syms["gSplatoonEnabled"])
         elif frame == 820:
             state["early"] = core.read_u32(syms["gSplatoonPaintedCount"])
         elif frame == 995:
@@ -73,6 +70,9 @@ def main():
     core.run(on_frame)
     core.shutdown()
 
+    check(state["enabled"] == 1,
+          "selecting the splatoon modifier star did not enable splatoon "
+          "(enabled=%r)" % state["enabled"])
     check(state["early"] is not None and state["early"] >= 2,
           "no paint after landing (early=%r)" % state["early"])
     check(state["late"] is not None and state["late"] > (state["early"] or 0) + 3,

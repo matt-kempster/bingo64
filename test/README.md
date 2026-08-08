@@ -10,6 +10,7 @@ features can be added or changed without hand-testing in an emulator.
 | RAM test | `test/emu` (`make test-ram`) | ~1 min | The running ROM agrees with the unit-tested logic |
 | Warp test | `test/emu` (`make test-warp`) | ~1 min | Tests can jump straight into any course |
 | Splatoon test | `test/emu` (`make test-splat`) | ~1 min | Walking paints floor triangles |
+| Star UI test | `test/emu` (`make test-starui`) | ~1 min | Modifier star row renders complete, evenly spaced, centered |
 
 ## Running
 
@@ -64,6 +65,15 @@ Levels are numbered by `levels/level_defines.h` order (BOB=9, CCM=5,
 WF=24). Poking works on every fresh build because addresses come from
 the linker map, which regenerates with the ROM — this is why RAM pokes
 are fine where savestates are not.
+
+Bingo modifiers are picked on the star select screen with Z/R. Z on a
+fresh screen wraps the selection backwards from NONE to the *last*
+modifier, so a script can select the newest one with a single Z press
+(`scripts/star_ui.txt` does this for splatoon). The star UI test also
+screenshots the screen and checks the modifier row geometrically: it
+finds each star by color, and asserts one star per `enum BingoModifier`
+entry, in enum order, evenly spaced, centered — so adding a modifier
+without a star (or breaking the row's layout) fails the test.
 
 ## Golden files, and when tests "fail" on purpose
 

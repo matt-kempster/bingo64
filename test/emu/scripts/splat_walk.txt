@@ -1,7 +1,9 @@
-# Boot, warp to BOB (harness pokes the warp at 450), pick star 1,
+# Boot, warp to BOB (harness pokes the warp at 450), select the splatoon
+# modifier with Z (wraps backwards from NONE to the last star), pick star 1,
 # then walk forward and veer right to paint a trail of floor triangles.
 150 155 START
 320 322 A
+570 572 Z
 700 702 A
 760 900 STICK 0 127
 900 990 STICK 100 40
