@@ -18,8 +18,8 @@
 // approach (decal render mode, camera matrix from gMatStack[1]) comes
 // from the original `splatoon` branch's triangle-highlight experiments.
 
-// Big enough for every course area's floor count (Rainbow Ride is the
-// largest at 1113).
+// Big enough for every course area's floor count (Hazy Maze Cave is
+// the largest at 748).
 #define SPLATOON_MAX_TRIS 1200
 
 // Swimming should only paint when Mario hugs the bottom, not the whole

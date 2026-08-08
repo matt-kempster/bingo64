@@ -50,7 +50,7 @@ s32 course_floors[] = {
     1003, // COURSE_CCM
     693,  // COURSE_BBH
     748,  // COURSE_HMC
-    1266, // COURSE_LLL
+    865,  // COURSE_LLL
     1297, // COURSE_SSL
     301,  // COURSE_DDD
     472,  // COURSE_SL
@@ -58,7 +58,7 @@ s32 course_floors[] = {
     1501, // COURSE_TTM
     601,  // COURSE_THI
     233,  // COURSE_TTC
-    1113, // COURSE_RR
+    409,  // COURSE_RR
 };
 
 s32 get_floors_in_course(enum CourseNum course) {

@@ -80,11 +80,13 @@ without a star (or breaking the row's layout) fails the test.
 Painted floors are tracked as (area, surface index) bits, so paint
 survives area transitions inside a course and the painted count never
 double-counts. The per-course floor totals hardcoded in
-`bingo_const.c` (`course_floors`) were counted from the level collision
-files with the same rule `surface_load.c` uses (a triangle is a floor
-when its normal's y exceeds 0.01); the splatoon test cross-checks BOB's
-621 against the live count in emulated RAM. If a level's collision ever
-changes, recount and update both.
+`bingo_const.c` (`course_floors`) come from `test/count_floors.py`,
+which applies the same rule `surface_load.c` uses (a triangle is a floor
+when its normal's y exceeds 0.01) after resolving `#ifdef VERSION_JP`
+blocks to the US branch — RR and LLL carry both variants in one file,
+and counting the raw text doubles them. The splatoon test cross-checks
+BOB's 621 against the live count in emulated RAM. If a level's collision
+ever changes, rerun the script and update the table.
 
 The RAM test's board dump decodes `enum BingoObjectiveType` by number
 (`ram_test.py` top constants) — inserting an enum entry shifts them, and
