@@ -11,6 +11,7 @@ extern s32 gSplatoonPaintedCount;
 extern s32 gSplatoonTotalFloors;
 
 void splatoon_clear(void);
+void splatoon_on_area_load(s16 areaIndex);
 void splatoon_render(void);
 
 #endif // SPLATOON_H
