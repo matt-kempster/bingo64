@@ -1,0 +1,56 @@
+# Verifies the web board generator: the WASM build of the bingo C code must
+# produce byte-identical boards to the gcc-built oracle and the goldens.
+#
+# No baserom is needed. The only baserom-derived inputs the bingo slice uses
+# are two vanilla HUD textures (star, coin); their bytes affect how icons
+# look, never board content, so CI stubs them with zeros.
+
+name: web-generator
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libaudiofile-dev
+
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/opt/emsdk
+          ~/opt/emsdk/emsdk install latest
+          ~/opt/emsdk/emsdk activate latest
+
+      - name: Generate build prerequisites
+        run: |
+          targets="build/us/include/text_strings.h build/us/text/us/define_text.inc.c"
+          for tex in $(grep -o '"textures/[^"]*"' src/game/bingo_objective_info.c | tr -d '"'); do
+            targets="$targets build/us/$tex"
+          done
+          for t in $targets; do
+            case "$t" in
+              build/us/textures/*)
+                png="${t#build/us/}"
+                png="${png%.inc.c}.png"
+                if [ ! -f "$png" ]; then
+                  mkdir -p "$(dirname "$t")"
+                  python3 -c "print('0x0,' * 512)" > "$t"
+                fi
+                ;;
+            esac
+          done
+          make QEMU_IRIX=true NOEXTRACT=1 GRUCODE=f3dex $targets
+
+      - name: Host unit tests
+        run: make -C test/host test
+
+      - name: Build WASM generator and verify against the oracle
+        run: make -C web check

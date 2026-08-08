@@ -1,6 +1,7 @@
 # Plan: Online Bingo64
 
-Status: agreed 2026-08-08. Work has not started.
+Status: agreed 2026-08-08. Part A is done (see `web/`), with the Bingosync
+goal export from part B. Parts B (step 2) and D have not started.
 
 Note: this document uses ASD-STE100 (Simplified Technical English) style.
 

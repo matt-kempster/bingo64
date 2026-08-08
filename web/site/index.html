@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bingo64 Board Generator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Bingo64 Board Generator</h1>
+    <p class="tagline">The exact board the game makes for a seed &mdash; same C code, compiled to WebAssembly.</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label for="seed">Seed</label>
+      <input id="seed" type="text" inputmode="numeric" maxlength="9" placeholder="0&ndash;999999999">
+      <button id="random">Random</button>
+
+      <label for="target">Game mode</label>
+      <select id="target">
+        <option value="1">1 Bingo</option>
+        <option value="2">2 Bingos</option>
+        <option value="3">3 Bingos</option>
+        <option value="12">Blackout</option>
+      </select>
+
+      <button id="permalink" title="Copy a link to this exact board">Copy link</button>
+    </section>
+
+    <details id="optionsBox">
+      <summary>Objective options <span id="optionsSummary"></span></summary>
+      <div class="options-actions">
+        <button id="toggleAll">Toggle all</button>
+        <p>Turn objectives off here exactly like on the game's options screen.
+           The same seed with different options makes a different board.</p>
+      </div>
+      <div id="optionsList" class="options-list"></div>
+    </details>
+
+    <section id="boardWrap">
+      <div id="board"></div>
+    </section>
+
+    <details id="descriptionsBox">
+      <summary>Cell descriptions</summary>
+      <ol id="descriptions"></ol>
+    </details>
+
+    <section class="bingosync">
+      <h2>Race it on Bingosync</h2>
+      <p>
+        On <a href="https://bingosync.com" target="_blank" rel="noopener">bingosync.com</a>, choose
+        <strong>Make Room</strong>, set Game to <strong>Custom (Advanced)</strong>, and paste the
+        goals below into the Board field.
+      </p>
+      <div class="bingosync-controls">
+        <label for="goalStyle">Goal text</label>
+        <select id="goalStyle">
+          <option value="desc">Full descriptions</option>
+          <option value="title">Short in-game titles</option>
+        </select>
+        <button id="copyGoals">Copy goals JSON</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Generator version <code id="version"></code> &middot;
+       boards verified against the game's own code &middot;
+       <a href="https://github.com/matt-kempster/bingo64" target="_blank" rel="noopener">bingo64 on GitHub</a></p>
+  </footer>
+
+  <div id="toast" hidden></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
