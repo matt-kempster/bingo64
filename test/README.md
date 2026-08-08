@@ -9,6 +9,7 @@ features can be added or changed without hand-testing in an emulator.
 | Smoke test | `test/emu` (`make test-smoke`) | ~1 min | The ROM boots, plays, renders |
 | RAM test | `test/emu` (`make test-ram`) | ~1 min | The running ROM agrees with the unit-tested logic |
 | Warp test | `test/emu` (`make test-warp`) | ~1 min | Tests can jump straight into any course |
+| Splatoon test | `test/emu` (`make test-splat`) | ~1 min | Walking paints floor triangles |
 
 ## Running
 
