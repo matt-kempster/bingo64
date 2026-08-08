@@ -36,6 +36,16 @@
 #define INK_G 0x40
 #define INK_B 0xA0
 
+// The visual mesh does not always line up with the collision mesh, so
+// besides tinting the stepped-on triangle's footprint we also splat all
+// vertices near Mario's feet. Radius chosen to look like an ink blob.
+#define SPLAT_RADIUS 130.0f
+#define SPLAT_Y_WINDOW 180.0f
+#define SPLAT_MOVE_MIN 45.0f
+
+enum SplatoonWalkOp { WALK_BAKE, WALK_TINT, WALK_SPLAT };
+static f32 sSplatX, sSplatY, sSplatZ;
+
 s32 gSplatoonEnabled = 0;
 s32 gSplatoonPaintedCount = 0;
 s32 gSplatoonTotalFloors = 0;
@@ -43,6 +53,8 @@ s32 gSplatoonTotalFloors = 0;
 static struct Surface *sPaintedSurfs[SPLATOON_MAX_TRIS];
 static struct Surface *sLastFloor = NULL;
 static s32 sBaked = 0;
+static f32 sLastSplat[3];
+static s32 sHasSplatted = 0;
 
 // Current material lights, tracked while walking display lists.
 static u8 sLightCol[3];
@@ -61,6 +73,7 @@ void splatoon_clear(void) {
     sLastFloor = NULL;
     sBaked = 0;
     sTrampolineCount = 0;
+    sHasSplatted = 0;
 }
 
 static s32 splatoon_count_floors(void) {
@@ -162,12 +175,36 @@ static void tint_vtx_array(Vtx *v, s32 n, struct Surface *surf) {
     }
 }
 
-// Walks a display list. With surf == NULL this is the bake pass: track
-// each material's lights and convert lit vertices to baked colors.
-// With surf set, tint that triangle's vertices.
-static void walk_display_list(Gfx *dl, struct Surface *surf, s32 depth) {
+// Inks every baked vertex inside a cylinder around Mario's feet. This
+// covers spots where the visual mesh is coarser than the collision
+// mesh and the footprint test would miss every vertex.
+static void splat_vtx_array(Vtx *v, s32 n) {
+    f32 dx, dy, dz;
+    s32 i;
+
+    for (i = 0; i < n; i++) {
+        if (v[i].v.flag != BAKED_FLAG) {
+            continue;
+        }
+        dx = v[i].v.ob[0] - sSplatX;
+        dy = v[i].v.ob[1] - sSplatY;
+        dz = v[i].v.ob[2] - sSplatZ;
+        if (dy < -SPLAT_Y_WINDOW || dy > SPLAT_Y_WINDOW) {
+            continue;
+        }
+        if (dx * dx + dz * dz > SPLAT_RADIUS * SPLAT_RADIUS) {
+            continue;
+        }
+        v[i].v.cn[0] = INK_R;
+        v[i].v.cn[1] = INK_G;
+        v[i].v.cn[2] = INK_B;
+    }
+}
+
+// Walks a display list, applying `op` to every vertex array it loads.
+// The bake pass also tracks each material's lights along the way.
+static void walk_display_list(Gfx *dl, s32 op, struct Surface *surf, s32 depth) {
     u32 w0, w1;
-    u8 op;
 
     if (dl == NULL || depth > 8) {
         return;
@@ -175,28 +212,29 @@ static void walk_display_list(Gfx *dl, struct Surface *surf, s32 depth) {
     for (;;) {
         w0 = dl->words.w0;
         w1 = dl->words.w1;
-        op = w0 >> 24;
 
-        if (op == OP_ENDDL) {
+        if ((w0 >> 24) == OP_ENDDL) {
             return;
         }
-        if (op == OP_DL) {
+        if ((w0 >> 24) == OP_DL) {
             Gfx *sub = segmented_to_virtual((void *) w1);
             if (((w0 >> 16) & 0xFF) == G_DL_PUSH) {
-                walk_display_list(sub, surf, depth + 1);
+                walk_display_list(sub, op, surf, depth + 1);
             } else {
                 dl = sub;
                 continue;
             }
-        } else if (op == OP_VTX) {
+        } else if ((w0 >> 24) == OP_VTX) {
             s32 n = (w0 >> 10) & 0x3F;
             Vtx *v = segmented_to_virtual((void *) w1);
-            if (surf != NULL) {
+            if (op == WALK_TINT) {
                 tint_vtx_array(v, n, surf);
+            } else if (op == WALK_SPLAT) {
+                splat_vtx_array(v, n);
             } else {
                 bake_vtx_array(v, n);
             }
-        } else if (op == OP_MOVEMEM && surf == NULL) {
+        } else if ((w0 >> 24) == OP_MOVEMEM && op == WALK_BAKE) {
             u8 param = (w0 >> 16) & 0xFF;
             if (param == G_MV_L0) {
                 u8 *light = segmented_to_virtual((void *) w1);
@@ -219,7 +257,7 @@ static void walk_display_list(Gfx *dl, struct Surface *surf, s32 depth) {
 
 // Finds every display list in the area's geo graph (skipping objects —
 // only the level's own geometry gets painted).
-static void walk_graph_node(struct GraphNode *firstNode, struct Surface *surf, s32 depth) {
+static void walk_graph_node(struct GraphNode *firstNode, s32 op, struct Surface *surf, s32 depth) {
     struct GraphNode *node = firstNode;
 
     if (firstNode == NULL || depth > 16) {
@@ -237,9 +275,9 @@ static void walk_graph_node(struct GraphNode *firstNode, struct Surface *surf, s
                 dl = (void *) ((Gfx *) dl)[1].words.w1;
             }
             if (dl != NULL) {
-                walk_display_list(segmented_to_virtual(dl), surf, 0);
+                walk_display_list(segmented_to_virtual(dl), op, surf, 0);
 
-                if (surf == NULL && !wrapped && sTrampolineCount < MAX_TRAMPOLINES) {
+                if (op == WALK_BAKE && !wrapped && sTrampolineCount < MAX_TRAMPOLINES) {
                     Gfx *g = sTrampolines[sTrampolineCount++];
                     gSPClearGeometryMode(g++, G_LIGHTING);
                     gSPDisplayList(g++, dl);
@@ -250,7 +288,7 @@ static void walk_graph_node(struct GraphNode *firstNode, struct Surface *surf, s
             }
         }
         if (node->type != GRAPH_NODE_TYPE_OBJECT_PARENT && node->children != NULL) {
-            walk_graph_node(node->children, surf, depth + 1);
+            walk_graph_node(node->children, op, surf, depth + 1);
         }
         node = node->next;
     } while (node != firstNode);
@@ -279,7 +317,7 @@ static void splatoon_step(struct Surface *floor) {
     sPaintedSurfs[gSplatoonPaintedCount++] = floor;
 
     if (gCurrentArea != NULL && gCurrentArea->unk04 != NULL) {
-        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, floor, 0);
+        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, WALK_TINT, floor, 0);
     }
 }
 
@@ -294,11 +332,26 @@ void splatoon_update(void) {
         sLightCol[0] = sLightCol[1] = sLightCol[2] = 255;
         sAmbCol[0] = sAmbCol[1] = sAmbCol[2] = 127;
         sLightDir[0] = sLightDir[1] = sLightDir[2] = 40;
-        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, NULL, 0);
+        walk_graph_node((struct GraphNode *) gCurrentArea->unk04, WALK_BAKE, NULL, 0);
         sBaked = 1;
     }
 
     if (!(gMarioState->action & ACT_FLAG_AIR)) {
+        f32 dx, dz;
+
         splatoon_step(gMarioState->floor);
+
+        dx = gMarioState->pos[0] - sLastSplat[0];
+        dz = gMarioState->pos[2] - sLastSplat[2];
+        if (!sHasSplatted || dx * dx + dz * dz > SPLAT_MOVE_MIN * SPLAT_MOVE_MIN) {
+            sHasSplatted = 1;
+            sLastSplat[0] = gMarioState->pos[0];
+            sLastSplat[1] = gMarioState->pos[1];
+            sLastSplat[2] = gMarioState->pos[2];
+            sSplatX = gMarioState->pos[0];
+            sSplatY = gMarioState->pos[1];
+            sSplatZ = gMarioState->pos[2];
+            walk_graph_node((struct GraphNode *) gCurrentArea->unk04, WALK_SPLAT, NULL, 0);
+        }
     }
 }
