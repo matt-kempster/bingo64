@@ -5,6 +5,7 @@
 
 #include "area.h"
 #include "bingo.h"
+#include "sm64.h"
 #include "engine/rand.h"
 #include "harness.h"
 #include "splatoon.h"
@@ -471,6 +472,38 @@ static void test_sim_splatoon_objective(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
 
+static void test_sim_unique_deaths(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_UNIQUE_DEATHS;
+    o->data.collectableFlagsData.toGet = 3;
+
+    // Each new way of dying counts once and posts a HUD toast.
+    bingo_track_death(ACT_QUICKSAND_DEATH);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 1);
+
+    // Dying the same way again does nothing.
+    bingo_track_death(ACT_QUICKSAND_DEATH);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+
+    bingo_track_death(ACT_DROWNING);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(gGlueHudNumberLast, 2);
+
+    // A non-death action maps to falling out of the level.
+    bingo_track_death(0);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // Completion is sticky and doesn't re-toast.
+    bingo_track_death(ACT_LAVA_BOOST);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 2);
+}
+
 static void test_sim_kill_collectable(void) {
     struct BingoObjective *o = &gBingoObjectives[0];
     int i;
@@ -623,6 +656,7 @@ int main(void) {
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
     RUN_TEST(test_sim_splatoon_objective);
+    RUN_TEST(test_sim_unique_deaths);
     RUN_TEST(test_sim_kill_collectable);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);

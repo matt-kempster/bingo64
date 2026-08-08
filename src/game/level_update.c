@@ -741,6 +741,7 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
                 // if (m->numLives == 0) {
                 //     sDelayedWarpOp = WARP_OP_GAME_OVER;
                 // }
+                bingo_track_death(m->action);
                 sDelayedWarpTimer = 48;
                 sSourceWarpNodeId = WARP_NODE_DEATH;
                 play_transition(WARP_TRANSITION_FADE_INTO_BOWSER, 0x30, 0x00, 0x00, 0x00);

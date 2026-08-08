@@ -287,7 +287,12 @@ s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum Bingo
     }
 }
 
-s32 objective_lose_mario_hat(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+s32 objective_flags_collectable(
+    struct BingoObjective *objective,
+    enum BingoObjectiveUpdate update,
+    enum BingoObjectiveUpdate flagsBegin,
+    enum BingoObjectiveUpdate flagsEnd
+) {
     struct CollectableFlagsData *data = &objective->data.collectableFlagsData;
     u32 flags, flag;
     s32 count = 0;
@@ -297,8 +302,8 @@ s32 objective_lose_mario_hat(struct BingoObjective *objective, enum BingoObjecti
         count += flags & 1;
         flags >>= 1;
     }
-    if (BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN <= update && update <= BINGO_UPDATE_LOST_HAT_FLAGS_END) {
-        flag = 1 << (update - BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN);
+    if (flagsBegin <= update && update <= flagsEnd) {
+        flag = 1 << (update - flagsBegin);
         if (!(data->flags & flag)) {
             data->flags |= flag;
             count++;
@@ -444,7 +449,15 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             return objective_dangerous_wall_kicks(objective, update);
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
-            return objective_lose_mario_hat(objective, update);
+            return objective_flags_collectable(
+                objective, update,
+                BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN, BINGO_UPDATE_LOST_HAT_FLAGS_END
+            );
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+            return objective_flags_collectable(
+                objective, update,
+                BINGO_UPDATE_DEATH_FLAGS_BEGIN, BINGO_UPDATE_DEATH_FLAGS_END
+            );
         case BINGO_OBJECTIVE_BLJ:
             return objective_blj(objective, update);
         case BINGO_OBJECTIVE_RACING_STARS:

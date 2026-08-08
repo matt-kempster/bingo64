@@ -682,6 +682,13 @@ s32 bingo_objective_lose_mario_hat_init(enum BingoObjectiveClass class) {
     }
 }
 
+s32 bingo_objective_unique_deaths_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(4, 6);
+    }
+}
+
 s32 bingo_objective_blj_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -875,6 +882,8 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_blj_init(class);
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
             return bingo_objective_lose_mario_hat_init(class);
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+            return bingo_objective_unique_deaths_init(class);
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
             return bingo_objective_exclamation_mark_box_init(class);
         case BINGO_OBJECTIVE_WING_CAP_BOX:

@@ -123,6 +123,55 @@ u8 bingo_check_win() {
     return bingos;
 }
 
+void bingo_track_death(u32 deathAction) {
+    enum BingoObjectiveUpdate update;
+
+    switch (deathAction) {
+        case ACT_STANDING_DEATH:
+            update = BINGO_UPDATE_DEATH_STANDING;
+            break;
+        case ACT_DEATH_ON_BACK:
+            update = BINGO_UPDATE_DEATH_ON_BACK;
+            break;
+        case ACT_DEATH_ON_STOMACH:
+            update = BINGO_UPDATE_DEATH_ON_STOMACH;
+            break;
+        case ACT_DROWNING:
+            update = BINGO_UPDATE_DEATH_DROWNED;
+            break;
+        case ACT_WATER_DEATH:
+            update = BINGO_UPDATE_DEATH_IN_WATER;
+            break;
+        case ACT_QUICKSAND_DEATH:
+            update = BINGO_UPDATE_DEATH_QUICKSAND;
+            break;
+        case ACT_ELECTROCUTION:
+            update = BINGO_UPDATE_DEATH_SHOCKED;
+            break;
+        case ACT_SUFFOCATION:
+            update = BINGO_UPDATE_DEATH_GAS;
+            break;
+        case ACT_EATEN_BY_BUBBA:
+            update = BINGO_UPDATE_DEATH_EATEN;
+            break;
+        case ACT_SQUISHED:
+            update = BINGO_UPDATE_DEATH_SQUISHED;
+            break;
+        case ACT_LAVA_BOOST:
+            update = BINGO_UPDATE_DEATH_LAVA;
+            break;
+        case ACT_CAUGHT_IN_WHIRLPOOL:
+            update = BINGO_UPDATE_DEATH_WHIRLPOOL;
+            break;
+        default:
+            // Only deaths reach here without a death action: falling
+            // out of the level (m->floor == NULL in update_mario_inputs).
+            update = BINGO_UPDATE_DEATH_FELL_OUT;
+            break;
+    }
+    bingo_update(update);
+}
+
 void bingo_update(enum BingoObjectiveUpdate update) {
     s32 i;
     // This is to avoid a bug where the call to bingo_update() from area.c

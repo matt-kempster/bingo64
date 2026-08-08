@@ -88,7 +88,7 @@ Items marked done are implemented but may not be in a release yet.
 ### Misc
 
 - [ ] Swim with a cork box
-- [ ] Die in N unique ways
+- [x] Die in N unique ways
 - [ ] Grab trees
 - [ ] Get all 3 toad stars
 

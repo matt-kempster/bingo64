@@ -499,6 +499,9 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
             strcpy(verb, "Lose your hat in");
             break;
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+            strcpy(verb, "Die in");
+            break;
         case BINGO_OBJECTIVE_POLES:
             strcpy(verb, "Grab");
             break;
@@ -519,6 +522,7 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             printUnique = 0;
             break;
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
             strcpy(collectName, "ways");
             break;
         case BINGO_OBJECTIVE_SIGNPOST:
@@ -573,7 +577,10 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
 
     if (obj->state == BINGO_STATE_COMPLETE) {
         strcpy(suffix, ": Complete!");
-    } else if (obj->type == BINGO_OBJECTIVE_LOSE_MARIO_HAT) {
+    } else if (
+        obj->type == BINGO_OBJECTIVE_LOSE_MARIO_HAT
+        || obj->type == BINGO_OBJECTIVE_UNIQUE_DEATHS
+    ) {
         flags = obj->data.collectableFlagsData.flags;
         while (flags) {
             count += flags & 1;
@@ -680,6 +687,7 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             get_secrets_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
         case BINGO_OBJECTIVE_BLJ:
         case BINGO_OBJECTIVE_SIGNPOST:
         case BINGO_OBJECTIVE_POLES:

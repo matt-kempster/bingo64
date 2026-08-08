@@ -176,6 +176,7 @@
 #define TEXT_STARS_LEVEL _("All Stars in Level")
 #define TEXT_STARS_MULTI_LEVELS _("Star in N Levels")
 #define TEXT_MARIO_HAT _("Lose Mario's hat")
+#define TEXT_UNIQUE_DEATHS _("Die in Unique Ways")
 #define TEXT_DANGEROUS_WALL_KICKS _("Perilous Wallkicks")
 #define TEXT_BLJ _("Perform BLJs")
 #define TEXT_RACING _("Racing Stars")
