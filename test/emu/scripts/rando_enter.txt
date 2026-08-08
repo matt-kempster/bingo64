@@ -1,0 +1,9 @@
+# Boot, warp to BOB (harness pokes the warp at 450), select the random-stars
+# modifier with three Z presses (selection wraps backwards from NONE:
+# splatoon, daredevil, random stars), then A to enter the level.
+150 155 START
+320 322 A
+570 572 Z
+585 587 Z
+600 602 Z
+700 702 A

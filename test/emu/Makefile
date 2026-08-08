@@ -7,9 +7,9 @@
 M64P_SRC ?= $(HOME)/opt/m64p/mupen64plus-core/src/api
 BUILD := build
 
-.PHONY: test test-smoke test-ram test-warp test-splat test-starui plugin clean
+.PHONY: test test-smoke test-ram test-warp test-splat test-starui test-rando plugin clean
 
-test: test-smoke test-ram test-warp test-splat test-starui
+test: test-smoke test-ram test-warp test-splat test-starui test-rando
 
 plugin: $(BUILD)/input_script.so
 
@@ -34,6 +34,9 @@ test-splat: plugin
 
 test-starui: plugin
 	xvfb-run -a python3 star_ui_test.py
+
+test-rando: plugin
+	xvfb-run -a python3 rando_test.py
 
 clean:
 	rm -rf $(BUILD)
