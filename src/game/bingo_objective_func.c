@@ -148,6 +148,9 @@ s32 objective_obtain_coins(struct BingoObjective *objective, enum BingoObjective
     }
 }
 
+// A per-tile toast would spam the HUD, so only every 50th tile posts one.
+#define SPLATOON_NOTIFY_EVERY 50
+
 s32 objective_splatoon(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct CourseCollectableData *data = &objective->data.courseCollectableData;
 
@@ -158,6 +161,8 @@ s32 objective_splatoon(struct BingoObjective *objective, enum BingoObjectiveUpda
         data->gotten = gSplatoonPaintedCount;
         if (data->gotten >= data->toGet) {
             set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (data->gotten % SPLATOON_NOTIFY_EVERY == 0) {
+            bingo_hud_update_number(objective->icon, data->gotten);
         }
     }
 }

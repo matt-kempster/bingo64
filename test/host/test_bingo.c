@@ -9,6 +9,10 @@
 #include "harness.h"
 #include "splatoon.h"
 
+// From glue.c: records bingo_hud_update_number calls.
+extern s32 gGlueHudNumberCalls;
+extern s32 gGlueHudNumberLast;
+
 void setup_bingo_objectives(u32 seed);
 u8 bingo_check_win(void);
 s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2);
@@ -424,9 +428,11 @@ static void test_sim_coin_objective(void) {
 static void test_sim_splatoon_objective(void) {
     struct BingoObjective *o = &gBingoObjectives[0];
     reset_sim();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
     o->type = BINGO_OBJECTIVE_SPLATOON;
     o->data.courseCollectableData.course = 1;
-    o->data.courseCollectableData.toGet = 60;
+    o->data.courseCollectableData.toGet = 120;
 
     // Painting in the wrong course does nothing.
     gCurrCourseNum = 2;
@@ -435,21 +441,30 @@ static void test_sim_splatoon_objective(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
     CHECK_EQ_INT(o->data.courseCollectableData.gotten, 0);
 
-    // Painting in the right course tracks the game's counter.
+    // Painting in the right course tracks the game's counter. 40 is not
+    // a milestone, so no HUD toast yet.
     gCurrCourseNum = 1;
     gSplatoonPaintedCount = 40;
     bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
     CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
     CHECK_EQ_INT(o->data.courseCollectableData.gotten, 40);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 0);
+
+    // Every 50th tile posts the icon-x-N HUD toast.
+    gSplatoonPaintedCount = 50;
+    bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 50);
 
     // Leaving the course throws the progress away.
     bingo_update(BINGO_UPDATE_COURSE_CHANGED);
     CHECK_EQ_INT(o->data.courseCollectableData.gotten, 0);
 
-    // Enough paint completes it.
-    gSplatoonPaintedCount = 60;
+    // Enough paint completes it (no extra toast on the completing tile).
+    gSplatoonPaintedCount = 120;
     bingo_update(BINGO_UPDATE_SPLATOON_PAINTED);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
 
     // Completion is sticky.
     bingo_update(BINGO_UPDATE_COURSE_CHANGED);

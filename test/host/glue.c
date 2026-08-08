@@ -48,9 +48,14 @@ void bingo_hud_update_message(s32 icon, char message[10], s8 horribleHackWallkic
     (void) horribleHackWallkick;
 }
 
+// Recorded so tests can assert when a HUD toast was posted.
+s32 gGlueHudNumberCalls = 0;
+s32 gGlueHudNumberLast = -1;
+
 void bingo_hud_update_number(s32 icon, s32 number) {
     (void) icon;
-    (void) number;
+    gGlueHudNumberCalls++;
+    gGlueHudNumberLast = number;
 }
 
 void bingo_hud_update_state(s32 icon, s32 state) {
