@@ -84,7 +84,9 @@ def main():
           "no paint after landing (early=%r)" % state["early"])
     check(state["late"] is not None and state["late"] > (state["early"] or 0) + 3,
           "walking painted too little (early=%r late=%r)" % (state["early"], state["late"]))
-    check(state["total"] is not None and 500 < state["total"] < 20000,
+    # BOB has 621 unique static floors; the whole surface pool holds 2300
+    # surfaces, so a count past that means cell-duplicated counting is back.
+    check(state["total"] is not None and 300 < state["total"] < 2300,
           "total floor count looks wrong (%r)" % state["total"])
     check((state["late"] or 0) < (state["total"] or 1),
           "painted more floors than exist")

@@ -10,6 +10,7 @@
 #include "engine/math_util.h"
 #include "engine/surface_collision.h"
 #include "engine/surface_load.h"
+#include "object_list_processor.h"
 
 // Splatoon mode. Every static floor triangle Mario stands on gets
 // remembered and drawn as translucent ink from then on. The rendering
@@ -18,7 +19,12 @@
 
 #define SPLATOON_MAX_TRIS 1000
 
+// Swimming should only paint when Mario hugs the bottom, not the whole
+// lakebed under his swim path.
+#define SPLATOON_MAX_HEIGHT_ABOVE_FLOOR 100.0f
+
 extern Mat4 gMatStack[32];
+extern struct Surface *sSurfacePool;
 
 s32 gSplatoonEnabled = 0;
 s32 gSplatoonPaintedCount = 0;
@@ -53,17 +59,14 @@ void splatoon_clear(void) {
 }
 
 static s32 splatoon_count_floors(void) {
-    struct SurfaceNode *node;
-    s32 i, j;
+    s32 i;
     s32 count = 0;
 
-    for (i = 0; i < 16; i++) {
-        for (j = 0; j < 16; j++) {
-            node = gStaticSurfacePartition[i][j][SPATIAL_PARTITION_FLOORS].next;
-            while (node != NULL) {
-                count++;
-                node = node->next;
-            }
+    // Walk the surface pool, not the cell partition: a triangle spanning
+    // several cells has a node in each and would be counted repeatedly.
+    for (i = 0; i < gNumStaticSurfaces; i++) {
+        if (sSurfacePool[i].normal.y > 0.01) {
+            count++;
         }
     }
     return count;
@@ -117,7 +120,8 @@ void splatoon_render(void) {
         return;
     }
 
-    if (!(gMarioState->action & ACT_FLAG_AIR)) {
+    if (!(gMarioState->action & ACT_FLAG_AIR)
+        && gMarioState->pos[1] - gMarioState->floorHeight < SPLATOON_MAX_HEIGHT_ABOVE_FLOOR) {
         splatoon_step(gMarioState->floor);
     }
 
