@@ -59,5 +59,6 @@ enum FloorSafeLevels {
 
 void get_safe_position(struct Object *obj, Vec3s pos, f32 minHeightRange, f32 maxHeightRange,
                        u16 *seed, u8 floorSafeLevel, u8 randPosFlags);
+s32 bingo_rando_area_count(s32 levelNum);
 
 #endif /* _BINGO_RANDO_SPAWN_H */

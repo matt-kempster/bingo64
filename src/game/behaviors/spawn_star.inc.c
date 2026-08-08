@@ -24,6 +24,7 @@ void bhv_rando_star_init(void) {
 
     s8 sp1F;
     u8 sp1E;
+    u32 areaHash;
 
     if (!gBingoRandomStarsActive) {
         mark_obj_for_deletion(o);
@@ -31,6 +32,20 @@ void bhv_rando_star_init(void) {
     }
 
     sp1F = (o->oBehParams >> 24) & 0xFF;
+
+    // The star objects are placed in every AREA block of multi-area levels
+    // so that each one initializes with its own area's collision loaded.
+    // Each star belongs to exactly one area, chosen deterministically from
+    // the bingo seed; every copy of it in another area deletes itself.
+    areaHash = ((u32) seedCopy << 8) + (u32) gCurrCourseNum * 3 + sp1F;
+    areaHash = (areaHash ^ (areaHash >> 16)) * 0x45d9f3b;
+    areaHash = (areaHash ^ (areaHash >> 16)) * 0x45d9f3b;
+    areaHash ^= areaHash >> 16;
+    if (1 + (s32) (areaHash % bingo_rando_area_count(gCurrLevelNum)) != gCurrAreaIndex) {
+        mark_obj_for_deletion(o);
+        return;
+    }
+
     sp1E = bingo_get_rando_star_status(gCurrCourseNum, sp1F);
     if (sp1E) {
         o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_TRANSPARENT_STAR];

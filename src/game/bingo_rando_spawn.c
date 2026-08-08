@@ -215,6 +215,53 @@ AreaParamsArray *sLevelParams[] = {
     &ttmParams
 };
 
+// Number of AreaParams entries per level. Must stay in the same order as
+// sLevelParams above; ARRAY_COUNT keeps each entry current when areas are
+// added to a table.
+static u8 sLevelAreaCounts[] = {
+    ARRAY_COUNT(bbhParams),
+    ARRAY_COUNT(ccmParams),
+    ARRAY_COUNT(icParams),
+    ARRAY_COUNT(hmcParams),
+    ARRAY_COUNT(sslParams),
+    ARRAY_COUNT(bobParams),
+    ARRAY_COUNT(slParams),
+    ARRAY_COUNT(wdwParams),
+    ARRAY_COUNT(jrbParams),
+    ARRAY_COUNT(thiParams),
+    ARRAY_COUNT(ttcParams),
+    ARRAY_COUNT(rrParams),
+    ARRAY_COUNT(cgParams),
+    ARRAY_COUNT(bitdwParams),
+    ARRAY_COUNT(vcutmParams),
+    ARRAY_COUNT(bitfsParams),
+    ARRAY_COUNT(saParams),
+    ARRAY_COUNT(bitsParams),
+    ARRAY_COUNT(lllParams),
+    ARRAY_COUNT(dddParams),
+    ARRAY_COUNT(wfParams),
+    1,
+    ARRAY_COUNT(ccParams),
+    ARRAY_COUNT(pssParams),
+    ARRAY_COUNT(cotmcParams),
+    ARRAY_COUNT(totwcParams),
+    1,
+    ARRAY_COUNT(wmotrParams),
+    1,
+    1,
+    1,
+    1,
+    ARRAY_COUNT(ttmParams)
+};
+
+s32 bingo_rando_area_count(s32 levelNum) {
+    if (levelNum < 4 || levelNum - 4 >= (s32) ARRAY_COUNT(sLevelParams)
+        || sLevelParams[levelNum - 4] == NULL) {
+        return 1;
+    }
+    return sLevelAreaCounts[levelNum - 4];
+}
+
 // Only uniform if used for floats. [min, max)
 // Draws from the global MT, which get_safe_position seeds; the old
 // self-feeding u16 scheme (reseed from the previous draw) collapsed into a
