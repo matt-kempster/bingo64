@@ -1618,18 +1618,18 @@ $(BUILD_DIR)/text/debug_text.raw.inc.c: text/debug_text.inc.c $(BUILD_DIR)/$(CHA
 	$(V)$(CPP) $(CPPFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) $(BUILD_DIR)/$(CHARMAP_DEBUG) - $@
 
 ifeq ($(EXT_OPTIONS_MENU),1)
-$(BUILD_DIR)/include/text_options_strings.h: include/text_options_strings.h.in
+$(BUILD_DIR)/include/text_options_strings.h: include/text_options_strings.h.in $(BUILD_DIR)/$(CHARMAP)
 	$(call print,Encoding:,$<,$@)
 	$(V)$(TEXTCONV) $(BUILD_DIR)/$(CHARMAP) $< $@
 
 ifeq ($(CHEATS_ACTIONS),1)
-$(BUILD_DIR)/include/text_cheats_strings.h: include/text_cheats_strings.h.in
+$(BUILD_DIR)/include/text_cheats_strings.h: include/text_cheats_strings.h.in $(BUILD_DIR)/$(CHARMAP)
 	$(call print,Encoding:,$<,$@)
 	$(V)$(TEXTCONV) $(BUILD_DIR)/$(CHARMAP) $< $@
 endif
 
 ifeq ($(EXT_DEBUG_MENU),1)
-$(BUILD_DIR)/include/text_debug_strings.h: include/text_debug_strings.h.in
+$(BUILD_DIR)/include/text_debug_strings.h: include/text_debug_strings.h.in $(BUILD_DIR)/$(CHARMAP)
 	$(call print,Encoding:,$<,$@)
 	$(V)$(TEXTCONV) $(BUILD_DIR)/$(CHARMAP) $< $@
 endif

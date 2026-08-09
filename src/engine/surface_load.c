@@ -93,6 +93,10 @@ static struct Surface *alloc_surface(u32 dynamic) {
 #endif
     gSurfacesAllocated++;
 
+    if (!dynamic) {
+        splatoon_register_static_surface(surface);
+    }
+
     surface->type = 0;
     surface->force = 0;
     surface->flags = 0;
@@ -124,6 +128,7 @@ static void clear_spatial_partition(SpatialPartitionCell *cells) {
  * Clears the static (level) surface partitions for new use.
  */
 static void clear_static_surfaces(void) {
+    splatoon_static_surfaces_reset();
 #ifndef USE_SYSTEM_MALLOC
     gTotalStaticSurfaceData = 0;
 #endif

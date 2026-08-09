@@ -1,4 +1,3 @@
-#include "../../enhancements/crash.inc.c"
 #include <ultra64.h>
 
 #include "sm64.h"
@@ -21,10 +20,10 @@
 #include "segment2.h"
 #include "segment_symbols.h"
 #include "rumble_init.h"
-#include <prevent_bss_reordering.h>
 #include "game_init.h"
 #include "bingo_board_setup.h"
 #include "bingo.h"
+#include "engine/math_util.h"
 #include "menu/star_select.h"
 #include "camera.h"
 

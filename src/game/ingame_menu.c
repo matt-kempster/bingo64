@@ -26,7 +26,6 @@
 #include "bingo.h"
 #include "course_table.h"
 
-extern Gfx *gDisplayListHead;
 extern s16 gCurrCourseNum;
 extern s16 gCurrSaveFileNum;
 

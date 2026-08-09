@@ -576,6 +576,27 @@ void render_textrect(s32 x, s32 y, s32 pos, u8 alpha) {
                         (rectY + 16) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
 }
 
+/**
+ * Clips textrect into the boundaries defined.
+ */
+static void clip_to_bounds(s32 *x, s32 *y) {
+    if (*x < TEXRECT_MIN_X) {
+        *x = TEXRECT_MIN_X;
+    }
+
+    if (*x > TEXRECT_MAX_X) {
+        *x = TEXRECT_MAX_X;
+    }
+
+    if (*y < TEXRECT_MIN_Y) {
+        *y = TEXRECT_MIN_Y;
+    }
+
+    if (*y > TEXRECT_MAX_Y) {
+        *y = TEXRECT_MAX_Y;
+    }
+}
+
 static void render_large_text(int x, int y, int pos) {
     int sp34 = x + pos * 24;
     int sp30 = 224 - y;

@@ -36,7 +36,34 @@
 #define SURFACE_POOL_SIZE 2300
 
 extern Mat4 gMatStack[32];
-extern struct Surface *sSurfacePool;
+
+// ex-alo's surface pools are chunked (and malloc-backed on PC), so surfaces
+// can no longer be indexed by pointer arithmetic on one contiguous pool.
+// Instead surface_load.c registers every static surface here as it loads;
+// load order is deterministic, so the registry index is the same stable id
+// the old pool offset used to be.
+static struct Surface *sStaticSurfaces[SURFACE_POOL_SIZE];
+static s32 sStaticSurfaceCount = 0;
+
+void splatoon_static_surfaces_reset(void) {
+    sStaticSurfaceCount = 0;
+}
+
+void splatoon_register_static_surface(struct Surface *surf) {
+    if (sStaticSurfaceCount < SURFACE_POOL_SIZE) {
+        sStaticSurfaces[sStaticSurfaceCount++] = surf;
+    }
+}
+
+static s32 splatoon_static_surface_index(struct Surface *surf) {
+    s32 i;
+    for (i = 0; i < sStaticSurfaceCount; i++) {
+        if (sStaticSurfaces[i] == surf) {
+            return i;
+        }
+    }
+    return -1;
+}
 
 s32 gSplatoonEnabled = 0;
 s32 gSplatoonPaintedCount = 0;  // unique floors painted, all areas of the course
@@ -126,8 +153,8 @@ void splatoon_on_area_load(s16 areaIndex) {
     splatoon_reset_decals();
 
     gSplatoonTotalFloors = 0;
-    for (idx = 0; idx < gNumStaticSurfaces; idx++) {
-        surf = &sSurfacePool[idx];
+    for (idx = 0; idx < sStaticSurfaceCount; idx++) {
+        surf = sStaticSurfaces[idx];
         if (surf->normal.y > 0.01) {
             gSplatoonTotalFloors++;
             if (sPaintedBits[sAreaIndex][idx >> 3] & (1 << (idx & 7))) {
@@ -145,8 +172,8 @@ static void splatoon_step(struct Surface *floor) {
     }
     sLastFloor = floor;
 
-    idx = floor - sSurfacePool;
-    if (idx < 0 || idx >= gNumStaticSurfaces) {
+    idx = splatoon_static_surface_index(floor);
+    if (idx < 0) {
         return;
     }
     if (sPaintedBits[sAreaIndex][idx >> 3] & (1 << (idx & 7))) {

@@ -698,6 +698,5 @@ void render_hud(void) {
                 render_hud_timer();
             }
         }
-#endif
     }
 }
