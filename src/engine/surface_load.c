@@ -292,7 +292,7 @@ static void add_surface(struct Surface *surface, s32 dynamic) {
     }
 }
 
-static void stub_surface_load_1(void) {
+UNUSED static void stub_surface_load_1(void) {
 }
 
 /**
@@ -658,7 +658,7 @@ void clear_dynamic_surfaces(void) {
     }
 }
 
-static void unused_80383604(void) {
+UNUSED static void unused_80383604(void) {
 }
 
 /**

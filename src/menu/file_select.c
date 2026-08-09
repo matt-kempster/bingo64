@@ -429,7 +429,7 @@ void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButto
     if (scoreFileButton->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
         && sCursorClickingTimer == 2) {
         play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gGlobalSoundSource);
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
         scoreFileButton->oMenuButtonState = MENU_BUTTON_STATE_SHRINKING;

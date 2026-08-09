@@ -10,7 +10,7 @@ void bhv_1up_interact(void) {
         gMarioState->numLives++;
         o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
         bingo_update(BINGO_UPDATE_GOT_1UP);
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
     }
