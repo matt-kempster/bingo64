@@ -7,6 +7,10 @@
 *.ilk
 *.exp
 
+# Patch and wiggle related residdue
+*.rej
+*.porig
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -41,15 +45,20 @@
 # Text editor remnants
 *.swp
 .vscode/*
+.idea/*
 
 # General project-specific ignores
 doxygen/doxygen/*
 build/*
+!/lib/discord/*
 *.dump
 *.mio0
 *.z64
 *.map
+*.sav
 .assets-local.txt
+sm64_save_file.bin
+sm64config.txt
 
 # Assets. Generally ignored, but ones with "custom" in the name are fine.
 /levels/**/*.png
@@ -70,3 +79,12 @@ build/*
 !/sound/**/*custom*/**/*.aiff
 !/assets/**/*custom*.bin
 !/assets/**/*custom*/**/*.bin
+
+# Android files
+!/textures/touchcontrols/*.png
+platform/android/SDL/include
+!platform/android/android/**/*.so
+platform/android/android/lib/*/libc++_shared.so
+
+# macOS autocreated directory settings file 
+.DS_Store

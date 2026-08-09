@@ -6,6 +6,16 @@
 #include "engine/surface_collision.h"
 #include "macros.h"
 #include "types.h"
+#include "behavior_actions.h"
+#include "rm2c.h"
+
+#ifdef RM2C_HAS_TRAJECTORIES //#include "src/extras/rm2c/trajectories.inc.c"
+extern const Trajectory KoopaBoB_path[];
+extern const Trajectory KoopaTHI_path[]; 
+#endif
+#ifdef RM2C_HAS_CUSTOM_STAR_POS
+#include "src/extras/rm2c/star_pos.inc.c" //just defines
+#endif
 
 void set_yoshi_as_not_dead(void);
 s32 coin_step(s16 *collisionFlagsPtr);
@@ -49,7 +59,6 @@ void bhv_cannon_closed_init(void);
 void cannon_door_act_opening(void);
 void bhv_cannon_closed_loop(void);
 void bhv_whirlpool_init(void);
-void whirlpool_set_hitbox(void);
 void bhv_whirlpool_loop(void);
 void bhv_jet_stream_loop(void);
 void bhv_homing_amp_init(void);
@@ -64,7 +73,7 @@ void butterfly_act_follow_mario(void);
 void butterfly_act_return_home(void);
 void bhv_butterfly_loop(void);
 void bhv_hoot_init(void);
-f32 hoot_find_next_floor(struct FloorGeometry **arg0, f32 arg1);
+f32 hoot_find_next_floor(f32 dist);
 void hoot_floor_bounce(void);
 void hoot_free_step(s16 fastOscY, s32 speed);
 void hoot_player_set_yaw(void);
@@ -87,7 +96,7 @@ void bhv_bobomb_bully_death_smoke_init(void);
 void bhv_bobomb_explosion_bubble_init(void);
 void bhv_bobomb_explosion_bubble_loop(void);
 void bhv_respawner_loop(void);
-void create_respawner(s32 arg0, const BehaviorScript *behToSpawn, s32 minSpawnDist);
+void create_respawner(ModelID32 model, const BehaviorScript *behToSpawn, s32 minSpawnDist);
 void bhv_small_bully_init(void);
 void bhv_big_bully_init(void);
 void bully_check_mario_collision(void);

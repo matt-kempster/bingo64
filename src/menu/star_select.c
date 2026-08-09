@@ -12,10 +12,10 @@
 #include "game/memory.h"
 #include "game/object_helpers.h"
 #include "game/object_list_processor.h"
+#include "game/rumble_init.h"
 #include "game/save_file.h"
 #include "game/segment2.h"
 #include "game/segment7.h"
-#include "game/rumble_init.h"
 #include "sm64.h"
 #include "star_select.h"
 #include "text_strings.h"
@@ -150,7 +150,6 @@ void bhv_act_selector_init(void) {
         sStarSelectorModels[i] =
             spawn_object_abs_with_rot(gCurrentObject, 0, selectorModelIDs[i], bhvActSelectorStarType,
                                       (sVisibleStars - 1) * -75 + i * 152, 248, -300, 0, 0, 0);
-
         sStarSelectorModels[i]->oStarSelectorSize = 1.0f;
     }
 
@@ -302,7 +301,6 @@ void print_act_selector_strings(void) {
     }
     currLevelName = segmented_to_virtual(levelNameTbl[COURSE_NUM_TO_INDEX(gCurrCourseNum)]);
 #endif
-
     // Print the coin highscore.
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
@@ -345,7 +343,6 @@ void print_act_selector_strings(void) {
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
 #endif
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
-
     // Print the name of the selected act.
     if (sVisibleStars != 0) {
         selectedActName = segmented_to_virtual(actNameTbl[COURSE_NUM_TO_INDEX(gCurrCourseNum) * 6 + sSelectedActIndex]);
@@ -390,7 +387,16 @@ Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node)
 #endif
 {
     if (callContext == GEO_CONTEXT_RENDER) {
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++);
+        gDPSet2d(gDisplayListHead++, 1);
+        gDPSetIod(gDisplayListHead++, iodStarSelect);
+#endif
         print_act_selector_strings();
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++);
+        gDPSet2d(gDisplayListHead++, 0);
+#endif
     }
     return NULL;
 }
@@ -406,6 +412,10 @@ s32 lvl_init_act_selector_values_and_stars(UNUSED s32 arg, UNUSED s32 unused) {
     sInitSelectedActNum = 0;
     sVisibleStars = 0;
     sActSelectorMenuTimer = 0;
+#ifdef NO_SEGMENTED_MEMORY
+    sSelectedActIndex = 0;
+    sSelectableStarIndex = 0;
+#endif
     sObtainedStars =
         save_file_get_course_star_count(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum));
 
@@ -427,22 +437,15 @@ s32 lvl_init_act_selector_values_and_stars(UNUSED s32 arg, UNUSED s32 unused) {
 s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused) {
     if (sActSelectorMenuTimer > 10) {
         // If any of these buttons are pressed, play sound and go to course act
-#ifndef VERSION_EU
-        if ((gPlayer3Controller->buttonPressed & A_BUTTON)
-         || (gPlayer3Controller->buttonPressed & START_BUTTON)
-         || (gPlayer3Controller->buttonPressed & B_BUTTON))
-#else
-        if (gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))
-#endif
-        {
+        if ((gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | START_BUTTON | B_BUTTON))) {
 #ifdef VERSION_JP
             play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
 #else
             play_sound(SOUND_MENU_STAR_SOUND_LETS_A_GO, gGlobalSoundSource);
 #endif
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
             queue_rumble_data(60, 70);
-            func_sh_8024C89C(1);
+            queue_rumble_decay(1);
 #endif
             if (sInitSelectedActNum >= sSelectedActIndex + 1) {
                 sLoadedActNum = sSelectedActIndex + 1;

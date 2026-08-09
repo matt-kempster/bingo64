@@ -11,6 +11,8 @@
 #include "game/obj_behaviors_2.h"
 #include "game/object_helpers.h"
 #include "game/object_list_processor.h"
+
+#include "math_util.h"
 #include "graph_node.h"
 #include "surface_collision.h"
 
@@ -23,61 +25,17 @@
 #define BHV_CMD_GET_1ST_S16(index) (s16)(gCurBhvCommand[index] >> 16)
 #define BHV_CMD_GET_2ND_S16(index) (s16)(gCurBhvCommand[index] & 0xFFFF)
 
+#define BHV_CMD_GET_S32(index)     (s32)(gCurBhvCommand[index])
 #define BHV_CMD_GET_U32(index)     (u32)(gCurBhvCommand[index])
+
 #define BHV_CMD_GET_VPTR(index)    (void *)(gCurBhvCommand[index])
 
 #define BHV_CMD_GET_ADDR_OF_CMD(index) (uintptr_t)(&gCurBhvCommand[index])
-
-static u16 gRandomSeed16;
 
 // Unused function that directly jumps to a behavior command and resets the object's stack index.
 UNUSED static void goto_behavior_unused(const BehaviorScript *bhvAddr) {
     gCurBhvCommand = segmented_to_virtual(bhvAddr);
     gCurrentObject->bhvStackIndex = 0;
-}
-
-// Generate a pseudorandom integer from 0 to 65535 from the random seed, and update the seed.
-u16 random_u16(void) {
-    u16 temp1, temp2;
-
-    if (gRandomSeed16 == 22026) {
-        gRandomSeed16 = 0;
-    }
-
-    temp1 = (gRandomSeed16 & 0x00FF) << 8;
-    temp1 = temp1 ^ gRandomSeed16;
-
-    gRandomSeed16 = ((temp1 & 0x00FF) << 8) + ((temp1 & 0xFF00) >> 8);
-
-    temp1 = ((temp1 & 0x00FF) << 1) ^ gRandomSeed16;
-    temp2 = (temp1 >> 1) ^ 0xFF80;
-
-    if ((temp1 & 1) == 0) {
-        if (temp2 == 43605) {
-            gRandomSeed16 = 0;
-        } else {
-            gRandomSeed16 = temp2 ^ 0x1FF4;
-        }
-    } else {
-        gRandomSeed16 = temp2 ^ 0x8180;
-    }
-
-    return gRandomSeed16;
-}
-
-// Generate a pseudorandom float in the range [0, 1).
-f32 random_float(void) {
-    f32 rnd = random_u16();
-    return rnd / (double) 0x10000;
-}
-
-// Return either -1 or 1 with a 50:50 chance.
-s32 random_sign(void) {
-    if (random_u16() >= 0x7FFF) {
-        return 1;
-    } else {
-        return -1;
-    }
 }
 
 // Update an object's graphical position and rotation to match its real position and rotation.
@@ -90,6 +48,19 @@ void obj_update_gfx_pos_and_angle(struct Object *obj) {
     obj->header.gfx.angle[1] = obj->oFaceAngleYaw & 0xFFFF;
     obj->header.gfx.angle[2] = obj->oFaceAngleRoll & 0xFFFF;
 }
+
+#if OBJ_OPACITY_BY_CAM_DIST
+#define OBJ_OPACITY_NEAR   128.0f
+#define OBJ_OPACITY_LENGTH 512.0f
+void obj_set_opacity_from_cam_dist(struct Object *obj) {
+    s32 opacityDist = ((-obj->header.gfx.cameraToObject[2] - OBJ_OPACITY_NEAR) * 256.0f / OBJ_OPACITY_LENGTH);
+    if (opacityDist < 0x00) opacityDist = 0xFF;
+
+    obj->oOpacity = CLAMP(opacityDist, 0x00, 0xFF);
+}
+#undef OBJ_OPACITY_NEAR
+#undef OBJ_OPACITY_LENGTH
+#endif
 
 // Push the address of a behavior command to the object's behavior stack.
 static void cur_obj_bhv_stack_push(uintptr_t bhvAddr) {
@@ -140,10 +111,18 @@ static s32 bhv_cmd_billboard(void) {
     return BHV_PROC_CONTINUE;
 }
 
+// Custom bhv that doesn't face billboards upwards
+static s32 bhv_cmd_cylboard(void) {
+    gCurrentObject->header.gfx.node.flags |= GRAPH_RENDER_CYLBOARD;
+
+    gCurBhvCommand++;
+    return BHV_PROC_CONTINUE;
+}
+
 // Command 0x1B: Sets the current model ID of the object.
 // Usage: SET_MODEL(modelID)
 static s32 bhv_cmd_set_model(void) {
-    s32 modelID = BHV_CMD_GET_2ND_S16(0);
+    ModelID32 modelID = BHV_CMD_GET_2ND_S16(0);
 
     gCurrentObject->header.gfx.sharedChild = gLoadedGraphNodes[modelID];
 
@@ -154,7 +133,7 @@ static s32 bhv_cmd_set_model(void) {
 // Command 0x1C: Spawns a child object with the specified model and behavior.
 // Usage: SPAWN_CHILD(modelID, behavior)
 static s32 bhv_cmd_spawn_child(void) {
-    u32 model = BHV_CMD_GET_U32(1);
+    ModelID32 model = BHV_CMD_GET_U32(1);
     const BehaviorScript *behavior = BHV_CMD_GET_VPTR(2);
 
     struct Object *child = spawn_object_at_origin(gCurrentObject, 0, model, behavior);
@@ -167,7 +146,7 @@ static s32 bhv_cmd_spawn_child(void) {
 // Command 0x2C: Spawns a new object with the specified model and behavior.
 // Usage: SPAWN_OBJ(modelID, behavior)
 static s32 bhv_cmd_spawn_obj(void) {
-    u32 model = BHV_CMD_GET_U32(1);
+    ModelID32 model = BHV_CMD_GET_U32(1);
     const BehaviorScript *behavior = BHV_CMD_GET_VPTR(2);
 
     struct Object *object = spawn_object_at_origin(gCurrentObject, 0, model, behavior);
@@ -183,7 +162,7 @@ static s32 bhv_cmd_spawn_obj(void) {
 // Usage: SPAWN_CHILD_WITH_PARAM(bhvParam, modelID, behavior)
 static s32 bhv_cmd_spawn_child_with_param(void) {
     u32 bhvParam = BHV_CMD_GET_2ND_S16(0);
-    u32 modelID = BHV_CMD_GET_U32(1);
+    ModelID32 modelID = BHV_CMD_GET_U32(1);
     const BehaviorScript *behavior = BHV_CMD_GET_VPTR(2);
 
     struct Object *child = spawn_object_at_origin(gCurrentObject, 0, modelID, behavior);
@@ -379,9 +358,9 @@ static s32 bhv_cmd_set_float(void) {
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x10: Sets the specified field to an integer.
-// Usage: SET_INT(field, value)
-static s32 bhv_cmd_set_int(void) {
+// Command 0x10: Sets the specified field to a short.
+// Usage: SET_SHORT(field, value)
+static s32 bhv_cmd_set_short(void) {
     u8 field = BHV_CMD_GET_2ND_U8(0);
     s16 value = BHV_CMD_GET_2ND_S16(0);
 
@@ -480,9 +459,9 @@ static s32 bhv_cmd_add_float(void) {
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x0F: Adds an integer to the specified field.
-// Usage: ADD_INT(field, value)
-static s32 bhv_cmd_add_int(void) {
+// Command 0x0F: Adds a short to the specified field.
+// Usage: ADD_SHORT(field, value)
+static s32 bhv_cmd_add_short(void) {
     u8 field = BHV_CMD_GET_2ND_U8(0);
     s16 value = BHV_CMD_GET_2ND_S16(0);
 
@@ -492,15 +471,15 @@ static s32 bhv_cmd_add_int(void) {
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x11: Performs a bitwise OR with the specified field and the given integer.
+// Command 0x11: Performs a bitwise OR with the specified field and the given short.
 // Usually used to set an object's flags.
-// Usage: OR_INT(field, value)
-static s32 bhv_cmd_or_int(void) {
-    u8 objectOffset = BHV_CMD_GET_2ND_U8(0);
+// Usage: OR_SHORT(field, value)
+static s32 bhv_cmd_or_short(void) {
+    u8 field = BHV_CMD_GET_2ND_U8(0);
     s32 value = BHV_CMD_GET_2ND_S16(0);
 
     value &= 0xFFFF;
-    cur_obj_or_int(objectOffset, value);
+    cur_obj_or_int(field, value);
 
     gCurBhvCommand++;
     return BHV_PROC_CONTINUE;
@@ -557,30 +536,39 @@ static s32 bhv_cmd_drop_to_floor(void) {
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x18: No operation. Unused.
-// Usage: CMD_NOP_1(field)
-static s32 bhv_cmd_nop_1(void) {
-    UNUSED u8 field = BHV_CMD_GET_2ND_U8(0);
+// Command 0x18: Adds an integer to the specified field.
+// Usage: ADD_INT(field)
+static s32 bhv_cmd_add_int(void) {
+    u8 field = BHV_CMD_GET_2ND_U8(0);
+    s32 value = BHV_CMD_GET_S32(1);
 
-    gCurBhvCommand++;
+    cur_obj_add_int(field, value);
+
+    gCurBhvCommand += 2;
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x1A: No operation. Unused.
-// Usage: CMD_NOP_3(field)
-static s32 bhv_cmd_nop_3(void) {
-    UNUSED u8 field = BHV_CMD_GET_2ND_U8(0);
+// Command 0x1A: Performs a bitwise OR with the specified field and the given integer.
+// Usage: OR_INT(field)
+static s32 bhv_cmd_or_int(void) {
+    u8 field = BHV_CMD_GET_2ND_U8(0);
+    s32 value = BHV_CMD_GET_S32(1);
 
-    gCurBhvCommand++;
+    cur_obj_or_int(field, value);
+
+    gCurBhvCommand += 2;
     return BHV_PROC_CONTINUE;
 }
 
-// Command 0x19: No operation. Unused.
-// Usage: CMD_NOP_2(field)
-static s32 bhv_cmd_nop_2(void) {
-    UNUSED u8 field = BHV_CMD_GET_2ND_U8(0);
+// Command 0x19: Sets the specified field to an integer.
+// Usage: SET_INT(field)
+static s32 bhv_cmd_set_int(void) {
+    u8 field = BHV_CMD_GET_2ND_U8(0);
+    s32 value = BHV_CMD_GET_S32(1);
 
-    gCurBhvCommand++;
+    cur_obj_set_int(field, value);
+
+    gCurBhvCommand += 2;
     return BHV_PROC_CONTINUE;
 }
 
@@ -662,23 +650,8 @@ static s32 bhv_cmd_nop_4(void) {
 }
 
 // Command 0x00: Defines the start of the behavior script as well as the object list the object belongs to.
-// Has some special behavior for certain objects.
 // Usage: BEGIN(objList)
 static s32 bhv_cmd_begin(void) {
-    // These objects were likely very early objects, which is why this code is here
-    // instead of in the respective behavior scripts.
-
-    // Initiate the room if the object is a haunted chair or the mad piano.
-    if (cur_obj_has_behavior(bhvHauntedChair)) {
-        bhv_init_room();
-    }
-    if (cur_obj_has_behavior(bhvMadPiano)) {
-        bhv_init_room();
-    }
-    // Set collision distance if the object is a message panel.
-    if (cur_obj_has_behavior(bhvMessagePanel)) {
-        gCurrentObject->oCollisionDistance = 150.0f;
-    }
     gCurBhvCommand++;
     return BHV_PROC_CONTINUE;
 }
@@ -844,72 +817,81 @@ void stub_behavior_script_2(void) {
 
 typedef s32 (*BhvCommandProc)(void);
 static BhvCommandProc BehaviorCmdTable[] = {
-    bhv_cmd_begin,
-    bhv_cmd_delay,
-    bhv_cmd_call,
-    bhv_cmd_return,
-    bhv_cmd_goto,
-    bhv_cmd_begin_repeat,
-    bhv_cmd_end_repeat,
-    bhv_cmd_end_repeat_continue,
-    bhv_cmd_begin_loop,
-    bhv_cmd_end_loop,
-    bhv_cmd_break,
-    bhv_cmd_break_unused,
-    bhv_cmd_call_native,
-    bhv_cmd_add_float,
-    bhv_cmd_set_float,
-    bhv_cmd_add_int,
-    bhv_cmd_set_int,
-    bhv_cmd_or_int,
-    bhv_cmd_bit_clear,
-    bhv_cmd_set_int_rand_rshift,
-    bhv_cmd_set_random_float,
-    bhv_cmd_set_random_int,
-    bhv_cmd_add_random_float,
-    bhv_cmd_add_int_rand_rshift,
-    bhv_cmd_nop_1,
-    bhv_cmd_nop_2,
-    bhv_cmd_nop_3,
-    bhv_cmd_set_model,
-    bhv_cmd_spawn_child,
-    bhv_cmd_deactivate,
-    bhv_cmd_drop_to_floor,
-    bhv_cmd_sum_float,
-    bhv_cmd_sum_int,
-    bhv_cmd_billboard,
-    bhv_cmd_hide,
-    bhv_cmd_set_hitbox,
-    bhv_cmd_nop_4,
-    bhv_cmd_delay_var,
-    bhv_cmd_begin_repeat_unused,
-    bhv_cmd_load_animations,
-    bhv_cmd_animate,
-    bhv_cmd_spawn_child_with_param,
-    bhv_cmd_load_collision_data,
-    bhv_cmd_set_hitbox_with_offset,
-    bhv_cmd_spawn_obj,
-    bhv_cmd_set_home,
-    bhv_cmd_set_hurtbox,
-    bhv_cmd_set_interact_type,
-    bhv_cmd_set_obj_physics,
-    bhv_cmd_set_interact_subtype,
-    bhv_cmd_scale,
-    bhv_cmd_parent_bit_clear,
-    bhv_cmd_animate_texture,
-    bhv_cmd_disable_rendering,
-    bhv_cmd_set_int_unused,
-    bhv_cmd_spawn_water_droplet,
+    bhv_cmd_begin, //00
+    bhv_cmd_delay, //01
+    bhv_cmd_call,  //02
+    bhv_cmd_return, //03
+    bhv_cmd_goto, //04
+    bhv_cmd_begin_repeat, //05
+    bhv_cmd_end_repeat, //06
+    bhv_cmd_end_repeat_continue, //07
+    bhv_cmd_begin_loop, //08
+    bhv_cmd_end_loop, //09
+    bhv_cmd_break, //0A
+    bhv_cmd_break_unused, //0B
+    bhv_cmd_call_native, //0C
+    bhv_cmd_add_float, //0D
+    bhv_cmd_set_float, //0E
+    bhv_cmd_add_short, //0F
+    bhv_cmd_set_short, //10
+    bhv_cmd_or_short, //11
+    bhv_cmd_bit_clear, //12
+    bhv_cmd_set_int_rand_rshift, //13
+    bhv_cmd_set_random_float, //14
+    bhv_cmd_set_random_int, //15
+    bhv_cmd_add_random_float, //16
+    bhv_cmd_add_int_rand_rshift, //17
+    bhv_cmd_add_int, //18
+    bhv_cmd_set_int, //19
+    bhv_cmd_or_int, //1A
+    bhv_cmd_set_model, //1B
+    bhv_cmd_spawn_child, //1C
+    bhv_cmd_deactivate, //1D
+    bhv_cmd_drop_to_floor, //1E
+    bhv_cmd_sum_float, //1F
+    bhv_cmd_sum_int, //20
+    bhv_cmd_billboard, //21
+    bhv_cmd_hide, //22
+    bhv_cmd_set_hitbox, //23
+    bhv_cmd_nop_4, //24
+    bhv_cmd_delay_var, //25
+    bhv_cmd_begin_repeat_unused, //26
+    bhv_cmd_load_animations, //27
+    bhv_cmd_animate, //28
+    bhv_cmd_spawn_child_with_param, //29
+    bhv_cmd_load_collision_data, //2A
+    bhv_cmd_set_hitbox_with_offset, //2B
+    bhv_cmd_spawn_obj, //2C
+    bhv_cmd_set_home, //2D
+    bhv_cmd_set_hurtbox, //2E
+    bhv_cmd_set_interact_type, //2F
+    bhv_cmd_set_obj_physics, //30
+    bhv_cmd_set_interact_subtype, //31
+    bhv_cmd_scale, //32
+    bhv_cmd_parent_bit_clear, //33
+    bhv_cmd_animate_texture, //34
+    bhv_cmd_disable_rendering, //35
+    bhv_cmd_set_int_unused, //36
+    bhv_cmd_spawn_water_droplet, //37
+    bhv_cmd_cylboard, //38
 };
 
 // Execute the behavior script of the current object, process the object flags, and other miscellaneous code for updating objects.
 void cur_obj_update(void) {
-    UNUSED u8 filler[4];
-
-    s16 objFlags = gCurrentObject->oFlags;
+    u32 objFlags = gCurrentObject->oFlags;
     f32 distanceFromMario;
     BhvCommandProc bhvCmdProc;
     s32 bhvProcResult;
+
+    s32 inRoom = cur_obj_is_mario_in_room();
+
+#if PROCESS_ONLY_ON_ROOM_PARENT
+    // Activates objects only if is inside a room associated with it.
+    if (inRoom == MARIO_OUTSIDE_ROOM && (objFlags & OBJ_FLAG_ONLY_PROCESS_INSIDE_ROOM)) {
+        cur_obj_disable_rendering_in_room();
+        return;
+    }
+#endif
 
     // Calculate the distance from the object to Mario.
     if (objFlags & OBJ_FLAG_COMPUTE_DIST_TO_MARIO) {
@@ -952,7 +934,7 @@ void cur_obj_update(void) {
     }
 
     // Execute various code based on object flags.
-    objFlags = (s16) gCurrentObject->oFlags;
+    objFlags = gCurrentObject->oFlags;
 
     if (objFlags & OBJ_FLAG_SET_FACE_ANGLE_TO_MOVE_ANGLE) {
         obj_set_face_angle_to_move_angle(gCurrentObject);
@@ -982,18 +964,57 @@ void cur_obj_update(void) {
         obj_update_gfx_pos_and_angle(gCurrentObject);
     }
 
+#if OBJ_OPACITY_BY_CAM_DIST
+    if (objFlags & OBJ_FLAG_OPACITY_FROM_CAMERA_DIST) {
+        obj_set_opacity_from_cam_dist(gCurrentObject);
+    }
+#endif
+
+    // ex-alo change
+    // Ensure the object is allocated to set default collision and drawing distance
+    // in case that they were still not set at this point.
+    if (gCurrentObject->activeFlags & ACTIVE_FLAG_ALLOCATED) {
+        // This is for static collision since dynamic collision has different checks.
+        if (gCurrentObject->collisionData != NULL) {
+            if (gCurrentObject->oCollisionDistance == 0.0f) { gCurrentObject->oCollisionDistance = 1000.0f; }
+        }
+        // Prevent an always invisible object.
+        if (gCurrentObject->oDrawingDistance == 0.0f) { gCurrentObject->oDrawingDistance = 4000.0f; }
+    }
+
     // Handle visibility of object
     if (gCurrentObject->oRoom != -1) {
         // If the object is in a room, only show it when Mario is in the room.
-        cur_obj_enable_rendering_if_mario_in_room();
+#ifndef NODRAWINGDISTANCE
+        if ((objFlags & OBJ_FLAG_ACTIVE_FROM_AFAR)|| distanceFromMario < gCurrentObject->oDrawingDistance)
+#endif
+        {
+            if (inRoom == MARIO_OUTSIDE_ROOM) {
+                cur_obj_disable_rendering_in_room();
+            } else if (inRoom == MARIO_INSIDE_ROOM) {
+                cur_obj_enable_rendering_in_room();
+            }
+            gCurrentObject->activeFlags &= ~ACTIVE_FLAG_FAR_AWAY;
+        }
+#ifndef NODRAWINGDISTANCE
+        else {
+            gCurrentObject->header.gfx.node.flags &= ~GRAPH_RENDER_ACTIVE;
+            gCurrentObject->activeFlags |= ACTIVE_FLAG_FAR_AWAY;
+        }
+#endif
     } else if ((objFlags & OBJ_FLAG_COMPUTE_DIST_TO_MARIO) && gCurrentObject->collisionData == NULL) {
         if (!(objFlags & OBJ_FLAG_ACTIVE_FROM_AFAR)) {
             // If the object has a render distance, check if it should be shown.
+#ifndef NODRAWINGDISTANCE
             if (distanceFromMario > gCurrentObject->oDrawingDistance) {
                 // Out of render distance, hide the object.
                 gCurrentObject->header.gfx.node.flags &= ~GRAPH_RENDER_ACTIVE;
                 gCurrentObject->activeFlags |= ACTIVE_FLAG_FAR_AWAY;
-            } else if (gCurrentObject->oHeldState == HELD_FREE) {
+            } else if (gCurrentObject->oHeldState == HELD_FREE)
+#else
+            if (distanceFromMario <= gCurrentObject->oDrawingDistance && gCurrentObject->oHeldState == HELD_FREE)
+#endif
+            {
                 // In render distance (and not being held), show the object.
                 gCurrentObject->header.gfx.node.flags |= GRAPH_RENDER_ACTIVE;
                 gCurrentObject->activeFlags &= ~ACTIVE_FLAG_FAR_AWAY;

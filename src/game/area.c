@@ -1,6 +1,5 @@
 #include <PR/ultratypes.h>
 
-#include "prevent_bss_reordering.h"
 #include "area.h"
 #include "sm64.h"
 #include "gfx_dimensions.h"
@@ -23,8 +22,10 @@
 #include "level_table.h"
 #include "dialog_ids.h"
 
+#include "gfx_dimensions.h"
+
 struct SpawnInfo gPlayerSpawnInfos[1];
-struct GraphNode *D_8033A160[0x100];
+struct GraphNode *gGraphNodePointers[MODEL_ID_COUNT];
 struct Area gAreaData[8];
 
 struct WarpTransition gWarpTransition;
@@ -37,7 +38,7 @@ s16 gMenuOptSelectIndex;
 s16 gSaveOptSelectIndex;
 
 struct SpawnInfo *gMarioSpawnInfo = &gPlayerSpawnInfos[0];
-struct GraphNode **gLoadedGraphNodes = D_8033A160;
+struct GraphNode **gLoadedGraphNodes = gGraphNodePointers;
 struct Area *gAreas = gAreaData;
 struct Area *gCurrentArea = NULL;
 struct CreditsEntry *gCurrCreditsEntry = NULL;
@@ -51,6 +52,10 @@ u8 gWarpTransGreen = 0;
 u8 gWarpTransBlue = 0;
 s16 gCurrSaveFileNum = 1;
 s16 gCurrLevelNum = LEVEL_MIN;
+
+// ex-alo change
+// New variable to quickly skip game intros
+s16 gGlobalGameSkips = 0;
 
 /*
  * The following two tables are used in get_mario_spawn_type() to determine spawn type
@@ -68,8 +73,8 @@ const BehaviorScript *sWarpBhvSpawnTable[] = {
 };
 
 u8 sSpawnTypeFromWarpBhv[] = {
-    MARIO_SPAWN_DOOR_WARP,             MARIO_SPAWN_UNKNOWN_02,           MARIO_SPAWN_UNKNOWN_03,            MARIO_SPAWN_UNKNOWN_03,
-    MARIO_SPAWN_UNKNOWN_03,            MARIO_SPAWN_TELEPORT,             MARIO_SPAWN_INSTANT_ACTIVE,        MARIO_SPAWN_AIRBORNE,
+    MARIO_SPAWN_DOOR_WARP,             MARIO_SPAWN_IDLE,                 MARIO_SPAWN_PIPE,                  MARIO_SPAWN_PIPE,
+    MARIO_SPAWN_PIPE,                  MARIO_SPAWN_TELEPORT,             MARIO_SPAWN_INSTANT_ACTIVE,        MARIO_SPAWN_AIRBORNE,
     MARIO_SPAWN_HARD_AIR_KNOCKBACK,    MARIO_SPAWN_SPIN_AIRBORNE_CIRCLE, MARIO_SPAWN_DEATH,                 MARIO_SPAWN_SPIN_AIRBORNE,
     MARIO_SPAWN_FLYING,                MARIO_SPAWN_SWIMMING,             MARIO_SPAWN_PAINTING_STAR_COLLECT, MARIO_SPAWN_PAINTING_DEATH,
     MARIO_SPAWN_AIRBORNE_STAR_COLLECT, MARIO_SPAWN_AIRBORNE_DEATH,       MARIO_SPAWN_LAUNCH_STAR_COLLECT,   MARIO_SPAWN_LAUNCH_DEATH,
@@ -105,9 +110,14 @@ void set_warp_transition_rgb(u8 red, u8 green, u8 blue) {
     gWarpTransBlue = blue;
 }
 
+static int scale_x_to_correct_aspect_center(int x) {
+    f32 aspect = GFX_DIMENSIONS_ASPECT_RATIO;
+    return x + (SCREEN_HEIGHT * aspect / 2) - (SCREEN_WIDTH / 2);
+}
+
 void print_intro_text(void) {
 #ifdef VERSION_CN
-    u8 sp18[] = { 0xB0, 0x00 }; // TODO: iQue colorful text
+    u8 sp18[] = { 0xB0, 0x00 }; // 按
 #endif
 #ifdef VERSION_EU
     s32 language = eu_get_language();
@@ -117,18 +127,18 @@ void print_intro_text(void) {
 #ifdef VERSION_EU
             print_text_centered(SCREEN_WIDTH / 2, 20, gNoControllerMsg[language]);
 #else
-            print_text_centered(SCREEN_WIDTH / 2, 20, "NO CONTROLLER");
+            print_text_centered(scale_x_to_correct_aspect_center(SCREEN_WIDTH / 2), 20, "NO CONTROLLER");
 #endif
         } else {
 #ifdef VERSION_EU
-            print_text(20, 20, "START");
+            print_text(GFX_DIMENSIONS_FROM_LEFT_EDGE(20), 20, "START");
 #else
 #ifdef VERSION_CN
-            print_text_centered(60, 38, (char *) sp18);
+            print_text_centered(GFX_DIMENSIONS_FROM_LEFT_EDGE(60), 38, (char *) sp18);
 #else
-            print_text_centered(60, 38, "PRESS");
+            print_text_centered(GFX_DIMENSIONS_FROM_LEFT_EDGE(60), 38, "PRESS");
 #endif
-            print_text_centered(60, 20, "START");
+            print_text_centered(GFX_DIMENSIONS_FROM_LEFT_EDGE(60), 20, "START");
 #endif
         }
     }
@@ -143,7 +153,7 @@ u32 get_mario_spawn_type(struct Object *o) {
             return sSpawnTypeFromWarpBhv[i];
         }
     }
-    return 0;
+    return MARIO_SPAWN_NONE;
 }
 
 struct ObjectWarpNode *area_get_warp_node(u8 id) {
@@ -167,6 +177,11 @@ void load_obj_warp_nodes(void) {
     struct ObjectWarpNode *sp24;
     struct Object *sp20 = (struct Object *) gObjParentGraphNode.children;
 
+#ifdef USE_SYSTEM_MALLOC
+    if (sp20 == NULL) {
+        return;
+    }
+#endif
     do {
         struct Object *sp1C = sp20;
 
@@ -181,7 +196,7 @@ void load_obj_warp_nodes(void) {
 }
 
 void clear_areas(void) {
-    s32 i;
+    s32 i, j;
 
     gCurrentArea = NULL;
     gWarpTransition.isActive = FALSE;
@@ -202,10 +217,12 @@ void clear_areas(void) {
         gAreaData[i].objectSpawnInfos = NULL;
         gAreaData[i].camera = NULL;
         gAreaData[i].unused = NULL;
-        gAreaData[i].whirlpools[0] = NULL;
-        gAreaData[i].whirlpools[1] = NULL;
-        gAreaData[i].dialog[0] = DIALOG_NONE;
-        gAreaData[i].dialog[1] = DIALOG_NONE;
+        for (j = 0; j < ARRAY_COUNT(gAreaData[i].whirlpools); j++) {
+            gAreaData[i].whirlpools[j] = NULL;
+        }
+        for (j = 0; j < ARRAY_COUNT(gAreaData[i].dialog); j++) {
+            gAreaData[i].dialog[j] = DIALOG_NONE;
+        }
         gAreaData[i].musicParam = 0;
         gAreaData[i].musicParam2 = 0;
     }
@@ -232,6 +249,18 @@ void load_area(s32 index) {
     if (gCurrentArea == NULL && gAreaData[index].unk04 != NULL) {
         gCurrentArea = &gAreaData[index];
         gCurrAreaIndex = gCurrentArea->index;
+        main_pool_pop_state();
+        main_pool_push_state();
+
+#if BETTER_ROOM_CHECKS
+        gMarioCurrentRoom = 0;
+#endif
+
+#if FIX_DOOR_NO_ROOM_VISIBLE
+        if (gCurrentArea->surfaceRooms != NULL) {
+            bzero(gDoorAdjacentRooms, sizeof(gDoorAdjacentRooms));
+        }
+#endif
 
         if (gCurrentArea->terrainData != NULL) {
             load_area_terrain(index, gCurrentArea->terrainData, gCurrentArea->surfaceRooms,
@@ -370,19 +399,30 @@ void render_game(void) {
         geo_process_root(gCurrentArea->unk04, D_8032CE74, D_8032CE78, gFBSetColor);
 
         gSPViewport(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(&D_8032CF00));
-
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                       SCREEN_HEIGHT - BORDER_HEIGHT);
-        render_hud();
 
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++); // flush anything
+        gDPSet2d(gDisplayListHead++, 1); // HUD, text labels and cutscene text are 2D
+#endif
+
+        render_hud();
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         render_text_labels();
         do_cutscene_handler();
+
         print_displaying_credits_entry();
 
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                       SCREEN_HEIGHT - BORDER_HEIGHT);
         gMenuOptSelectIndex = render_menus_and_dialogs();
+
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++); // flush dialog/menus
+        gDPSet2d(gDisplayListHead++, 0); // reset 2D mode
+#endif
+
         if (gMenuOptSelectIndex != MENU_OPT_NONE) {
             gSaveOptSelectIndex = gMenuOptSelectIndex;
         }
@@ -410,7 +450,19 @@ void render_game(void) {
             }
         }
     } else {
+
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++); // flush anything
+        gDPSet2d(gDisplayListHead++, 1); // text labels are 2D
+#endif
+
         render_text_labels();
+
+#ifdef TARGET_N3DS
+        gDPForceFlush(gDisplayListHead++); // flush text labels
+        gDPSet2d(gDisplayListHead++, 0); // reset 2D mode
+#endif
+
         if (D_8032CE78 != NULL) {
             clear_viewport(D_8032CE78, gWarpTransFBSetColor);
         } else {

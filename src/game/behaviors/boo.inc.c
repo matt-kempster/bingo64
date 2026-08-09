@@ -182,7 +182,11 @@ static void boo_move_during_hit(s32 roll, f32 fVel) {
     s32 oscillationVel = o->oTimer * 0x800 + 0x800;
 
     o->oForwardVel = fVel;
+#if FIX_BOO_MOVE_HIT_VELOCITY
+    o->oVelY = coss(oscillationVel) * 5;
+#else
     o->oVelY = coss(oscillationVel);
+#endif
     o->oMoveAngleYaw = o->oBooMoveYawDuringHit;
 
     if (roll) {
@@ -571,6 +575,15 @@ static void big_boo_act_2(void) {
     }
 }
 
+#ifdef RM2C_HAS_CUSTOM_STAR_POS
+static void big_boo_spawn_ghost_hunt_star(void) {
+    spawn_default_star(GhostHuntBooStarPos);
+}
+
+static void big_boo_spawn_balcony_star(void) {
+    spawn_default_star(BalconyBooStarPos);
+}
+#else
 static void big_boo_spawn_ghost_hunt_star(void) {
     spawn_default_star(980.0f, 1100.0f, 250.0f);
 }
@@ -578,11 +591,16 @@ static void big_boo_spawn_ghost_hunt_star(void) {
 static void big_boo_spawn_balcony_star(void) {
     spawn_default_star(700.0f, 3200.0f, 1900.0f);
 }
+#endif
 
 static void big_boo_spawn_merry_go_round_star(void) {
     struct Object *merryGoRound;
 
+#ifdef RM2C_HAS_CUSTOM_STAR_POS
+    spawn_default_star(MerryGoRoundStarPos);
+#else
     spawn_default_star(-1600.0f, -2100.0f, 205.0f);
+#endif
 
     merryGoRound = cur_obj_nearest_object_with_behavior(bhvMerryGoRound);
 
@@ -857,7 +875,7 @@ void bhv_boo_in_castle_loop(void) {
 }
 
 void bhv_boo_staircase(void) {
-    f32 targetY;
+    f32 targetY = 0.0f;
 
     switch (o->oBhvParams2ndByte) {
         case 1:
@@ -889,7 +907,7 @@ void bhv_boo_staircase(void) {
 
         case 2:
             if (o->oTimer == 0) {
-                cur_obj_play_sound_2(SOUND_GENERAL_UNKNOWN4_LOWPRIO);
+                cur_obj_play_sound_2(SOUND_GENERAL_ELEVATOR_WOBBLE_LOWPRIO);
             }
 
             if (jiggle_bbh_stair(o->oTimer)) {

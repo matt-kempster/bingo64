@@ -4,6 +4,8 @@
 #include <PR/ultratypes.h>
 #include <PR/gbi.h>
 
+#include "rm2c.h"
+
 enum FlyingCarpetState {
     FLYING_CARPET_IDLE = 0,
     FLYING_CARPET_MOVING_WITHOUT_MARIO = 1,
@@ -11,6 +13,18 @@ enum FlyingCarpetState {
 };
 
 extern s8 gFlyingCarpetState;
+
+#ifdef RM2C_HAS_CUSTOM_SKYBOX
+#define MIO0_SEG(name, addr) \
+    name##_Index, \
+
+
+enum Custom_Skybox_Indices{
+#include "textures/skyboxes/Skybox_Rules.ld"
+};
+
+#undef MIO0_SEG
+#endif
 
 #ifndef GBI_FLOATS
 extern void make_vertex(
@@ -21,7 +35,6 @@ extern void make_vertex(
     Vtx *vtx, s32 n, f32 x, f32 y, f32 z, s16 tx, s16 ty, u8 r, u8 g, u8 b, u8 a
 );
 #endif
-extern s16 round_float(f32);
 extern Gfx *geo_exec_inside_castle_light(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]);
 extern Gfx *geo_exec_flying_carpet_timer_update(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]);
 extern Gfx *geo_exec_flying_carpet_create(s32 callContext, struct GraphNode *node, UNUSED f32 mtx[4][4]);

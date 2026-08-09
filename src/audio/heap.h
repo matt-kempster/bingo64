@@ -4,6 +4,7 @@
 #include <PR/ultratypes.h>
 
 #include "internal.h"
+#include "data.h"
 
 #define SOUND_LOAD_STATUS_NOT_LOADED     0
 #define SOUND_LOAD_STATUS_IN_PROGRESS    1
@@ -97,9 +98,10 @@ extern struct SoundMultiPool gBankLoadedPool;
 extern struct Unk1Pool gUnkPool1;
 extern struct UnkPool gUnkPool2;
 extern struct UnkPool gUnkPool3;
+extern u8 gUnkLoadStatus[MAX_NUM_SOUNDBANKS];
 #endif
-extern u8 gBankLoadStatus[64];
-extern u8 gSeqLoadStatus[256];
+extern u8 gBankLoadStatus[MAX_NUM_SOUNDBANKS];
+extern u8 gSeqLoadStatus[0x100];
 extern volatile u8 gAudioResetStatus;
 extern u8 gAudioResetPresetIdToLoad;
 
@@ -122,7 +124,7 @@ void *get_bank_or_seq(struct SoundMultiPool *arg0, s32 arg1, s32 id);
 s32 audio_shut_down_and_reset_step(void);
 void audio_reset_session(void);
 #else
-void audio_reset_session(struct AudioSessionSettings *preset);
+void audio_reset_session(s32 presetId);
 #endif
 void discard_bank(s32 bankId);
 

@@ -3,6 +3,12 @@
 
 #include "config.h"
 
+#ifndef TARGET_N64
+#include <stdbool.h>
+#else
+#define bool int
+#endif
+
 extern OSThread D_80339210;
 extern OSThread gIdleThread;
 extern OSThread gMainThread;
@@ -29,10 +35,11 @@ extern struct SPTask *gActiveSPTask;
 extern u32 gNumVblanks;
 extern s8 gResetTimer;
 extern s8 gNmiResetBarsTimer;
-extern s8 gDebugLevelSelect;
 extern s8 D_8032C650;
-extern s8 gShowProfiler;
-extern s8 gShowDebugText;
+
+extern bool gDebugLevelSelect;
+extern bool gShowProfiler;
+extern bool gShowDebugText;
 
 void set_vblank_handler(s32 index, struct VblankHandler *handler, OSMesgQueue *queue, OSMesg *msg);
 void dispatch_audio_sptask(struct SPTask *spTask);

@@ -75,30 +75,34 @@ void bhv_goomba_triplet_spawner_update(void) {
     // If mario is close enough and the goombas aren't currently loaded, then
     // spawn them
     if (o->oAction == GOOMBA_TRIPLET_SPAWNER_ACT_UNLOADED) {
+#ifndef NODRAWINGDISTANCE
         if (o->oDistanceToMario < 3000.0f) {
+#endif
             // The spawner is capable of spawning more than 3 goombas, but this
             // is not used in the game
             s32 dAngle =
                 0x10000
                 / (((o->oBhvParams2ndByte & GOOMBA_TRIPLET_SPAWNER_BP_EXTRA_GOOMBAS_MASK) >> 2) + 3);
 
-            for (angle = 0, goombaFlag = 1 << 8; angle < 0xFFFF; angle += dAngle, goombaFlag <<= 1) {
+            for (angle = 0, goombaFlag = 1; angle < 0xFFFF; angle += dAngle, goombaFlag <<= 1) {
                 // Only spawn goombas which haven't been killed yet
-                if (!(o->oBhvParams & goombaFlag)) {
+                if (!(o->respawnInfo & goombaFlag)) {
                     s16 dx = 500.0f * coss(angle);
                     s16 dz = 500.0f * sins(angle);
 
                     spawn_object_relative((o->oBhvParams2ndByte & GOOMBA_BP_SIZE_MASK)
-                                           | (goombaFlag >> 6), dx, 0, dz, o, MODEL_GOOMBA, bhvGoomba);
+                                           | (goombaFlag << 2), dx, 0, dz, o, MODEL_GOOMBA, bhvGoomba);
                 }
             }
 
             o->oAction++;
+#ifndef NODRAWINGDISTANCE
         }
     } else if (o->oDistanceToMario > 4000.0f) {
         // If mario is too far away, enter the unloaded action. The goombas
         // will detect this and unload themselves
         o->oAction = GOOMBA_TRIPLET_SPAWNER_ACT_UNLOADED;
+#endif
     }
 }
 
@@ -139,9 +143,6 @@ static void mark_goomba_as_dead(void) {
     if (o->parentObj != o) {
         set_object_respawn_info_bits(
             o->parentObj, (o->oBhvParams2ndByte & GOOMBA_BP_TRIPLET_RESPAWN_FLAG_MASK) >> 2);
-
-        o->parentObj->oBhvParams =
-            o->parentObj->oBhvParams | (o->oBhvParams2ndByte & GOOMBA_BP_TRIPLET_RESPAWN_FLAG_MASK) << 6;
     }
 }
 
@@ -218,12 +219,20 @@ static void goomba_act_walk(void) {
 static void goomba_act_attacked_mario(void) {
     if (o->oGoombaSize == GOOMBA_SIZE_TINY) {
         mark_goomba_as_dead();
+#if !TINY_GOOMBA_DROP_COIN
         o->oNumLootCoins = 0;
+#endif
         obj_die_if_health_non_positive();
     } else {
+#if FIX_GOOMBA_JUMP_AIR
+        if (o->oPosY <= o->oFloorHeight) {
+            goomba_begin_jump();
+        }
+#else
         //! This can happen even when the goomba is already in the air. It's
         //  hard to chain these in practice
         goomba_begin_jump();
+#endif
         o->oGoombaTargetYaw = o->oAngleToMario;
         o->oGoombaTurningAwayFromWall = FALSE;
     }
@@ -304,7 +313,11 @@ void bhv_goomba_update(void) {
         // and will not respawn if Mario leaves and re-enters the spawner's radius
         // even though the goomba isn't actually dead.
         if (obj_handle_attacks(&sGoombaHitbox, GOOMBA_ACT_ATTACKED_MARIO,
-                               sGoombaAttackHandlers[o->oGoombaSize & 1])) {
+            sGoombaAttackHandlers[o->oGoombaSize & 1])
+#if FIX_GOOMBA_DEAD_ATTACKED_MARIO
+        && (o->oAction != GOOMBA_ACT_ATTACKED_MARIO)
+#endif
+            ) {
             mark_goomba_as_dead();
         }
 

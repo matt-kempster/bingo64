@@ -16,10 +16,13 @@ struct ExclamationBoxContents {
     u8 id;
     u8 unused;
     u8 bhvParams1stByte;
-    u8 model;
+    ModelID16 model;
     const BehaviorScript *behavior;
 };
 
+#ifdef RM2C_HAS_CUSTOM_BOX_ITEMS
+#include "src/extras/rm2c/item_box.inc.c"
+#else
 struct ExclamationBoxContents sExclamationBoxContents[] = {
     { EXCLAMATION_BOX_BP_WING_CAP,         0,                0, MODEL_MARIOS_WING_CAP,  bhvWingCap               },
     { EXCLAMATION_BOX_BP_METAL_CAP,        0,                0, MODEL_MARIOS_METAL_CAP, bhvMetalCap              },
@@ -38,6 +41,7 @@ struct ExclamationBoxContents sExclamationBoxContents[] = {
     { EXCLAMATION_BOX_BP_STAR_ACT_6,       0, STAR_INDEX_ACT_6, MODEL_STAR,             bhvSpawnedStar           },
     { EXCLAMATION_BOX_BP_END,              0,                0, MODEL_NONE,             NULL                     },
 };
+#endif
 
 void bhv_rotating_exclamation_box_loop(void) {
     if (o->parentObj->oAction != 1) {
@@ -93,7 +97,7 @@ void exclamation_box_act_2(void) {
         o->oGravity = -8.0f;
         o->oFloorHeight = o->oPosY;
         o->oAction = 3;
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         queue_rumble_data(5, 80);
 #endif
     }
@@ -118,29 +122,29 @@ void exclamation_box_act_3(void) {
     o->header.gfx.scale[0] = o->oExclamationBoxUnkF4 * 2.0f;
     o->header.gfx.scale[1] = o->oExclamationBoxUnkF8 * 2.0f;
     o->header.gfx.scale[2] = o->oExclamationBoxUnkF4 * 2.0f;
-
     if (o->oTimer == 7) {
         o->oAction = 4;
     }
 }
 
-void exclamation_box_spawn_contents(struct ExclamationBoxContents *contents, u8 targetContentsID) {
+void exclamation_box_spawn_contents(struct ExclamationBoxContents *contentsList, u8 boxType) {
+    struct ExclamationBoxContents *contents = &contentsList[boxType];
     struct Object *contentsObj = NULL;
 
-    while (contents->id != EXCLAMATION_BOX_BP_END) {
-        if (targetContentsID == contents->id) {
-            contentsObj = spawn_object(o, contents->model, contents->behavior);
-            contentsObj->oVelY = 20.0f;
-            contentsObj->oForwardVel = 3.0f;
-            contentsObj->oMoveAngleYaw = gMarioObject->oMoveAngleYaw;
-            o->oBhvParams |= contents->bhvParams1stByte << 24;
-            if (contents->model == MODEL_STAR) {
-                o->oFlags |= OBJ_FLAG_PERSISTENT_RESPAWN;
-            }
-            break;
-        }
-        contents++;
+    contentsObj = spawn_object(o, contents->model, contents->behavior);
+    contentsObj->oVelY = 20.0f;
+    contentsObj->oForwardVel = 3.0f;
+
+    contentsObj->oMoveAngleYaw = gMarioObject->oMoveAngleYaw;
+    o->oBhvParams |= contents->bhvParams1stByte << 24;
+    if (contents->model == MODEL_STAR) {
+        o->oFlags |= OBJ_FLAG_PERSISTENT_RESPAWN;
     }
+#if KOOPA_SHELL_BOXES_RESPAWN
+    if (contents->model == MODEL_KOOPA_SHELL) {
+        contentsObj->oSubAction = 1;
+    }
+#endif
 }
 
 void exclamation_box_act_4(void) {
@@ -149,7 +153,7 @@ void exclamation_box_act_4(void) {
     spawn_triangle_break_particles(20, MODEL_CARTOON_STAR, 0.3f, o->oAnimState);
     create_sound_spawner(SOUND_GENERAL_BREAK_BOX);
 
-    if (o->oBhvParams2ndByte <= EXCLAMATION_BOX_BP_SPECIAL_CAP_END) {
+    if (o->oBhvParams2ndByte <= EXCLAMATION_BOX_BP_RESPAWN_END) {
         o->oAction = 5;
         cur_obj_hide();
     } else {

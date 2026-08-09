@@ -17,7 +17,8 @@ void sequence_channel_process_sound(struct SequenceChannel *seqChannel, s32 reca
     s32 i;
 
     if (seqChannel->changes.as_bitfields.volume || recalculateVolume) {
-        channelVolume = seqChannel->volume * seqChannel->volumeScale * seqChannel->seqPlayer->appliedFadeVolume;
+        channelVolume = seqChannel->volume * seqChannel->volumeScale *
+            seqChannel->seqPlayer->appliedFadeVolume * seqChannel->seqPlayer->volumeScale;
         if (seqChannel->seqPlayer->muted && (seqChannel->muteBehavior & MUTE_BEHAVIOR_SOFTEN) != 0) {
             channelVolume = seqChannel->seqPlayer->muteVolumeScale * channelVolume;
         }
@@ -62,7 +63,8 @@ static void sequence_channel_process_sound(struct SequenceChannel *seqChannel) {
     f32 panFromChannel;
     s32 i;
 
-    channelVolume = seqChannel->volume * seqChannel->volumeScale * seqChannel->seqPlayer->fadeVolume;
+    channelVolume = seqChannel->volume * seqChannel->volumeScale *
+        seqChannel->seqPlayer->fadeVolume * seqChannel->seqPlayer->volumeScale;
     if (seqChannel->seqPlayer->muted && (seqChannel->muteBehavior & MUTE_BEHAVIOR_SOFTEN) != 0) {
         channelVolume *= seqChannel->seqPlayer->muteVolumeScale;
     }
@@ -291,6 +293,7 @@ void note_vibrato_init(struct Note *note) {
 
     vib = &note->vibratoState;
 
+/* This code was probably removed from EU and SH for a reason; probably because it's dumb and makes vibrato harder to use well.
 #if defined(VERSION_JP) || defined(VERSION_US)
     if (note->parentLayer->seqChannel->vibratoExtentStart == 0
         && note->parentLayer->seqChannel->vibratoExtentTarget == 0
@@ -299,6 +302,7 @@ void note_vibrato_init(struct Note *note) {
         return;
     }
 #endif
+*/
 
     vib->active = TRUE;
     vib->time = 0;
@@ -400,7 +404,7 @@ s32 adsr_update(struct AdsrState *adsr) {
             restart:
 #endif
         case ADSR_STATE_LOOP:
-            adsr->delay = BSWAP16(adsr->envelope[adsr->envIndex].delay);
+            adsr->delay = BE_TO_HOST16(adsr->envelope[adsr->envIndex].delay);
             switch (adsr->delay) {
                 case ADSR_DISABLE:
                     adsr->state = ADSR_STATE_DISABLED;
@@ -409,7 +413,7 @@ s32 adsr_update(struct AdsrState *adsr) {
                     adsr->state = ADSR_STATE_HANG;
                     break;
                 case ADSR_GOTO:
-                    adsr->envIndex = BSWAP16(adsr->envelope[adsr->envIndex].arg);
+                    adsr->envIndex = BE_TO_HOST16(adsr->envelope[adsr->envIndex].arg);
 #if defined(VERSION_SH) || defined(VERSION_CN)
                     goto restart;
 #else
@@ -432,14 +436,14 @@ s32 adsr_update(struct AdsrState *adsr) {
                     if (adsr->delay == 0) {
                         adsr->delay = 1;
                     }
-                    adsr->target = (f32) BSWAP16(adsr->envelope[adsr->envIndex].arg) / 32767.0f;
+                    adsr->target = (f32) BE_TO_HOST16(adsr->envelope[adsr->envIndex].arg) / 32767.0f;
 #elif defined(VERSION_EU)
-                    adsr->target = (f32) BSWAP16(adsr->envelope[adsr->envIndex].arg) / 32767.0;
+                    adsr->target = (f32) BE_TO_HOST16(adsr->envelope[adsr->envIndex].arg) / 32767.0;
 #endif
                     adsr->target = adsr->target * adsr->target;
                     adsr->velocity = (adsr->target - adsr->current) / adsr->delay;
 #else
-                    adsr->target = BSWAP16(adsr->envelope[adsr->envIndex].arg);
+                    adsr->target = BE_TO_HOST16(adsr->envelope[adsr->envIndex].arg);
                     adsr->velocity = ((adsr->target - adsr->current) << 0x10) / adsr->delay;
 #endif
                     adsr->state = ADSR_STATE_FADE;

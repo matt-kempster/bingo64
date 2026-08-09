@@ -44,8 +44,17 @@
 #include "spawn_object.h"
 #include "spawn_sound.h"
 #include "rumble_init.h"
+#ifdef PORT_MOP_OBJS
+#include "src/extras/mop/include_code.h"
+#endif
 
 #define o gCurrentObject
+
+#if FIX_PARTICLES_CALL_DELETED
+#define SWAP_PARTICLE_CALL(a,b) b; a;
+#else
+#define SWAP_PARTICLE_CALL(a,b) a; b;
+#endif
 
 static s32 sCapSaveFlags[] = {
     SAVE_FLAG_HAVE_WING_CAP,
@@ -160,7 +169,9 @@ Gfx *geo_move_mario_part_from_parent(s32 run, UNUSED struct GraphNode *node, Mat
 #include "behaviors/heave_ho.inc.c"
 #include "behaviors/spawn_star_exit.inc.c"
 #include "behaviors/unused_poundable_platform.inc.c"
+#ifndef PORT_MOP_OBJS
 #include "behaviors/beta_trampoline.inc.c"
+#endif
 #include "behaviors/jumping_box.inc.c"
 #include "behaviors/boo_cage.inc.c"
 
@@ -264,3 +275,10 @@ s32 set_obj_anim_with_accel_and_sound(s16 a0, s16 a1, s32 a2) {
 #include "behaviors/strong_wind_particle.inc.c"
 #include "behaviors/sl_snowman_wind.inc.c"
 #include "behaviors/sl_walking_penguin.inc.c"
+
+#include "behaviors/2d_physics.inc.c"
+#include "behaviors/legacy_tex_scroll.inc.c"
+
+#ifdef PORT_MOP_OBJS
+#include "src/extras/mop/code.inc.c"
+#endif

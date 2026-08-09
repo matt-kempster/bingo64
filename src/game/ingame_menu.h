@@ -19,6 +19,7 @@
 // to print specific Japanese HUD chars
 #define HUD_LUT_JPMENU 1
 #define HUD_LUT_GLOBAL 2
+#define HUD_LUT_CNFIX  3
 
 // For file select JP HUD difference
 #if defined(VERSION_JP) || defined(VERSION_SH)
@@ -27,11 +28,19 @@
 #define HUD_LUT_DIFF HUD_LUT_GLOBAL
 #endif
 
-// They didn't change it everywhere in iQue
 #ifdef VERSION_CN
-#define HUD_LUT_DIFF2 HUD_LUT_JPMENU
+#define HUD_LUT_CNDIFF HUD_LUT_CNFIX
 #else
-#define HUD_LUT_DIFF2 HUD_LUT_DIFF
+#define HUD_LUT_CNDIFF HUD_LUT_GLOBAL
+#endif
+
+// Japanese font use the same width string size
+#define JP_DIALOG_CHAR_WIDTH 10
+
+#ifdef VERSION_JP
+#define HUD_LUT_STRIDE_GLOBAL   14
+#else
+#define HUD_LUT_STRIDE_GLOBAL   12
 #endif
 
 enum MenuMode {
@@ -151,12 +160,13 @@ extern s8 gRedCoinsCollected;
 
 void create_dl_identity_matrix(void);
 void create_dl_translation_matrix(s8 pushOp, f32 x, f32 y, f32 z);
+void create_dl_rotation_matrix(s8 pushOp, f32 a, f32 x, f32 y, f32 z);
+void create_dl_scale_matrix(s8 pushOp, f32 x, f32 y, f32 z);
 void create_dl_ortho_matrix(void);
 
 void print_generic_string(s16 x, s16 y, const u8 *str);
 void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str);
 void print_menu_generic_string(s16 x, s16 y, const u8 *str);
-
 void handle_menu_scrolling(s8 scrollDirection, s8 *currentIndex, s8 minIndex, s8 maxIndex);
 #if defined(VERSION_US) || defined(VERSION_EU) || defined(VERSION_CN)
 s16 get_str_x_pos_from_center(s16 centerPos, u8 *str, f32 scale);
@@ -167,6 +177,7 @@ s16 get_str_x_pos_from_center(s16 centerPos, u8 *str, f32 scale);
 #if defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH)
 s16 get_str_x_pos_from_center_scale(s16 centerPos, u8 *str, f32 scale);
 #endif
+s16 get_string_width(u8 *str);
 void print_hud_my_score_coins(s32 useCourseCoinScore, s8 fileIndex, s8 courseIndex, s16 x, s16 y);
 
 void int_to_str(s32 num, u8 *dst);

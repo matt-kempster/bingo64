@@ -16,15 +16,6 @@
  * @see camera.c
  */
 
-#define ABS(x) ((x) > 0.f ? (x) : -(x))
-#define ABS2(x) ((x) >= 0.f ? (x) : -(x))
-
-/**
- * Converts an angle in degrees to sm64's s16 angle units. For example, DEGREES(90) == 0x4000
- * This should be used mainly to make camera code clearer at first glance.
- */
-#define DEGREES(x) ((x) * 0x10000 / 360)
-
 #define LEVEL_AREA_INDEX(levelNum, areaNum) (((levelNum) << 4) + (areaNum))
 
 /**
@@ -110,6 +101,7 @@
 #define CAMERA_MODE_PARALLEL_TRACKING 0x0C
 #define CAMERA_MODE_FIXED             0x0D
 #define CAMERA_MODE_8_DIRECTIONS      0x0E // AKA Parallel Camera, Bowser Courses & Rainbow Ride
+#define CAMERA_MODE_2_DIRECTIONS      0x0F // For 2D levels
 #define CAMERA_MODE_FREE_ROAM         0x10
 #define CAMERA_MODE_SPIRAL_STAIRS     0x11
 
@@ -278,19 +270,22 @@
 #define CAM_FOV_ZOOM_30     12
 #define CAM_FOV_SET_29      13
 
-#define CAM_EVENT_CANNON              1
-#define CAM_EVENT_SHOT_FROM_CANNON    2
-#define CAM_EVENT_UNUSED_3            3
-#define CAM_EVENT_BOWSER_INIT         4
-#define CAM_EVENT_DOOR_WARP           5
-#define CAM_EVENT_DOOR                6
-#define CAM_EVENT_BOWSER_JUMP         7
-#define CAM_EVENT_BOWSER_THROW_BOUNCE 8
-#define CAM_EVENT_START_INTRO         9
-#define CAM_EVENT_START_GRAND_STAR    10
-#define CAM_EVENT_START_ENDING        11
-#define CAM_EVENT_START_END_WAVING    12
-#define CAM_EVENT_START_CREDITS       13
+enum CameraEvent {
+    CAM_EVENT_NONE,
+    CAM_EVENT_CANNON,
+    CAM_EVENT_SHOT_FROM_CANNON,
+    CAM_EVENT_NO_EXIT_STAR, // repurpose from unused
+    CAM_EVENT_BOWSER_INIT,
+    CAM_EVENT_DOOR_WARP,
+    CAM_EVENT_DOOR,
+    CAM_EVENT_BOWSER_JUMP,
+    CAM_EVENT_BOWSER_THROW_BOUNCE,
+    CAM_EVENT_START_INTRO,
+    CAM_EVENT_START_GRAND_STAR,
+    CAM_EVENT_START_ENDING,
+    CAM_EVENT_START_END_WAVING,
+    CAM_EVENT_START_CREDITS
+};
 
 /**
  * A copy of player information that is relevant to the camera.
@@ -639,6 +634,9 @@ struct LakituState {
     /// Mario's action from the previous frame. Only used to determine if Mario just finished a dive.
     /*0xB8*/ u32 lastFrameAction;
     /*0xBC*/ s16 unused;
+#ifdef HIGH_FPS_PC
+    u32 skipCameraInterpolationTimestamp;
+#endif
 };
 
 // bss order hack to not affect BSS order. if possible, remove me, but it will be hard to match otherwise
@@ -649,7 +647,7 @@ extern s16 sCameraSoundFlags;
 extern u16 sCButtonsPressed;
 extern struct PlayerCameraState gPlayerCameraState[2];
 extern struct LakituState gLakituState;
-extern s16 gCameraMovementFlags;
+extern u16 gCameraMovementFlags;
 extern s32 gObjCutsceneDone;
 extern struct Camera *gCamera;
 #endif
@@ -663,6 +661,7 @@ extern u8 gRecentCutscene;
 void set_camera_shake_from_hit(s16 shake);
 void set_environmental_camera_shake(s16 shake);
 void set_camera_shake_from_point(s16 shake, f32 posX, f32 posY, f32 posZ);
+BAD_RETURN(f32) calc_y_to_curr_floor(f32 *posOff, f32 posMul, f32 posBound, f32 *focOff, f32 focMul, f32 focBound);
 void move_mario_head_c_up(UNUSED struct Camera *c);
 void transition_next_state(UNUSED struct Camera *c, s16 frames);
 void set_camera_mode(struct Camera *c, s16 mode, s16 frames);
@@ -673,10 +672,9 @@ void select_mario_cam_mode(void);
 Gfx *geo_camera_main(s32 callContext, struct GraphNode *g, void *context);
 void stub_camera_2(UNUSED struct Camera *c);
 void stub_camera_3(UNUSED struct Camera *c);
-void vec3f_sub(Vec3f dst, Vec3f src);
 void object_pos_to_vec3f(Vec3f dst, struct Object *o);
 void vec3f_to_object_pos(struct Object *o, Vec3f src);
-s32 move_point_along_spline(Vec3f p, struct CutsceneSplinePoint spline[], s16 *splineSegment, f32 *progress);
+s32 move_point_along_spline(Vec3f pos, struct CutsceneSplinePoint spline[], s16 *splineSegment, f32 *progress);
 s32 cam_select_alt_mode(s32 angle);
 s32 set_cam_angle(s32 mode);
 void set_handheld_shake(u8 mode);
@@ -687,25 +685,22 @@ s32 collide_with_walls(Vec3f pos, f32 offsetY, f32 radius);
 s32 clamp_pitch(Vec3f from, Vec3f to, s16 maxPitch, s16 minPitch);
 s32 is_within_100_units_of_mario(f32 posX, f32 posY, f32 posZ);
 s32 set_or_approach_f32_asymptotic(f32 *dst, f32 goal, f32 scale);
-s32 approach_f32_asymptotic_bool(f32 *current, f32 target, f32 multiplier);
-f32 approach_f32_asymptotic(f32 current, f32 target, f32 multiplier);
-s32 approach_s16_asymptotic_bool(s16 *current, s16 target, s16 divisor);
-s32 approach_s16_asymptotic(s16 current, s16 target, s16 divisor);
 void approach_vec3f_asymptotic(Vec3f current, Vec3f target, f32 xMul, f32 yMul, f32 zMul);
 void set_or_approach_vec3f_asymptotic(Vec3f dst, Vec3f goal, f32 xMul, f32 yMul, f32 zMul);
-s32 camera_approach_s16_symmetric_bool(s16 *current, s16 target, s16 increment);
-s32 set_or_approach_s16_symmetric(s16 *current, s16 target, s16 increment);
-s32 camera_approach_f32_symmetric_bool(f32 *current, f32 target, f32 increment);
-f32 camera_approach_f32_symmetric(f32 value, f32 target, f32 increment);
+s32 camera_approach_s16_symmetric_bool(s16 *current, s16 target, s16 inc);
+s32 set_or_approach_s16_symmetric(s16 *current, s16 target, s16 inc);
+s32 camera_approach_f32_symmetric_bool(f32 *current, f32 target, f32 inc);
+f32 camera_approach_f32_symmetric(f32 value, f32 target, f32 inc);
 void random_vec3s(Vec3s dst, s16 xRange, s16 yRange, s16 zRange);
 s32 clamp_positions_and_find_yaw(Vec3f pos, Vec3f origin, f32 xMax, f32 xMin, f32 zMax, f32 zMin);
 s32 is_range_behind_surface(Vec3f from, Vec3f to, struct Surface *surf, s16 range, s16 surfType);
 void scale_along_line(Vec3f dest, Vec3f from, Vec3f to, f32 scale);
 s16 calculate_pitch(Vec3f from, Vec3f to);
 s16 calculate_yaw(Vec3f from, Vec3f to);
-void calculate_angles(Vec3f from, Vec3f to, s16 *pitch, s16 *yaw);
-f32 calc_abs_dist(Vec3f a, Vec3f b);
-f32 calc_hor_dist(Vec3f a, Vec3f b);
+#define calculate_angles vec3f_get_angle // Backwards compatibility
+f32 calc_abs_dist(Vec3f from, Vec3f to);
+f32 calc_abs_dist_squared(Vec3f from, Vec3f to);
+f32 calc_hor_dist(Vec3f from, Vec3f to);
 void rotate_in_xz(Vec3f dst, Vec3f src, s16 yaw);
 void rotate_in_yz(Vec3f dst, Vec3f src, s16 pitch);
 void set_camera_pitch_shake(s16 mag, s16 decay, s16 inc);
@@ -725,7 +720,7 @@ void play_sound_cbutton_side(void);
 void play_sound_button_change_blocked(void);
 void play_sound_rbutton_changed(void);
 void play_sound_if_cam_switched_to_lakitu_or_mario(void);
-s32 radial_camera_input(struct Camera *c, UNUSED f32 unused);
+void radial_camera_input(struct Camera *c);
 s32 trigger_cutscene_dialog(s32 trigger);
 void handle_c_button_movement(struct Camera *c);
 void start_cutscene(struct Camera *c, u8 cutscene);

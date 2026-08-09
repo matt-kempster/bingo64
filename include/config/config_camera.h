@@ -1,0 +1,48 @@
+#pragma once
+
+/*******************
+ * CAMERA SETTINGS *
+ *******************/
+
+/// Enabled specific vanilla camera code.
+#define CAMERA_VANILLA_DEFINES (0 || VANILLA_CHECKS)
+
+/// Makes the camera approach Mario's height much more quickly.
+#define FAST_VERTICAL_CAMERA_MOVEMENT (0 || QOL_FIXES)
+
+/// Fixes up checks when vanilla camera rotates to a wall 
+#define CORRECT_ROTATE_CAMERA_AROUND_WALLS (0 || QOL_FIXES)
+
+/// Fixes up checks when vanilla camera collides to a wall 
+#define CORRECT_COLLIDE_WITH_WALLS (0 || QOL_FIXES)
+
+/// Fixes camera boss fight y position to be more dynamic
+#define FIX_CAMERA_BOSS_FIGHT_POS (0 || QOL_FIXES || !VANILLA_CHECKS)
+
+/// Changes C-Up vanilla camera similar to the DS version
+#define DS_CAM_MOVEMENT_C_UP (0 || QOL_FEATURES)
+
+/// Adds parallel lakitu camera, star road mario camera and some reonucam stuff, all configurable
+#define MORE_VANILLA_CAM_STUFF (0 || (EXT_OPTIONS_MENU && QOL_FEATURES))
+
+/// The number of steps between Mario and the camera to check for walls obstructing Mario. Vanilla is 8.
+#define CAMERA_NUM_OBSTRUCTION_CHECKS   8
+
+/// The number of radius between Mario and the camera to rotate around walls. Vanilla is 200.
+#define CAMERA_NUM_ROT_WALL_RADIUS      200
+
+/*********************
+ * CUTSCENE SETTINGS *
+ *********************/
+
+/// Fixes possible softlock with object cutscene focus
+#define FIX_CUTSCENE_FOCUS_DEACTIVE (0 || QOL_FIXES)
+
+/// Properly adds unused SSL Pyramid cutscene after standing on the 4 pillars
+#define SSL_PYRAMID_CUTSCENE (0 || QOL_FEATURES)
+
+/// Makes Mario dance in midair if he's way above a floor and uses default cam for nonstop stars
+#define BETTER_STAR_INTERACTION (0 || QOL_FEATURES)
+
+/// Makes cutscene object camera correctly focus an object in a room
+#define ROOM_OBJECT_CAMERA_FOCUS (0 || QOL_FEATURES || !VANILLA_CHECKS)

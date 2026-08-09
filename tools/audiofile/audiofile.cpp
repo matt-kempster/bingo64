@@ -3552,6 +3552,17 @@ struct IntTypes<kInt24> { typedef int32_t SignedType; typedef uint32_t UnsignedT
 template <>
 struct IntTypes<kInt32> { typedef int32_t SignedType; typedef uint32_t UnsignedType; };
 
+namespace compat
+{
+	template<typename Arg, typename R>
+	class unary_function
+	{
+	public:
+		using argument_type = Arg;
+		using result_type = R;
+	};
+}
+
 template <FormatCode Format>
 struct signConverter
 {
@@ -3562,13 +3573,13 @@ struct signConverter
 	static const int kMaxSignedValue = (((1 << (kScaleBits - 1)) - 1) << 1) + 1;
 	static const int kMinSignedValue = -kMaxSignedValue - 1;
 
-	struct signedToUnsigned : public std::unary_function<SignedType, UnsignedType>
-	{
+	struct signedToUnsigned : public compat::unary_function<SignedType, UnsignedType>
+ 	{
 		UnsignedType operator()(SignedType x) { return x - kMinSignedValue; }
 	};
 
-	struct unsignedToSigned : public std::unary_function<SignedType, UnsignedType>
-	{
+	struct unsignedToSigned : public compat::unary_function<SignedType, UnsignedType>
+ 	{
 		SignedType operator()(UnsignedType x) { return x + kMinSignedValue; }
 	};
 };
@@ -3760,7 +3771,7 @@ private:
 };
 
 template <typename Arg, typename Result>
-struct intToFloat : public std::unary_function<Arg, Result>
+struct intToFloat : public compat::unary_function<Arg, Result>
 {
 	Result operator()(Arg x) const { return x; }
 };
@@ -3826,13 +3837,13 @@ private:
 };
 
 template <typename Arg, typename Result, unsigned shift>
-struct lshift : public std::unary_function<Arg, Result>
+struct lshift : public compat::unary_function<Arg, Result>
 {
 	Result operator()(const Arg &x) const { return x << shift; }
 };
 
 template <typename Arg, typename Result, unsigned shift>
-struct rshift : public std::unary_function<Arg, Result>
+struct rshift : public compat::unary_function<Arg, Result>
 {
 	Result operator()(const Arg &x) const { return x >> shift; }
 };
@@ -3928,7 +3939,7 @@ private:
 };
 
 template <typename Arg, typename Result>
-struct floatToFloat : public std::unary_function<Arg, Result>
+struct floatToFloat : public compat::unary_function<Arg, Result>
 {
 	Result operator()(Arg x) const { return x; }
 };
@@ -8047,41 +8058,43 @@ void AudioFormat::computeBytesPerPacketPCM()
 	bytesPerPacket = bytesPerSample * channelCount;
 }
 
+static char s_tmpSampleBuf[2048];
+
 std::string AudioFormat::description() const
 {
 	std::string d;
-	char s[1024];
+
 	/* sampleRate, channelCount */
-	sprintf(s, "{ %7.2f Hz %d ch ", sampleRate, channelCount);
-	d += s;
+	snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "{ %7.2f Hz %d ch ", sampleRate, channelCount);
+	d += s_tmpSampleBuf;
 
 	/* sampleFormat, sampleWidth */
 	switch (sampleFormat)
 	{
 		case AF_SAMPFMT_TWOSCOMP:
-			sprintf(s, "%db 2 ", sampleWidth);
+			snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "%db 2 ", sampleWidth);
 			break;
 		case AF_SAMPFMT_UNSIGNED:
-			sprintf(s, "%db u ", sampleWidth);
+			snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "%db u ", sampleWidth);
 			break;
 		case AF_SAMPFMT_FLOAT:
-			sprintf(s, "flt ");
+			snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "flt ");
 			break;
 		case AF_SAMPFMT_DOUBLE:
-			sprintf(s, "dbl ");
+			snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "dbl ");
 			break;
 		default:
 			assert(false);
 			break;
 	}
 
-	d += s;
+	d += s_tmpSampleBuf;
 
 	/* pcm */
-	sprintf(s, "(%.30g+-%.30g [%.30g,%.30g]) ",
+	snprintf(s_tmpSampleBuf, sizeof(s_tmpSampleBuf), "(%.30g+-%.30g [%.30g,%.30g]) ",
 		pcm.intercept, pcm.slope,
 		pcm.minClip, pcm.maxClip);
-	d += s;
+	d += s_tmpSampleBuf;
 
 	/* byteOrder */
 	switch (byteOrder)
@@ -8243,7 +8256,9 @@ File *File::open(const char *path, File::AccessMode mode)
 		flags = O_RDONLY;
 	else if (mode == WriteAccess)
 		flags = O_CREAT | O_WRONLY | O_TRUNC;
-#if defined(WIN32) || defined(__CYGWIN__)
+// ex-alo note: Added defines for mingw to fix crashes on some custom aiff files
+// if audiofile was build using MSYS Mingw.
+#if defined(WIN32) || defined(__CYGWIN__) || defined(_WIN32) || defined(__MINGW32__) || defined(__MINGW64__)
 	flags |= O_BINARY;
 #endif
 	int fd = ::open(path, flags, 0666);
@@ -10184,7 +10199,9 @@ static const TrackSetup _af_default_tracksetup =
 {
 	0,
 	{
-		44100.0,
+        // ex-alo note: Originally 44100.0 (44.1 kHz), since we are using audiofile
+        // on an old game (Super Mario 64), 32 kHz should be enough by default.
+		32728.5,
 		AF_SAMPFMT_TWOSCOMP,
 		16,
 		_AF_BYTEORDER_NATIVE,
@@ -15913,3 +15930,4 @@ bool _af_unique_ids (const int *ids, int nids, const char *idname, int iderr)
 
 	return true;
 }
+

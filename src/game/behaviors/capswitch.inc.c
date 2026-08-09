@@ -36,7 +36,7 @@ void cap_switch_act_2(void) {
             cur_obj_shake_screen(SHAKE_POS_SMALL);
             spawn_mist_particles();
             spawn_triangle_break_particles(60, MODEL_CARTOON_STAR, 0.3f, o->oBhvParams2ndByte);
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
             queue_rumble_data(5, 80);
 #endif
         }

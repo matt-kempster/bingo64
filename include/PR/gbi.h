@@ -117,6 +117,9 @@
 #define G_SPECIAL_1		0xd5
 #define G_SPECIAL_2		0xd4
 #define G_SPECIAL_3		0xd3
+#ifdef TARGET_N3DS
+#define G_SPECIAL_4		0xd2
+#endif
 
 #define G_VTX			0x01
 #define G_MODIFYVTX		0x02
@@ -485,6 +488,7 @@
 /* typical CC cycle 1 modes */
 #define	G_CC_PRIMITIVE              0, 0, 0, PRIMITIVE, 0, 0, 0, PRIMITIVE
 #define	G_CC_SHADE                  0, 0, 0, SHADE, 0, 0, 0, SHADE
+#define G_CC_ENVIRONMENT            0, 0, 0, ENVIRONMENT, 0, 0, 0, ENVIRONMENT
 
 #define	G_CC_MODULATEI              TEXEL0, 0, SHADE, 0, 0, 0, 0, SHADE
 #define	G_CC_MODULATEIDECALA        TEXEL0, 0, SHADE, 0, 0, 0, 0, TEXEL0
@@ -4424,7 +4428,8 @@ typedef union {
 	_g0->words.w0 = _SHIFTL(G_FILLRECT, 24, 8) | 			\
 		       _SHIFTL((lrx), 2, 22);				\
 	_g0->words.w1 = _SHIFTL((lry), 2, 22);				\
-        _g1->words.w0 = _SHIFTL((ulx), 2, 22);				\
+	_g1->words.w0 = _SHIFTL(G_RDPHALF_1, 24, 8) | 			\
+		       _SHIFTL((ulx), 2, 22);				\
 	_g1->words.w1 = _SHIFTL((uly), 2, 22);				\
 }
 #define	gsDPFillRectangle(ulx, uly, lrx, lry)				\
@@ -4433,7 +4438,7 @@ typedef union {
 	_SHIFTL((lry), 2, 22),						\
 }},									\
 {{									\
-	_SHIFTL((ulx), 2, 22),						\
+	(_SHIFTL(G_RDPHALF_1, 24, 8) | _SHIFTL((ulx), 2, 22)),		\
 	_SHIFTL((uly), 2, 22),						\
 }}
 #else
@@ -4670,24 +4675,26 @@ typedef union {
 									\
     _g0->words.w0 = _SHIFTL(G_TEXRECT, 24, 8) | 			\
 		       _SHIFTL((xh), 0, 24);				\
-    _g0->words.w1 = _SHIFTL((yh), 0, 24);				\
-    _g1->words.w0 = (_SHIFTL(tile, 24, 3) | _SHIFTL((xl), 0, 24));	\
-    _g1->words.w1 = _SHIFTL((yl), 0, 24);				\
-    _g2->words.w0 = (_SHIFTL(s, 16, 16) | _SHIFTL(t, 0, 16));		\
+    _g0->words.w1 = (_SHIFTL(tile, 24, 3) | _SHIFTL((yh), 0, 24));	\
+    _g1->words.w0 = (_SHIFTL(G_RDPHALF_1, 24, 8) | 			\
+		       _SHIFTL((xl), 0, 24));				\
+    _g1->words.w1 = (_SHIFTL(s, 16, 16) | _SHIFTL(t, 0, 16));		\
+    _g2->words.w0 = _SHIFTL(G_RDPHALF_2, 24, 8) | 			\
+		       _SHIFTL((yl), 0, 24);				\
     _g2->words.w1 = (_SHIFTL(dsdx, 16, 16) | _SHIFTL(dtdy, 0, 16));	\
 }
 
 # define gsSPTextureRectangle(xl, yl, xh, yh, tile, s, t, dsdx, dtdy)	\
 {{									\
     (_SHIFTL(G_TEXRECT, 24, 8) | _SHIFTL((xh), 0, 24)),			\
-    _SHIFTL((yh), 0, 24),						\
+    (_SHIFTL((tile), 24, 3) | _SHIFTL((yh), 0, 24)),			\
 }},									\
 {{									\
-    (_SHIFTL((tile), 24, 3) | _SHIFTL((xl), 0, 24)),			\
-    _SHIFTL((yl), 0, 24),						\
-}},									\
-{{									\
+    (_SHIFTL((G_RDPHALF_1), 24, 8) | _SHIFTL((xl), 0, 24)),		\
     _SHIFTL(s, 16, 16) | _SHIFTL(t, 0, 16),				\
+}},									\
+{{									\
+    (_SHIFTL((G_RDPHALF_2), 24, 8) | _SHIFTL((yl), 0, 24)),		\
     _SHIFTL(dsdx, 16, 16) | _SHIFTL(dtdy, 0, 16)			\
 }}
 
@@ -4697,10 +4704,12 @@ typedef union {
 									\
     _g0->words.w0 = _SHIFTL(G_TEXRECTFLIP, 24, 8) | 			\
 		       _SHIFTL((xh), 0, 24);				\
-    _g0->words.w1 = _SHIFTL((yh), 0, 24);				\
-    _g1->words.w0 = (_SHIFTL(tile, 24, 3) | _SHIFTL((xl), 0, 24));	\
-    _g1->words.w1 = _SHIFTL((yl), 0, 24);				\
-    _g2->words.w0 = (_SHIFTL(s, 16, 16) | _SHIFTL(t, 0, 16));		\
+    _g0->words.w1 = (_SHIFTL(tile, 24, 3) | _SHIFTL((yh), 0, 24));	\
+    _g1->words.w0 = (_SHIFTL(G_RDPHALF_1, 24, 8) | 			\
+		       _SHIFTL((xl), 0, 24));				\
+    _g1->words.w1 = (_SHIFTL(s, 16, 16) | _SHIFTL(t, 0, 16));		\
+    _g2->words.w0 = _SHIFTL(G_RDPHALF_2, 24, 8) | 			\
+		       _SHIFTL((yl), 0, 24);				\
     _g2->words.w1 = (_SHIFTL(dsdx, 16, 16) | _SHIFTL(dtdy, 0, 16));	\
 }
 #else
@@ -4794,6 +4803,43 @@ typedef union {
 #define	gsDPNoOp()		gsDPNoParam(G_NOOP)
 #define	gDPNoOpTag(pkt, tag)	gDPParam(pkt, G_NOOP, tag)
 #define	gsDPNoOpTag(tag)	gsDPParam(G_NOOP, tag)
+
+#if defined(F3DZEX_GBI_2) || defined(F3DZEX_NON_GBI_2) || defined(L3DZEX_GBI)
+#include "gbi-poslight.h"
+#endif
+
+#ifdef TARGET_N3DS
+#define gDPSet2d(pkt, mode) \
+{ \
+	Gfx *_g = (Gfx *)(pkt);	\
+									\
+	_g->words.w0 = _SHIFTL(G_SPECIAL_1, 24, 8); \
+	_g->words.w1 = (unsigned int)(mode); \
+}
+#define gDPForceFlush(pkt) \
+{ \
+	Gfx *_g = (Gfx *)(pkt);	\
+									\
+	_g->words.w0 = _SHIFTL(G_SPECIAL_2, 24, 8); \
+}
+
+#define gDPSetIod(pkt, iod) \
+{ \
+	Gfx *_g = (Gfx *)(pkt);	\
+									\
+	_g->words.w0 = _SHIFTL(G_SPECIAL_4, 24, 8); \
+	_g->words.w1 = (unsigned int)(iod); \
+}
+/*
+ * G_SPECIAL_4: IOD parameter flags
+ */
+#define iodNormal       0x00
+#define iodGoddard      0x01
+#define iodFileSelect   0x02
+#define iodStarSelect   0x03
+#define iodCannon       0x04
+
+#endif
 
 #endif /* _LANGUAGE_C */
 

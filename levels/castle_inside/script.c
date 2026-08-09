@@ -153,8 +153,8 @@ static const LevelScript script_func_local_2[] = {
     WARP_NODE(/*id*/ WARP_NODE_67, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_67, /*flags*/ WARP_NO_CHECKPOINT),
     WARP_NODE(/*id*/ WARP_NODE_68, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_68, /*flags*/ WARP_NO_CHECKPOINT),
     WARP_NODE(/*id*/ WARP_NODE_69, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_69, /*flags*/ WARP_NO_CHECKPOINT),
-    WARP_NODE(/*id*/ WARP_NODE_6B, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_6B, /*flags*/ WARP_NO_CHECKPOINT),
     WARP_NODE(/*id*/ WARP_NODE_6C, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_6C, /*flags*/ WARP_NO_CHECKPOINT),
+    WARP_NODE(/*id*/ WARP_NODE_6B, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_6B, /*flags*/ WARP_NO_CHECKPOINT),
     WARP_NODE(/*id*/ WARP_NODE_6D, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_6D, /*flags*/ WARP_NO_CHECKPOINT),
     RETURN(),
 };
@@ -225,6 +225,8 @@ const LevelScript level_castle_inside_entry[] = {
     LOAD_MIO0_TEXTURE(/*seg*/ 0x09, _inside_mio0SegmentRomStart, _inside_mio0SegmentRomEnd),
     LOAD_MIO0        (/*seg*/ 0x06, _group15_mio0SegmentRomStart, _group15_mio0SegmentRomEnd),
     LOAD_RAW         (/*seg*/ 0x0D, _group15_geoSegmentRomStart,  _group15_geoSegmentRomEnd),
+    LOAD_MIO0        (/*seg*/ 0x08, _common0_mio0SegmentRomStart, _common0_mio0SegmentRomEnd),
+    LOAD_RAW         (/*seg*/ 0x0F, _common0_geoSegmentRomStart,  _common0_geoSegmentRomEnd),
     ALLOC_LEVEL_POOL(),
     MARIO(/*model*/ MODEL_MARIO, /*bhvParam*/ BPARAM4(0x01), /*bhv*/ bhvMario),
     JUMP_LINK(script_func_global_16),

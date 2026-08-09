@@ -40,9 +40,9 @@ Gfx *geo_snufit_move_mask(s32 callContext, struct GraphNode *node, UNUSED Mat4 *
         struct GraphNodeTranslationRotation *transNode
             = (struct GraphNodeTranslationRotation *) node->next;
 
-        transNode->translation[0] = obj->oSnufitXOffset;
-        transNode->translation[1] = obj->oSnufitYOffset;
-        transNode->translation[2] = obj->oSnufitZOffset;
+        transNode->translation[0] = 0;
+        transNode->translation[1] = -32;
+        transNode->translation[2] = obj->oSnufitRecoil + 180;
     }
 
     return NULL;
@@ -67,9 +67,7 @@ Gfx *geo_snufit_scale_body(s32 callContext, struct GraphNode *node, UNUSED Mat4 
  * then prepares to shoot after a period.
  */
 void snufit_act_idle(void) {
-    // This line would could cause a crash in certain PU situations,
-    // if the game would not have already crashed.
-    s32 marioDist = (s32)(o->oDistanceToMario / 10.0f);
+    f32 marioDist = (o->oDistanceToMario / 10.0f);
 
     if (o->oTimer > marioDist && o->oDistanceToMario < 800.0f) {
 
@@ -151,8 +149,6 @@ void bhv_snufit_loop(void) {
         o->oPosY = o->oHomeY + 8.0f * coss(4000 * gGlobalTimer);
         o->oPosZ = o->oHomeZ + 100.0f * sins(o->oSnufitCircularPeriod);
 
-        o->oSnufitYOffset = -0x20;
-        o->oSnufitZOffset = o->oSnufitRecoil + 180;
         o->oSnufitBodyScale
             = (s16)(o->oSnufitBodyBaseScale + 666
             + o->oSnufitBodyBaseScale * coss(o->oSnufitBodyScalePeriod));
@@ -175,7 +171,10 @@ void bhv_snufit_loop(void) {
 void bhv_snufit_balls_loop(void) {
     // If far from Mario or in a different room, despawn.
     if ((o->activeFlags & ACTIVE_FLAG_IN_DIFFERENT_ROOM)
-        || (o->oTimer != 0 && o->oDistanceToMario > 1500.0f)) {
+#ifndef NODRAWINGDISTANCE
+        || (o->oTimer != 0 && o->oDistanceToMario > 1500.0f)
+#endif
+            ){
         obj_mark_for_deletion(o);
     }
 

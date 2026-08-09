@@ -20,7 +20,9 @@
 
 const LevelScript level_main_menu_entry_1[] = {
     INIT_LEVEL(),
+#ifdef GODDARD_MFACE
     FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
+#endif    
     LOAD_MIO0(/*seg*/ 0x07, _menu_segment_7SegmentRomStart, _menu_segment_7SegmentRomEnd),
     LOAD_RAW (/*seg*/ 0x13, _behaviorSegmentRomStart, _behaviorSegmentRomEnd),
     ALLOC_LEVEL_POOL(),
@@ -43,6 +45,10 @@ const LevelScript level_main_menu_entry_1[] = {
 
     FREE_LEVEL_POOL(),
     LOAD_AREA(/*area*/ 1),
+
+    GET_OR_SET(/*op*/ OP_GET, /*var*/ VAR_CURR_GAME_SKIPS),
+    JUMP_IF(/*op*/ OP_AND, /*arg*/ GAME_SKIP_FILE_SELECT, level_main_menu_entry_1_skip),
+
     SET_MENU_MUSIC(/*seq*/ SEQ_MENU_FILE_SELECT),
     TRANSITION(/*transType*/ WARP_TRANSITION_FADE_FROM_COLOR, /*time*/ 16, /*color*/ 0xFF, 0xFF, 0xFF),
     CALL(/*arg*/ 0, /*func*/ lvl_init_menu_values_and_cursor_pos),
@@ -53,15 +59,30 @@ const LevelScript level_main_menu_entry_1[] = {
     SLEEP(/*frames*/ 16),
     CLEAR_LEVEL(),
     SLEEP_BEFORE_EXIT(/*frames*/ 1),
+#ifdef RM2C
+    SET_REG(/*value*/ START_LEVEL),
+#else
     SET_REG(/*value*/ LEVEL_CASTLE_GROUNDS),
+#endif
+    EXIT_AND_EXECUTE(/*seg*/ 0x15, _scriptsSegmentRomStart, _scriptsSegmentRomEnd, level_main_scripts_entry),
+};
+
+const LevelScript level_main_menu_entry_1_skip[] = {
+#ifdef RM2C
+    SET_REG(/*value*/ START_LEVEL),
+#else
+    SET_REG(/*value*/ LEVEL_CASTLE_GROUNDS),
+#endif
     EXIT_AND_EXECUTE(/*seg*/ 0x15, _scriptsSegmentRomStart, _scriptsSegmentRomEnd, level_main_scripts_entry),
 };
 
 const LevelScript level_main_menu_entry_2[] = {
     /*0*/ CALL(/*arg*/ 0, /*func*/ lvl_set_current_level),
-    /*2*/ JUMP_IF(/*op*/ OP_EQ, /*arg*/ 0, level_main_menu_entry_2 + 42),
+    /*2*/ JUMP_IF(/*op*/ OP_EQ, /*arg*/ 0, level_main_menu_entry_2_skip),
     /*5*/ INIT_LEVEL(),
+#ifdef GODDARD_MFACE
     /*6*/ FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
+#endif
     /*10*/ LOAD_MIO0(/*seg*/ 0x07, _menu_segment_7SegmentRomStart, _menu_segment_7SegmentRomEnd),
     /*13*/ ALLOC_LEVEL_POOL(),
 
@@ -72,15 +93,20 @@ const LevelScript level_main_menu_entry_2[] = {
 
     /*25*/ FREE_LEVEL_POOL(),
     /*26*/ LOAD_AREA(/*area*/ 2),
+
+    GET_OR_SET(/*op*/ OP_GET, /*var*/ VAR_CURR_GAME_SKIPS),
+    JUMP_IF(/*op*/ OP_AND, /*arg*/ GAME_SKIP_STAR_SELECT, level_main_menu_entry_2_skip),
+
 #ifdef NO_SEGMENTED_MEMORY
-           // sVisibleStars is set to 0 during FIXED_LOAD above on N64, but not when NO_SEGMENTED_MEMORY is used.
-           // lvl_init_act_selector_values_and_stars must be called here otherwise the previous
-           // value is retained and causes incorrect drawing during the 16 transition frames.
+           // sVisibleStars is set to 0 during FIXED_LOAD above on N64, but not on PC-port.
+           // lvl_init_act_selector_values_and_stars must be called here otherwise the
+           // previous value is retained and causes incorrect drawing during the 16 transition
+           // frames.
            CALL(/*arg*/ 0, /*func*/ lvl_init_act_selector_values_and_stars),
 #endif
     /*27*/ TRANSITION(/*transType*/ WARP_TRANSITION_FADE_FROM_COLOR, /*time*/ 16, /*color*/ 0xFF, 0xFF, 0xFF),
     /*29*/ SLEEP(/*frames*/ 16),
-    /*30*/ SET_MENU_MUSIC(/*seq*/ 0x000D),
+    /*30*/ SET_MENU_MUSIC(/*seq*/ SEQ_MENU_STAR_SELECT),
 #ifndef NO_SEGMENTED_MEMORY
     /*31*/ CALL(/*arg*/ 0, /*func*/ lvl_init_act_selector_values_and_stars),
 #endif
@@ -90,7 +116,17 @@ const LevelScript level_main_menu_entry_2[] = {
     /*37*/ TRANSITION(/*transType*/ WARP_TRANSITION_FADE_INTO_COLOR, /*time*/ 16, /*color*/ 0xFF, 0xFF, 0xFF),
     /*39*/ SLEEP(/*frames*/ 16),
     /*40*/ CLEAR_LEVEL(),
+#ifndef TARGET_N64 // Prevent cut-off "let's a go" on Non-N64
+    /*41*/ SLEEP_BEFORE_EXIT(/*frames*/ 5),
+#else
     /*41*/ SLEEP_BEFORE_EXIT(/*frames*/ 1),
+#endif
     // L1:
     /*42*/ EXIT(),
 };
+
+const LevelScript level_main_menu_entry_2_skip[] = {
+    EXIT(),
+};
+
+#undef JUMP_VAL

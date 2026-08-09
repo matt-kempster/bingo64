@@ -35,8 +35,13 @@ void bhv_purple_switch_loop(void) {
                 cur_obj_play_sound_2(SOUND_GENERAL2_PURPLE_SWITCH);
                 o->oAction = PURPLE_SWITCH_ACT_TICKING;
                 cur_obj_shake_screen(SHAKE_POS_SMALL);
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
                 queue_rumble_data(5, 80);
+#endif
+#ifdef PORT_MOP_OBJS // bparam2 value is p-switch
+                if (o->oBhvParams2ndByte == 3) {
+                    bhv_pswitch_swap_coins_and_boxes();
+                }
 #endif
             }
             break;
@@ -56,6 +61,11 @@ void bhv_purple_switch_loop(void) {
                         play_sound(SOUND_GENERAL2_SWITCH_TICK_SLOW, gGlobalSoundSource);
                     }
                     if (o->oTimer > 400) {
+#ifdef PORT_MOP_OBJS // bparam2 value is p-switch
+                        if (o->oBhvParams2ndByte == 3) {
+                            bhv_pswitch_swap_coins_and_boxes();
+                        }
+#endif
                         o->oAction = PURPLE_SWITCH_ACT_WAIT_FOR_MARIO_TO_GET_OFF;
                     }
                 }

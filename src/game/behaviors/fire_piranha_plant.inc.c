@@ -40,7 +40,7 @@ void bhv_fire_piranha_plant_init(void) {
         o->oFlags |= OBJ_FLAG_PERSISTENT_RESPAWN;
         o->oHealth = 1;
 
-        if (o->oBhvParams & 0x0000FF00) {
+        if (o->respawnInfo & 1) {
             o->oNumLootCoins = 0;
         } else {
             o->oNumLootCoins = 2;
@@ -69,7 +69,11 @@ static void fire_piranha_plant_act_hide(void) {
 
             if ((u16)(o->oBhvParams >> 16) != 0 && o->oHealth == 0) {
                 if (++sNumKilledFirePiranhaPlants == 5) {
+                    #ifdef RM2C_HAS_CUSTOM_STAR_POS
+                    spawn_default_star(BigPiranhasStarPos);
+                    #else
                     spawn_default_star(-6300.0f, -1850.0f, -6300.0f);
+                    #endif
                 }
 
                 obj_die_if_health_non_positive();

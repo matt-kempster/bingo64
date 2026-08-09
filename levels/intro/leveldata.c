@@ -1,6 +1,7 @@
 #include <PR/ultratypes.h>
 #include <PR/gbi.h>
 
+#include "sm64.h"
 #include "macros.h"
 #include "types.h"
 
@@ -7879,10 +7880,10 @@ const Gfx intro_seg7_dl_logo[] = {
     gsDPPipeSync(),
     gsDPSetCombineMode(G_CC_MODULATEI, G_CC_MODULATEI),
     gsSPClearGeometryMode(G_LIGHTING),
-    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, 0x0000, G_TX_LOADTILE, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOLOD),
+    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, 0, G_TX_LOADTILE, 0, G_TX_WRAP | G_TX_NOMIRROR, G_TX_NOMASK, G_TX_NOLOD, G_TX_WRAP | G_TX_NOMIRROR, G_TX_NOMASK, G_TX_NOLOD),
     gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),
     gsDPTileSync(),
-    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0x0000, G_TX_RENDERTILE, 0, G_TX_NOMIRROR | G_TX_WRAP, 5, G_TX_NOLOD, G_TX_NOMIRROR | G_TX_WRAP, 5, G_TX_NOLOD),
+    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, G_TX_RENDERTILE, 0, G_TX_WRAP | G_TX_NOMIRROR, 5, G_TX_NOLOD, G_TX_WRAP | G_TX_NOMIRROR, 5, G_TX_NOLOD),
     gsDPSetTileSize(G_TX_RENDERTILE, 0, 0, (32 - 1) << G_TEXTURE_IMAGE_FRAC, (32 - 1) << G_TEXTURE_IMAGE_FRAC),
     gsSPDisplayList(intro_seg7_dl_07008AA0),
     gsSPDisplayList(intro_seg7_dl_0700A398),
@@ -8615,7 +8616,7 @@ const Gfx intro_seg7_dl_logo[] = {
     gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),
     gsDPTileSync(),
     gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, G_TX_RENDERTILE, 0, G_TX_WRAP | G_TX_NOMIRROR, 5, G_TX_NOLOD, G_TX_WRAP | G_TX_NOMIRROR, 5, G_TX_NOLOD),
-    gsDPSetTileSize(0, 0, 0, (32 - 1) << G_TEXTURE_IMAGE_FRAC, (32 - 1) << G_TEXTURE_IMAGE_FRAC),
+    gsDPSetTileSize(G_TX_RENDERTILE, 0, 0, (32 - 1) << G_TEXTURE_IMAGE_FRAC, (32 - 1) << G_TEXTURE_IMAGE_FRAC),
     gsSPDisplayList(intro_seg7_dl_07008EA0),
     gsSPDisplayList(intro_seg7_dl_07009E38),
     gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF),
@@ -8625,44 +8626,78 @@ const Gfx intro_seg7_dl_logo[] = {
     gsSPSetGeometryMode(G_LIGHTING),
     gsSPEndDisplayList(),
 };
-
 #endif
 
 #if defined(VERSION_CN)
+#define BB_T_W 128
+#define BB_T_H 16
+#define BB_X_L 96
+#define BB_X_R (BB_X_L + BB_T_W)
+#define BB_Y_L 42
+#define BB_Y_R (BB_Y_L + BB_T_H)
+
 // 0x0700B860 - 0x0700B8A0
 static const Vtx intro_seg7_vertex_copyright_ique[] = {
-    {{{    96,     42,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     42,     -1}, 0, {  4096,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     58,     -1}, 0, {  4096,      0}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{    96,     58,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
-};
-
-// 0x0700B8A0 - 0x0700B8E0
-static const Vtx intro_seg7_vertex_copyright[] = {
-    {{{    96,     58,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     58,     -1}, 0, {  4096,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     75,     -1}, 0, {  4096,      0}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{    96,     75,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
-};
-
-#else
-
-// 0x0700B420 - 0x0700B460
-static const Vtx intro_seg7_vertex_copyright[] = {
-    {{{    96,     42,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     42,     -1}, 0, {  4096,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   224,     58,     -1}, 0, {  4096,      0}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{    96,     58,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ BB_X_L, BB_Y_L, -1}, 0, {           0, BB_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ BB_X_R, BB_Y_L, -1}, 0, { BB_T_W << 5, BB_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ BB_X_R, BB_Y_R, -1}, 0, { BB_T_W << 5,           0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ BB_X_L, BB_Y_R, -1}, 0, {           0,           0}, {0xff, 0xff, 0xff, 0xff}}},
 };
 #endif
 
+#define CR_T_W 128
+#define CR_T_H 16
+#define CR_X_L 96
+#define CR_X_R (CR_X_L + CR_T_W)
+#if defined(VERSION_CN)
+#define CR_Y_L 58
+#else
+#define CR_Y_L 42
+#endif
+#define CR_Y_R (CR_Y_L + CR_T_H)
+
+// 0x0700B420 - 0x0700B460
+static const Vtx intro_seg7_vertex_copyright[] = {
+    {{{ CR_X_L, CR_Y_L, -1}, 0, {           0, CR_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ CR_X_R, CR_Y_L, -1}, 0, { CR_T_W << 5, CR_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ CR_X_R, CR_Y_R, -1}, 0, { CR_T_W << 5,           0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ CR_X_L, CR_Y_R, -1}, 0, {           0,           0}, {0xff, 0xff, 0xff, 0xff}}},
+};
+
+#define TM_T_W 16
+#define TM_T_H 16
+#define TM_X_L 268
+#define TM_X_R (TM_X_L + TM_T_W)
+#define TM_Y_L 180
+#define TM_Y_R (TM_Y_L + TM_T_H)
+
 // 0x0700B460 - 0x0700B4A0
 static const Vtx intro_seg7_vertex_tm[] = {
-    {{{   268,    180,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   284,    180,     -1}, 0, {   544,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   284,    196,     -1}, 0, {   544,      0}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   268,    196,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ TM_X_L, TM_Y_L, -1}, 0, {           0, TM_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ TM_X_R, TM_Y_L, -1}, 0, { TM_T_W << 5, TM_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ TM_X_R, TM_Y_R, -1}, 0, { TM_T_W << 5,           0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ TM_X_L, TM_Y_R, -1}, 0, {           0,           0}, {0xff, 0xff, 0xff, 0xff}}},
 };
+
+#if INTRO_JAPANESE_GAME_TEXT
+#define JP_T_W 128
+#define JP_T_H 16
+#define JP_X_L 96
+#define JP_X_R (CR_X_L + JP_T_W)
+#define JP_Y_L 70
+#define JP_Y_R (JP_Y_L + JP_T_H)
+
+static const Vtx intro_seg7_vertex_jptext[] = {
+    {{{ JP_X_L, JP_Y_L, -1}, 0, {           0, JP_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ JP_X_R, JP_Y_L, -1}, 0, { JP_T_W << 5, JP_T_H << 5}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ JP_X_R, JP_Y_R, -1}, 0, { JP_T_W << 5,           0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{ JP_X_L, JP_Y_R, -1}, 0, {           0,           0}, {0xff, 0xff, 0xff, 0xff}}},
+};
+
+ALIGNED8 static const Texture intro_seg7_texture_jptext[] = {
+#include "levels/intro/jp_game_text_custom.rgba16.inc.c"
+};
+#endif
 
 #if defined(VERSION_EU) || defined(VERSION_SH)
 // 0x0700B4A0 - 0x0700B4A2
@@ -8693,12 +8728,10 @@ ALIGNED8 static const Texture intro_seg7_texture_copyright[] = {
 ALIGNED8 static const u8 intro_seg7_texture_tm[] = {
 #include "levels/intro/3_eu_tm.rgba16.inc.c"
 };
-
 #elif defined(VERSION_SH) || defined(VERSION_CN)
 ALIGNED8 static const u8 intro_seg7_texture_tm[] = {
 #include "levels/intro/3_sh_tm.rgba16.inc.c"
 };
-
 #else
 // 0x0700C4A0 - 0x0700D4A0
 ALIGNED8 static const Texture intro_seg7_texture_tm[] = {
@@ -8711,19 +8744,26 @@ const Gfx intro_seg7_dl_copyright[] = {
     gsDPPipeSync(),
     gsDPSetCombineMode(G_CC_DECALFADE, G_CC_DECALFADE),
     gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),
+
 #if defined(VERSION_CN)
-    gsDPLoadTextureBlock(intro_seg7_texture_copyright_ique, G_IM_FMT_RGBA, G_IM_SIZ_16b, 128, 16, 0, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, 7, 4, G_TX_NOLOD, G_TX_NOLOD),
+    gsDPLoadTextureBlock(intro_seg7_texture_copyright_ique, G_IM_FMT_RGBA, G_IM_SIZ_16b, BB_T_W, BB_T_H, 0, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, 7, 4, G_TX_NOLOD, G_TX_NOLOD),
     gsSPVertex(intro_seg7_vertex_copyright_ique, 4, 0),
-    gsSP1Triangle(0, 1, 2, 0),
-    gsSP1Triangle(0, 2, 3, 0),
+    gsSP2Triangles( 0,  1,  2, 0x0,  0,  2,  3, 0x0),
 #endif
-    gsDPLoadTextureBlock(intro_seg7_texture_copyright, G_IM_FMT_RGBA, G_IM_SIZ_16b, 128, 16, 0, G_TX_CLAMP, G_TX_CLAMP, 7, 4, G_TX_NOLOD, G_TX_NOLOD),
+
+    gsDPLoadTextureBlock(intro_seg7_texture_copyright, G_IM_FMT_RGBA, G_IM_SIZ_16b, CR_T_W, CR_T_H, 0, G_TX_CLAMP, G_TX_CLAMP, 7, 4, G_TX_NOLOD, G_TX_NOLOD),
     gsSPVertex(intro_seg7_vertex_copyright, 4, 0),
     gsSP2Triangles( 0,  1,  2, 0x0,  0,  2,  3, 0x0),
 
-    gsDPLoadTextureBlock(intro_seg7_texture_tm, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 16, 0, G_TX_CLAMP, G_TX_CLAMP, 4, 4, G_TX_NOLOD, G_TX_NOLOD),
+    gsDPLoadTextureBlock(intro_seg7_texture_tm, G_IM_FMT_RGBA, G_IM_SIZ_16b, TM_T_W, TM_T_H, 0, G_TX_CLAMP, G_TX_CLAMP, 4, 4, G_TX_NOLOD, G_TX_NOLOD),
     gsSPVertex(intro_seg7_vertex_tm, 4, 0),
     gsSP2Triangles( 0,  1,  2, 0x0,  0,  2,  3, 0x0),
+
+#if INTRO_JAPANESE_GAME_TEXT
+    gsDPLoadTextureBlock(intro_seg7_texture_jptext, G_IM_FMT_RGBA, G_IM_SIZ_16b, JP_T_W, JP_T_H, 0, G_TX_CLAMP, G_TX_CLAMP, 7, 4, G_TX_NOLOD, G_TX_NOLOD),
+    gsSPVertex(intro_seg7_vertex_jptext, 4, 0),
+    gsSP2Triangles( 0,  1,  2, 0x0,  0,  2,  3, 0x0),
+#endif
 
     gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF),
     gsDPPipeSync(),

@@ -22,6 +22,9 @@ static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_NONE,                  /*pos*/ -2050,     0, -3069, /*angle*/ 0, 25, 0,   /*bhvParam*/ BPARAM2(OPENABLE_GRILL_BP_BOB), /*bhv*/ bhvOpenableGrill),
     OBJECT(/*model*/ MODEL_PURPLE_SWITCH,         /*pos*/ -2283,     0, -3682, /*angle*/ 0, 27, 0,   /*bhvParam*/ 0, /*bhv*/ bhvFloorSwitchGrills),
     OBJECT(/*model*/ MODEL_CHECKERBOARD_PLATFORM, /*pos*/  1612,   300,  4611, /*angle*/ 0, 0, 0,    /*bhvParam*/ BPARAM1(0) | BPARAM2(40), /*bhv*/ bhvCheckerboardElevatorGroup),
+#ifdef PORT_MOP_OBJS
+    OBJECT(/*model*/ MODEL_MOP_CHECKPOINT_FLAG,   /*pos*/  3495,  2984, -1978, /*angle*/ 0, 0, 0,    /*bhvParam*/ 0, /*bhv*/ bhvCheckpoint_Flag_MOP),
+#endif
     RETURN(),
 };
 

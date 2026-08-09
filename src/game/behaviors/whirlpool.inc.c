@@ -19,10 +19,6 @@ void bhv_whirlpool_init(void) {
     o->oFaceAngleRoll = 0;
 }
 
-void whirlpool_set_hitbox(void) {
-    obj_set_hitbox(o, &sWhirlpoolHitbox);
-}
-
 void whirpool_orient_graph(void) {
     f32 cosPitch = coss(o->oFaceAnglePitch);
     f32 sinPitch = sins(o->oFaceAnglePitch);
@@ -35,7 +31,9 @@ void whirpool_orient_graph(void) {
 }
 
 void bhv_whirlpool_loop(void) {
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario < 5000.0f) {
+#endif
         o->header.gfx.node.flags &= ~GRAPH_RENDER_INVISIBLE;
 
         // not sure if actually an array
@@ -52,14 +50,16 @@ void bhv_whirlpool_loop(void) {
         whirpool_orient_graph();
 
         o->oFaceAngleYaw += 8000;
+#ifndef NODRAWINGDISTANCE
     } else {
         o->header.gfx.node.flags |= GRAPH_RENDER_INVISIBLE;
         gEnvFxBubbleConfig[ENVFX_STATE_PARTICLECOUNT] = 0;
     }
+#endif
 
     cur_obj_play_sound_1(SOUND_ENV_WATER);
 
-    whirlpool_set_hitbox();
+    obj_set_hitbox(o, &sWhirlpoolHitbox);
 }
 
 void bhv_jet_stream_loop(void) {

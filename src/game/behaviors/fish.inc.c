@@ -10,10 +10,13 @@
  */
 static void fish_spawner_act_spawn(void) {
     s32 i;
-    s32 schoolQuantity;
-    s16 model;
+    s32 schoolQuantity = 0;
+    ModelID16 model = MODEL_NONE;
+#ifdef NODRAWINGDISTANCE
+    UNUSED
+#endif
     f32 minDistToMario;
-    const struct Animation * const *fishAnimation;
+    const struct Animation * const *fishAnimation = NULL;
 
     switch (o->oBhvParams2ndByte) {
         // Cases need to be on one line to match with and without optimizations.
@@ -37,7 +40,9 @@ static void fish_spawner_act_spawn(void) {
     // Spawn and animate the schoolQuantity of fish if Mario enters render distance
     // or the stage is Secret Aquarium.
     // Fish moves randomly within a range of 700.0f.
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario < minDistToMario || gCurrLevelNum == LEVEL_SA) {
+#endif
         for (i = 0; i < schoolQuantity; i++) {
             struct Object *fishObject = spawn_object(o, model, bhvFish);
             fishObject->oBhvParams2ndByte = o->oBhvParams2ndByte;
@@ -45,7 +50,9 @@ static void fish_spawner_act_spawn(void) {
             obj_translate_xyz_random(fishObject, 700.0f);
         }
         o->oAction = FISH_SPAWNER_ACT_IDLE;
+#ifndef NODRAWINGDISTANCE
     }
+#endif
 }
 
 /**
@@ -53,9 +60,11 @@ static void fish_spawner_act_spawn(void) {
  * Mario is more than 2000 units higher.
  */
 static void fish_spawner_act_idle(void) {
+#ifndef NODRAWINGDISTANCE
     if ((gCurrLevelNum != LEVEL_SA) && (gMarioObject->oPosY - o->oPosY > 2000.0f)) {
         o->oAction = FISH_SPAWNER_ACT_RESPAWN;
     }
+#endif
 }
 
 /**

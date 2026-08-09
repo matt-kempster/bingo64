@@ -12,6 +12,7 @@
 #include "game/camera.h"
 #include "seq_ids.h"
 #include "dialog_ids.h"
+#include "level_table.h"
 
 #if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
 #define EU_FLOAT(x) x##f
@@ -89,7 +90,7 @@ s32 sGameLoopTicked = 0;
 #define YOSHI 10
 #define _ 0xFF
 
-#ifdef VERSION_JP
+#if BUGFIX_DIALOG_SOUND_KTQ_WIN
 #define DIFF KOOPA
 #else
 #define DIFF TUXIE
@@ -275,6 +276,12 @@ u16 sLevelAcousticReaches[LEVEL_COUNT] = {
 #define VOLUME_RANGE_UNK2 0.8f
 #endif
 
+// sBackgroundMusicDefaultVolume represents the default volume for background music sequences using the level player (deprecated).
+// This code block is simply commented out for now as to not destroy compatibility with any streamed audio tools.
+// TODO: Delete this entirely once the unsupporting streamed tools or their builds are outdated.
+
+/*
+
 // Default volume for background music sequences (playing on player 0).
 u8 sBackgroundMusicDefaultVolume[] = {
     127, // SEQ_SOUND_PLAYER
@@ -317,23 +324,14 @@ u8 sBackgroundMusicDefaultVolume[] = {
 STATIC_ASSERT(ARRAY_COUNT(sBackgroundMusicDefaultVolume) == SEQ_COUNT,
               "change this array if you are adding sequences");
 
+*/
+
 u8 sCurrentBackgroundMusicSeqId = SEQUENCE_NONE;
 u8 sMusicDynamicDelay = 0;
 u8 sSoundBankUsedListBack[SOUND_BANK_COUNT] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 u8 sSoundBankFreeListFront[SOUND_BANK_COUNT] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 u8 sNumSoundsInBank[SOUND_BANK_COUNT] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // only used for debugging
 u8 sMaxChannelsForSoundBank[SOUND_BANK_COUNT] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-
-// Banks 2 and 7 both grew from 0x30 sounds to 0x40 in size in US.
-#ifdef VERSION_JP
-#define BANK27_SIZE 0x30
-#else
-#define BANK27_SIZE 0x40
-#endif
-u8 sNumSoundsPerBank[SOUND_BANK_COUNT] = {
-    0x70, 0x30, BANK27_SIZE, 0x80, 0x20, 0x80, 0x20, BANK27_SIZE, 0x80, 0x80,
-};
-#undef BANK27_SIZE
 
 // sBackgroundMusicMaxTargetVolume and sBackgroundMusicTargetVolume use the 0x80
 // bit to indicate that they are set, and the rest of the bits for the actual value
@@ -374,7 +372,6 @@ s32 D_SH_80343CF0;
 s8 D_SH_80343CF8_pad[0x8];
 struct UnkStruct80343D00 D_SH_80343D00;
 s8 D_SH_8034DC8_pad[0x8];
-OSPiHandle DriveRomHandle; // used in osDriveRomInit.c. Why here?
 s8 D_SH_80343E48_pad[0x8];
 #endif
 
@@ -416,7 +413,7 @@ OSMesg OSMesg1;
 s32 pad2[2];    // it's not just that the struct is bigger than we think, because there are 2 here
 OSMesg OSMesg2; // and none here. wth nintendo
 OSMesg OSMesg3;
-#else // VERSION_SH
+#else // VERSION_SH || VERSION_CN
 extern OSMesgQueue *D_SH_80350F88;
 extern OSMesgQueue *D_SH_80350FA8;
 #endif
@@ -659,7 +656,6 @@ static void seq_player_fade_to_target_volume(s32 player, FadeT fadeDuration, u8 
         seqPlayer->fadeVolume = (FLOAT_CAST(targetVolume) / EU_FLOAT(127.0));
         return;
     }
-
     seqPlayer->fadeVelocity =
         (((f32)(FLOAT_CAST(targetVolume) / EU_FLOAT(127.0)) - seqPlayer->fadeVolume)
          / (f32) fadeDuration);
@@ -705,6 +701,7 @@ void func_eu_802e9bec(s32 player, s32 channel, s32 arg2) {
 /**
  * Called from threads: thread4_sound
  */
+#ifdef TARGET_N64
 struct SPTask *create_next_audio_frame_task(void) {
     u32 samplesRemainingInAI;
     s32 writtenCmds;
@@ -794,20 +791,28 @@ struct SPTask *create_next_audio_frame_task(void) {
     task->output_buff_size = NULL;
     task->data_ptr = gAudioCmdBuffers[index];
     task->data_size = writtenCmds * sizeof(u64);
-
-// The audio task never yields, so having a yield buffer is pointless.
-// This wastefulness was fixed in US.
-#ifdef VERSION_JP
-    task->yield_data_ptr = (u64 *) gAudioSPTaskYieldBuffer;
-    task->yield_data_size = OS_YIELD_AUDIO_SIZE;
-#else
     task->yield_data_ptr = NULL;
     task->yield_data_size = 0;
-#endif
 
     decrease_sample_dma_ttls();
     return gAudioTask;
 }
+#else
+struct SPTask *create_next_audio_frame_task(void) {
+    return NULL;
+}
+void create_next_audio_buffer(s16 *samples, u32 num_samples) {
+    gAudioFrameCount++;
+    if (sGameLoopTicked != 0) {
+        update_game_sound();
+        sGameLoopTicked = 0;
+    }
+    s32 writtenCmds;
+    synthesis_execute(gAudioCmdBuffers[0], &writtenCmds, samples, num_samples);
+    gAudioRandom = ((gAudioRandom + gAudioFrameCount) * gAudioFrameCount);
+    decrease_sample_dma_ttls();
+}
+#endif
 #endif
 
 /**
@@ -823,21 +828,15 @@ void play_sound(s32 soundBits, f32 *pos) {
  * Called from threads: thread4_sound, thread5_game_loop (EU only)
  */
 static void process_sound_request(u32 bits, f32 *pos) {
-    u8 bank;
-    u8 soundIndex;
-    u8 counter = 0;
-    u8 soundId;
-    f32 dist;
-    const f32 one = 1.0f;
+    s32 counter = 0;
 
-    bank = (bits & SOUNDARGS_MASK_BANK) >> SOUNDARGS_SHIFT_BANK;
-    soundId = (bits & SOUNDARGS_MASK_SOUNDID) >> SOUNDARGS_SHIFT_SOUNDID;
+    s32 bank = (bits & SOUNDARGS_MASK_BANK) >> SOUNDARGS_SHIFT_BANK;
 
-    if (soundId >= sNumSoundsPerBank[bank] || sSoundBankDisabled[bank]) {
+    if (sSoundBankDisabled[bank]) {
         return;
     }
 
-    soundIndex = sSoundBanks[bank][0].next;
+    s32 soundIndex = sSoundBanks[bank][0].next;
     while (soundIndex != 0xff && soundIndex != 0) {
         // If an existing sound from the same source exists in the bank, then we should either
         // interrupt that sound and replace it with the new sound, or we should drop the new sound.
@@ -886,7 +885,7 @@ static void process_sound_request(u32 bits, f32 *pos) {
         // Allocate from free list
         soundIndex = sSoundBankFreeListFront[bank];
 
-        dist = sqrtf(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]) * one;
+        f32 dist = sqrtf(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
         sSoundBanks[bank][soundIndex].x = &pos[0];
         sSoundBanks[bank][soundIndex].y = &pos[1];
         sSoundBanks[bank][soundIndex].z = &pos[2];
@@ -2083,7 +2082,7 @@ static u8 begin_background_music_fade(u16 fadeDuration) {
         targetVolume = 40;
     }
 
-    if (sSoundBanksThatLowerBackgroundMusic != 0 && targetVolume > 20) {
+    if (sSoundBanksThatLowerBackgroundMusic && targetVolume > 20) {
         targetVolume = 20;
     }
 
@@ -2092,8 +2091,7 @@ static u8 begin_background_music_fade(u16 fadeDuration) {
             seq_player_fade_to_target_volume(SEQ_PLAYER_LEVEL, fadeDuration, targetVolume);
         } else {
 #if defined(VERSION_JP) || defined(VERSION_US)
-            gSequencePlayers[SEQ_PLAYER_LEVEL].volume =
-                sBackgroundMusicDefaultVolume[sCurrentBackgroundMusicSeqId] / 127.0f;
+            gSequencePlayers[SEQ_PLAYER_LEVEL].volume = gSequencePlayers[SEQ_PLAYER_LEVEL].volumeDefault;
 #endif
             seq_player_fade_to_normal_volume(SEQ_PLAYER_LEVEL, fadeDuration);
         }
@@ -2361,6 +2359,10 @@ void play_dialog_sound(u8 dialogID) {
 #endif
 }
 
+void set_sequence_player_volume(s32 player, f32 volume) {
+    gSequencePlayers[player].volumeScale = volume;
+}
+
 /**
  * Called from threads: thread5_game_loop
  */
@@ -2372,11 +2374,12 @@ void play_music(u8 player, u16 seqArgs, u16 fadeTimer) {
 
     // Except for the background music player, we don't support queued
     // sequences. Just play them immediately, stopping any old sequence.
+
     if (player != SEQ_PLAYER_LEVEL) {
         seq_player_play_sequence(player, seqId, fadeTimer);
         return;
     }
-
+    
     // Abort if the queue is already full.
     if (sBackgroundMusicQueueSize == MAX_BACKGROUND_MUSIC_QUEUE_SIZE) {
         return;
@@ -2388,7 +2391,9 @@ void play_music(u8 player, u16 seqArgs, u16 fadeTimer) {
     for (i = 0; i < sBackgroundMusicQueueSize; i++) {
         if (sBackgroundMusicQueue[i].seqId == seqId) {
             if (i == 0) {
+#if !PERSISTENT_CAP_MUSIC
                 seq_player_play_sequence(SEQ_PLAYER_LEVEL, seqId, fadeTimer);
+#endif
             } else if (!gSequencePlayers[SEQ_PLAYER_LEVEL].enabled) {
                 stop_background_music(sBackgroundMusicQueue[0].seqId);
             }
@@ -2709,7 +2714,7 @@ void sound_reset(u8 presetId) {
     func_802ad74c(0xF2000000, 0);
 #endif
 #if defined(VERSION_JP) || defined(VERSION_US)
-    audio_reset_session(&gAudioSessionPresets[presetId]);
+    audio_reset_session(presetId);
 #else
     audio_reset_session_eu(presetId);
 #endif

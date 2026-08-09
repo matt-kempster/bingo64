@@ -3,6 +3,18 @@
 
 #include "text_menu_strings.h"
 
+#ifdef EXT_OPTIONS_MENU
+#include "text_options_strings.h"
+#endif
+
+#ifdef CHEATS_ACTIONS
+#include "text_cheats_strings.h"
+#endif
+
+#ifdef EXT_DEBUG_MENU
+#include "text_debug_strings.h"
+#endif
+
 /**
  * Global Symbols
  */
@@ -28,18 +40,25 @@
 // File Select
 #define TEXT_4DASHES _("----") // Used in Score File Menu
 #ifdef VERSION_CN
-#define TEXT_NEW 0x7E, 0x7F, 0x82, 0x83, 0xFE, 0x80, 0x81, 0x84, 0x85, 0xFF
+#define TEXT_NEW 0x7E, 0x7F, 0x82, 0x83, 0xFE, 0x80, 0x81, 0x84, 0x85, 0xFF // 新游戏
 #else
 #define TEXT_NEW _("NEW") // New File Text
 #endif
 
 // Ingame Menu
 #ifdef VERSION_CN
-#define TEXT_PAUSE 0x86, 0x87, 0x8A, 0x8B, 0x8E, 0x8F, 0xFE, 0x88, 0x89, 0x8C, 0x8D, 0x90, 0x91, 0xFF
-#define TEXT_HUD_CONGRATULATIONS 0x3A, 0x3B, 0x3E, 0x3F, 0x42, 0x43, 0xFE, 0x3C, 0x3D, 0x40, 0x41, 0x44, 0x45, 0xFF
+#define TEXT_PAUSE 0x86, 0x87, 0x8A, 0x8B, 0x8E, 0x8F, 0xFE, 0x88, 0x89, 0x8C, 0x8D, 0x90, 0x91, 0xFF // 暂停
+#define TEXT_HUD_CONGRATULATIONS 0x3A, 0x3B, 0x3E, 0x3F, 0x42, 0x43, 0xFE, 0x3C, 0x3D, 0x40, 0x41, 0x44, 0x45, 0xFF // 祝贺你
 #else
 #define TEXT_PAUSE _("PAUSE") // Pause text, Castle Courses
 #define TEXT_HUD_CONGRATULATIONS _("CONGRATULATIONS") // Course Complete Text, Bowser Courses
+#endif
+
+#ifdef TARGET_N64
+// Memory Expansion Error Screen
+#define TEXT_CONSOLE_8MB _("If you're using an N64 console, then you will need to buy an\nExpansion Pak to play this ROM hack.")
+#define TEXT_PJ64 _("If you are using PJ64 1.6, go to:\nOptions ◀ Settings ◀ Rom Settings Tab ◀ Memory Size\nthen select 8 MB from the drop-down box.")
+#define TEXT_PJ64_2 _("If you are using PJ64 2.X, go to:\nOptions ◀ Settings ◀ Config: ◀ Memory Size, select 8 MB")
 #endif
 
 #if defined(VERSION_JP) || defined(VERSION_SH)
@@ -108,6 +127,7 @@
 #define TEXT_COURSE _("コース")
 #define TEXT_MYSCORE _("マイスコア")
 #define TEXT_CONTINUE _("つづけて　マリオする？")
+#define TEXT_EXIT_GAME _("ゲームをしゅうりょうする")
 #define TEXT_EXIT_COURSE _("コースからでる？")
 #define TEXT_CAMERA_ANGLE_R _("Ｒボタンのカメラきりかえ")
 
@@ -125,6 +145,7 @@
 // Save Options
 #define TEXT_SAVE_AND_CONTINUE _("セーブしてつづける？")
 #define TEXT_SAVE_AND_QUIT _("セーブしておわる？")
+#define TEXT_SAVE_EXIT_GAME _("ゲームをやめる？")
 #define TEXT_CONTINUE_WITHOUT_SAVING _("セーブしないでつづける？")
 
 /**
@@ -147,7 +168,6 @@
 /**
  * File Select Text
  */
-
 // Main Screens
 #define TEXT_MARIO _("MARIO") // View Score Menu
 #define TEXT_SELECT_FILE _("SELECT FILE")
@@ -155,7 +175,6 @@
 #define TEXT_COPY_FILE _("COPY FILE")
 #define TEXT_ERASE_FILE _("ERASE FILE")
 #define TEXT_SOUND_SELECT _("SOUND SELECT")
-
 #define TEXT_FILE_MARIO_A _("MARIO A")
 #define TEXT_FILE_MARIO_B _("MARIO B")
 #define TEXT_FILE_MARIO_C _("MARIO C")
@@ -209,6 +228,7 @@
 #define TEXT_MYSCORE _("MYSCORE")
 #define TEXT_CONTINUE _("CONTINUE")
 #define TEXT_EXIT_COURSE _("EXIT COURSE")
+#define TEXT_EXIT_GAME _("EXIT GAME")
 #ifndef VERSION_EU // "R" text is different in EU
 #define TEXT_CAMERA_ANGLE_R _("SET CAMERA ANGLE WITH R")
 #endif
@@ -227,6 +247,7 @@
 // Save Options
 #define TEXT_SAVE_AND_CONTINUE _("SAVE & CONTINUE")
 #define TEXT_SAVE_AND_QUIT _("SAVE & QUIT")
+#define TEXT_SAVE_EXIT_GAME _("SAVE & EXIT GAME")
 #define TEXT_CONTINUE_WITHOUT_SAVING _("CONTINUE, DON'T SAVE")
 
 /**
@@ -353,12 +374,14 @@
 #define TEXT_MY_SCORE_FR                _("MON SCORE")
 #define TEXT_CONTINUE_FR                _("CONTINUER")
 #define TEXT_EXIT_COURSE_FR             _("QUITTER NIVEAU")
+#define TEXT_EXIT_GAME_FR		_("QUITTER JEU")
 #define TEXT_CAMERA_ANGLE_R_FR          _("RÉGLAGE CAMÉRA AVEC [R]")
 // German
 #define TEXT_COURSE_DE                  _("KURS")
 #define TEXT_MY_SCORE_DE                _("LEISTUNG")
 #define TEXT_CONTINUE_DE                _("WEITER")
 #define TEXT_EXIT_COURSE_DE             _("KURS VERLASSEN")
+#define TEXT_EXIT_GAME_DE		_("SPIEL VERLASSEN")
 #define TEXT_CAMERA_ANGLE_R_DE          _("KAMERA MIT [R] VERSTELLEN")
 
 // Camera Options
@@ -381,10 +404,12 @@
 // French
 #define TEXT_SAVE_AND_CONTINUE_FR       _("SAUVEGARDER & CONTINUER")
 #define TEXT_SAVE_AND_QUIT_FR           _("SAUVEGARDER & QUITTER")
+#define TEXT_SAVE_EXIT_GAME_FR		_("SAUVEGARDER & QUITTER JEU")
 #define TEXT_CONTINUE_WITHOUT_SAVING_FR _("CONTINUER SANS SAUVEGARDER")
 // German
 #define TEXT_SAVE_AND_CONTINUE_DE       _("SPEICHERN & WEITER")
 #define TEXT_SAVE_AND_QUIT_DE           _("SPEICHERN & ENDE")
+#define TEXT_SAVE_EXIT_GAME_DE		_("SPEICHERN & SPIEL VERLASSEN")
 #define TEXT_CONTINUE_WITHOUT_SAVING_DE _("WEITER OHNE ZU SPEICHERN")
 
 /**
@@ -500,12 +525,12 @@
 
 // Main Screens
 // JPHUD menu strings are defined in "text_menu_strings.h.in"
-#define TEXT_MARIO 0x76, 0x77, 0x7A, 0x7B, 0xFE, 0x78, 0x79, 0x7C, 0x7D, 0xFF
-#define TEXT_SELECT_FILE 0x96, 0x97, 0x9A, 0x9B, 0x9E, 0x9F, 0xFE, 0x98, 0x99, 0x9C, 0x9D, 0xA0, 0xA1, 0xFF
-#define TEXT_CHECK_FILE 0x46, 0x47, 0x4A, 0x4B, 0x4E, 0x4F, 0xFE, 0x48, 0x49, 0x4C, 0x4D, 0x50, 0x51, 0xFF
-#define TEXT_COPY_FILE 0x52, 0x53, 0x56, 0x57, 0x5A, 0x5B, 0xFE, 0x54, 0x55, 0x58, 0x59, 0x5C, 0x5D, 0xFF
-#define TEXT_ERASE_FILE 0x5E, 0x5F, 0x62, 0x63, 0x66, 0x67, 0xFE, 0x60, 0x61, 0x64, 0x65, 0x68, 0x69, 0xFF
-#define TEXT_SOUND_SELECT 0xA2, 0xA3, 0xA6, 0xA7, 0xAA, 0xAB, 0xFE, 0xA4, 0xA5, 0xA8, 0xA9, 0xAC, 0xAD, 0xFF
+#define TEXT_MARIO 0x76, 0x77, 0x7A, 0x7B, 0xFE, 0x78, 0x79, 0x7C, 0x7D, 0xFF // 马力欧
+#define TEXT_SELECT_FILE 0x96, 0x97, 0x9A, 0x9B, 0x9E, 0x9F, 0xFE, 0x98, 0x99, 0x9C, 0x9D, 0xA0, 0xA1, 0xFF // 选择文件
+#define TEXT_CHECK_FILE 0x46, 0x47, 0x4A, 0x4B, 0x4E, 0x4F, 0xFE, 0x48, 0x49, 0x4C, 0x4D, 0x50, 0x51, 0xFF // 检查文件
+#define TEXT_COPY_FILE 0x52, 0x53, 0x56, 0x57, 0x5A, 0x5B, 0xFE, 0x54, 0x55, 0x58, 0x59, 0x5C, 0x5D, 0xFF // 复制文件
+#define TEXT_ERASE_FILE 0x5E, 0x5F, 0x62, 0x63, 0x66, 0x67, 0xFE, 0x60, 0x61, 0x64, 0x65, 0x68, 0x69, 0xFF // 删除文件
+#define TEXT_SOUND_SELECT 0xA2, 0xA3, 0xA6, 0xA7, 0xAA, 0xAB, 0xFE, 0xA4, 0xA5, 0xA8, 0xA9, 0xAC, 0xAD, 0xFF // 声音选择
 
 #define TEXT_FILE_MARIO_A _("马力欧　A")
 #define TEXT_FILE_MARIO_B _("马力欧　B")
@@ -558,6 +583,7 @@
 #define TEXT_COURSE _("关卡")
 #define TEXT_MYSCORE TEXT_MY_SCORE
 #define TEXT_CONTINUE _("继续")
+#define TEXT_EXIT_GAME _("出口")
 #define TEXT_EXIT_COURSE _("退出")
 #define TEXT_CAMERA_ANGLE_R _("使用[R]键设定视角")
 
@@ -570,11 +596,12 @@
 // Course Completed Misc Text
 #define TEXT_CATCH _("接住")
 #define TEXT_CLEAR _("清除")
-#define TEXT_HUD_HI_SCORE 0x6A, 0x6B, 0x6E, 0x6F, 0x72, 0x73, 0xFE, 0x6C, 0x6D, 0x70, 0x71, 0x74, 0x75, 0xFF
+#define TEXT_HUD_HI_SCORE 0x6A, 0x6B, 0x6E, 0x6F, 0x72, 0x73, 0xFE, 0x6C, 0x6D, 0x70, 0x71, 0x74, 0x75, 0xFF // 最高积分
 
 // Save Options
 #define TEXT_SAVE_AND_CONTINUE _("保存并继续")
 #define TEXT_SAVE_AND_QUIT _("保存并退出")
+#define TEXT_SAVE_EXIT_GAME _("保存和关闭")
 #define TEXT_CONTINUE_WITHOUT_SAVING _("不必保存")
 
 // File Score Menu Icons
@@ -584,5 +611,3 @@
 #endif // VERSION_CN
 
 #endif // TEXT_STRINGS_H
-
-

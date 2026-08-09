@@ -13,16 +13,13 @@ struct ObjectHitbox sSparkleSpawnStarHitbox = {
 };
 
 void bhv_spawned_star_init(void) {
-    s32 starIndex;
-
     if (!(o->oInteractionSubtype & INT_SUBTYPE_NO_EXIT)) {
         o->oBhvParams = o->parentObj->oBhvParams;
     }
 
-    starIndex = (o->oBhvParams >> 24) & 0xFF;
+    u8 starIndex = (o->oBhvParams >> 24) & 0xFF;
 
-    if (bit_shift_left(starIndex)
-        & save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum))) {
+    if (save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum)) & (1 << starIndex)) {
         cur_obj_set_model(MODEL_TRANSPARENT_STAR);
     }
 
@@ -32,25 +29,9 @@ void bhv_spawned_star_init(void) {
 void set_sparkle_spawn_star_hitbox(void) {
     obj_set_hitbox(o, &sSparkleSpawnStarHitbox);
     if (o->oInteractStatus & INT_STATUS_INTERACTED) {
-        mark_obj_for_deletion(o);
+        obj_mark_for_deletion(o);
         o->oInteractStatus = 0;
     }
-}
-
-void set_home_to_mario(void) {
-    f32 sp1C;
-    f32 sp18;
-
-    o->oHomeX = gMarioObject->oPosX;
-    o->oHomeZ = gMarioObject->oPosZ;
-    o->oHomeY = gMarioObject->oPosY;
-    o->oHomeY += 250.0f;
-    o->oPosY = o->oHomeY;
-
-    sp1C = o->oHomeX - o->oPosX;
-    sp18 = o->oHomeZ - o->oPosZ;
-
-    o->oForwardVel = sqrtf(sp1C * sp1C + sp18 * sp18) / 23.0f;
 }
 
 void set_y_home_to_pos(void) {
@@ -58,11 +39,37 @@ void set_y_home_to_pos(void) {
     o->oHomeY = o->oPosY;
 }
 
+void set_home_to_mario(void) {
+#if FIX_STARS_ON_CEILINGS
+    // Force y home to pos to prevent star clipping inside the ceiling
+    if (mario_is_close_to_a_ceiling()) {
+        set_y_home_to_pos();
+        return;
+    }
+#endif
+    o->oHomeX = gMarioObject->oPosX;
+    o->oHomeZ = gMarioObject->oPosZ;
+    o->oHomeY = gMarioObject->oPosY;
+    o->oHomeY += 250.0f;
+    o->oPosY = o->oHomeY;
+
+    f32 sp1C = o->oHomeX - o->oPosX;
+    f32 sp18 = o->oHomeZ - o->oPosZ;
+
+    o->oForwardVel = sqrtf(sp1C * sp1C + sp18 * sp18) / 23.0f;
+}
+
 void slow_star_rotation(void) {
     if (o->oAngleVelYaw > 0x400) {
         o->oAngleVelYaw -= 0x40;
     }
 }
+
+#if FIX_SPAWNED_STAR_SOFTLOCK
+#define CHECK(cond, set)    { set }
+#else
+#define CHECK(cond, set)    if (cond) { set }
+#endif
 
 void bhv_spawned_star_loop(void) {
     if (o->oAction == 0) {
@@ -110,11 +117,11 @@ void bhv_spawned_star_loop(void) {
         }
         spawn_object(o, MODEL_NONE, bhvSparkleSpawn);
     } else if (o->oAction == 2) {
-        if (gCamera->cutscene == 0 && gRecentCutscene == 0) {
+        CHECK(gCamera->cutscene == 0 && gRecentCutscene == 0,
             clear_time_stop_flags(TIME_STOP_ENABLED | TIME_STOP_MARIO_AND_DOORS);
             o->activeFlags &= ~ACTIVE_FLAG_INITIATED_TIME_STOP;
             o->oAction++;
-        }
+        )
     } else {
         set_sparkle_spawn_star_hitbox();
         slow_star_rotation();
@@ -124,6 +131,8 @@ void bhv_spawned_star_loop(void) {
     o->oFaceAngleYaw += o->oAngleVelYaw;
     o->oInteractStatus = 0;
 }
+
+#undef CHECK
 
 void bhv_spawn_star_no_level_exit(u32 starIndex) {
     struct Object *star = spawn_object(o, MODEL_STAR, bhvSpawnedStarNoLevelExit);

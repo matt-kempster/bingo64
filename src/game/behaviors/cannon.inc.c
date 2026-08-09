@@ -17,10 +17,13 @@ void opened_cannon_act_0(void) {
         cur_obj_enable_rendering();
         cur_obj_become_tangible();
     }
-
+    cur_obj_become_tangible();
+    cur_obj_enable_rendering();
     if (o->oDistanceToMario < 500.0f) {
+#ifndef NODRAWINGDISTANCE 
         cur_obj_become_tangible();
         cur_obj_enable_rendering();
+#endif
         if ((o->oInteractStatus & INT_STATUS_INTERACTED)
             && !(o->oInteractStatus & INT_STATUS_TOUCHED_BOB_OMB)) { // bob-omb explodes when it gets into a cannon
             o->oAction = 4;
@@ -30,15 +33,17 @@ void opened_cannon_act_0(void) {
             o->oInteractStatus = 0;
         }
     } else {
+#ifndef NODRAWINGDISTANCE 
         cur_obj_become_intangible();
         cur_obj_disable_rendering();
+#endif
         o->oCannonUnk10C = FALSE;
     }
 }
 
 void opened_cannon_act_4(void) {
     if (o->oTimer == 0) {
-        cur_obj_play_sound_2(SOUND_OBJ_CANNON1);
+        cur_obj_play_sound_2(SOUND_OBJ_CANNON_RISE);
     }
 
     o->oPosY += 5.0f;
@@ -54,7 +59,7 @@ void opened_cannon_act_4(void) {
 
 void opened_cannon_act_6(void) {
     if (o->oTimer == 0) {
-        cur_obj_play_sound_2(SOUND_OBJ_CANNON2);
+        cur_obj_play_sound_2(SOUND_OBJ_CANNON_TURN);
     }
 
     if (o->oTimer < 4) {
@@ -78,7 +83,7 @@ void opened_cannon_act_6(void) {
 
 void opened_cannon_act_5(void) {
     if (o->oTimer == 0) {
-        cur_obj_play_sound_2(SOUND_OBJ_CANNON3);
+        cur_obj_play_sound_2(SOUND_OBJ_CANNON_BARREL_PITCH);
     }
 
     if (o->oTimer < 4) {

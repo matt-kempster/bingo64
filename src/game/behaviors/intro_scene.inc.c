@@ -2,7 +2,7 @@
 
 void spawn_child_obj_relative(struct Object *parent, s16 xOffset, s16 yOffset, s16 zOffset,
                               s16 pitchOffset, s16 yawOffset, s16 rollOffset,
-                              s16 forwardVel, s32 model, const BehaviorScript *behavior) {
+                              s16 forwardVel, ModelID32 model, const BehaviorScript *behavior) {
     struct Object *obj = spawn_object(parent, model, behavior);
 
     obj->header.gfx.animInfo.animFrame = random_float() * 6.0f;
@@ -37,7 +37,7 @@ void bhv_intro_scene_loop(void) {
 
         switch (gCutsceneObjSpawn) {
             case 6:
-                obj = spawn_object(o, MODEL_LAKITU, bhvBeginningLakitu);
+                obj = spawn_object_at_origin(o, 0, MODEL_LAKITU, bhvBeginningLakitu);
                 break;
 
             case 5:

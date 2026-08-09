@@ -22,7 +22,7 @@ static s32 eyerok_check_mario_relative_z(s32 arg0) {
     }
 }
 
-static void eyerok_spawn_hand(s16 side, s32 model, const BehaviorScript *behavior) {
+static void eyerok_spawn_hand(s16 side, ModelID32 model, const BehaviorScript *behavior) {
     struct Object *hand = spawn_object_relative_with_scale(side, -500 * side, 0, 300, 1.5f,
                                                            o, model, behavior);
     if (hand != NULL) {
@@ -119,7 +119,11 @@ static void eyerok_boss_act_fight(void) {
 static void eyerok_boss_act_die(void) {
     if (o->oTimer == 60) {
         if (cur_obj_update_dialog_with_cutscene(MARIO_DIALOG_LOOK_UP, DIALOG_FLAG_NONE, CUTSCENE_DIALOG, DIALOG_118)) {
+            #ifdef RM2C_HAS_CUSTOM_STAR_POS
+            spawn_default_star(EyerockStarPos);
+            #else
             spawn_default_star(0.0f, -900.0f, -3700.0f);
+            #endif
         } else {
             o->oTimer--;
         }

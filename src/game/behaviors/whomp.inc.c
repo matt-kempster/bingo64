@@ -30,7 +30,7 @@ void whomp_init(void) {
                 seq_player_lower_volume(SEQ_PLAYER_LEVEL, 60, 40);
             } else {
                 cur_obj_set_pos_to_home();
-                o->oHealth = 3;
+                o->oHealth = KING_WHOMP_HEALTH;
             }
         } else if (cur_obj_update_dialog_with_cutscene(MARIO_DIALOG_LOOK_UP,
             DIALOG_FLAG_TURN_TO_MARIO, CUTSCENE_DIALOG, DIALOG_114)) {
@@ -235,9 +235,15 @@ void whomp_on_ground_general(void) {
     }
 }
 
+#if FIX_MARIO_LOOK_HEAD_BOSSES
+#define MARIO_DIALOG_LOOK_BOSS MARIO_DIALOG_LOOK_DOWN
+#else
+#define MARIO_DIALOG_LOOK_BOSS MARIO_DIALOG_LOOK_UP
+#endif
+
 void whomp_die(void) {
     if (o->oBhvParams2ndByte != WHOMP_BP_SMALL) {
-        if (cur_obj_update_dialog_with_cutscene(MARIO_DIALOG_LOOK_UP,
+        if (cur_obj_update_dialog_with_cutscene(MARIO_DIALOG_LOOK_BOSS,
             DIALOG_FLAG_TEXT_DEFAULT, CUTSCENE_DIALOG, DIALOG_115)) {
             obj_set_angle(o, 0, 0, 0);
             cur_obj_hide();
@@ -246,7 +252,11 @@ void whomp_die(void) {
             spawn_triangle_break_particles(20, MODEL_DIRT_ANIMATION, 3.0f, 4);
             cur_obj_shake_screen(SHAKE_POS_SMALL);
             o->oPosY += 100.0f;
+            #ifdef RM2C_HAS_CUSTOM_STAR_POS
+            spawn_default_star(KingWhompStarPos);
+            #else
             spawn_default_star(180.0f, 3880.0f, 340.0f);
+            #endif
             cur_obj_play_sound_2(SOUND_OBJ_KING_WHOMP_DEATH);
             o->oAction = 9;
         }
@@ -258,6 +268,8 @@ void whomp_die(void) {
         obj_mark_for_deletion(o);
     }
 }
+
+#undef MARIO_DIALOG_LOOK_BOSS
 
 void king_whomp_stop_music(void) {
     if (o->oTimer == 60) {
@@ -282,11 +294,15 @@ void bhv_whomp_loop(void) {
     cur_obj_call_action_function(sWhompActions);
     cur_obj_move_standard(-20);
     if (o->oAction != 9) {
+#ifndef NODRAWINGDISTANCE
+        // o->oBhvParams2ndByte here seems to be a flag
+        // indicating whether this is a normal or king whomp
         if (o->oBhvParams2ndByte != WHOMP_BP_SMALL) {
             cur_obj_hide_if_mario_far_away_y(2000.0f);
         } else {
             cur_obj_hide_if_mario_far_away_y(1000.0f);
         }
+#endif
         load_object_collision_model();
     }
 }

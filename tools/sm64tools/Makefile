@@ -5,7 +5,7 @@ HOST_ENV := $(patsubst MINGW%,MinGW,$(HOST_ENV))
 
 CC           := gcc
 CXX          := g++
-CFLAGS       := -I . -Wall -Wextra -Wno-unused-parameter -pedantic -O2 -s
+CFLAGS       := -I . -O2 -s
 LDFLAGS      := -lm
 ALL_PROGRAMS := n64graphics n64graphics_ci mio0 n64cksum
 

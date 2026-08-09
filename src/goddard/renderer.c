@@ -19,6 +19,14 @@
 #include "skin.h"
 #include "types.h"
 
+#include "config.h"
+#include "gfx_dimensions.h"
+
+#ifdef MOUSE_ACTIONS
+#include "pc/controller/controller_mouse.h"
+#include "pc/configfile.h"
+#endif
+
 #define MAX_GD_DLS 1000
 #define OS_MESG_SI_COMPLETE 0x33333333
 
@@ -102,16 +110,19 @@ static struct ObjView *D_801BE994; // store if View flag 0x40 set
 
 u8 EUpad4[0x88];
 #endif
+
 static OSContStatus D_801BAE60[4];
 static OSContPad sGdContPads[4];    // @ 801BAE70
 static OSContPad sPrevFrameCont[4]; // @ 801BAE88
 static u8 D_801BAEA0;
 static struct ObjGadget *sTimerGadgets[GD_NUM_TIMERS]; // @ 801BAEA8
 static u32 D_801BAF28;                                 // RAM addr offset?
-static s16 sTriangleBuf[13][8];                          // [[s16; 8]; 13]? vert indices?
+static s16 sTriangleBuf[13][8];                        // [[s16; 8]; 13]? vert indices?
 UNUSED static u32 unref_801bb000[3];
+#ifndef USE_SYSTEM_MALLOC
 static u8 *sMemBlockPoolBase; // @ 801BB00C
 static u32 sAllocMemory;      // @ 801BB010; malloc-ed bytes
+#endif
 UNUSED static u32 unref_801bb014;
 static s32 D_801BB018;
 static s32 D_801BB01C;
@@ -177,6 +188,11 @@ static OSIoMesg sGdDMAReqMesg;
 static struct ObjView *D_801BE994; // store if View flag 0x40 set
 #endif
 
+#ifdef USE_SYSTEM_MALLOC
+static void *(*sAllocFn)(u32 size);
+static void (*sFreeFn)(void *ptr);
+#endif
+
 // data
 UNUSED static u32 unref_801a8670 = 0;
 static s32 D_801A8674 = 0;
@@ -188,8 +204,10 @@ static f32 sDynamicsTime = 0.0f;      // @ 801A8688
 static f32 sDLGenTime = 0.0f;         // @ 801A868C
 static f32 sRCPTime = 0.0f;           // @ 801A8690
 static f32 sTimeScaleFactor = 1.0f;   // @ D_801A8694
+#ifndef USE_SYSTEM_MALLOC
 static u32 sMemBlockPoolSize = 1;     // @ 801A8698
 static s32 sMemBlockPoolUsed = 0;     // @ 801A869C
+#endif
 static s32 sTextureCount = 0;  // maybe?
 static struct GdTimer *D_801A86A4 = NULL; // timer for dlgen, dynamics, or rcp
 static struct GdTimer *D_801A86A8 = NULL; // timer for dlgen, dynamics, or rcp
@@ -488,9 +506,7 @@ ALIGNED8 static Texture gd_texture_sparkle_4[] = {
 #include "textures/intro_raw/sparkle_4.rgba16.inc.c"
 };
 
-//! No reference to this texture. Two DL's uses the same previous texture
-//  instead of using this texture.
-UNUSED ALIGNED8 static Texture gd_texture_sparkle_5[] = {
+ALIGNED8 static Texture gd_texture_sparkle_5[] = {
 #include "textures/intro_raw/sparkle_5.rgba16.inc.c"
 };
 
@@ -566,10 +582,10 @@ static Gfx gd_dl_red_sparkle_4[] = {
     gsSPBranchList(gd_dl_sparkle),
 };
 
-static Gfx gd_dl_red_sparkle_4_dup[] ={
+static Gfx gd_dl_red_sparkle_5[] = {
     gsDPPipeSync(),
     gsSPDisplayList(gd_dl_sparkle_red_color),
-    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, gd_texture_sparkle_4), // 4 again, correct texture would be 5
+    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, gd_texture_sparkle_5),
     gsSPBranchList(gd_dl_sparkle),
 };
 
@@ -608,10 +624,10 @@ static Gfx gd_dl_silver_sparkle_4[] = {
     gsSPBranchList(gd_dl_sparkle),
 };
 
-static Gfx gd_dl_silver_sparkle_4_dup[] = {
+static Gfx gd_dl_silver_sparkle_5[] = {
     gsDPPipeSync(),
     gsSPDisplayList(gd_dl_sparkle_white_color),
-    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, gd_texture_sparkle_4), // 4 again, correct texture would be 5
+    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, gd_texture_sparkle_5),
     gsSPBranchList(gd_dl_sparkle),
 };
 
@@ -626,8 +642,8 @@ static Gfx *gd_red_sparkle_dl_array[] = {
     gd_dl_red_sparkle_1,
     gd_dl_red_sparkle_0,
     gd_dl_red_sparkle_0,
-    gd_dl_red_sparkle_4_dup,
-    gd_dl_red_sparkle_4_dup,
+    gd_dl_red_sparkle_5,
+    gd_dl_red_sparkle_5,
 };
 
 static Gfx *gd_silver_sparkle_dl_array[] = {
@@ -641,8 +657,8 @@ static Gfx *gd_silver_sparkle_dl_array[] = {
     gd_dl_silver_sparkle_1,
     gd_dl_silver_sparkle_0,
     gd_dl_silver_sparkle_0,
-    gd_dl_silver_sparkle_4_dup,
-    gd_dl_silver_sparkle_4_dup,
+    gd_dl_silver_sparkle_5,
+    gd_dl_silver_sparkle_5,
 };
 
 UNUSED static Gfx gd_texture3_dummy_aligner1[] = {
@@ -758,7 +774,11 @@ void reset_cur_dl_indices(void);
 // TODO: make a gddl_num_t?
 
 u32 get_alloc_mem_amt(void) {
+#ifdef USE_SYSTEM_MALLOC
+    return 0;
+#else
     return sAllocMemory;
+#endif
 }
 
 /**
@@ -973,9 +993,14 @@ void gd_exit(UNUSED s32 code) {
 
 /* 24A1D4 -> 24A220; orig name: func_8019BA04 */
 void gd_free(void *ptr) {
+#ifdef USE_SYSTEM_MALLOC
+    sFreeFn(ptr);
+#else
     sAllocMemory -= gd_free_mem(ptr);
+#endif
 }
 
+#ifndef USE_SYSTEM_MALLOC
 /* 24A220 -> 24A318 */
 void *gd_allocblock(u32 size) {
     void *block; // 1c
@@ -994,9 +1019,13 @@ void *gd_allocblock(u32 size) {
     sMemBlockPoolUsed += size;
     return block;
 }
+#endif
 
 /* 24A318 -> 24A3E8 */
-void *gd_malloc(u32 size, u8 perm) {
+void *gd_malloc(u32 size, UNUSED u8 perm) {
+#ifdef USE_SYSTEM_MALLOC
+    return sAllocFn(size);
+#else
     void *ptr; // 1c
     size = ALIGN(size, 8);
     ptr = gd_request_mem(size, perm);
@@ -1012,6 +1041,7 @@ void *gd_malloc(u32 size, u8 perm) {
     sAllocMemory += size;
 
     return ptr;
+#endif
 }
 
 /* 24A3E8 -> 24A420; orig name: func_8019BC18 */
@@ -1140,12 +1170,23 @@ void Unknown8019C288(s32 stickX, s32 stickY) {
     ctrl->stickYf = (f32)(stickY / 2);
 }
 
+#ifndef USE_SYSTEM_MALLOC
 /* 24AAA8 -> 24AAE0; orig name: func_8019C2D8 */
 void gd_add_to_heap(void *addr, u32 size) {
     // TODO: is this `1` for permanence special?
     gd_add_mem_to_heap(size, addr, 1);
 }
+#endif
 
+#ifdef USE_SYSTEM_MALLOC
+void gdm_init(void *(*allocFn)(u32 size), void (*freeFn)(void *addr)) {
+    imin("gdm_init");
+    sAllocFn = allocFn;
+    sFreeFn = freeFn;
+    gd_reset_sfx();
+    imout();
+}
+#else
 /* 24AAE0 -> 24AB7C */
 void gdm_init(void *blockpool, u32 size) {
     UNUSED u8 filler[4];
@@ -1163,6 +1204,7 @@ void gdm_init(void *blockpool, u32 size) {
     gd_reset_sfx();
     imout();
 }
+#endif
 
 /**
  * Initializes the Mario head demo
@@ -2379,7 +2421,12 @@ void start_view_dl(struct ObjView *view) {
         uly = lry - 1.0f;
     }
 
+#ifdef TARGET_N64
     gDPSetScissor(next_gfx(), G_SC_NON_INTERLACE, ulx, uly, lrx, lry);
+#endif
+#ifdef TARGET_N3DS
+    gDPSetIod(next_gfx(), iodGoddard);
+#endif
     gSPClearGeometryMode(next_gfx(), 0xFFFFFFFF);
     gSPSetGeometryMode(next_gfx(), G_LIGHTING | G_CULL_BACK | G_SHADING_SMOOTH | G_SHADE);
     if (view->flags & VIEW_ALLOC_ZBUF) {
@@ -2397,13 +2444,14 @@ void parse_p1_controller(void) {
     OSContPad *currInputs;
     OSContPad *prevInputs;
 
-    // Copy current inputs to previous
+    // Copy current inputs to previous 
     u8 *src = (u8 *) gdctrl;
     u8 *dest = (u8 *) gdctrl->prevFrame;
+
     for (i = 0; i < sizeof(struct GdControl); i++) {
         *dest++ = *src++;
     }
-
+    
     gdctrl->unk50 = gdctrl->unk4C = gdctrl->dup = gdctrl->ddown = 0;
 
     currInputs = &sGdContPads[0];
@@ -2484,24 +2532,45 @@ void parse_p1_controller(void) {
         sDebugViews[sCurrDebugViewIndex - 1]->flags |= VIEW_UPDATE;
     }
 
+#ifdef MOUSE_ACTIONS 
+    controller_mouse_read_window();
+#endif
+
     // deadzone checks
     if (ABS(gdctrl->stickX) >= 6) {
         gdctrl->csrX += gdctrl->stickX * 0.1;
-    }
-    if (ABS(gdctrl->stickY) >= 6) {
-        gdctrl->csrY -= gdctrl->stickY * 0.1;
+#ifdef MOUSE_ACTIONS
+        mouse_has_current_control = FALSE;
+#endif
     }
 
+    if (ABS(gdctrl->stickY) >= 6) {
+        gdctrl->csrY -= gdctrl->stickY * 0.1;
+#ifdef MOUSE_ACTIONS 
+        mouse_has_current_control = FALSE;
+#endif
+    }
+
+#ifdef MOUSE_ACTIONS
+    float screenScale = (float) gfx_current_dimensions.height / SCREEN_HEIGHT;
+    f32 mousePosX = (f32) ((mouse_window_x - (gfx_current_dimensions.width - (screenScale * (float)SCREEN_WIDTH))/ 2)/ screenScale);
+    f32 mousePosY = (f32) (mouse_window_y / screenScale);
+if (!controller_mouse_set_position(&gdctrl->csrX, &gdctrl->csrY, mousePosX, mousePosY, (sHandView->flags & VIEW_UPDATE), TRUE))
+#endif
+    {
     // clamp cursor position within screen view bounds
-    if (gdctrl->csrX < sScreenView->parent->upperLeft.x + 16.0f) {
-        gdctrl->csrX = sScreenView->parent->upperLeft.x + 16.0f;
+    if (gdctrl->csrX < sScreenView->parent->upperLeft.x + GFX_DIMENSIONS_FROM_LEFT_EDGE(16.0f)) {
+        gdctrl->csrX = sScreenView->parent->upperLeft.x + GFX_DIMENSIONS_FROM_LEFT_EDGE(16.0f);
     }
-    if (gdctrl->csrX > sScreenView->parent->upperLeft.x + sScreenView->parent->lowerRight.x - 48.0f) {
-        gdctrl->csrX = sScreenView->parent->upperLeft.x + sScreenView->parent->lowerRight.x - 48.0f;
+
+    if (gdctrl->csrX > sScreenView->parent->upperLeft.x + GFX_DIMENSIONS_FROM_RIGHT_EDGE(320 - (sScreenView->parent->lowerRight.x - 48.0f))) {
+        gdctrl->csrX = sScreenView->parent->upperLeft.x + GFX_DIMENSIONS_FROM_RIGHT_EDGE(320 - (sScreenView->parent->lowerRight.x - 48.0f));
     }
+
     if (gdctrl->csrY < sScreenView->parent->upperLeft.y + 16.0f) {
         gdctrl->csrY = sScreenView->parent->upperLeft.y + 16.0f;
     }
+
     if (gdctrl->csrY > sScreenView->parent->upperLeft.y + sScreenView->parent->lowerRight.y - 32.0f) {
         gdctrl->csrY = sScreenView->parent->upperLeft.y + sScreenView->parent->lowerRight.y - 32.0f;
     }
@@ -2509,11 +2578,12 @@ void parse_p1_controller(void) {
     for (i = 0; i < sizeof(OSContPad); i++) {
         ((u8 *) prevInputs)[i] = ((u8 *) currInputs)[i];
     }
+    }
 }
 
 void stub_renderer_4(f32 arg0) {
     return;
-
+    
     // dead code
     if (D_801BD768.x * D_801A86CC.x + arg0 * 2.0f > 160.0) {
         func_801A3370(D_801BD758.x - D_801BD768.x, -20.0f, 0.0f);
@@ -3060,9 +3130,9 @@ void update_cursor(void) {
     // Make hand display list
     begin_gddl(sHandShape->dlNums[gGdFrameBufNum]);
     if (gGdCtrl.dragging) {
-        gd_put_sprite((u16 *) gd_texture_hand_closed, sHandView->upperLeft.x, sHandView->upperLeft.y, 0x20, 0x20);
+        gd_put_sprite((u16 *) gd_texture_hand_closed, sHandView->upperLeft.x, sHandView->upperLeft.y, 32, 32);
     } else {
-        gd_put_sprite((u16 *) gd_texture_hand_open, sHandView->upperLeft.x, sHandView->upperLeft.y, 0x20, 0x20);
+        gd_put_sprite((u16 *) gd_texture_hand_open, sHandView->upperLeft.x, sHandView->upperLeft.y, 32, 32);
     }
     gd_enddlsplist_parent();
 
@@ -3201,9 +3271,11 @@ void gd_init(void) {
     s8 *data; // 2c
 
     imin("gd_init");
+#ifndef USE_SYSTEM_MALLOC
     i = (u32)(sMemBlockPoolSize - DOUBLE_SIZE_ON_64_BIT(0x3E800));
     data = gd_allocblock(i);
     gd_add_mem_to_heap(i, data, 0x10);
+#endif
     sAlpha = (u16) 0xff;
     D_801A867C = 0;
     D_801A8680 = 0;
@@ -3529,10 +3601,18 @@ void Unknown801A5FF8(struct ObjGroup *arg0) {
 }
 
 /* 254AC0 -> 254DFC; orig name: PutSprite */
+// thanks to gamemasterplc again for fixing this
 void gd_put_sprite(u16 *sprite, s32 x, s32 y, s32 wx, s32 wy) {
     s32 c; // 5c
     s32 r; // 58
-
+    // Must be game screen aspect ratio, not GFX window aspect ratio
+    f32 aspect = ((float) SCREEN_WIDTH) / ((float) SCREEN_HEIGHT ) * 0.75;
+    x *= aspect;
+    
+#ifdef TARGET_N3DS
+    gDPForceFlush(next_gfx());
+    gDPSet2d(next_gfx(), 1);
+#endif
     gSPDisplayList(next_gfx(), osVirtualToPhysical(gd_dl_sprite_start_tex_block));
     for (r = 0; r < wy; r += 32) {
         for (c = 0; c < wx; c += 32) {
@@ -3547,6 +3627,11 @@ void gd_put_sprite(u16 *sprite, s32 x, s32 y, s32 wx, s32 wy) {
     gDPSetCycleType(next_gfx(), G_CYC_1CYCLE);
     gDPSetRenderMode(next_gfx(), G_RM_AA_ZB_OPA_INTER, G_RM_NOOP2);
     gSPTexture(next_gfx(), 0x8000, 0x8000, 0, G_TX_RENDERTILE, G_OFF);
+    
+#ifdef TARGET_N3DS
+    gDPForceFlush(next_gfx());
+    gDPSet2d(next_gfx(), 0);
+#endif
 }
 
 /* 254DFC -> 254F94; orig name: proc_dyn_list */
@@ -3821,6 +3906,7 @@ struct GdObj *load_dynlist(struct DynList *dynlist) {
     return proc_dynlist(dynlist);
 }
 #endif
+
 
 /**
  * Unused (not called)

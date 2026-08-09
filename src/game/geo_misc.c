@@ -64,18 +64,6 @@ void make_vertex(Vtx *vtx, s32 n, f32 x, f32 y, f32 z, s16 tx, s16 ty, u8 r, u8 
 }
 
 /**
- * Round `num` to the nearest `s16`.
- */
-s16 round_float(f32 num) {
-    // Note that double literals are used here, rather than float literals.
-    if (num >= 0.0) {
-        return num + 0.5;
-    } else {
-        return num - 0.5;
-    }
-}
-
-/**
  * Create a display list for the light in the castle lobby that shows the
  * player where to look to enter Tower of the Wing Cap.
  */
@@ -199,11 +187,22 @@ Gfx *geo_exec_cake_end_screen(s32 callContext, struct GraphNode *node, UNUSED f3
     Gfx *displayList = NULL;
     Gfx *displayListHead = NULL;
 
+#ifdef TARGET_N3DS
+    if (callContext == GEO_CONTEXT_RENDER) {
+        displayList = alloc_display_list(5 * sizeof(*displayList));
+        displayListHead = displayList;
+
+        
+        generatedNode->fnNode.node.flags = (generatedNode->fnNode.node.flags & 0xFF) | 0x100;
+        gDPForceFlush(displayListHead++);
+        gDPSet2d(displayListHead++, 1);
+#else
     if (callContext == GEO_CONTEXT_RENDER) {
         displayList = alloc_display_list(3 * sizeof(*displayList));
         displayListHead = displayList;
 
         generatedNode->fnNode.node.flags = (generatedNode->fnNode.node.flags & 0xFF) | 0x100;
+#endif
 #ifdef VERSION_EU
         gSPDisplayList(displayListHead++, dl_cake_end_screen);
 #else
@@ -224,6 +223,7 @@ Gfx *geo_exec_cake_end_screen(s32 callContext, struct GraphNode *node, UNUSED f3
 #else
         gSPDisplayList(displayListHead++, dl_cake_end_screen);
 #endif
+
         gSPEndDisplayList(displayListHead);
     }
 

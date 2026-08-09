@@ -2,11 +2,12 @@
 #include <PR/gbi.h>
 
 #include "config.h"
-#include "gfx_dimensions.h"
 #include "game_init.h"
 #include "memory.h"
 #include "print.h"
 #include "segment2.h"
+
+#include "gfx_dimensions.h"
 
 /**
  * This file handles printing and formatting the colorful text that
@@ -24,7 +25,7 @@ struct TextLabel {
  * Stores the text to be rendered on screen
  * and how they are to be rendered.
  */
-FORCE_BSS struct TextLabel *sTextLabels[52];
+struct TextLabel *sTextLabels[256];
 s16 sTextLabelsCount = 0;
 
 /**
@@ -363,40 +364,13 @@ s8 char_to_glyph_index(char c) {
 /**
  * Adds an individual glyph to be rendered.
  */
-void add_glyph_texture(s8 glyphIndex) {
+void add_glyph_texture(u8 glyphIndex) {
     const u8 *const *glyphs = segmented_to_virtual(main_hud_lut);
 
     gDPPipeSync(gDisplayListHead++);
-#ifdef VERSION_CN
-    gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[(u8) glyphIndex]);
-#else
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[glyphIndex]);
-#endif
     gSPDisplayList(gDisplayListHead++, dl_hud_img_load_tex_block);
 }
-
-#ifndef WIDESCREEN
-/**
- * Clips textrect into the boundaries defined.
- */
-void clip_to_bounds(s32 *x, s32 *y) {
-    if (*x < TEXRECT_MIN_X) {
-        *x = TEXRECT_MIN_X;
-    }
-
-    if (*x > TEXRECT_MAX_X) {
-        *x = TEXRECT_MAX_X;
-    }
-
-    if (*y < TEXRECT_MIN_Y) {
-        *y = TEXRECT_MIN_Y;
-    }
-
-    if (*y > TEXRECT_MAX_Y) {
-        *y = TEXRECT_MAX_Y;
-    }
-}
-#endif
 
 /**
  * Renders the glyph that's set at the given position.
@@ -412,10 +386,6 @@ void render_textrect(s32 x, s32 y, s32 pos) {
     s32 rectX;
     s32 rectY;
 
-#ifndef WIDESCREEN
-    // For widescreen we must allow drawing outside the usual area
-    clip_to_bounds(&rectBaseX, &rectBaseY);
-#endif
     rectX = rectBaseX;
     rectY = rectBaseY;
     gSPTextureRectangle(gDisplayListHead++, rectX << 2, rectY << 2, (rectX + 15) << 2,
@@ -479,16 +449,16 @@ void render_text_labels(void) {
                     render_textrect(sTextLabels[i]->x, sTextLabels[i]->y, j);
                 }
 #elif defined(VERSION_CN)
-                if ((u8) glyphIndex == 0xB0) {
+                if ((u8) glyphIndex == 0xB0) { // 按 (Press)
                     add_glyph_texture(0x92);
-                    render_textrect(45, 50, 0, 16);
+                    render_textrect(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(45), 50, 0, 16);
                     add_glyph_texture(0x93);
-                    render_textrect(45, 50, 1, 16);
+                    render_textrect(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(45), 50, 1, 16);
                     add_glyph_texture(0x94);
-                    render_textrect(45, 34, 0, 16);
+                    render_textrect(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(45), 34, 0, 16);
                     add_glyph_texture(0x95);
-                    render_textrect(45, 34, 1, 16);
-                } else if ((u8) glyphIndex == 0xC0) {
+                    render_textrect(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(45), 34, 1, 16);
+                } else if ((u8) glyphIndex == 0xC0) { //  时间 (Time)
                     add_glyph_texture(0xAE);
                     render_textrect(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(150), 193, 0, 16);
                     add_glyph_texture(0xAF);

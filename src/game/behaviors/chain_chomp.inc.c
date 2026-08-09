@@ -50,7 +50,9 @@ static void chain_chomp_act_uninitialized(void) {
     struct ChainSegment *segments;
     s32 i;
 
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario < 3000.0f) {
+#endif
         segments = mem_pool_alloc(gObjectMemoryPool, 5 * sizeof(struct ChainSegment));
         if (segments != NULL) {
             // Each segment represents the offset of a chain part to the pivot.
@@ -78,7 +80,9 @@ static void chain_chomp_act_uninitialized(void) {
                 cur_obj_unhide();
             }
         }
+#ifndef NODRAWINGDISTANCE
     }
+#endif
 }
 
 /**
@@ -355,10 +359,12 @@ static void chain_chomp_act_move(void) {
     f32 maxDistToPivot;
 
     // Unload chain if mario is far enough
+#ifndef NODRAWINGDISTANCE
     if (o->oChainChompReleaseStatus == CHAIN_CHOMP_NOT_RELEASED && o->oDistanceToMario > 4000.0f) {
         o->oAction = CHAIN_CHOMP_ACT_UNLOAD_CHAIN;
         o->oForwardVel = o->oVelY = 0.0f;
     } else {
+#endif
         cur_obj_update_floor_and_walls();
 
         switch (o->oChainChompReleaseStatus) {
@@ -442,7 +448,9 @@ static void chain_chomp_act_move(void) {
             o->oGravity = -4.0f;
             o->oChainChompTargetPitch = -0x3000;
         }
+#ifndef NODRAWINGDISTANCE
     }
+#endif
 }
 
 /**
@@ -503,7 +511,7 @@ void bhv_wooden_post_update(void) {
 
     if (o->oWoodenPostOffsetY != 0.0f) {
         o->oPosY = o->oHomeY + o->oWoodenPostOffsetY;
-    } else if (!(o->oBhvParams & WOODEN_POST_BP_NO_COINS_MASK)) {
+    } else if (!(o->respawnInfo & 1)) {
         // Reset the timer once mario is far enough
         if (o->oDistanceToMario > 400.0f) {
             o->oTimer = o->oWoodenPostTotalMarioAngle = 0;

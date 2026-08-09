@@ -8,29 +8,15 @@
 .word  entry_point              /* Entrypoint */
 
 /* Revision */
-#ifdef VERSION_SH
-    .word  0x00001448
-#elif defined(VERSION_CN)
-    .word  0x0000144C
-#elif defined(VERSION_EU)
-    .word  0x00001446
-#else /* NTSC-U and NTSC-J 1.0 */
-    .word  0x00001444
-#endif
-
-#ifdef VERSION_CN
-    .fill 0x30
-#else
+.half 0x0000
+.byte 20 /* Major version 2.0 */
+.ascii LIBULTRA_STR_VER /* Minor Version */
 
 .word  0x4EAA3D0E               /* Checksum 1 */
 .word  0x74757C24               /* Checksum 2 */
 .word  0x00000000               /* Unknown */
 .word  0x00000000               /* Unknown */
-#ifdef VERSION_SH
-.ascii "SUPERMARIO64        "   /* Internal ROM name */
-#else
 .ascii "SUPER MARIO 64      "   /* Internal ROM name */
-#endif
 .word  0x00000000               /* Unknown */
 .word  0x0000004E               /* Cartridge */
 .ascii "SM"                     /* Cartridge ID */
@@ -44,11 +30,9 @@
     .ascii "J"                  /* NTSC-J (Japan) */
 #endif
 
-
+/* Undefined versions 1 and 2 are NTSC-U (North America) and PAL (Europe) respectively */
 #ifdef VERSION_SH
     .byte  0x03                 /* Version (Shindou) */
 #else
     .byte  0x00                 /* Version */
-#endif
-
 #endif

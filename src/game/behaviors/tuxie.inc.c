@@ -2,7 +2,6 @@
 
 void play_penguin_walking_sound(s32 walk) {
     s32 sound;
-
     if (o->oSoundStateID == 0) {
         if (walk == PENGUIN_WALK_BABY) {
             sound = SOUND_OBJ_BABY_PENGUIN_WALK;
@@ -37,7 +36,6 @@ void tuxies_mother_act_2(void) {
         o->oForwardVel = 0.0f;
         cur_obj_init_animation_with_sound(3);
     }
-
     if (sp1C != NULL && sp24 < 300.0f && sp1C->oHeldState != HELD_FREE) {
         o->oAction = 1;
         sp1C->oSmallPenguinUnk88 = TRUE;
@@ -75,20 +73,12 @@ void tuxies_mother_act_1(void) {
 
         case 1:
             if (o->prevObj->oHeldState == HELD_FREE) {
-                //! This line is was almost certainly supposed to be something
-                // like o->prevObj->oInteractionSubtype &= ~INT_SUBTYPE_DROP_IMMEDIATELY;
-                // however, this code uses the value of o->oInteractionSubtype
-                // rather than its offset to rawData. For this object,
-                // o->oInteractionSubtype is always 0, so the result is this:
-                // o->prevObj->oUnknownUnk88 &= ~INT_SUBTYPE_DROP_IMMEDIATELY
-                // which has no effect as o->prevObj->oUnknownUnk88 is always 0
-                // or 1, which is not affected by the bitwise AND.
-                o->prevObj->OBJECT_FIELD_S32(o->oInteractionSubtype) &= ~INT_SUBTYPE_DROP_IMMEDIATELY;
+                o->prevObj->oInteractionSubtype &= ~INT_SUBTYPE_DROP_IMMEDIATELY;                
                 obj_set_behavior(o->prevObj, bhvUnused20E0);
-#ifndef VERSION_JP
-                cur_obj_spawn_star_at_y_offset(3167.0f, -4300.0f, 5108.0f, 200.0f);
+#ifdef RM2C_HAS_CUSTOM_STAR_POS
+                cur_obj_spawn_star_at_y_offset(TuxieMotherStarPos, 200.0f);
 #else
-                spawn_default_star(3500.0f, -4300.0f, 4650.0f);
+                cur_obj_spawn_star_at_y_offset(3167.0f, -4300.0f, 5108.0f, 200.0f);
 #endif
                 o->oAction = 2;
             }
@@ -96,8 +86,7 @@ void tuxies_mother_act_1(void) {
 
         case 2:
             if (o->prevObj->oHeldState == HELD_FREE) {
-                //! Same bug as above
-                o->prevObj->OBJECT_FIELD_S32(o->oInteractionSubtype) &= ~INT_SUBTYPE_DROP_IMMEDIATELY;
+                o->prevObj->oInteractionSubtype &= ~INT_SUBTYPE_DROP_IMMEDIATELY;
                 obj_set_behavior(o->prevObj, bhvPenguinBaby);
                 o->oAction = 2;
             }
@@ -333,12 +322,22 @@ Gfx *geo_switch_tuxie_mother_eyes(s32 run, struct GraphNode *node, UNUSED Mat4 *
         struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
         s32 timer;
 
+        #if TUXIES_MOTHER_SAD_EYES
+        u32 isMother = obj_has_behavior(obj, bhvTuxiesMother);
+        s32 babyDelivered = obj->oAction == 2;
+        switchCase->selectedCase = (!isMother || babyDelivered) ? 0 : 4;
+        #else
         switchCase->selectedCase = 0;
+        #endif
 
         // timer logic for blinking. uses cases 0-2.
         timer = gGlobalTimer % 50;
         if (timer < 43) {
+            #if TUXIES_MOTHER_SAD_EYES
+            switchCase->selectedCase = (!isMother || babyDelivered) ? 0 : 4;
+            #else
             switchCase->selectedCase = 0;
+            #endif
         } else if (timer < 45) {
             switchCase->selectedCase = 1;
         } else if (timer < 47) {
