@@ -16,7 +16,7 @@ void bhv_bitfs_sinking_platform_loop(void) {
 
 // TODO: Named incorrectly. fix
 void bhv_ddd_moving_pole_loop(void) {
-    copy_object_pos_and_angle(o, o->parentObj);
+    obj_copy_pos_and_angle(o, o->parentObj);
     if (o->oTimer == 0) {
         o->oBingoId = get_unique_id(BINGO_UPDATE_GRABBED_POLE, o->oPosX, o->oPosY, o->oPosZ);
     }

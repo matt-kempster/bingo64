@@ -19,20 +19,20 @@ void bhv_spindrift_loop(void) {
     if (obj_set_hitbox_and_die_if_attacked_bingo(
         &sSpindriftHitbox, SOUND_OBJ_DYING_ENEMY1, 0, BINGO_UPDATE_KILLED_SPINDRIFT
     ))
-        obj_change_action(2);
-    obj_update_floor_and_walls();
+        cur_obj_change_action(2);
+    cur_obj_update_floor_and_walls();
     switch (o->oAction) {
         case 0:
             o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_SPINDRIFT, o->oPosX, o->oPosY, o->oPosZ);
             o->oAction = 1;
             break;
         case 1:
-            func_802A9050(&o->oForwardVel, 4.0f, 1.0f);
-            if (obj_lateral_dist_from_mario_to_home() > 1000.0f)
-                o->oAngleToMario = obj_angle_to_home();
+            approach_forward_vel(&o->oForwardVel, 4.0f, 1.0f);
+            if (cur_obj_lateral_dist_from_mario_to_home() > 1000.0f)
+                o->oAngleToMario = cur_obj_angle_to_home();
             else if (o->oDistanceToMario > 300.0f)
-                o->oAngleToMario = angle_to_object(o, gMarioObject);
-            obj_rotate_yaw_toward(o->oAngleToMario, 0x400);
+                o->oAngleToMario = obj_angle_to_object(o, gMarioObject);
+            cur_obj_rotate_yaw_toward(o->oAngleToMario, 0x400);
             break;
         case 2:
             o->oFlags &= ~8;
@@ -44,5 +44,5 @@ void bhv_spindrift_loop(void) {
             }
             break;
     }
-    obj_move_standard(-60);
+    cur_obj_move_standard(-60);
 }

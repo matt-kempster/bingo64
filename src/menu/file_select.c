@@ -27,6 +27,12 @@
 #include "engine/rand.h"
 #include "game/save_file.h"
 
+#include "eu_translation.h"
+#ifdef VERSION_EU
+#undef LANGUAGE_FUNCTION
+#define LANGUAGE_FUNCTION sLanguageMode
+#endif
+
 /**
  * @file file_select.c
  * This file implements how the file select and it's menus render and function.
@@ -34,11 +40,10 @@
  * special menu messages and phases, button states and button clicked checks.
  */
 
-
 #ifdef VERSION_US
 // The current sound mode is automatically centered on US due to
 // the large length difference between options.
-// sSoundTextY unused (EU supports its existance).
+// sSoundTextY unused (EU supports its existence).
 static s16 sSoundTextX;
 static s16 sSoundTextY;
 #endif
@@ -65,7 +70,6 @@ static struct Object *sMainMenuButtons[NUM_BUTTONS];
 #ifdef VERSION_EU
 static s16 sCenteredX;
 #endif
-
 
 // The button that is selected when it is clicked.
 static s8 sSelectedButtonID = MENU_BUTTON_NONE;
@@ -111,7 +115,7 @@ static s8 sSelectedFileNum = 0;
 // coin high score, 1 for high score across all files.
 static s8 sScoreFileCoinScoreMode = 0;
 
-// If no save file exists, open the language menu so the user can find it.
+// In PAL, if no save file exists, open the language menu so the user can find it.
 #ifdef VERSION_EU
 static s8 sOpenLangSettings = FALSE;
 #endif
@@ -177,7 +181,7 @@ void beh_yellow_background_menu_init(void) {
  * Properly scales the background in the main menu.
  */
 void beh_yellow_background_menu_loop(void) {
-    obj_scale(9.0f);
+    cur_obj_scale(9.0f);
 }
 
 /**
@@ -417,7 +421,7 @@ void bhv_menu_button_loop(void) {
             sCursorClickingTimer = 4;
             break;
     }
-    obj_scale(gCurrentObject->oMenuButtonScale);
+    cur_obj_scale(gCurrentObject->oMenuButtonScale);
 }
 
 /**
@@ -477,9 +481,9 @@ static void seed_backspace(void) {
 #undef MAIN_RETURN_TIMER
 
 #ifdef VERSION_EU
-    #define SOUND_Y 388
+    #define SOUND_BUTTON_Y 388
 #else
-    #define SOUND_Y 0
+    #define SOUND_BUTTON_Y 0
 #endif
 
 static void seed_menu_check_clicked_buttons() {
@@ -625,7 +629,7 @@ void bhv_menu_button_manager_init(void) {
     sTextBaseAlpha = 0;
 }
 
-#ifdef VERSION_JP
+#if defined(VERSION_JP) || defined(VERSION_SH)
     #define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND
 #else
     #define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND_OKEY_DOKEY
@@ -1347,8 +1351,8 @@ static void print_file_select_strings(void) {
     switch (sSelectedButtonID) {
         case MENU_BUTTON_NONE:
 #ifdef VERSION_EU
-            // Ultimately calls print_main_menu_strings, but prints strings first.
-            print_lang_strings();
+            // Ultimately calls print_main_menu_strings, but prints main language strings first.
+            print_main_lang_strings();
 #else
             print_main_menu_strings();
 #endif
@@ -1400,9 +1404,9 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
     sTextFadeAlpha = 0;
     sMainMenuTimer = 0;
     sSoundMode = save_file_get_sound_mode();
-
 #ifdef VERSION_EU
     sLanguageMode = eu_get_language();
+
     for (fileNum = 0; fileNum < 4; fileNum++) {
         if (save_file_exists(fileNum) == TRUE) {
             sOpenLangSettings = FALSE;
@@ -1412,7 +1416,6 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
         }
     }
 #endif
-
     //! no return value
 #ifdef AVOID_UB
     return 0;

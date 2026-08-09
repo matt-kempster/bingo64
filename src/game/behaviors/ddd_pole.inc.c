@@ -8,7 +8,7 @@ void bhv_ddd_pole_init(void) {
         shouldDelete = !(save_file_get_flags() & (SAVE_FLAG_HAVE_KEY_2 | SAVE_FLAG_UNLOCKED_UPSTAIRS_DOOR));
     }
     if (shouldDelete) {
-        mark_object_for_deletion(o);
+        obj_mark_for_deletion(o);
     } else {
         o->hitboxDownOffset = 100.0f;
         o->oDDDPoleMaxOffset = 100.0f * o->oBehParams2ndByte;

@@ -86,7 +86,7 @@ void bhv_act_selector_star_type_loop(void) {
             break;
     }
     // Scale act selector stars depending of the type selected
-    obj_scale(gCurrentObject->oStarSelectorSize);
+    cur_obj_scale(gCurrentObject->oStarSelectorSize);
     // Unused timer, only referenced here. Probably replaced by sActSelectorMenuTimer
     gCurrentObject->oStarSelectorTimer++;
 }
@@ -384,21 +384,23 @@ void print_course_number(void) {
 
     create_dl_translation_matrix(MENU_MTX_PUSH, 158.0f, 63.0f, 0.0f);
 
+    // Full wood texture in JP & US, lower part of it on EU
     gSPDisplayList(gDisplayListHead++, dl_menu_rgba16_wood_course);
 
 #ifdef VERSION_EU
+    // Change upper part of the wood texture depending of the language defined
     switch (language) {
-        case 0:
+        case LANGUAGE_ENGLISH:
             gSPDisplayList(gDisplayListHead++, dl_menu_texture_course_upper);
             break;
-        case 1:
+        case LANGUAGE_FRENCH:
             gSPDisplayList(gDisplayListHead++, dl_menu_texture_niveau_upper);
             break;
-        case 2:
+        case LANGUAGE_GERMAN:
             gSPDisplayList(gDisplayListHead++, dl_menu_texture_kurs_upper);
             break;
     }
-    
+
     gSPDisplayList(gDisplayListHead++, dl_menu_rgba16_wood_course_end);
 #endif
 
@@ -419,7 +421,7 @@ void print_course_number(void) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
 }
 
-#ifdef VERSION_JP
+#if defined(VERSION_JP) || defined(VERSION_SH)
 #define ACT_NAME_X 158
 #else
 #define ACT_NAME_X 163
@@ -486,6 +488,9 @@ void print_act_selector_strings(void) {
     // TODO: allow it to be declared.
 #ifdef VERSION_EU
     print_generic_string(get_str_x_pos_from_center(160, currLevelName + 3, 10.0f), 33, currLevelName + 3);
+#elif defined(VERSION_SH)
+    lvlNameX = get_str_x_pos_from_center_scale(160, currLevelName + 3, 10.0f);
+    print_generic_string(lvlNameX, 33, currLevelName + 3);
 #else
     lvlNameX = get_str_x_pos_from_center(160, currLevelName + 3, 10.0f);
     print_generic_string(lvlNameX, 10, currLevelName + 3);
@@ -605,7 +610,7 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
 #else
         if ((gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))) {
 #endif
-#ifdef VERSION_JP
+#if defined(VERSION_JP) || defined(VERSION_SH)
             play_sound(SOUND_MENU_STAR_SOUND, gDefaultSoundArgs);
 #else
             play_sound(SOUND_MENU_STAR_SOUND_LETS_A_GO, gDefaultSoundArgs);

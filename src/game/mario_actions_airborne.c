@@ -33,7 +33,7 @@ void play_far_fall_sound(struct MarioState *m) {
 }
 
 #ifndef VERSION_JP
-void func_u_8026A090(struct MarioState *m) {
+void play_knockback_sound(struct MarioState *m) {
     if (m->actionArg == 0 && (m->forwardVel <= -28.0f || m->forwardVel >= 28.0f)) {
         play_sound_if_no_flag(m, SOUND_MARIO_DOH, MARIO_MARIO_SOUND_PLAYED);
     } else {
@@ -1090,7 +1090,7 @@ u32 common_air_knockback_step(struct MarioState *m, u32 landAction, u32 hardFall
     return stepResult;
 }
 
-s32 func_8026CDFC(struct MarioState *m) {
+s32 check_wall_kick(struct MarioState *m) {
     if ((m->input & INPUT_A_PRESSED) && m->wallKickTimer != 0 && m->prevAction == ACT_AIR_HIT_WALL) {
         m->faceAngle[1] += 0x8000;
         if (is_dangerous_wallkick(m)) {
@@ -1103,12 +1103,12 @@ s32 func_8026CDFC(struct MarioState *m) {
 }
 
 s32 act_backward_air_kb(struct MarioState *m) {
-    if (func_8026CDFC(m)) {
+    if (check_wall_kick(m)) {
         return 1;
     }
 
 #ifndef VERSION_JP
-    func_u_8026A090(m);
+    play_knockback_sound(m);
 #else
     play_sound_if_no_flag(m, SOUND_MARIO_UH, MARIO_MARIO_SOUND_PLAYED);
 #endif
@@ -1117,12 +1117,12 @@ s32 act_backward_air_kb(struct MarioState *m) {
 }
 
 s32 act_forward_air_kb(struct MarioState *m) {
-    if (func_8026CDFC(m)) {
+    if (check_wall_kick(m)) {
         return 1;
     }
 
 #ifndef VERSION_JP
-    func_u_8026A090(m);
+    play_knockback_sound(m);
 #else
     play_sound_if_no_flag(m, SOUND_MARIO_UH, MARIO_MARIO_SOUND_PLAYED);
 #endif
@@ -1132,7 +1132,7 @@ s32 act_forward_air_kb(struct MarioState *m) {
 
 s32 act_hard_backward_air_kb(struct MarioState *m) {
 #ifndef VERSION_JP
-    func_u_8026A090(m);
+    play_knockback_sound(m);
 #else
     play_sound_if_no_flag(m, SOUND_MARIO_UH, MARIO_MARIO_SOUND_PLAYED);
 #endif
@@ -1143,7 +1143,7 @@ s32 act_hard_backward_air_kb(struct MarioState *m) {
 
 s32 act_hard_forward_air_kb(struct MarioState *m) {
 #ifndef VERSION_JP
-    func_u_8026A090(m);
+    play_knockback_sound(m);
 #else
     play_sound_if_no_flag(m, SOUND_MARIO_UH, MARIO_MARIO_SOUND_PLAYED);
 #endif
@@ -1194,12 +1194,12 @@ s32 act_thrown_forward(struct MarioState *m) {
 }
 
 s32 act_soft_bonk(struct MarioState *m) {
-    if (func_8026CDFC(m)) {
+    if (check_wall_kick(m)) {
         return 1;
     }
 
 #ifndef VERSION_JP
-    func_u_8026A090(m);
+    play_knockback_sound(m);
 #else
     play_sound_if_no_flag(m, SOUND_MARIO_UH, MARIO_MARIO_SOUND_PLAYED);
 #endif
@@ -1690,7 +1690,7 @@ s32 act_flying(struct MarioState *m) {
 
         if (is_anim_at_end(m)) {
             if (m->actionArg == 2) {
-                func_8024980C(0);
+                load_level_init_text(0);
                 m->actionArg = 1;
             }
 

@@ -38,11 +38,11 @@ void bhv_red_coin_init(void) {
     s32 i, j, temp;
 
     // Set the red coins to have a parent of the closest red coin star.
-    hiddenRedCoinStar = obj_nearest_object_with_behavior(bhvHiddenRedCoinStar);
+    hiddenRedCoinStar = cur_obj_nearest_object_with_behavior(bhvHiddenRedCoinStar);
     if (hiddenRedCoinStar != NULL)
         o->parentObj = hiddenRedCoinStar;
     else {
-        hiddenRedCoinStar = obj_nearest_object_with_behavior(bhvBowserCourseRedCoinStar);
+        hiddenRedCoinStar = cur_obj_nearest_object_with_behavior(bhvBowserCourseRedCoinStar);
         if (hiddenRedCoinStar != NULL) {
             o->parentObj = hiddenRedCoinStar;
         } else {
@@ -50,7 +50,7 @@ void bhv_red_coin_init(void) {
         }
     }
 
-    set_object_hitbox(o, &sRedCoinHitbox);
+    obj_set_hitbox(o, &sRedCoinHitbox);
     o->oBingoId = get_unique_id(BINGO_UPDATE_RED_COIN, o->oPosX, o->oPosY, o->oPosZ);
 
     if (gBingoStarSelected == BINGO_MODIFIER_ORDERED_RED_COINS) {
@@ -102,7 +102,7 @@ void bhv_red_coin_loop(void) {
 #endif
         }
 
-        CoinCollected();
+        coin_collected();
         // Despawn the coin.
         o->oInteractStatus = 0;
         bingoNumber = obj_nearest_object_with_behavior(bhvBingoOrangeNumber);
