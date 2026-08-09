@@ -17,7 +17,7 @@
 #include "print.h"
 #include "hud.h"
 #include "bingo_tracking_collectables.h"
-#include "room.h"
+#include "object_list_processor.h"
 #include "object_constants.h"
 
 

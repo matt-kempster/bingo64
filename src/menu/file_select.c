@@ -34,15 +34,38 @@
  * special menu messages and phases, button states and button clicked checks.
  */
 
+
+#ifdef VERSION_US
 // The current sound mode is automatically centered on US due to
 // the large length difference between options.
-#ifndef VERSION_JP
+// sSoundTextY unused (EU supports its existance).
 static s16 sSoundTextX;
+static s16 sSoundTextY;
+#endif
+
+//! @Bug (UB Array Access) For PAL, more buttons were added than the array was extended.
+//! This causes no currently known issues on console (as the other variables are not changed
+//! while this is used) but can cause issues with other compilers.
+#ifdef VERSION_EU
+    #ifdef AVOID_UB
+        #define NUM_BUTTONS 36
+    #else
+        #define NUM_BUTTONS 34
+    #endif
+#else
+// Bingo64 replaces the score/copy/erase menus with the seed menu.
+#define NUM_BUTTONS 35
 #endif
 
 // Amount of main menu buttons defined in the code called by spawn_object_rel_with_rot.
 // See file_select.h for the names in MenuButtonTypes.
-static struct Object *sMainMenuButtons[35];
+static struct Object *sMainMenuButtons[NUM_BUTTONS];
+
+// Unused variable that is written to for the centered X value for some strings.
+#ifdef VERSION_EU
+static s16 sCenteredX;
+#endif
+
 
 // The button that is selected when it is clicked.
 static s8 sSelectedButtonID = MENU_BUTTON_NONE;
@@ -88,14 +111,23 @@ static s8 sSelectedFileNum = 0;
 // coin high score, 1 for high score across all files.
 static s8 sScoreFileCoinScoreMode = 0;
 
+// If no save file exists, open the language menu so the user can find it.
+#ifdef VERSION_EU
+static s8 sOpenLangSettings = FALSE;
+#endif
+
 static unsigned char textReturn[] = { TEXT_RETURN };
 static unsigned char textMarioA[] = { TEXT_FILE_MARIO_A };
 static unsigned char textMarioB[] = { TEXT_FILE_MARIO_B };
 static unsigned char textMarioC[] = { TEXT_FILE_MARIO_C };
 static unsigned char textMarioD[] = { TEXT_FILE_MARIO_D };
+
+#ifndef VERSION_EU
 static unsigned char textNew[] = { TEXT_NEW };
 static unsigned char starIcon[] = { GLYPH_STAR, GLYPH_SPACE };
 static unsigned char xIcon[] = { GLYPH_MULTIPLY, GLYPH_SPACE };
+#endif
+
 static unsigned char textSelectFile[] = { TEXT_SELECT_FILE };
 static unsigned char textSeeds[] = { TEXT_SEEDS };
 static unsigned char textReset[] = { TEXT_RESET };
@@ -152,7 +184,7 @@ void beh_yellow_background_menu_loop(void) {
  * Check if a button was clicked.
  * depth = 200.0 for main menu, 22.0 for submenus.
  */
-static s32 check_clicked_button(s16 x, s16 y, f32 depth) {
+s32 check_clicked_button(s16 x, s16 y, f32 depth) {
     f32 a = 52.4213;
     f32 newX = ((f32) x * 160.0) / (a * depth);
     f32 newY = ((f32) y * 120.0) / (a * 3.0f / 4.0f * depth);
@@ -391,7 +423,7 @@ void bhv_menu_button_loop(void) {
 /**
  * Handles how to exit the score file menu using button states.
  */
-static void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButtonID) {
+void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButtonID) {
     // Begin exit
     if (scoreFileButton->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
         && sCursorClickingTimer == 2) {
@@ -430,6 +462,7 @@ static void seed_reset(void) {
         gBingoSeedText[i] = gBingoSeedRandomText[i];
     }
 }
+#undef BUZZ_TIMER
 
 static void seed_backspace(void) {
     s32 i;
@@ -440,6 +473,14 @@ static void seed_backspace(void) {
         gBingoSeedText[0] = 0x00;
     }
 }
+#undef ACTION_TIMER
+#undef MAIN_RETURN_TIMER
+
+#ifdef VERSION_EU
+    #define SOUND_Y 388
+#else
+    #define SOUND_Y 0
+#endif
 
 static void seed_menu_check_clicked_buttons() {
     int buttonId;
@@ -490,7 +531,7 @@ static void seed_menu_check_clicked_buttons() {
  * Loads a save file selected after it goes into a full screen state
  * retuning sSelectedFileNum to a save value defined in fileNum.
  */
-static void load_main_menu_save_file(struct Object *fileButton, s32 fileNum) {
+void load_main_menu_save_file(struct Object *fileButton, s32 fileNum) {
     if (fileButton->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
         sSelectedFileNum = fileNum;
     }
@@ -585,9 +626,9 @@ void bhv_menu_button_manager_init(void) {
 }
 
 #ifdef VERSION_JP
-#define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND
+    #define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND
 #else
-#define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND_OKEY_DOKEY
+    #define SAVE_FILE_SOUND SOUND_MENU_STAR_SOUND_OKEY_DOKEY
 #endif
 
 /**
@@ -704,7 +745,12 @@ static void handle_cursor_button_input(void) {
             }
         }
     } else { // If cursor is clicked
-        if (gPlayer3Controller->buttonPressed & (A_BUTTON | B_BUTTON | START_BUTTON)) {
+        if (gPlayer3Controller->buttonPressed
+#ifdef VERSION_EU
+            & (A_BUTTON | B_BUTTON | START_BUTTON | Z_TRIG)) {
+#else
+            & (A_BUTTON | B_BUTTON | START_BUTTON)) {
+#endif
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
             sCursorClickingTimer = 1;
@@ -715,7 +761,7 @@ static void handle_cursor_button_input(void) {
 /**
  * Cursor function that handles analog stick input and button presses with a function near the end.
  */
-static void handle_controller_cursor_input(void) {
+void handle_controller_cursor_input(void) {
     s16 rawStickX = gPlayer3Controller->rawStickX;
     s16 rawStickY = gPlayer3Controller->rawStickY;
 
@@ -756,7 +802,7 @@ static void handle_controller_cursor_input(void) {
  * and loads it's controller inputs in handle_controller_cursor_input
  * to be usable on the file select.
  */
-static void print_menu_cursor(void) {
+void print_menu_cursor(void) {
     handle_controller_cursor_input();
     create_dl_translation_matrix(MENU_MTX_PUSH, sCursorPos[0] + 160.0f - 5.0, sCursorPos[1] + 120.0f - 25.0, 0.0f);
     // Get the right graphic to use for the cursor.
@@ -779,7 +825,7 @@ static void print_menu_cursor(void) {
 /**
  * Prints a hud string depending of the hud table list defined with text fade properties.
  */
-static void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const unsigned char *text) {
+void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const unsigned char *text) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha - sTextFadeAlpha);
     print_hud_lut_string(hudLUT, x, y, text);
@@ -789,7 +835,7 @@ static void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const unsigned ch
 /**
  * Prints a generic white string with text fade properties.
  */
-static void print_generic_string_fade(s16 x, s16 y, const unsigned char *text) {
+void print_generic_string_fade(s16 x, s16 y, const unsigned char *text) {
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha - sTextFadeAlpha);
     print_generic_string(x, y, text);
@@ -825,6 +871,7 @@ static void draw_seed_mode_menu(void) {
 
 /**
  * Prints main menu strings that shows on the yellow background menu screen.
+ * Does not print the strings of text for EU, only the symbols.
  */
 static void print_main_menu_strings(void) {
     draw_seed_mode_menu();
@@ -1255,6 +1302,7 @@ static void print_bingo_page_2(void) {
             print_generic_string(creditsLeftX + 6 + 80, TOP_Y + offsetY, creditString2);
         }
     }
+
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
@@ -1298,7 +1346,12 @@ static void print_file_select_strings(void) {
     create_dl_ortho_matrix();
     switch (sSelectedButtonID) {
         case MENU_BUTTON_NONE:
+#ifdef VERSION_EU
+            // Ultimately calls print_main_menu_strings, but prints strings first.
+            print_lang_strings();
+#else
             print_main_menu_strings();
+#endif
             break;
         case MENU_BUTTON_SEED_OPTION:
             print_bingo_options();
@@ -1331,6 +1384,9 @@ Gfx *geo_file_select_strings_and_menu_cursor(s32 callContext, UNUSED struct Grap
  * either completing a course choosing "SAVE & QUIT" or having a game over.
  */
 s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
+#ifdef VERSION_EU
+    s8 fileNum;
+#endif
     sSelectedButtonID = MENU_BUTTON_NONE;
     sCurrentMenuLevel = MENU_LAYER_MAIN;
     sTextBaseAlpha = 0;
@@ -1344,6 +1400,18 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
     sTextFadeAlpha = 0;
     sMainMenuTimer = 0;
     sSoundMode = save_file_get_sound_mode();
+
+#ifdef VERSION_EU
+    sLanguageMode = eu_get_language();
+    for (fileNum = 0; fileNum < 4; fileNum++) {
+        if (save_file_exists(fileNum) == TRUE) {
+            sOpenLangSettings = FALSE;
+            break;
+        } else {
+            sOpenLangSettings = TRUE;
+        }
+    }
+#endif
 
     //! no return value
 #ifdef AVOID_UB

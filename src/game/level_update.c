@@ -88,6 +88,7 @@ const char *credits06[] = { "2COURSE DIRECTORS", "YOICHI YAMADA", "YASUHISA YAMA
 const char *credits07[] = { "2COURSE DESIGNERS", "KENTA USUI", "NAOKI MORI" };
 const char *credits08[] = { "3COURSE DESIGNERS", "YOSHIKI HARUHANA", "MAKOTO MIYANAGA",
                             "KATSUHIKO KANNO" };
+#ifdef VERSION_US
 const char *credits09[] = { "1SOUND COMPOSER", "KOJI KONDO" };
 const char *credits10[] = { "4SOUND EFFECTS", "SOUND PROGRAMMER", "YOJI INAGAKI",
                             "HIDEAKI SHIMIZU" }; // as well as sound effects and sound programmer
@@ -98,12 +99,32 @@ const char *credits14[] = { "1TECHNICAL SUPPORT", "SGI N64 PROJECT STAFF" };
 const char *credits15[] = { "2PROGRESS MANAGEMENT", "KIMIYOSHI FUKUI", "KEIZO KATO" };
 const char *credits16[] = { "5SCREEN TEXT WRITER", "TRANSLATION", "LESLIE SWAN", "MINA AKINO",
                             "HIRO YAMADA" }; // ...in order to make room for these 2 new lines
+#else // VERSION_EU
+const char *credits09[] = { "7SOUND COMPOSER", "SOUND EFFECTS", "SOUND PROGRAMMER", "KOJI KONDO", 
+                            "YOJI INAGAKI", "HIDEAKI SHIMIZU" }; 
+const char *credits10[] = { "63-D ANIMATORS", "ADDITIONAL GRAPHICS", "YOSHIAKI KOIZUMI", "SATORU TAKIZAWA", 
+                            "MASANAO ARIMOTO" };
+const char *credits11[] = { "3TECHNICAL SUPPORT", "TAKAO SAWANO", "HIROHITO YOSHIMOTO", "HIROTO YADA" };
+const char *credits12[] = { "1TECHNICAL SUPPORT", "SGI N64 PROJECT STAFF" };
+const char *credits13[] = { "2PROGRESS MANAGEMENT", "KIMIYOSHI FUKUI", "KEIZO KATO" };
+const char *credits14[] = { "5SCREEN TEXT WRITER", "ENGLISH TRANSLATION", "LESLIE SWAN", "MINA AKINO",
+                            "HIRO YAMADA" };
+const char *credits15[] = { "4SCREEN TEXT WRITER", "FRENCH TRANSLATION", "JULIEN BARDAKOFF", 
+                            "KENJI HARAGUCHI" };
+const char *credits16[] = { "4SCREEN TEXT WRITER", "GERMAN TRANSLATION", "THOMAS GOERG", 
+                            "THOMAS SPINDLER" };
+#endif
 const char *credits17[] = { "4MARIO VOICE", "PEACH VOICE", "CHARLES MARTINET", "LESLIE SWAN" };
 const char *credits18[] = { "3SPECIAL THANKS TO", "EAD STAFF", "ALL NINTENDO PERSONNEL",
-                            "MARIO CLUB STAFF" };
+#ifdef VERSION_US
+                           "MARIO CLUB STAFF" };
+#else // VERSION_EU
+                           "SUPER MARIO CLUB STAFF" };
+#endif
 const char *credits19[] = { "1PRODUCER", "SHIGERU MIYAMOTO" };
 const char *credits20[] = { "1EXECUTIVE PRODUCER", "HIROSHI YAMAUCHI" };
 #endif
+
 
 struct CreditsEntry sCreditsSequence[] = {
     { LEVEL_CASTLE_GROUNDS, 1, 1, -128, { 0, 8000, 0 }, NULL },
@@ -132,36 +153,31 @@ struct CreditsEntry sCreditsSequence[] = {
 };
 
 struct MarioState gMarioStates[1];
-struct MarioState *gMarioState = &gMarioStates[0];
-
-u8 unused1[4] = { 0 };
-
-s8 D_8032C9E0 = 0;
-
+struct HudDisplay gHudDisplay;
 s16 sCurrPlayMode;
 u16 D_80339ECA;
-
 s16 sTransitionTimer;
 void (*sTransitionUpdate)(s16 *);
-
-u8 unused3[4];
-
 struct WarpDest sWarpDest;
-
 s16 D_80339EE0;
-
 s16 sDelayedWarpOp;
 s16 sDelayedWarpTimer;
 s16 sSourceWarpNodeId;
 s32 sDelayedWarpArg;
+#ifdef VERSION_EU
+s16 unusedEULevelUpdateBss1;
+#endif
+s8 sTimerRunning;
+s8 gShouldNotPlayCastleMusic;
 
+struct MarioState *gMarioState = &gMarioStates[0];
+u8 unused1[4] = { 0 };
+s8 D_8032C9E0 = 0;
+u8 unused3[4];
 u8 unused4[2];
 
-s8 sTimerRunning;
 
-struct HudDisplay gHudDisplay;
 
-s8 gShouldNotPlayCastleMusic;
 
 void basic_update(s16 *arg);
 
@@ -715,7 +731,7 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
         switch (warpOp) {
             case WARP_OP_DEMO_NEXT:
             case WARP_OP_DEMO_END:
-                sDelayedWarpTimer = 20;
+                do {sDelayedWarpTimer = 20;} while (0);
                 sSourceWarpNodeId = WARP_NODE_F0;
                 gSavedCourseNum = 0;
                 val04 = FALSE;

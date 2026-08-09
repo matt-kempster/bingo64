@@ -375,12 +375,33 @@ void bhv_act_selector_loop(void) {
 /**
  * Print the course number selected with the wood rgba16 course texture.
  */
-static void print_course_number(void) {
+#ifdef VERSION_EU
+void print_course_number(s16 language) {
+#else
+void print_course_number(void) {
+#endif
     u8 courseNum[4];
 
     create_dl_translation_matrix(MENU_MTX_PUSH, 158.0f, 63.0f, 0.0f);
 
     gSPDisplayList(gDisplayListHead++, dl_menu_rgba16_wood_course);
+
+#ifdef VERSION_EU
+    switch (language) {
+        case 0:
+            gSPDisplayList(gDisplayListHead++, dl_menu_texture_course_upper);
+            break;
+        case 1:
+            gSPDisplayList(gDisplayListHead++, dl_menu_texture_niveau_upper);
+            break;
+        case 2:
+            gSPDisplayList(gDisplayListHead++, dl_menu_texture_kurs_upper);
+            break;
+    }
+    
+    gSPDisplayList(gDisplayListHead++, dl_menu_rgba16_wood_course_end);
+#endif
+
     gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
@@ -415,18 +436,32 @@ u8 gBingoTextSplatoon[] = { BINGO_SPLATOON };
 /**
  * Print act selector strings, some with special checks.
  */
-static void print_act_selector_strings(void) {
-// TODO: EU relocates level and act name tables to translation segment 0x19
-#ifndef VERSION_EU
+void print_act_selector_strings(void) {
+#ifdef VERSION_EU
+    unsigned char myScore[][10] = { {TEXT_MYSCORE}, {TEXT_MY_SCORE_FR}, {TEXT_MY_SCORE_DE} };
+#else
     unsigned char myScore[] = { TEXT_MYSCORE };
+#endif
     unsigned char starNumbers[] = { TEXT_ZERO };
+
+#ifdef VERSION_EU
+    u8 **levelNameTbl;
+    u8 *currLevelName;
+    u8 **actNameTbl;
+#else
     u8 **levelNameTbl = segmented_to_virtual(seg2_course_name_table);
     u8 *currLevelName = segmented_to_virtual(levelNameTbl[gCurrCourseNum - 1]);
     u8 **actNameTbl = segmented_to_virtual(seg2_act_name_table);
+#endif
     u8 *selectedActName;
+#ifndef VERSION_EU
     s16 lvlNameX;
     s16 actNameX;
+#endif
     s8 i;
+#ifdef VERSION_EU
+    s16 language = eu_get_language();
+#endif
 
     u8 bingoModifierText[] = { BINGO_MODIFIER };
     u8 *bingoModifierName;
@@ -447,11 +482,21 @@ static void print_act_selector_strings(void) {
     //     print_generic_string(102, 118, myScore);
     // }
     // Print the level name; add 3 to skip the number and spacing to get to the actual string to center.
+    // TODO: There has to be a way to merge these, but US seems to need lvlNameX and EU doesn't
+    // TODO: allow it to be declared.
+#ifdef VERSION_EU
+    print_generic_string(get_str_x_pos_from_center(160, currLevelName + 3, 10.0f), 33, currLevelName + 3);
+#else
     lvlNameX = get_str_x_pos_from_center(160, currLevelName + 3, 10.0f);
     print_generic_string(lvlNameX, 10, currLevelName + 3);
+#endif
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 
+#ifdef VERSION_EU
+    print_course_number((u32)language);
+#else
     print_course_number();
+#endif
 
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
@@ -504,7 +549,6 @@ static void print_act_selector_strings(void) {
         get_str_x_pos_from_center(159, bingoModifierName, 10.0f), 128, bingoModifierName);
 
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
-#endif // !VERSION_EU
 }
 
 /**
@@ -554,15 +598,19 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
     s8 bingoClickGameActivate = 0;
     if (sActSelectorMenuTimer >= 11) {
         // If any of these buttons are pressed, play sound and go to course act
+#ifndef VERSION_EU
         if ((gPlayer3Controller->buttonPressed & A_BUTTON)
          || (gPlayer3Controller->buttonPressed & START_BUTTON)
          || (gPlayer3Controller->buttonPressed & B_BUTTON)) {
+#else
+        if ((gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))) {
+#endif
 #ifdef VERSION_JP
             play_sound(SOUND_MENU_STAR_SOUND, gDefaultSoundArgs);
 #else
             play_sound(SOUND_MENU_STAR_SOUND_LETS_A_GO, gDefaultSoundArgs);
 #endif
-            if (sInitSelectedActNum > sSelectedActIndex) {
+            if (sInitSelectedActNum >= sSelectedActIndex + 1) {
                 sLoadedActNum = sSelectedActIndex + 1;
             } else {
                 sLoadedActNum = sInitSelectedActNum;
