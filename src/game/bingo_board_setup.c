@@ -178,7 +178,7 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
     }
     // TODO: if sum is 0, choose completely randomly
     // (while initializing usesRemaining given disabled objs)
-    want_sum = RandomU16() % sum;
+    want_sum = random_u16() % sum;
 
     i = -1;
     sum = 0;
@@ -220,7 +220,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
         // All objectives are disabled. I guess just allow free play?
         return;
     }
-    randomIndex = (RandomU16() % enabledSum) + 1;
+    randomIndex = (random_u16() % enabledSum) + 1;
     for (i = BINGO_OBJECTIVE_TYPE_MIN; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
         if (!gBingoObjectivesDisabled[i]) {
             enabledCounter++;
@@ -252,7 +252,7 @@ s32 switch_to(s32 exclude) {
             otherOne = 3;  // remain hard
             otherTwo = 1;  // easy or harder
     }
-    switch (RandomU16() % 5) {
+    switch (random_u16() % 5) {
         case 0:
         case 1:
             switchTo = otherOne;
@@ -272,7 +272,7 @@ void shuffle(s32 *array, s32 length) {
     s32 i, j, choice;
     for (i = 0; i < length - 1; i++)
     {
-        j = i + RandomU16() / (65535 / (length - i) + 1);
+        j = i + random_u16() / (65535 / (length - i) + 1);
         choice = array[j];
         array[j] = array[i];
         array[i] = choice;
@@ -369,7 +369,7 @@ s32 replace_one_if_duplicated(
     struct BingoObjective *obj2
 ) {
     if (obj1->initialized && obj2->initialized && are_duplicates(obj1, obj2)) {
-        if (RandomU16() % 2 == 0) {
+        if (random_u16() % 2 == 0) {
             replace_objective(obj1);
         } else {
             replace_objective(obj2);
@@ -476,13 +476,13 @@ void setup_bingo_objectives(u32 seed) {
     gBingoInitialized = 1;
     gBingoInitialSeed = seed;
 
-    harderClass = (RandomU16() % 2) + 1; // either 1 or 2
+    harderClass = (random_u16() % 2) + 1; // either 1 or 2
     easierClass = (2 - harderClass) + 1; // either 2 or 1, opposite harderClass
 
     // To shake it up a bit, mutate between 0 and 2 of the cells randomly.
-    for (i = 0; i < RandomU16() % 3; i++) {
-        row = RandomU16() % 5;
-        col = RandomU16() % 5;
+    for (i = 0; i < random_u16() % 3; i++) {
+        row = random_u16() % 5;
+        col = random_u16() % 5;
         objectiveClasses[row][col] = switch_to(objectiveClasses[row][col]);
     }
 

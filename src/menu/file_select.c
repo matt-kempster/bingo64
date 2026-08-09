@@ -3,7 +3,7 @@
 
 #include "sm64.h"
 #include "audio/external.h"
-#include "game/game.h"
+#include "game/game_init.h"
 #include "game/ingame_menu.h"
 #include "game/object_helpers.h"
 #include "game/area.h"
@@ -1425,7 +1425,7 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 u32 get_seed(void) {
     if (!gBingoSeedIsSet) {
         init_genrand(gGlobalTimer);
-        return RandomU32() % 999999999;
+        return random_u32() % 999999999;
     }
     return (
         gBingoSeedText[0] * 100000000

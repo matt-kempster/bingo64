@@ -13,33 +13,33 @@
 #include "level_table.h"
 
 s32 random_abc(enum CourseNum *course, s32 *star, char **hint) {
-    u32 the_star = RandomU16() % numPossibleABC;
+    u32 the_star = random_u16() % numPossibleABC;
     *course = possibleABC[the_star].course;
     *star = possibleABC[the_star].star - 1; // star is 0-indexed everywhere else :(
     *hint = possibleABC[the_star].hint;
 }
 
 enum CourseNum random_main_course() {
-    return (RandomU16() % 15) + 1;
+    return (random_u16() % 15) + 1;
 }
 
 enum CourseNum random_course_including_special() {
-    return (RandomU16() % 24) + 1;
+    return (random_u16() % 24) + 1;
 }
 
 s32 random_star_main_course(enum CourseNum *course, s32 *star) {
     *course = random_main_course();
-    *star = (RandomU16() % 7); // zero-indexed
+    *star = (random_u16() % 7); // zero-indexed
 }
 
 s32 random_star_main_course_except_100c(enum CourseNum *course, s32 *star) {
     *course = random_main_course();
-    *star = (RandomU16() % 6); // zero-indexed
+    *star = (random_u16() % 6); // zero-indexed
 }
 
 s32 random_star_except_mips_toad(enum CourseNum *course, s32 *star) {
     // This is gonna be a bit janky since I want every star to have equal prob.
-    s32 starIndex = (RandomU16() % 115); // 120 - (mips * 2) - (toad * 3)
+    s32 starIndex = (random_u16() % 115); // 120 - (mips * 2) - (toad * 3)
     if (starIndex < (15 * 7)) {
         *course = (starIndex % 15) + 1;
         *star = starIndex % 7;
@@ -143,7 +143,7 @@ retry:
 
 
 s32 random_range_inclusive(s32 low, s32 high) {
-    return low + (RandomU16() % (high - low + 1));
+    return low + (random_u16() % (high - low + 1));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -248,7 +248,7 @@ s32 bingo_objective_star_ttc_random_init(
     s32 star;
     switch (class) {
         default:
-            star = RandomU16() % 7;
+            star = random_u16() % 7;
             break;
     }
 
@@ -310,7 +310,7 @@ s32 bingo_objective_star_click_game_init(
         switch (class) {
             default:
                 clickDiff = clickInfo->maxClicks - clickInfo->minClicks;
-                clicks = clickInfo->minClicks + (RandomU16() % clickDiff) + 1;
+                clicks = clickInfo->minClicks + (random_u16() % clickDiff) + 1;
                 break;
             case BINGO_CLASS_HARD:
                 clicks = clickInfo->minClicks;
@@ -367,7 +367,7 @@ s32 bingo_objective_star_daredevil_init(
                 course = random_main_course();
             } while (course == COURSE_DDD);
             if (course == COURSE_JRB) {
-                switch (RandomU16() % 3) {
+                switch (random_u16() % 3) {
                     case 0:
                         star = 2;
                     case 1:
@@ -579,9 +579,9 @@ s32 bingo_objective_1ups_in_level_init(
                 _1upsMin = (s32) get_1ups_in_level(course) * 0.6f;
                 if (get_1ups_in_level(course) == _1upsMin) {
                     _1ups = _1upsMin;
-                    RandomU16();
+                    random_u16();
                 } else {
-                    _1ups = (RandomU16() % (get_1ups_in_level(course) - _1upsMin)) + _1upsMin;
+                    _1ups = (random_u16() % (get_1ups_in_level(course) - _1upsMin)) + _1upsMin;
                 }
             } while (_1ups < 3);
             break;
@@ -654,7 +654,7 @@ s32 bingo_objective_bowser_init(
 
     switch (class) {
         default:
-            if (RandomU16() % 2 == 0) {
+            if (random_u16() % 2 == 0) {
                 level = LEVEL_BOWSER_1;
             } else {
                 level = LEVEL_BOWSER_2;

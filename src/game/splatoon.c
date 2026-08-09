@@ -2,7 +2,7 @@
 
 #include "sm64.h"
 #include "splatoon.h"
-#include "game.h"
+#include "game_init.h"
 #include "area.h"
 #include "bingo.h"
 #include "level_update.h"

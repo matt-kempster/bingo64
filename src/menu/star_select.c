@@ -2,7 +2,7 @@
 
 #include "sm64.h"
 #include "audio/external.h"
-#include "game/game.h"
+#include "game/game_init.h"
 #include "game/memory.h"
 #include "game/area.h"
 #include "game/save_file.h"
@@ -21,6 +21,8 @@
 #include "game/bingo_tracking_star.h"
 #include "game/camera.h"
 #include "game/splatoon.h"
+#include "eu_translation.h"
+#include <prevent_bss_reordering.h>
 
 /**
  * @file star_select.c

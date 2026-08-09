@@ -3,7 +3,7 @@
 #include <PR/os_libc.h>
 
 #include "types.h"
-#include "game.h"
+#include "game_init.h"
 #include "sm64.h"
 #include "print.h"
 #include "hud.h"

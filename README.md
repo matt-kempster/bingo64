@@ -114,4 +114,4 @@ bingo_guide.txt, if you would like to add a new objective type.
 
 Run clang-format on your code to ensure it meets the project's coding standards.
 
-Official discord: https://discord.gg/27JtCWs
+Official Discord: https://discord.gg/27JtCWs

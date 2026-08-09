@@ -1,7 +1,7 @@
 #include <ultra64.h>
 
 #include "sm64.h"
-#include "game.h"
+#include "game_init.h"
 #include "main.h"
 #include "engine/math_util.h"
 #include "area.h"
@@ -11,6 +11,8 @@
 #include "bingo.h"
 #include "bingo_tracking_star.h"
 #include "level_table.h"
+#include "course_table.h"
+#include "thread6.h"
 
 #define MENU_DATA_MAGIC 0x4849
 #define SAVE_FILE_MAGIC 0x4441
@@ -24,7 +26,7 @@ struct WarpCheckpoint gWarpCheckpoint;
 s8 gMainMenuDataModified;
 s8 gSaveFileModified;
 
-u8 gLastCompletedCourseNum = 0;
+u8 gLastCompletedCourseNum = COURSE_NONE;
 u8 gLastCompletedStarNum = 0;
 s8 sUnusedGotGlobalCoinHiScore = 0;
 u8 gGotFileCoinHiScore = 0;
@@ -610,8 +612,8 @@ u16 eu_get_language(void) {
 #endif
 
 void disable_warp_checkpoint(void) {
-    // check_warp_checkpoint() checks to see if gWarpCheckpoint.courseNum != 0
-    gWarpCheckpoint.courseNum = 0;
+    // check_warp_checkpoint() checks to see if gWarpCheckpoint.courseNum != COURSE_NONE
+    gWarpCheckpoint.courseNum = COURSE_NONE;
 }
 
 /**
@@ -640,7 +642,7 @@ s32 check_warp_checkpoint(struct WarpNode *warpNode) {
     s16 currCourseNum = gLevelToCourseNumTable[(warpNode->destLevel & 0x7F) - 1];
 
     // gSavedCourseNum is only used in this function.
-    if (gWarpCheckpoint.courseNum != 0 && gSavedCourseNum == currCourseNum
+    if (gWarpCheckpoint.courseNum != COURSE_NONE && gSavedCourseNum == currCourseNum
         && gWarpCheckpoint.actNum == gCurrActNum) {
         warpNode->destLevel = gWarpCheckpoint.levelID;
         warpNode->destArea = gWarpCheckpoint.areaNum;
@@ -648,7 +650,7 @@ s32 check_warp_checkpoint(struct WarpNode *warpNode) {
         isWarpCheckpointActive = TRUE;
     } else {
         // Disable the warp checkpoint just incase the other 2 conditions failed?
-        gWarpCheckpoint.courseNum = 0;
+        gWarpCheckpoint.courseNum = COURSE_NONE;
     }
 
     return isWarpCheckpointActive;

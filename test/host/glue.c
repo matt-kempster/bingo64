@@ -83,14 +83,14 @@ void splatoon_clear(void) {
     gSplatoonTotalFloors = 0;
 }
 
-// Same as the game's RandomU16 in behavior_script.c: low 16 bits of the
+// Same as the game's random_u16 in behavior_script.c: low 16 bits of the
 // Mersenne Twister output.
 unsigned long genrand_int32(void);
 
-u32 RandomU32(void) {
+u32 random_u32(void) {
     return genrand_int32();
 }
 
-u16 RandomU16(void) {
-    return (u16) RandomU32();
+u16 random_u16(void) {
+    return (u16) random_u32();
 }

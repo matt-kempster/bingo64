@@ -90,9 +90,11 @@ SECTIONS
       BUILD_DIR/asm/entry.o(.text);
       BUILD_DIR/src/game/crash_screen.o(.text);
       BUILD_DIR/src/game/main.o(.text);
-      BUILD_DIR/src/game/display.o(.text);
-      BUILD_DIR/src/game/game.o(.text);
+      BUILD_DIR/src/game/game_init.o(.text);
       BUILD_DIR/src/game/sound_init.o(.text);
+#ifdef VERSION_SH
+      BUILD_DIR/src/game/thread6.o(.text);
+#endif
       BUILD_DIR/src/game/level_update.o(.text);
       BUILD_DIR/src/game/bingo.o(.text);
       BUILD_DIR/src/game/bingo_ui.o(.text);
@@ -301,6 +303,7 @@ SECTIONS
       BUILD_DIR/libultra.a:osContInit.o(.text);
       BUILD_DIR/libultra.a:osEepromProbe.o(.text);
       BUILD_DIR/libultra.a:llmuldiv.o(.text);
+      BUILD_DIR/libultra.a:llmuldiv_gcc.o(.text);
       BUILD_DIR/libultra.a:osInvalDCache.o(.text);
       BUILD_DIR/libultra.a:osPiStartDma.o(.text);
       BUILD_DIR/libultra.a:bzero.o(.text);
@@ -385,8 +388,7 @@ SECTIONS
       /* data */
       BUILD_DIR/src/game/crash_screen.o(.data*);
       BUILD_DIR/src/game/main.o(.data*);
-      BUILD_DIR/src/game/display.o(.data*);
-      BUILD_DIR/src/game/game.o(.data*);
+      BUILD_DIR/src/game/game_init.o(.data*);
       BUILD_DIR/src/game/sound_init.o(.data*);
       BUILD_DIR/src/game/level_update.o(.data*);
       BUILD_DIR/src/game/bingo.o(.data*);
@@ -495,7 +497,7 @@ SECTIONS
       /* rodata */
       BUILD_DIR/src/game/crash_screen.o(.rodata*);
       BUILD_DIR/src/game/main.o(.rodata*);
-      BUILD_DIR/src/game/game.o(.rodata*);
+      BUILD_DIR/src/game/game_init.o(.rodata*);
       BUILD_DIR/src/game/sound_init.o(.rodata*);
       BUILD_DIR/src/game/level_update.o(.rodata*);
       BUILD_DIR/src/game/bingo.o(.rodata*);
@@ -601,7 +603,7 @@ SECTIONS
    {
       BUILD_DIR/src/game/crash_screen.o(.bss*);
       BUILD_DIR/src/game/main.o(.bss*);
-      BUILD_DIR/src/game/game.o(.bss*);
+      BUILD_DIR/src/game/game_init.o(.bss*);
       BUILD_DIR/src/game/sound_init.o(.bss*);
       BUILD_DIR/src/game/level_update.o(.bss*);
       BUILD_DIR/src/game/bingo.o(.bss*);
@@ -695,6 +697,8 @@ SECTIONS
       BUILD_DIR/libultra.a:kdebugserver.o(.bss*);
       BUILD_DIR/libultra.a:*.o(.bss*);
 #endif
+
+      . = ALIGN(0x8);
    }
    END_NOLOAD(main)
    _mainSegmentNoloadSizeLo = SIZEOF (.main.noload) & 0xffff;
@@ -975,8 +979,8 @@ SECTIONS
       BUILD_DIR/libgoddard.a:anim_mario_eyebrows_1.o(.data);
       BUILD_DIR/libgoddard.a:anim_group_1.o(.data);
       BUILD_DIR/libgoddard.a:anim_group_2.o(.data);
-      BUILD_DIR/libgoddard.a:dynlist_test_cube.o(.rodata);
-      BUILD_DIR/libgoddard.a:dynlist_unused.o(.rodata);
+      BUILD_DIR/libgoddard.a:dynlist_test_cube.o(.rodata*);
+      BUILD_DIR/libgoddard.a:dynlist_unused.o(.rodata*);
       BUILD_DIR/libgoddard.a:*.o(.data);
       BUILD_DIR/libgoddard.a:*.o(.rodata);
    }
@@ -1041,6 +1045,7 @@ SECTIONS
    BEGIN_SEG(assets, __romPos)
    {
       BUILD_DIR/assets/mario_anim_data.o(.data);
+      BUILD_DIR/assets/mario_anim_data.o(.rodata);
       BUILD_DIR/assets/demo_data.o(.data);
       gSoundDataADSR = .;
       BUILD_DIR/sound/sound_data.ctl.o(.data);

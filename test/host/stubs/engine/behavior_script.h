@@ -3,6 +3,6 @@
 
 #include <ultra64.h>
 
-u16 RandomU16(void);
+u16 random_u16(void);
 
 #endif
