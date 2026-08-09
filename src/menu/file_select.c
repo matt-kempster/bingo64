@@ -19,6 +19,7 @@
 #include "game/segment2.h"
 #include "game/segment7.h"
 #include "game/spawn_object.h"
+#include "game/rumble_init.h"
 #include "sm64.h"
 #include "text_strings.h"
 #include "file_select.h"
@@ -44,22 +45,15 @@
  */
 
 #ifdef VERSION_US
-// The current sound mode is automatically centered on US due to
-// the large length difference between options.
-// sSoundTextY unused (EU supports its existence).
+// The current sound mode is automatically centered on US and Shindou.
 static s16 sSoundTextX;
-static s16 sSoundTextY;
 #endif
 
 //! @Bug (UB Array Access) For EU, more buttons were added than the array was extended.
 //! This causes no currently known issues on console (as the other variables are not changed
 //! while this is used) but can cause issues with other compilers.
-#ifdef VERSION_EU
-    #ifdef AVOID_UB
-        #define NUM_BUTTONS 36
-    #else
-        #define NUM_BUTTONS 34
-    #endif
+#if defined(VERSION_EU) && !defined(AVOID_UB)
+#define NUM_BUTTONS (MENU_BUTTON_OPTION_MAX - 1)
 #else
 // Bingo64 replaces the score/copy/erase menus with the seed menu.
 #define NUM_BUTTONS 35
@@ -434,7 +428,10 @@ void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButto
     // Begin exit
     if (scoreFileButton->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
         && sCursorClickingTimer == 2) {
-        play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gDefaultSoundArgs);
+        play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gGlobalSoundSource);
+#ifdef VERSION_SH
+        queue_rumble_data(5, 80);
+#endif
         scoreFileButton->oMenuButtonState = MENU_BUTTON_STATE_SHRINKING;
     }
     // End exit
@@ -507,7 +504,7 @@ static void seed_menu_check_clicked_buttons() {
                     seed_backspace();
                     break;
                 case MENU_BUTTON_SEED_OPTION:
-                    play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gDefaultSoundArgs);
+                    play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
                     gOptionSelectIconOpacity = 0;
                     sMainMenuButtons[buttonId]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
                     sSelectedButtonID = buttonId;
@@ -553,7 +550,7 @@ static void return_to_main_menu(s16 prevMenuButtonID, struct Object *sourceButto
     // play zoom out sound and shrink previous menu
     if (sourceButton->oMenuButtonState == MENU_BUTTON_STATE_DEFAULT
         && sMainMenuButtons[prevMenuButtonID]->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
-        play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gDefaultSoundArgs);
+        play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gGlobalSoundSource);
         sMainMenuButtons[prevMenuButtonID]->oMenuButtonState = MENU_BUTTON_STATE_SHRINKING;
         sCurrentMenuLevel = MENU_LAYER_MAIN;
     }
@@ -661,7 +658,7 @@ static void check_main_menu_clicked_buttons(void) {
     // Play sound of the save file clicked
     switch (sSelectedButtonID) {
         case MENU_BUTTON_PLAY_FILE_A:
-            play_sound(SAVE_FILE_SOUND, gDefaultSoundArgs);
+            play_sound(SAVE_FILE_SOUND, gGlobalSoundSource);
             break;
     }
 }

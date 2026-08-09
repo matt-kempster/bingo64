@@ -3,7 +3,7 @@
 
 #include <ultra64.h>
 
-extern f32 gDefaultSoundArgs[3];
+extern f32 gGlobalSoundSource[3];
 void play_sound(s32 soundBits, f32 *pos);
 
 #endif

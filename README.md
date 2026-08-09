@@ -36,33 +36,25 @@ There are 3 steps to set up a working build.
 
 The build system has the following package requirements:
  * binutils-mips
+ * capstone
+ * pkgconf
  * python3 >= 3.6
- * libaudiofile
- * qemu-irix
 
 Dependency installation instructions for common Linux distros are provided below:
 
 ##### Debian / Ubuntu
 To install build dependencies:
 ```
-sudo apt install -y build-essential git binutils-mips-linux-gnu python3 libaudiofile-dev
-```
-
-Download latest package from [qemu-irix Releases.](https://github.com/n64decomp/qemu-irix/releases)
-
-Install this package with:
-```
-sudo dpkg -i qemu-irix-2.11.0-2169-g32ab296eef_amd64.deb
+sudo apt install -y binutils-mips-linux-gnu build-essential git libcapstone-dev pkgconf python3
 ```
 
 ##### Arch Linux
 To install build dependencies:
 ```
-sudo pacman -S base-devel python audiofile
+sudo pacman -S base-devel capstone python
 ```
 Install the following AUR packages:
 * [mips64-elf-binutils](https://aur.archlinux.org/packages/mips64-elf-binutils) (AUR)
-* [qemu-irix-git](https://aur.archlinux.org/packages/qemu-irix-git) (AUR)
 
 
 Run `make` to build the ROM (defaults to `VERSION=us`). Make sure your path to the repo
@@ -81,23 +73,47 @@ The full list of configurable variables are listed below, with the default being
 * ``VERSION``: ``us``, ``jp``, ``eu``, ``sh`` (WIP)
 * ``GRUCODE``: ``f3d_old``, ``f3d_new``, ``f3dex``, ``f3dex2``, ``f3dzex``
 * ``COMPARE``: ``1`` (compare ROM hash), ``0`` (do not compare ROM hash)
-* ``NON_MATCHING``: Use functionally equivalent C implementations for non-matchings. Also will avoid instances of undefined behavior.
+* ``NON_MATCHING``: Use functionally equivalent C implementations for non-matchings (Currently there aren't any non-matchings, but this will apply to Shindou and iQue). Also will avoid instances of undefined behavior.
 * ``CROSS``: Cross-compiler tool prefix (Example: ``mips64-elf-``).
-* ``QEMU_IRIX``: Path to a ``qemu-irix`` binary.
 
 ### macOS
 
-Installing Docker is the recommended avenue for macOS users. This project does not support macOS natively due to lack of macOS host support.
+With macOS, you may either use Homebrew or [Docker](#docker-installation).
+
+#### Homebrew
+
+#### Step 1: Install dependencies
+Install [Homebrew](https://brew.sh) and the following dependencies:
+```
+brew update
+brew install capstone coreutils gcc make pkg-config tehzz/n64-dev/mips64-elf-binutils
+```
+
+#### Step 2: Copy baserom(s) for asset extraction
+
+For each version (jp/us/eu) for which you want to build a ROM, put an existing ROM at
+`./baserom.<VERSION>.z64` for asset extraction.
+
+##### Step 3: Build the ROM
+
+Use Homebrew's GNU make because the version included with macOS is too old.
+
+```
+gmake VERSION=jp -j4       # build (J) version instead with 4 jobs
+```
 
 ### Docker Installation
 
 #### Create Docker image
 
-Create the docker image with `docker build -t sm64`.
+After installing and starting Docker, create the docker image. This only needs to be done once.
+```
+docker build -t sm64 .
+```
 
 #### Build
 
-To build, mount the local filesystem into the Docker container and build the ROM with `docker run`.
+To build, mount the local filesystem into the Docker container and build the ROM with `docker run sm64 make`.
 
 ##### macOS example for (U):
 ```
@@ -107,7 +123,7 @@ docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 sm64 make VE
 ##### Linux example for (U):
 For a Linux host, Docker needs to be instructed which user should own the output files:
 ```
-docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 --user $UID:$UID sm64 make VERSION=us -j4
+docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 --user $UID:$GID sm64 make VERSION=us -j4
 ```
 
 Resulting artifacts can be found in the `build` directory.

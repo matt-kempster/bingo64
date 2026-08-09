@@ -9,7 +9,7 @@ s16 gCurrLevelNum = 0;
 s16 gTTCSpeedSetting = 0;
 s16 sSelectionFlags = 0;
 s8 gDialogCameraAngleIndex = 0;
-f32 gDefaultSoundArgs[3] = { 0 };
+f32 gGlobalSoundSource[3] = { 0 };
 
 const BehaviorScript bhv1upGreenDemon[] = { 0 };
 

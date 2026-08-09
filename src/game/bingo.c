@@ -84,11 +84,11 @@ void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveSt
 
     switch (state) {
         case BINGO_STATE_COMPLETE:
-            play_sound(SOUND_GENERAL2_RIGHT_ANSWER, gDefaultSoundArgs);
+            play_sound(SOUND_GENERAL2_RIGHT_ANSWER, gGlobalSoundSource);
             bingo_hud_update_state(objective->icon, BINGO_ICON_SUCCESS);
             break;
         case BINGO_STATE_FAILED_IN_THIS_COURSE:
-            play_sound(SOUND_MENU_CAMERA_BUZZ, gDefaultSoundArgs);
+            play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
             bingo_hud_update_state(objective->icon, BINGO_ICON_FAILED);
             break;
     }

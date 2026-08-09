@@ -30,7 +30,7 @@
 #include "bingo_tracking_collectables.h"
 #include "sm64.h"
 #include "sound_init.h"
-#include "thread6.h"
+#include "rumble_init.h"
 
 #define INT_GROUND_POUND_OR_TWIRL (1 << 0) // 0x01
 #define INT_PUNCH                 (1 << 1) // 0x02
