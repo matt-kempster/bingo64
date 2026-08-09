@@ -45,18 +45,18 @@ void bhv_tree_snow_or_leaf_loop(void) {
 
 void bhv_snow_leaf_particle_spawn_init(void) {
     struct Object *obj; // Either snow or leaf
-    UNUSED u8 filler1[4];
     s32 isSnow;
     f32 scale;
-    UNUSED u8 filler2[4];
 
     gMarioObject->oActiveParticleFlags &= ~ACTIVE_PARTICLE_LEAF;
 
-    if (gCurrLevelNum == LEVEL_CCM || gCurrLevelNum == LEVEL_SL) {
-        isSnow = TRUE;
-    } else {
-        isSnow = FALSE;
-    }
+#if FIX_HARDCODED_TREE_PARTICLES
+    struct Object *nearestTree = cur_obj_nearest_object_with_behavior(bhvTree);
+    isSnow = (obj_has_model(nearestTree, MODEL_CCM_SNOW_TREE) || obj_has_model(nearestTree, MODEL_SL_SNOW_TREE)
+            || (gMarioState->area->terrainType & TERRAIN_MASK) == TERRAIN_SNOW);
+#else
+    isSnow = (gCurrLevelNum == LEVEL_CCM || gCurrLevelNum == LEVEL_SL);
+#endif
 
     if (isSnow) {
         if (random_float() < 0.5) {

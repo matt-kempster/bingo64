@@ -38,6 +38,7 @@ struct SpawnInfo {
     /*0x06*/ Vec3s startAngle;
     /*0x0C*/ s8 areaIndex;
     /*0x0D*/ s8 activeAreaIndex;
+    /*0x0E*/ u8 respawnInfo;
     /*0x10*/ u32 behaviorArg;
     /*0x14*/ void *behaviorScript;
     /*0x18*/ struct GraphNode *model;
@@ -117,6 +118,7 @@ enum MenuOption {
     MENU_OPT_1,
     MENU_OPT_2,
     MENU_OPT_3,
+    MENU_OPT_4,
     MENU_OPT_DEFAULT = MENU_OPT_1,
 
     // Course Pause Menu
@@ -127,12 +129,25 @@ enum MenuOption {
     // Save Menu
     MENU_OPT_SAVE_AND_CONTINUE = MENU_OPT_1,
     MENU_OPT_SAVE_AND_QUIT = MENU_OPT_2,
-    MENU_OPT_CONTINUE_DONT_SAVE = MENU_OPT_3
+#ifdef TARGET_N64
+    MENU_OPT_CONTINUE_DONT_SAVE = MENU_OPT_3,
+#else
+    MENU_OPT_SAVE_AND_EXIT = MENU_OPT_3,
+    MENU_OPT_CONTINUE_DONT_SAVE = MENU_OPT_4,
+#endif
 };
+
+#define GAME_SKIP_TITLE_SCREEN  (1 << 0)
+#define GAME_SKIP_GODDARD       (1 << 1)
+#define GAME_SKIP_FILE_SELECT   (1 << 2)
+#define GAME_SKIP_INTRO_SCENE   (1 << 3)
+#define GAME_SKIP_STAR_SELECT   (1 << 4)
+
+#define GAME_SKIP_GENERAL       (GAME_SKIP_TITLE_SCREEN | GAME_SKIP_GODDARD | GAME_SKIP_FILE_SELECT | GAME_SKIP_INTRO_SCENE)
 
 extern struct GraphNode **gLoadedGraphNodes;
 extern struct SpawnInfo gPlayerSpawnInfos[];
-extern struct GraphNode *D_8033A160[];
+extern struct GraphNode *gGraphNodePointers[];
 extern struct Area gAreaData[];
 extern struct WarpTransition gWarpTransition;
 extern s16 gCurrCourseNum;
@@ -141,6 +156,7 @@ extern s16 gCurrAreaIndex;
 extern s16 gSavedCourseNum;
 extern s16 gMenuOptSelectIndex;
 extern s16 gSaveOptSelectIndex;
+extern s16 gGlobalGameSkips;
 
 extern struct SpawnInfo *gMarioSpawnInfo;
 

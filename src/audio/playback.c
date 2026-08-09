@@ -339,7 +339,7 @@ void note_disable(struct Note *note) {
 void note_disable2(struct Note *note) {
     note_disable(note);
 }
-#endif // VERSION_EU || VERSION_SH
+#endif // VERSION_EU || VERSION_SH || VERSION_CN
 
 void process_notes(void) {
     f32 scale;

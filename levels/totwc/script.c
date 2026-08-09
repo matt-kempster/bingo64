@@ -17,7 +17,10 @@
 #include "levels/totwc/header.h"
 
 static const LevelScript script_func_local_1[] = {
-    OBJECT(/*model*/ MODEL_CAP_SWITCH, /*pos*/   0, -2047, 10, /*angle*/ 0, 0, 0, /*bhvParam*/ 0, /*bhv*/ bhvCapSwitch),
+    OBJECT(/*model*/ MODEL_CAP_SWITCH, /*pos*/    0, -2047, 10, /*angle*/ 0, 0, 0, /*bhvParam*/ 0, /*bhv*/ bhvCapSwitch),
+#ifdef PORT_MOP_OBJS
+    OBJECT(/*model*/ MODEL_TRAMPOLINE, /*pos*/ -800, -1900,  0, /*angle*/ 0, 0, 0, /*bhvParam*/ BPARAM2(0xAA), /*bhv*/ bhvBetaTrampolineTop),
+#endif
     OBJECT(/*model*/ MODEL_1UP, /*pos*/ -4095, 3935, 0, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhv1upGreenDemon),
     RETURN(),
 };

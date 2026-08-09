@@ -3,6 +3,7 @@
 #include "sm64.h"
 #include "area.h"
 #include "engine/graph_node.h"
+#include "engine/math_util.h"
 #include "engine/surface_collision.h"
 #include "game_init.h"
 #include "geo_misc.h"
@@ -188,6 +189,34 @@ struct Painting **sPaintingGroups[] = {
 
 s16 gPaintingUpdateCounter = 1;
 s16 gLastPaintingUpdateCounter = 0;
+
+#ifdef HIGH_FPS_PC
+static Vtx sLastVertices[2 * 264 * 3];
+static u32 sLastVerticesTimestamp;
+static Vtx *sVerticesPtr[2];
+static s32 sVerticesCount;
+
+void patch_interpolated_paintings(void) {
+    if (sVerticesPtr[0] != NULL) {
+        s32 i;
+        if (sVerticesPtr[1] != NULL) {
+            for (i = 0; i < sVerticesCount / 2; i++) {
+                sVerticesPtr[0][i] = sLastVertices[i];
+            }
+            for (; i < sVerticesCount; i++) {
+                sVerticesPtr[1][i - sVerticesCount / 2] = sLastVertices[i];
+            }
+        } else {
+            for (i = 0; i < sVerticesCount; i++) {
+                sVerticesPtr[0][i] = sLastVertices[i];
+            }
+        }
+        sVerticesPtr[0] = NULL;
+        sVerticesPtr[1] = NULL;
+        sVerticesCount = 0;
+    }
+}
+#endif
 
 /**
  * Stop paintings in paintingGroup from rippling if their id is different from *idptr.
@@ -899,6 +928,25 @@ Gfx *render_painting(u8 *img, s16 tWidth, s16 tHeight, s16 *textureMap, s16 mapV
         gSP1Triangle(gfx++, group * 3, group * 3 + 1, group * 3 + 2, 0);
     }
 
+#ifdef HIGH_FPS_PC
+    if (sVerticesCount >= numVtx * 2) {
+        sVerticesCount = 0;
+    }
+    for (map = 0; map < numVtx; map++) {
+        Vtx v = verts[map];
+        if (gGlobalTimer == sLastVerticesTimestamp + 1) {
+            s32 i;
+            for (i = 0; i < 3; i++) {
+                verts[map].n.ob[i] = (v.n.ob[i] + sLastVertices[sVerticesCount + map].n.ob[i]) / 2;
+                verts[map].n.n[i] = (v.n.n[i] + sLastVertices[sVerticesCount + map].n.n[i]) / 2;
+            }
+        }
+        sLastVertices[sVerticesCount + map] = v;
+    }
+    sVerticesPtr[sVerticesCount / numVtx] = verts;
+    sVerticesCount += numVtx;
+#endif
+
     gSPEndDisplayList(gfx);
     return dlist;
 }
@@ -963,6 +1011,9 @@ Gfx *painting_ripple_image(struct Painting *painting) {
         meshTris = textureMap[meshVerts * 3 + 1];
         gSPDisplayList(gfx++, render_painting(textures[i], tWidth, tHeight, textureMap, meshVerts, meshTris, painting->alpha));
     }
+#ifdef HIGH_FPS_PC
+    sLastVerticesTimestamp = gGlobalTimer;
+#endif
 
     // Update the ripple, may automatically reset the painting's state.
     painting_update_ripple_state(painting);
@@ -1000,6 +1051,9 @@ Gfx *painting_ripple_env_mapped(struct Painting *painting) {
     meshVerts = textureMap[0];
     meshTris = textureMap[meshVerts * 3 + 1];
     gSPDisplayList(gfx++, render_painting(tArray[0], tWidth, tHeight, textureMap, meshVerts, meshTris, painting->alpha));
+#ifdef HIGH_FPS_PC
+    sLastVerticesTimestamp = gGlobalTimer;
+#endif
 
     // Update the ripple, may automatically reset the painting's state.
     painting_update_ripple_state(painting);
@@ -1019,7 +1073,7 @@ Gfx *display_painting_rippling(struct Painting *painting) {
     s16 *neighborTris = segmented_to_virtual(seg2_painting_mesh_neighbor_tris);
     s16 numVtx = mesh[0];
     s16 numTris = mesh[numVtx * 3 + 1];
-    Gfx *dlist;
+    Gfx *dlist = NULL;
 
     // Generate the mesh and its lighting data
     painting_generate_mesh(painting, mesh, numVtx);
@@ -1137,7 +1191,6 @@ void move_ddd_painting(struct Painting *painting, f32 frontPos, f32 backPos, f32
         gDDDPaintingStatus = BOWSERS_SUB_BEATEN | DDD_BACK;
     }
 }
-
 /**
  * Set the painting's node's layer based on its alpha
  */

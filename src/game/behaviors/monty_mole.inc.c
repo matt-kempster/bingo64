@@ -262,7 +262,15 @@ static void monty_mole_act_jump_into_hole(void) {
  * Become intangible and enter the select hole action.
  */
 static void monty_mole_hide_in_hole(void) {
+#if FIX_HIDE_IN_HOLE_NULL_CHECK
+    // This fixes the comment below
+    if (o->oMontyMoleCurrentHole != NULL) {
+        o->oMontyMoleCurrentHole->oMontyMoleHoleCooldown = 30;
+    }
+#else
     o->oMontyMoleCurrentHole->oMontyMoleHoleCooldown = 30;
+#endif
+
     o->oAction = MONTY_MOLE_ACT_SELECT_HOLE;
     o->oVelY = 0.0f;
 

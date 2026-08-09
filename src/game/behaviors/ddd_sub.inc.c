@@ -1,7 +1,7 @@
 // ddd_sub.inc.c
 #include "game/bingo.h"
 
-void bhv_bowsers_sub_loop(void) {
+void bhv_bowsers_sub_init(void) {
     s32 shouldDelete = 0;
     if (gBingoFullGameUnlocked) {
         shouldDelete = (gCurrActNum != 1);
@@ -10,5 +10,7 @@ void bhv_bowsers_sub_loop(void) {
     }
     if (shouldDelete) {
         obj_mark_for_deletion(o);
+    } else {
+        load_object_static_model();
     }
 }

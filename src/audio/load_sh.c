@@ -1,12 +1,17 @@
 #if defined(VERSION_SH) || defined(VERSION_CN)
 #include <ultra64.h>
-#include <PR/os.h>
 
 #include "data.h"
 #include "external.h"
 #include "heap.h"
 #include "load.h"
 #include "seqplayer.h"
+#include "segment_symbols.h"
+
+#ifdef EXTERNAL_DATA
+#include "pc/platform.h"
+#include "pc/fs/fs.h"
+#endif
 
 #define ALIGN16(val) (((val) + 0xF) & ~0xF)
 
@@ -102,13 +107,6 @@ s16 gTempoInternalToExternal;
 s8 gSoundMode;
 
 s8 gAudioUpdatesPerFrame;
-
-extern u64 gAudioGlobalsStartMarker;
-extern u64 gAudioGlobalsEndMarker;
-
-extern u8 gSoundDataADSR[]; // ctl
-extern u8 gSoundDataRaw[];  // tbl
-extern u8 gMusicData[];     // sequences
 
 ALSeqFile *get_audio_file_header(s32 arg0);
 
@@ -323,7 +321,7 @@ struct AudioBank *load_banks_immediate(s32 seqId, s32 *outDefaultBank) {
     u8 bank;
     s32 offset;
     s32 i;
-    void *ret;
+    void *ret = NULL;
 
     offset = ((u16 *)gAlBankSets)[canonicalize_index(0, seqId)];
     bank = 0xFF;
@@ -523,8 +521,6 @@ void *func_sh_802f3564(s32 seqId) {
     s32 temp;
     return func_sh_802f3764(0, seqId2, &temp);
 }
-
-extern u8 gUnkLoadStatus[0x40];
 
 void *func_sh_802f3598(s32 idx, s32 *medium) {
     void *ret;
@@ -910,7 +906,10 @@ void *func_802f3f08(s32 poolIdx, s32 idx, s32 numChunks, s32 arg3, OSMesgQueue *
     vAddr = get_bank_or_seq_wrapper(poolIdx, idx);
     if (vAddr != NULL) {
         loadStatus = 2;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
         osSendMesg(retQueue, (OSMesg) (arg3 << 0x18), 0);
+#pragma GCC diagnostic pop
     } else {
         f = get_audio_file_header(poolIdx);
         size = f->seqArray[idx].len;
@@ -983,6 +982,22 @@ void func_sh_802f41e4(s32 audioResetStatus) {
     func_sh_802f4dcc(audioResetStatus);
 }
 
+#ifdef EXTERNAL_DATA
+# define LOAD_DATA(x) load_sound_res((const char *)x)
+# include <stdio.h>
+# include <stdlib.h>
+static inline void *load_sound_res(const char *path) {
+    void *data = fs_load_file(path, NULL);
+    if (!data) sys_fatal("could not load sound data from '%s'", path);
+    // FIXME: figure out where it is safe to free this shit
+    //        can't free it immediately after in audio_init()
+    return data;
+}
+#else
+# define LOAD_DATA(x) x
+#endif
+
+#ifndef EXTERNAL_DATA
 u8 gShindouSoundBanksHeader[] = {
 #include "sound/ctl_header.inc.c"
 };
@@ -998,30 +1013,33 @@ u8 gShindouSampleBanksHeader[] = {
 u8 gShindouSequencesHeader[] = {
 #include "sound/sequences_header.inc.c"
 };
+#endif
+
+extern u8 gSoundDataADSR[]; // sound_data.ctl
+extern u8 gSoundDataRaw[];  // sound_data.tbl
+extern u8 gMusicData[];     // sequences.bin
+#ifdef EXTERNAL_DATA
+extern u8 gBankSetsData[];  // bank_sets
+extern u8 gShindouSequencesHeader[];   // sequences_header
+extern u8 gShindouSoundBanksHeader[];  // ctl_header
+extern u8 gShindouSampleBanksHeader[]; // tbl_header
+#endif
 
 // (void) must be omitted from parameters
 void audio_init() {
-    UNUSED s8 pad[0x34];
-    s32 i, j, k;
-    s32 lim;
-    u64 *ptr64;
+    UNUSED s8 pad[16]; // SH - 52
+    s32 i, j, UNUSED k; // unused on PC
+
     void *data;
     UNUSED u8 pad2[4];
     s32 seqCount;
 
     gAudioLoadLockSH = 0;
 
-    for (i = 0; i < gAudioHeapSize / 8; i++) {
-        ((u64 *) gAudioHeap)[i] = 0;
-    }
-
+    bzero(&gAudioHeap, gAudioHeapSize);
 #ifdef TARGET_N64
-    // It seems boot.s doesn't clear the .bss area for audio, so do it here.
-    lim = ((uintptr_t) &gAudioGlobalsEndMarker - (uintptr_t) &gAudioGlobalsStartMarker) / 8;
-    ptr64 = &gAudioGlobalsStartMarker;
-    for (k = lim; k >= 0; k--) {
-        *ptr64++ = 0;
-    }
+    // Audio bss is located differently, so clean it here
+    bzero((void *) _audioSegmentBssStart, (uintptr_t) _audioSegmentBssEnd - (uintptr_t) _audioSegmentBssStart);
 #endif
 
     D_EU_802298D0 = 16.713f;
@@ -1078,14 +1096,14 @@ void audio_init() {
     eu_stubbed_printf_0("Main Heap Initialize.\n");
 
     // Load headers for sounds and sequences
-    gSeqFileHeader = (ALSeqFile *) gShindouSequencesHeader;
-    gAlCtlHeader = (ALSeqFile *) gShindouSoundBanksHeader;
-    gAlTbl = (ALSeqFile *) gShindouSampleBanksHeader;
-    gAlBankSets = gBankSetsData;
+    gSeqFileHeader = LOAD_DATA((ALSeqFile *) gShindouSequencesHeader);
+    gAlCtlHeader = LOAD_DATA((ALSeqFile *) gShindouSoundBanksHeader);
+    gAlTbl = LOAD_DATA((ALSeqFile *) gShindouSampleBanksHeader);
+    gAlBankSets = LOAD_DATA(gBankSetsData);
     gSequenceCount = (s16) gSeqFileHeader->seqCount;
-    patch_seq_file(gSeqFileHeader, gMusicData, D_SH_80315EF4);
-    patch_seq_file(gAlCtlHeader, gSoundDataADSR, D_SH_80315EF8);
-    patch_seq_file(gAlTbl, gSoundDataRaw, D_SH_80315EFC);
+    patch_seq_file(gSeqFileHeader, LOAD_DATA(gMusicData), D_SH_80315EF4);
+    patch_seq_file(gAlCtlHeader, LOAD_DATA(gSoundDataADSR), D_SH_80315EF8);
+    patch_seq_file(gAlTbl, LOAD_DATA(gSoundDataRaw), D_SH_80315EFC);
     seqCount = gAlCtlHeader->seqCount;
     gCtlEntries = sound_alloc_uninitialized(&gAudioInitPool, seqCount * sizeof(struct CtlEntry));
     for (i = 0; i < seqCount; i++) {
@@ -1281,6 +1299,12 @@ void func_sh_802f4dcc(s32 audioResetStatus) {
     }
 }
 
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wself-assign"
+#endif
+#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
+
 void func_sh_802f4e50(struct PendingDmaAudioBank *audioBank, s32 audioResetStatus) {
     ALSeqFile *alSeqFile;
     u32 *encodedInfo;
@@ -1311,12 +1335,7 @@ void func_sh_802f4e50(struct PendingDmaAudioBank *audioBank, s32 audioResetStatu
     encodedInfo = &audioBank->encodedInfo;
     if (audioBank->remaining == 0) {
         mesg = (OSMesg) audioBank->encodedInfo;
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wself-assign"
-#endif
         mesg = mesg;    //! needs an extra read from mesg here to match...
-#pragma GCC diagnostic pop
         temp = *encodedInfo;
         bankId = (temp >> 8) & 0xFF;
         switch ((u8) (temp >> 0x10)) {
@@ -1375,6 +1394,7 @@ void func_sh_802f4e50(struct PendingDmaAudioBank *audioBank, s32 audioResetStatu
         audioBank->vAddr = ((u8 *) audioBank->vAddr) + audioBank->transferSize;
     }
 }
+#pragma GCC diagnostic pop
 
 extern char shindouDebugPrint110[]; // "BGCOPY"
 void func_sh_802f50ec(struct PendingDmaAudioBank *arg0, size_t len) {
@@ -1430,7 +1450,7 @@ void patch_sound(struct AudioBankSound *sound, struct AudioBank *memBase, struct
 
 BAD_RETURN(s32) func_sh_802f5310(s32 bankId, struct AudioBank *mem, struct PatchStruct *patchInfo, s32 arg3) {
     UNUSED u32 pad[2];
-    u8 *addr;
+    u8 *addr = NULL;
     UNUSED u32 pad1[3];
     s32 sp4C;
     struct AudioBankSample *temp_s0;

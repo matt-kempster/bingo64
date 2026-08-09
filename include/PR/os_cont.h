@@ -60,6 +60,8 @@ typedef struct {
 	u16     button;
 	s8      stick_x;		/* -80 <= stick_x <= 80 */
 	s8      stick_y;		/* -80 <= stick_y <= 80 */
+	s8      ext_stick_x;	/* Only used on non-n64 */
+	s8      ext_stick_y;	/* Only used on non-n64 */
 	u8      errnum;
 } OSContPad;
 
@@ -93,6 +95,7 @@ typedef struct {
 /* controller errors */
 #define CONT_NO_RESPONSE_ERROR          0x8
 #define CONT_OVERRUN_ERROR              0x4
+#define CONT_RANGE_ERROR               -1
 #ifdef _HW_VERSION_1
 #define CONT_FRAME_ERROR                0x2
 #define CONT_COLLISION_ERROR            0x1

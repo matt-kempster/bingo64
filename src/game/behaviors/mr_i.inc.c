@@ -14,6 +14,14 @@ void bhv_piranha_particle_loop(void) {
 }
 
 void mr_i_piranha_particle_act_0(void) {
+#if MR_I_PITCH_SHOOTING
+    // Take pitch into account
+    o->oVelX = (o->oForwardVel *  coss(o->oMoveAnglePitch) * sins(o->oMoveAngleYaw));
+    o->oVelY = (o->oForwardVel * -sins(o->oMoveAnglePitch)                         );
+    o->oVelZ = (o->oForwardVel *  coss(o->oMoveAnglePitch) * coss(o->oMoveAngleYaw));
+    vec3f_add(&o->oPosX, &o->oVelX);
+#endif
+
     cur_obj_scale(3.0f);
     o->oForwardVel = 20.0f;
     cur_obj_update_floor_and_walls();
@@ -22,17 +30,19 @@ void mr_i_piranha_particle_act_0(void) {
         o->oAction = 1;
     } else if ((o->oTimer > 100) || (o->oMoveFlags & OBJ_MOVE_HIT_WALL)
                || (o->activeFlags & ACTIVE_FLAG_IN_DIFFERENT_ROOM)) {
-        obj_mark_for_deletion(o);
-        spawn_mist_particles();
+        SWAP_PARTICLE_CALL(obj_mark_for_deletion(o), spawn_mist_particles());
     }
 }
 
 void mr_i_piranha_particle_act_1(void) {
     s32 i;
+    SWAP_PARTICLE_CALL(
     obj_mark_for_deletion(o);
+    ,
     for (i = 0; i < 10; i++) {
         spawn_object(o, MODEL_PURPLE_MARBLE, bhvPurpleParticle);
     }
+    )
 }
 
 void (*sMrIParticleActions[])(void) = {
@@ -45,14 +55,19 @@ void bhv_mr_i_particle_loop(void) {
 }
 
 void spawn_mr_i_particle(void) {
-    struct Object *particle;
-    f32 sp18 = o->header.gfx.scale[1];
+    f32 yScale = o->header.gfx.scale[1];
 
-    particle = spawn_object(o, MODEL_PURPLE_MARBLE, bhvMrIParticle);
-    particle->oPosY += 50.0f * sp18;
-    particle->oPosX += sins(o->oMoveAngleYaw) * 90.0f * sp18;
-    particle->oPosZ += coss(o->oMoveAngleYaw) * 90.0f * sp18;
-
+    struct Object *particle = spawn_object(o, MODEL_PURPLE_MARBLE, bhvMrIParticle);
+#if MR_I_PITCH_SHOOTING
+    // Take pitch into account
+    particle->oPosX += (90.0f * yScale) *  coss(o->oMoveAnglePitch) * sins(o->oMoveAngleYaw);
+    particle->oPosY += (90.0f * yScale) * -sins(o->oMoveAnglePitch) + (50.0f * yScale);
+    particle->oPosZ += (90.0f * yScale) *  coss(o->oMoveAnglePitch) * coss(o->oMoveAngleYaw);
+#else
+    particle->oPosY += 50.0f * yScale;
+    particle->oPosX += sins(o->oMoveAngleYaw) * 90.0f * yScale;
+    particle->oPosZ += coss(o->oMoveAngleYaw) * 90.0f * yScale;
+#endif
     cur_obj_play_sound_2(SOUND_OBJ_MRI_SHOOT);
 }
 
@@ -77,9 +92,15 @@ void bhv_mr_i_body_loop(void) {
         }
     }
 
+#if FIX_MR_I_DELETED_PARENT
+    if (!(o->parentObj->activeFlags & ACTIVE_FLAG_ACTIVE) || !obj_has_behavior(o->parentObj, bhvMrI)) {
+        obj_mark_for_deletion(o);
+    }
+#else
     if (o->parentObj->activeFlags == ACTIVE_FLAG_DEACTIVATED) {
         obj_mark_for_deletion(o);
     }
+#endif
 }
 
 void mr_i_act_3(void) {
@@ -139,7 +160,11 @@ void mr_i_act_3(void) {
             }
             if (o->oBhvParams2ndByte != 0) {
                 o->oPosY += 100.0f;
+                #ifdef RM2C_HAS_CUSTOM_STAR_POS
+                spawn_default_star(MrIStarPos);
+                #else
                 spawn_default_star(1370, 2000.0f, -320.0f);
+                #endif
                 obj_mark_for_deletion(o);
             } else {
                 cur_obj_spawn_loot_blue_coin();
@@ -280,7 +305,9 @@ void mr_i_act_0(void) {
     o->oMoveAngleRoll = 0;
 #endif
     cur_obj_scale(o->oBhvParams2ndByte + 1);
-
+#if FIX_MR_I_EYEBALL_POSITION
+    o->oGraphYOffset = 100.0f * o->header.gfx.scale[1];
+#endif
     if (o->oTimer == 0) {
         cur_obj_set_pos_to_home();
     }

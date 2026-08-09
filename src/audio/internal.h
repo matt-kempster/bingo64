@@ -4,13 +4,25 @@
 #include <ultra64.h>
 
 #include "types.h"
+#include "config/config_audio.h"
 
 #if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
 #define SEQUENCE_PLAYERS 4
+#else
+#define SEQUENCE_PLAYERS 3
+#endif
+
+#define LAYERS_MAX       4
+#define CHANNELS_MAX     16
+
+#if EXPAND_AUDIO_HEAP // Not technically on the heap but it's memory nonetheless...
+#define SEQUENCE_CHANNELS (SEQUENCE_PLAYERS * CHANNELS_MAX)
+#define SEQUENCE_LAYERS ((SEQUENCE_CHANNELS * LAYERS_MAX) / 2) // This should be more than plenty in nearly all circumstances.
+#else // EXPAND_AUDIO_HEAP
+#if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
 #define SEQUENCE_CHANNELS 48
 #define SEQUENCE_LAYERS 64
 #else
-#define SEQUENCE_PLAYERS 3
 #define SEQUENCE_CHANNELS 32
 #ifdef VERSION_JP
 #define SEQUENCE_LAYERS 48
@@ -18,9 +30,7 @@
 #define SEQUENCE_LAYERS 52
 #endif
 #endif
-
-#define LAYERS_MAX       4
-#define CHANNELS_MAX     16
+#endif // EXPAND_AUDIO_HEAP
 
 #define NO_LAYER ((struct SequenceChannelLayer *)(-1))
 
@@ -168,11 +178,16 @@ struct AdpcmBook {
 
 struct AudioBankSample {
 #if defined(VERSION_SH) || defined(VERSION_CN)
+#if !IS_BIG_ENDIAN
+    u32 size : 24;
+#endif
     /* 0x00 */ u32 codec : 4;
     /* 0x00 */ u32 medium : 2;
     /* 0x00 */ u32 bit1 : 1;
     /* 0x00 */ u32 isPatched : 1;
+#if IS_BIG_ENDIAN
     /* 0x01 */ u32 size : 24;
+#endif
 #else
     u8 unused;
     u8 loaded;
@@ -293,7 +308,7 @@ struct SequencePlayer {
     /*     , 0x028, 0x02C*/ f32 fadeVolumeScale;
     /*     , 0x02C*/ f32 appliedFadeVolume;
 #else
-    /*            */ u8 pad2[4];
+    /*0x028, */ f32 volumeDefault;
 #endif
     /*0x02C, 0x030, 0x034*/ struct SequenceChannel *channels[CHANNELS_MAX];
     /*0x06C, 0x070*/ struct M64ScriptState scriptState;
@@ -312,6 +327,7 @@ struct SequencePlayer {
 #endif
     /*0x138, 0x140*/ uintptr_t bankDmaCurrDevAddr;
     /*0x13C, 0x144*/ ssize_t bankDmaRemaining;
+    /*     ext    */ f32 volumeScale;
 }; // size = 0x140, 0x148 on EU, 0x14C on SH
 
 struct AdsrSettings {
@@ -615,9 +631,6 @@ struct Note {
     // when needed... This breaks alignment on non-N64 platforms, which we hack
     // around by skipping the padding in that case.
     // TODO: use macros or something instead.
-#ifdef TARGET_N64
-    u8 pad0[12];
-#endif
 
     /*0x04, 0x30, 0x30*/ u8 priority;
     /*      0x31, 0x31*/ u8 waveId;
@@ -721,6 +734,11 @@ struct ReverbSettingsEU {
     u16 gain;
 };
 #else
+struct ReverbSettingsUS {
+    u8 downsampleRate;
+    u16 windowSize;
+    u16 gain;
+};
 struct ReverbSettingsEU {
     u8 downsampleRate; // always 1
     u8 windowSize; // To be multiplied by 16

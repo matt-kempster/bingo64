@@ -29,7 +29,7 @@ void bhv_treasure_chest_top_loop(void) {
             if (o->oTimer == 0) {
                 if (sp34->oTreasureChestUnkFC == 0) {
                     spawn_object_relative(0, 0, -80, 120, o, MODEL_BUBBLE, bhvWaterAirBubble);
-                    play_sound(SOUND_GENERAL_CLAM_SHELL1, o->header.gfx.cameraToObject);
+                    play_sound(SOUND_GENERAL_OPEN_CHEST_WATER, o->header.gfx.cameraToObject);
                 } else {
                     play_sound(SOUND_GENERAL_OPEN_CHEST, o->header.gfx.cameraToObject);
                 }
@@ -137,8 +137,8 @@ void bhv_treasure_chest_ship_loop(void) {
                     gEnvironmentRegions[6] = -335;
                     o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
                 }
-#if ENABLE_RUMBLE
-                reset_rumble_timers_2(2);
+#ifdef RUMBLE_FEEDBACK
+                reset_rumble_timers_viblate(2);
 #endif
             }
             break;
@@ -166,7 +166,11 @@ void bhv_treasure_chest_jrb_loop(void) {
         case 1:
             if (o->oTimer == 60) {
                 spawn_mist_particles();
+                #ifdef RM2C_HAS_CUSTOM_STAR_POS
+                spawn_default_star(TreasureChestStarPos);
+                #else
                 spawn_default_star(-1800.0f, -2500.0f, -1700.0f);
+                #endif
                 o->oAction = 2;
             }
             break;

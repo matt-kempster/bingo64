@@ -14,6 +14,10 @@
 #include "sm64.h"
 #include "types.h"
 
+#ifdef EXT_DEBUG_MENU
+#include "extras/debug_menu.h"
+#endif
+
 #define DEBUG_INFO_NOFLAGS (0 << 0)
 #define DEBUG_INFO_FLAG_DPRINT (1 << 0)
 #define DEBUG_INFO_FLAG_LSELECT (1 << 1)
@@ -163,12 +167,11 @@ void print_debug_top_down_normal(const char *str, s32 number) {
 }
 
 void print_mapinfo(void) {
-    // EU mostly stubbed this function out.
     struct Surface *pfloor;
-    UNUSED f32 bgY;   // unused in EU
-    UNUSED f32 water; // unused in EU
-    UNUSED s32 area;  // unused in EU
-    UNUSED s32 angY;  // unused in EU
+    f32 bgY;
+    f32 water;
+    s32 area;
+    s32 angY;
 
     angY = gCurrentObject->oMoveAngleYaw / 182.044000;
     area = ((s32) gCurrentObject->oPosX + 0x2000) / 1024
@@ -178,7 +181,6 @@ void print_mapinfo(void) {
     water = find_water_level(gCurrentObject->oPosX, gCurrentObject->oPosZ);
 
     print_debug_top_down_normal("mapinfo", 0);
-#ifndef VERSION_EU
     print_debug_top_down_mapinfo("area %x", area);
     print_debug_top_down_mapinfo("wx   %d", gCurrentObject->oPosX);
     //! Fat finger: programmer hit tab instead of space. Japanese
@@ -198,7 +200,6 @@ void print_mapinfo(void) {
     if (gCurrentObject->oPosY < water) {
         print_debug_top_down_mapinfo("water %d", water);
     }
-#endif
 }
 
 void print_checkinfo(void) {
@@ -291,7 +292,7 @@ void reset_debug_objectinfo(void) {
     gObjectCounter = 0;
     sDebugStringArrPrinted = FALSE;
     D_8035FEE2 = 0;
-    D_8035FEE4 = 0;
+    gNumDoorRenderCount = 0;
 
     set_print_state_info(gDebugPrintState1, 20, 185, 40, 200, -15);
     set_print_state_info(gDebugPrintState2, 180, 30, 0, 150, 15);
@@ -331,7 +332,7 @@ UNUSED static void check_debug_button_seq(void) {
  * Poll the debug info flags and controller for appropriate presses that
  * control sDebugPage's range. (unused)
  */
-UNUSED static void try_change_debug_page(void) {
+void try_change_debug_page(void) {
     if (gDebugInfoFlags & DEBUG_INFO_FLAG_DPRINT) {
         if ((gPlayer1Controller->buttonPressed & L_JPAD)
             && (gPlayer1Controller->buttonDown & (L_TRIG | R_TRIG))) {
@@ -356,9 +357,6 @@ UNUSED static void try_change_debug_page(void) {
  * sDebugSysCursor. This is used to adjust enemy and effect behaviors
  * on the fly. (unused)
  */
-#ifdef VERSION_EU
-UNUSED static
-#endif
 void try_modify_debug_controls(void) {
     s32 sp4;
 
@@ -460,6 +458,10 @@ void try_print_debug_mario_level_info(void) {
         default:
             break;
     }
+    
+#ifdef EXT_DEBUG_MENU
+    activate_complex_debug_display();
+#endif
 }
 
 /*
@@ -489,8 +491,7 @@ void try_do_mario_debug_object_spawn(void) {
 }
 
 // TODO: figure out what this is
-void debug_print_obj_move_flags(void) {
-#ifndef VERSION_EU // TODO: Is there a better way to diff this? static EU doesn't seem to work.
+UNUSED static void debug_print_obj_move_flags(void) {
     if (gCurrentObject->oMoveFlags & OBJ_MOVE_LANDED) {
         print_debug_top_down_objectinfo("BOUND   %x", gCurrentObject->oMoveFlags);
     }
@@ -518,11 +519,10 @@ void debug_print_obj_move_flags(void) {
     if (gCurrentObject->oMoveFlags & OBJ_MOVE_OUT_SCOPE) {
         print_debug_top_down_objectinfo("OUT SCOPE %x", gCurrentObject->oMoveFlags);
     }
-#endif
 }
 
 // unused, what is this?
-void debug_enemy_unknown(s16 *enemyArr) {
+UNUSED static void debug_enemy_unknown(s16 *enemyArr) {
     // copy b1-b4 over to an unknown s16 array
     enemyArr[4] = gDebugInfo[DEBUG_PAGE_ENEMYINFO][1];
     enemyArr[5] = gDebugInfo[DEBUG_PAGE_ENEMYINFO][2];

@@ -19,12 +19,6 @@
 
 #define obj_and_int(object, offset, value) object->OBJECT_FIELD_S32(offset) &= (s32)(value)
 
-extern u16 gRandomSeed16;
-u16 random_u16(void);
-u32 random_u32(void);
-float random_float(void);
-s32 random_sign(void);
-
 void stub_behavior_script_2(void);
 
 void cur_obj_update(void);

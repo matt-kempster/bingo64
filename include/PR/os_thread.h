@@ -66,13 +66,13 @@ typedef struct OSThread_s
 
 /* Functions */
 
-void osCreateThread(OSThread *thread, OSId id, void (*entry)(void *),
-    void *arg, void *sp, OSPri pri);
-OSId osGetThreadId(OSThread *thread);
-OSPri osGetThreadPri(OSThread *thread);
-void osSetThreadPri(OSThread *thread, OSPri pri);
-void osStartThread(OSThread *thread);
-void osStopThread(OSThread *thread);
+void osCreateThread(OSThread *, OSId, void (*)(void *), void *, void *, OSPri);
+void osYieldThread(void);
+OSId osGetThreadId(OSThread *);
+OSPri osGetThreadPri(OSThread *);
+void osSetThreadPri(OSThread *, OSPri);
+void osStartThread(OSThread *);
+void osStopThread(OSThread *);
 
 #endif
 

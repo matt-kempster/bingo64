@@ -5,6 +5,7 @@
 #include "gfx_dimensions.h"
 #include "audio/external.h"
 #include "buffers/buffers.h"
+#include "gfx_dimensions.h"
 #include "buffers/gfx_output_buffer.h"
 #include "buffers/framebuffers.h"
 #include "buffers/zbuffer.h"
@@ -27,13 +28,35 @@
 #include "menu/star_select.h"
 #include "camera.h"
 
+#ifdef TARGET_N64
+#include "boot/system_checks.h"
+#endif
+
+#ifdef BETTERCAMERA
+#include "extras/bettercamera.h"
+#endif
+
+#if defined(TARGET_N3DS) && !defined(DISABLE_N3DS_AUDIO)
+#include "pc/audio/audio_3ds_threading.h"
+#endif
+
+#ifdef EXT_DEBUG_MENU
+#include "extras/debug_menu.h"
+#endif
+
 // First 3 controller slots
 struct Controller gControllers[3];
 
 // Gfx handlers
 struct SPTask *gGfxSPTask;
+#ifdef USE_SYSTEM_MALLOC
+struct AllocOnlyPool *gGfxAllocOnlyPool;
+Gfx *gDisplayListHeadInChunk;
+Gfx *gDisplayListEndInChunk;
+#else
 Gfx *gDisplayListHead;
 u8 *gGfxPoolEnd;
+#endif
 struct GfxPool *gGfxPool;
 
 // OS Controllers
@@ -61,10 +84,6 @@ void *gDemoInputsMemAlloc;
 struct DmaHandlerList gMarioAnimsBuf;
 struct DmaHandlerList gDemoInputsBuf;
 
-// fillers
-UNUSED static u8 sfillerGameInit[0x90];
-static s32 sUnusedGameInitValue = 0;
-
 // General timer that runs as the game starts
 u32 gGlobalTimer = 0;
 
@@ -73,7 +92,9 @@ u16 sRenderedFramebuffer = 0;
 u16 sRenderingFramebuffer = 0;
 
 // Goddard Vblank Function Caller
+#ifdef GODDARD_MFACE
 void (*gGoddardVblankCallback)(void) = NULL;
+#endif
 
 // Defined controller slots
 struct Controller *gPlayer1Controller = &gControllers[0];
@@ -257,11 +278,13 @@ void create_gfx_task_structure(void) {
     gGfxSPTask->msgqueue = &gGfxVblankQueue;
     gGfxSPTask->msg = (OSMesg) 2;
     gGfxSPTask->task.t.type = M_GFXTASK;
+#ifdef TARGET_N64
     gGfxSPTask->task.t.ucode_boot = rspF3DBootStart;
     gGfxSPTask->task.t.ucode_boot_size = ((u8 *) rspF3DBootEnd - (u8 *) rspF3DBootStart);
     gGfxSPTask->task.t.flags = 0;
     gGfxSPTask->task.t.ucode = rspF3DStart;
     gGfxSPTask->task.t.ucode_data = rspF3DDataStart;
+#endif
     gGfxSPTask->task.t.ucode_size = SP_UCODE_SIZE; // (this size is ignored)
     gGfxSPTask->task.t.ucode_data_size = SP_UCODE_DATA_SIZE;
     gGfxSPTask->task.t.dram_stack = (u64 *) gGfxSPTaskStack;
@@ -331,6 +354,7 @@ void draw_reset_bars(void) {
     osRecvMesg(&gGameVblankQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
 }
 
+#ifdef TARGET_N64
 /**
  * Initial settings for the first rendered frame.
  */
@@ -345,9 +369,26 @@ void render_init(void) {
     end_master_display_list();
     exec_display_list(&gGfxPool->spTask);
 
-    sRenderingFramebuffer++;
+    // Skip incrementing the initial framebuffer index on emulators so that they display immediately as the Gfx task finishes
+    // VC probably emulates osViSwapBuffer accurately so instant patch breaks VC compatibility
+    // Currently, Ares passes the cache emulation test and has issues with single buffering so disable it there as well.
+    if (gIsConsole || gIsWiiVC || gCacheEmulated) {
+        sRenderingFramebuffer++;
+    }
     gGlobalTimer++;
 }
+#endif
+
+#ifdef USE_SYSTEM_MALLOC
+Gfx **alloc_next_dl(void) {
+    u32 size = GFX_POOL_SIZE_FIXED;
+    Gfx *new_chunk = alloc_only_pool_alloc(gGfxAllocOnlyPool, size * sizeof(Gfx));
+    gSPBranchList(gDisplayListHeadInChunk++, new_chunk);
+    gDisplayListHeadInChunk = new_chunk;
+    gDisplayListEndInChunk = new_chunk + size;
+    return &gDisplayListHeadInChunk;
+}
+#endif
 
 /**
  * Selects the location of the F3D output buffer (gDisplayListHead).
@@ -356,8 +397,14 @@ void select_gfx_pool(void) {
     gGfxPool = &gGfxPools[gGlobalTimer % ARRAY_COUNT(gGfxPools)];
     set_segment_base_addr(1, gGfxPool->buffer);
     gGfxSPTask = &gGfxPool->spTask;
+#ifdef USE_SYSTEM_MALLOC
+    gDisplayListHeadInChunk = gGfxPool->buffer;
+    gDisplayListEndInChunk = gDisplayListHeadInChunk + 1;
+    alloc_only_pool_clear(gGfxAllocOnlyPool);
+#else
     gDisplayListHead = gGfxPool->buffer;
     gGfxPoolEnd = (u8 *) (gGfxPool->buffer + GFX_POOL_SIZE);
+#endif
 }
 
 /**
@@ -370,22 +417,29 @@ void select_gfx_pool(void) {
 void display_and_vsync(void) {
     profiler_log_thread5_time(BEFORE_DISPLAY_LISTS);
     osRecvMesg(&gGfxVblankQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
+#ifdef GODDARD_MFACE
     if (gGoddardVblankCallback != NULL) {
         gGoddardVblankCallback();
         gGoddardVblankCallback = NULL;
     }
+#endif
     exec_display_list(&gGfxPool->spTask);
     profiler_log_thread5_time(AFTER_DISPLAY_LISTS);
     osRecvMesg(&gGameVblankQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
     osViSwapBuffer((void *) PHYSICAL_TO_VIRTUAL(gPhysicalFramebuffers[sRenderedFramebuffer]));
     profiler_log_thread5_time(THREAD5_END);
     osRecvMesg(&gGameVblankQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
-    if (++sRenderedFramebuffer == 3) {
-        sRenderedFramebuffer = 0;
+#ifdef TARGET_N64
+    // Skip swapping buffers on inaccurate emulators other than VC so that they display immediately as the Gfx task finishes
+    if (gIsConsole || gIsWiiVC || gCacheEmulated) {
+        if (++sRenderedFramebuffer == 3) {
+            sRenderedFramebuffer = 0;
+        }
+        if (++sRenderingFramebuffer == 3) {
+            sRenderingFramebuffer = 0;
+        }
     }
-    if (++sRenderingFramebuffer == 3) {
-        sRenderingFramebuffer = 0;
-    }
+#endif
     gGlobalTimer++;
 }
 
@@ -540,7 +594,7 @@ void read_controller_inputs(void) {
     if (gControllerBits) {
         osRecvMesg(&gSIEventMesgQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
         osContGetReadData(&gControllerPads[0]);
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         release_rumble_pak_control();
 #endif
     }
@@ -567,6 +621,10 @@ void read_controller_inputs(void) {
 
             controller->rawStickX = controller->controllerData->stick_x;
             controller->rawStickY = controller->controllerData->stick_y;
+#ifndef TARGET_N64
+            controller->extStickX = controller->controllerData->ext_stick_x;
+            controller->extStickY = controller->controllerData->ext_stick_y;
+#endif
 
             if (gBingoReverseJoystickActive && !gStarSelectScreenActive) {
                 controller->rawStickX *= -1;
@@ -629,6 +687,10 @@ void read_controller_inputs(void) {
         } else { // otherwise, if the controllerData is NULL, 0 out all of the inputs.
             controller->rawStickX = 0;
             controller->rawStickY = 0;
+#ifndef TARGET_N64
+            controller->extStickX = 0;
+            controller->extStickY = 0;
+#endif
             controller->buttonPressed = 0;
             controller->buttonDown = 0;
             controller->stickX = 0;
@@ -654,6 +716,19 @@ void read_controller_inputs(void) {
     gPlayer3Controller->stickMag = gPlayer1Controller->stickMag;
     gPlayer3Controller->buttonPressed = gPlayer1Controller->buttonPressed;
     gPlayer3Controller->buttonDown = gPlayer1Controller->buttonDown;
+    
+#ifdef BETTERCAMERA
+    //If a cutscene's active, just kill all controller input.
+    if (gPuppyCam.enabled && gPuppyCam.cutscene && gPuppyCam.sceneInput) {
+        gPlayer1Controller->rawStickX = 0;
+        gPlayer1Controller->rawStickY = 0;
+        gPlayer1Controller->buttonPressed = 0;
+        gPlayer1Controller->buttonDown = 0;
+        gPlayer1Controller->stickX = 0;
+        gPlayer1Controller->stickY = 0;
+        gPlayer1Controller->stickMag = 0;
+    }
+#endif
 }
 
 /**
@@ -684,7 +759,7 @@ void init_controllers(void) {
             // into any port in order to play the game. this was probably
             // so if any of the ports didn't work, you can have controllers
             // plugged into any of them and it will work.
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
             gControllers[cont].port = port;
 #endif
             gControllers[cont].statusData = &gControllerStatuses[port];
@@ -726,50 +801,68 @@ void setup_game_memory(void) {
     load_segment_decompress(2, _segment2_mio0SegmentRomStart, _segment2_mio0SegmentRomEnd);
 }
 
+#ifndef TARGET_N64
+static struct LevelCommand *levelCommandAddr;
+#endif
+
 /**
  * Main game loop thread. Runs forever as long as the game continues.
  */
 void thread5_game_loop(UNUSED void *arg) {
-    struct LevelCommand *addr;
+#ifdef TARGET_N64
+    struct LevelCommand *levelCommandAddr;
+#endif
 
     CN_DEBUG_PRINTF(("start gfx thread\n"));
 
     setup_game_memory();
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
     init_rumble_pak_scheduler_queue();
 #endif
-
     CN_DEBUG_PRINTF(("init ctrl\n"));
     init_controllers();
     CN_DEBUG_PRINTF(("done ctrl\n"));
-
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
     create_thread_6();
 #endif
-
     save_file_load_all();
+#ifdef BETTERCAMERA
+    puppycam_boot();
+#endif
 
     set_vblank_handler(2, &gGameVblankHandler, &gGameVblankQueue, (OSMesg) 1);
 
-    // Point address to the entry point into the level script data.
-    addr = segmented_to_virtual(level_script_entry);
+    // Point levelCommandAddr to the entry point into the level script data.
+    levelCommandAddr = segmented_to_virtual(level_script_entry);
 
     play_music(SEQ_PLAYER_SFX, SEQUENCE_ARGS(0, SEQ_SOUND_PLAYER), 0);
     set_sound_mode(save_file_get_sound_mode());
+
+#ifdef TARGET_N64
     render_init();
 
     while (TRUE) {
+#else
+    gGlobalTimer++;
+}
+
+void game_loop_one_iteration(void) {
+#endif
         // If the reset timer is active, run the process to reset the game.
         if (gResetTimer != 0) {
             draw_reset_bars();
+#ifdef TARGET_N64
             continue;
+#else
+            return;
+#endif
         }
         profiler_log_thread5_time(THREAD5_START);
 
         // If any controllers are plugged in, start read the data for when
         // read_controller_inputs is called later.
         if (gControllerBits) {
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
             block_until_rumble_pak_free();
 #endif
             osContStartReadData(&gSIEventMesgQueue);
@@ -778,15 +871,26 @@ void thread5_game_loop(UNUSED void *arg) {
         audio_game_loop_tick();
         select_gfx_pool();
         read_controller_inputs();
-        addr = level_script_execute(addr);
+        levelCommandAddr = level_script_execute(levelCommandAddr);
+
+#if defined(TARGET_N3DS) && !defined(DISABLE_N3DS_AUDIO)
+        LightEvent_Signal(&s_event_audio);
+#endif
 
         display_and_vsync();
 
+#ifndef USE_SYSTEM_MALLOC
         // when debug info is enabled, print the "BUF %d" information.
         if (gShowDebugText) {
             // subtract the end of the gfx pool with the display list to obtain the
             // amount of free space remaining.
             print_text_fmt_int(180, 20, "BUF %d", gGfxPoolEnd - (u8 *) gDisplayListHead);
         }
+#endif
+#ifdef EXT_DEBUG_MENU
+        set_debug_main_action();
+#endif
+#ifdef TARGET_N64
     }
+#endif
 }

@@ -3,7 +3,7 @@
 
 void spawn_mist_particles_variable(s32 count, s32 offsetY, f32 size);
 void bhv_spawn_star_no_level_exit(u32);
-void bhv_star_door_loop_2(void);
+void bhv_door_rendering_loop(void);
 void spawn_triangle_break_particles(s16 numTris, s16 triModel, f32 triSize, s16 triAnimState);
 
 void spawn_mist_from_global(void);
@@ -205,7 +205,7 @@ void bhv_bub_loop(void);
 void bhv_exclamation_box_loop(void);
 void bhv_rotating_exclamation_box_loop(void);
 void bhv_sound_spawner_init(void);
-void bhv_bowsers_sub_loop(void);
+void bhv_bowsers_sub_init(void);
 void bhv_sushi_shark_loop(void);
 void bhv_sushi_shark_collision_loop(void);
 void bhv_jrb_sliding_box_loop(void);
@@ -547,6 +547,7 @@ void bhv_donut_platform_update(void);
 void bhv_ddd_pole_init(void);
 void bhv_ddd_pole_update(void);
 void bhv_red_coin_star_marker_init(void);
+void bhv_red_coin_star_marker_loop(void);
 void bhv_triplet_butterfly_update(void);
 void bhv_bubba_loop(void);
 void bhv_intro_lakitu_loop(void);
@@ -557,6 +558,9 @@ void bhv_intro_scene_loop(void);
 void bhv_dust_smoke_loop(void);
 void bhv_yoshi_loop(void);
 void bhv_volcano_trap_loop(void);
+
+void bhv_2d_physics_loop(void);
+void uv_update_scroll(void);
 
 Gfx *geo_move_mario_part_from_parent(s32 run, UNUSED struct GraphNode *node, Mat4 mtx);
 

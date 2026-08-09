@@ -34,7 +34,7 @@ static void set_swimming_at_surface_particles(struct MarioState *m, u32 particle
     if (atSurface) {
         m->particleFlags |= particleFlag;
         if (atSurface ^ sWasAtSurface) {
-            play_sound(SOUND_ACTION_UNKNOWN431, m->marioObj->header.gfx.cameraToObject);
+            play_sound(SOUND_ACTION_SWIM_SURFACE, m->marioObj->header.gfx.cameraToObject);
         }
     }
 
@@ -76,7 +76,7 @@ static u32 perform_water_full_step(struct MarioState *m, Vec3f nextPos) {
 
     wall = resolve_and_return_wall_collisions(nextPos, 10.0f, 110.0f);
     floorHeight = find_floor(nextPos[0], nextPos[1], nextPos[2], &floor);
-    ceilHeight = vec3f_find_ceil(nextPos, floorHeight, &ceil);
+    ceilHeight = find_mario_ceil(nextPos, floorHeight, &ceil);
 
     if (floor == NULL) {
         return WATER_STEP_CANCELLED;
@@ -128,7 +128,7 @@ static void apply_water_current(struct MarioState *m, Vec3f step) {
         step[2] += currentSpeed * coss(currentAngle);
     }
 
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < ARRAY_COUNT(gAreaData[i].whirlpools); i++) {
         struct Whirlpool *whirlpool = gCurrentArea->whirlpools[i];
         if (whirlpool != NULL) {
             f32 strength = 0.0f;
@@ -146,10 +146,11 @@ static void apply_water_current(struct MarioState *m, Vec3f step) {
             yawToWhirlpool -= (s16)(0x2000 * 1000.0f / (distance + 1000.0f));
 
             if (whirlpool->strength >= 0) {
+#ifdef VANILLA_CHECKS
                 if (gCurrLevelNum == LEVEL_DDD && gCurrAreaIndex == 2) {
                     whirlpoolRadius = 4000.0f;
                 }
-
+#endif
                 if (distance >= 26.0f && distance < whirlpoolRadius) {
                     strength = whirlpool->strength * (1.0f - distance / whirlpoolRadius);
                 }
@@ -448,7 +449,11 @@ static void common_swimming_step(struct MarioState *m, s16 swimStrength) {
         case WATER_STEP_HIT_FLOOR:
             floorPitch = -find_floor_slope(m, -0x8000);
             if (m->faceAngle[0] < floorPitch) {
+#if SMOOTH_PITCH_WHEN_HITTING_FLOOR_UNDERWATER
+                approach_angle_bool(&m->faceAngle[0], floorPitch, 0x800);
+#else
                 m->faceAngle[0] = floorPitch;
+#endif
             }
             break;
 
@@ -486,7 +491,7 @@ static void play_swimming_noise(struct MarioState *m) {
     s16 animFrame = m->marioObj->header.gfx.animInfo.animFrame;
 
     // This must be one line to match on -O2
-    if (animFrame == 0 || animFrame == 12) play_sound(SOUND_ACTION_UNKNOWN434, m->marioObj->header.gfx.cameraToObject);
+    if (animFrame == 0 || animFrame == 12) play_sound(SOUND_ACTION_FLUTTER_KICK, m->marioObj->header.gfx.cameraToObject);
 }
 
 static s32 check_water_jump(struct MarioState *m) {
@@ -556,13 +561,11 @@ static s32 act_breaststroke(struct MarioState *m) {
                    m->marioObj->header.gfx.cameraToObject);
         reset_bob_variables(m);
     }
-
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
     if (m->actionTimer < 6) {
-        func_sh_8024CA04();
+        queue_rumble_submerged();
     }
 #endif
-
     set_mario_animation(m, MARIO_ANIM_SWIM_PART1);
     common_swimming_step(m, sSwimStrength);
 
@@ -776,6 +779,7 @@ static s32 check_water_grab(struct MarioState *m) {
     // you can use water grab to pick up heave ho.
     if (m->marioObj->collidedObjInteractTypes & INTERACT_GRABBABLE) {
         struct Object *object = mario_get_collided_object(m, INTERACT_GRABBABLE);
+
         f32 dx = object->oPosX - m->pos[0];
         f32 dz = object->oPosZ - m->pos[2];
         s16 dAngleToObject = atan2s(dz, dx) - m->faceAngle[1];
@@ -805,7 +809,7 @@ static s32 act_water_throw(struct MarioState *m) {
 
     if (m->actionTimer++ == 5) {
         mario_throw_held_object(m);
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         queue_rumble_data(3, 50);
 #endif
     }
@@ -974,14 +978,14 @@ static s32 act_water_plunge(struct MarioState *m) {
     stepResult = perform_water_step(m);
 
     if (m->actionState == 0) {
-        play_sound(SOUND_ACTION_UNKNOWN430, m->marioObj->header.gfx.cameraToObject);
+        play_sound(SOUND_ACTION_WATER_PLUNGE, m->marioObj->header.gfx.cameraToObject);
         if (m->peakHeight - m->pos[1] > 1150.0f) {
-            play_sound(SOUND_MARIO_HAHA_2, m->marioObj->header.gfx.cameraToObject);
+            play_sound(SOUND_MARIO_HAHA_WATER, m->marioObj->header.gfx.cameraToObject);
         }
 
         m->particleFlags |= PARTICLE_WATER_SPLASH;
         m->actionState = 1;
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         if (m->prevAction & ACT_FLAG_AIR) {
             queue_rumble_data(5, 80);
         }
@@ -1090,10 +1094,9 @@ static s32 act_caught_in_whirlpool(struct MarioState *m) {
     set_mario_animation(m, MARIO_ANIM_GENERAL_FALL);
     vec3f_copy(m->marioObj->header.gfx.pos, m->pos);
     vec3s_set(m->marioObj->header.gfx.angle, 0, m->faceAngle[1], 0);
-#if ENABLE_RUMBLE
-    reset_rumble_timers();
+#ifdef RUMBLE_FEEDBACK
+    reset_rumble_timers_slip();
 #endif
-
     return FALSE;
 }
 
@@ -1498,9 +1501,19 @@ static s32 act_hold_metal_water_fall_land(struct MarioState *m) {
 }
 
 static s32 check_common_submerged_cancels(struct MarioState *m) {
-    if (m->pos[1] > m->waterLevel - 80) {
-        if (m->waterLevel - 80 > m->floorHeight) {
-            m->pos[1] = m->waterLevel - 80;
+    s16 waterHeight = m->waterLevel - 80;
+    if (m->pos[1] > waterHeight) {
+        if (waterHeight > m->floorHeight) {
+#if FIX_WATER_PLUNGE_UPWARP
+            if (m->pos[1] - waterHeight < 50) {
+                m->pos[1] = waterHeight; // lock mario to top if the falloff isn't big enough
+            } else {
+                return transition_submerged_to_airborne(m);
+            }
+#else
+            // Vanilla bug: Downwarp swimming out of waterfalls
+            m->pos[1] = waterHeight;
+#endif
         } else {
             //! If you press B to throw the shell, there is a ~5 frame window
             // where your held object is the shell, but you are not in the
@@ -1524,7 +1537,7 @@ static s32 check_common_submerged_cancels(struct MarioState *m) {
 }
 
 s32 mario_execute_submerged_action(struct MarioState *m) {
-    s32 cancel;
+    s32 cancel = FALSE;
 
     if (check_common_submerged_cancels(m)) {
         return TRUE;

@@ -15,6 +15,7 @@
 #include "sm64.h"
 #include "sound_init.h"
 #include "rumble_init.h"
+#include "pc/configfile.h"
 
 #define MUSIC_NONE 0xFFFF
 
@@ -33,6 +34,14 @@ static u16 sCurrentCapMusic = MUSIC_NONE;
 static u8 sPlayingInfiniteStairs = FALSE;
 UNUSED static u8 unused8032C6D8[16] = { 0 };
 static s16 sSoundMenuModeToSoundMode[] = { SOUND_MODE_STEREO, SOUND_MODE_MONO, SOUND_MODE_HEADSET };
+
+#ifdef TARGET_N64
+unsigned int configMasterVolume = MAX_VOLUME; // 0 - MAX_VOLUME
+unsigned int configMusicVolume = MAX_VOLUME;
+unsigned int configSfxVolume = MAX_VOLUME;
+unsigned int configEnvVolume = MAX_VOLUME;
+#endif
+
 // Only the 20th array element is used.
 static u32 sMenuSoundsExtra[] = {
     SOUND_MOVING_TERRAIN_SLIDE + (0 << 16),
@@ -50,7 +59,7 @@ static u32 sMenuSoundsExtra[] = {
     NO_SOUND,
     SOUND_ENV_BOAT_ROCKING1,
     SOUND_ENV_ELEVATOR3,
-    SOUND_ENV_UNKNOWN2,
+    SOUND_ENV_BOWLING_BALL_ROLL,
     SOUND_ENV_WATERFALL1,
     SOUND_ENV_WATERFALL2,
     SOUND_ENV_ELEVATOR1,
@@ -146,16 +155,17 @@ void set_sound_mode(u16 soundMode) {
 
 /**
  * Wrapper method by menu used to set the sound via flags.
- *
- * Called from threads: thread5_game_loop
++ *
++ * Called from threads: thread5_game_loop
  */
 void play_menu_sounds(s16 soundMenuFlags) {
+
     if (soundMenuFlags & SOUND_MENU_FLAG_HANDAPPEAR) {
         play_sound(SOUND_MENU_HAND_APPEAR, gGlobalSoundSource);
     } else if (soundMenuFlags & SOUND_MENU_FLAG_HANDISAPPEAR) {
         play_sound(SOUND_MENU_HAND_DISAPPEAR, gGlobalSoundSource);
     } else if (soundMenuFlags & SOUND_MENU_FLAG_UNKNOWN1) {
-        play_sound(SOUND_MENU_UNK0C, gGlobalSoundSource);
+        play_sound(SOUND_MENU_UNK0C_FLAG_UNKNOWN1, gGlobalSoundSource);
     } else if (soundMenuFlags & SOUND_MENU_FLAG_PINCHMARIOFACE) {
         play_sound(SOUND_MENU_PINCH_MARIO_FACE, gGlobalSoundSource);
     } else if (soundMenuFlags & SOUND_MENU_FLAG_PINCHMARIOFACE2) {
@@ -171,7 +181,7 @@ void play_menu_sounds(s16 soundMenuFlags) {
     if (soundMenuFlags & 0x100) {
         play_menu_sounds_extra(20, NULL);
     }
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
     if (soundMenuFlags & SOUND_MENU_FLAG_LETGOMARIOFACE) {
         queue_rumble_data(10, 60);
     }
@@ -232,7 +242,10 @@ void set_background_music(u16 a, u16 seqArgs, s16 fadeTimer) {
             sound_reset(a);
         }
 
-        if (!gNeverEnteredCastle || seqArgs != SEQ_LEVEL_INSIDE_CASTLE) {
+#ifdef VANILLA_CHECKS
+        if (!gNeverEnteredCastle || seqArgs != SEQ_LEVEL_INSIDE_CASTLE)
+#endif
+        {
             play_music(SEQ_PLAYER_LEVEL, seqArgs, fadeTimer);
             sCurrentMusic = seqArgs;
         }
@@ -285,10 +298,22 @@ void stop_shell_music(void) {
     }
 }
 
+#if PERSISTENT_CAP_MUSIC
+static s8 sDoResetMusic = FALSE;
+extern void stop_cap_music(void);
+#endif
+
 /**
  * Called from threads: thread5_game_loop
  */
 void play_cap_music(u16 seqArgs) {
+#if PERSISTENT_CAP_MUSIC
+    if (sDoResetMusic) {
+        sDoResetMusic = FALSE;
+        stop_cap_music();
+    }
+#endif
+
     play_music(SEQ_PLAYER_LEVEL, seqArgs, 0);
     if (sCurrentCapMusic != MUSIC_NONE && sCurrentCapMusic != seqArgs) {
         stop_background_music(sCurrentCapMusic);
@@ -302,6 +327,9 @@ void play_cap_music(u16 seqArgs) {
 void fadeout_cap_music(void) {
     if (sCurrentCapMusic != MUSIC_NONE) {
         fadeout_background_music(sCurrentCapMusic, 600);
+#if PERSISTENT_CAP_MUSIC
+        sDoResetMusic = TRUE;
+#endif
     }
 }
 
@@ -327,6 +355,13 @@ void play_menu_sounds_extra(s32 a, void *b) {
  */
 void audio_game_loop_tick(void) {
     audio_signal_game_loop_tick();
+}
+
+void change_audio_volumes(void) {
+    const f32 master_mod = (f32)configMasterVolume / 127.0f;
+    set_sequence_player_volume(SEQ_PLAYER_LEVEL, (f32)configMusicVolume / 127.0f * master_mod);
+    set_sequence_player_volume(SEQ_PLAYER_SFX, (f32)configSfxVolume / 127.0f * master_mod);
+    set_sequence_player_volume(SEQ_PLAYER_ENV, (f32)configEnvVolume / 127.0f * master_mod);
 }
 
 /**
@@ -355,5 +390,9 @@ void thread4_sound(UNUSED void *arg) {
             }
             profiler_log_thread4_time();
         }
+        
+#ifdef TARGET_N64 // TODO: save to EEPROM
+        change_audio_volumes();
+#endif
     }
 }

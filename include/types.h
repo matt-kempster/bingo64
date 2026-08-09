@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef _SM64_TYPES_H_
+#define _SM64_TYPES_H_
 
 // This file contains various data types used in Super Mario 64 that don't yet
 // have an appropriate header.
@@ -7,7 +7,6 @@
 #include <ultra64.h>
 #include "macros.h"
 #include "config.h"
-
 
 // Certain functions are marked as having return values, but do not
 // actually return a value. This causes undefined behavior, which we'd rather
@@ -30,32 +29,78 @@ struct Controller {
   /*0x12*/ u16 buttonPressed;
   /*0x14*/ OSContStatus *statusData;
   /*0x18*/ OSContPad *controllerData;
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
   /*0x1C*/ s32 port;
+#endif
+#ifndef TARGET_N64
+  /*ext */ s16 extStickX;       // additional (right) stick values
+  /*ext */ s16 extStickY;
 #endif
 };
 
+// -- Booleans --
+typedef u8  Bool8;
+typedef u16 Bool16;
+typedef u32 Bool32;
+
+// -- Vectors --
+typedef u8 Vec2uc[2];
+typedef s8  Vec2c[2];
+typedef s16 Vec2s[2];
+typedef s32 Vec2i[2];
 typedef f32 Vec2f[2];
-typedef f32 Vec3f[3]; // X, Y, Z, where Y is up
+typedef f64 Vec2d[2];
+
+typedef u8 Vec3uc[3];
+typedef s8  Vec3c[3];
 typedef s16 Vec3s[3];
 typedef s32 Vec3i[3];
-typedef f32 Vec4f[4];
-typedef s16 Vec4s[4];
+typedef f32 Vec3f[3]; // X, Y, Z, where Y is up
+typedef f64 Vec3d[3];
 
+typedef u8 Vec4uc[4];
+typedef s8  Vec4c[4];
+typedef s16 Vec4s[4];
+typedef s32 Vec4i[4];
+typedef f32 Vec4f[4];
+typedef f64 Vec4d[4];
+
+typedef f32 Mat2[2][2];
+typedef f32 Mat3[3][3];
 typedef f32 Mat4[4][4];
 
+// -- Scripts --
 typedef uintptr_t GeoLayout;
 typedef uintptr_t LevelScript;
+typedef uintptr_t BehaviorScript;
+
+// -- Angle --
+typedef s16 Angle;
+typedef u16 UAngle;
+typedef s32 Angle32;
+typedef Angle Vec3a[3];
+
 typedef s16 Movtex;
 typedef s16 MacroObject;
 typedef s16 Collision; // Collision data is limited to -32768 to 32767. Change this if you want to increase it.
 typedef s16 Trajectory;
 typedef s16 PaintingData;
-typedef uintptr_t BehaviorScript;
 typedef u8 Texture;
 typedef s8 RoomData; // Rooms are limited to -128 to 127. Change the type if you wish to have more rooms.
 typedef Collision TerrainData;
-typedef TerrainData Vec3Terrain[3];
+typedef Collision Vec3t[3];
+
+// -- Models --
+
+typedef u8  ModelID8;
+typedef u16 ModelID16;
+typedef u32 ModelID32;
+
+#define M_GFXTASK 1
+#define M_AUDTASK 2
+#define M_VIDTASK 3
+#define M_HVQTASK 6
+#define M_HVQMTASK 7
 
 enum SpTaskState {
     SPTASK_STATE_NOT_STARTED,
@@ -117,6 +162,12 @@ struct AnimInfo {
     /*0x0A 0x42*/ u16 animTimer;
     /*0x0C 0x44*/ s32 animFrameAccelAssist;
     /*0x10 0x48*/ s32 animAccel;
+#ifdef HIGH_FPS_PC
+    s16 prevAnimFrame;
+    s16 prevAnimID;
+    u32 prevAnimFrameTimestamp;
+    struct Animation *prevAnimPtr;
+#endif
 };
 
 struct GraphNodeObject {
@@ -127,9 +178,24 @@ struct GraphNodeObject {
     /*0x1A*/ Vec3s angle;
     /*0x20*/ Vec3f pos;
     /*0x2C*/ Vec3f scale;
+#ifdef HIGH_FPS_PC
+    Vec3s prevAngle;
+    Vec3f prevPos;
+    u32 prevTimestamp;
+    Vec3f prevShadowPos;
+    u32 prevShadowPosTimestamp;
+    Vec3f prevScale;
+    u32 prevScaleTimestamp;
+#endif
     /*0x38*/ struct AnimInfo animInfo;
     /*0x4C*/ struct SpawnInfo *unk4C;
     /*0x50*/ Mat4 *throwMatrix; // matrix ptr
+#ifdef HIGH_FPS_PC
+    Mat4 prevThrowMatrix;
+    u32 prevThrowMatrixTimestamp;
+    Mat4 *throwMatrixInterpolated;
+    u32 skipInterpolationTimestamp;
+#endif
     /*0x54*/ Vec3f cameraToObject;
 };
 
@@ -142,6 +208,8 @@ struct ObjectNode {
 // NOTE: Since ObjectNode is the first member of Object, it is difficult to determine
 // whether some of these pointers point to ObjectNode or Object.
 
+#define MAX_OBJECT_FIELDS 0x50
+
 struct Object {
     /*0x000*/ struct ObjectNode header;
     /*0x068*/ struct Object *parentObj;
@@ -153,33 +221,33 @@ struct Object {
     /*0x088*/
     union {
         // Object fields. See object_fields.h.
-        u32 asU32[0x50];
-        s32 asS32[0x50];
-        s16 asS16[0x50][2];
-        f32 asF32[0x50];
+        u32 asU32[MAX_OBJECT_FIELDS];
+        s32 asS32[MAX_OBJECT_FIELDS];
+        s16 asS16[MAX_OBJECT_FIELDS][2];
+        f32 asF32[MAX_OBJECT_FIELDS];
 #if !IS_64_BIT
-        s16 *asS16P[0x50];
-        s32 *asS32P[0x50];
-        struct Animation **asAnims[0x50];
-        struct Waypoint *asWaypoint[0x50];
-        struct ChainSegment *asChainSegment[0x50];
-        struct Object *asObject[0x50];
-        struct Surface *asSurface[0x50];
-        void *asVoidPtr[0x50];
-        const void *asConstVoidPtr[0x50];
+        s16 *asS16P[MAX_OBJECT_FIELDS];
+        s32 *asS32P[MAX_OBJECT_FIELDS];
+        struct Animation **asAnims[MAX_OBJECT_FIELDS];
+        struct Waypoint *asWaypoint[MAX_OBJECT_FIELDS];
+        struct ChainSegment *asChainSegment[MAX_OBJECT_FIELDS];
+        struct Object *asObject[MAX_OBJECT_FIELDS];
+        struct Surface *asSurface[MAX_OBJECT_FIELDS];
+        void *asVoidPtr[MAX_OBJECT_FIELDS];
+        const void *asConstVoidPtr[MAX_OBJECT_FIELDS];
 #endif
     } rawData;
 #if IS_64_BIT
     union {
-        s16 *asS16P[0x50];
-        s32 *asS32P[0x50];
-        struct Animation **asAnims[0x50];
-        struct Waypoint *asWaypoint[0x50];
-        struct ChainSegment *asChainSegment[0x50];
-        struct Object *asObject[0x50];
-        struct Surface *asSurface[0x50];
-        void *asVoidPtr[0x50];
-        const void *asConstVoidPtr[0x50];
+        s16 *asS16P[MAX_OBJECT_FIELDS];
+        s32 *asS32P[MAX_OBJECT_FIELDS];
+        struct Animation **asAnims[MAX_OBJECT_FIELDS];
+        struct Waypoint *asWaypoint[MAX_OBJECT_FIELDS];
+        struct ChainSegment *asChainSegment[MAX_OBJECT_FIELDS];
+        struct Object *asObject[MAX_OBJECT_FIELDS];
+        struct Surface *asSurface[MAX_OBJECT_FIELDS];
+        void *asVoidPtr[MAX_OBJECT_FIELDS];
+        const void *asConstVoidPtr[MAX_OBJECT_FIELDS];
     } ptrData;
 #endif
     /*0x1C8*/ u32 unused1;
@@ -187,7 +255,7 @@ struct Object {
     /*0x1D0*/ u32 bhvStackIndex;
     /*0x1D4*/ uintptr_t bhvStack[8];
     /*0x1F4*/ s16 bhvDelayTimer;
-    /*0x1F6*/ s16 respawnInfoType;
+    /*0x1F6*/ u8 respawnInfo;
     /*0x1F8*/ f32 hitboxRadius;
     /*0x1FC*/ f32 hitboxHeight;
     /*0x200*/ f32 hurtboxRadius;
@@ -198,7 +266,7 @@ struct Object {
     /*0x214*/ struct Object *platform;
     /*0x218*/ void *collisionData;
     /*0x21C*/ Mat4 transform;
-    /*0x25C*/ void *respawnInfo;
+    /*0x25C*/ u8 *respawnInfoPointer;
 };
 
 struct ObjectHitbox {
@@ -225,9 +293,9 @@ struct Surface {
     /*0x05*/ RoomData room;
     /*0x06*/ TerrainData lowerY;
     /*0x08*/ TerrainData upperY;
-    /*0x0A*/ Vec3Terrain vertex1;
-    /*0x10*/ Vec3Terrain vertex2;
-    /*0x16*/ Vec3Terrain vertex3;
+    /*0x0A*/ Vec3t vertex1;
+    /*0x10*/ Vec3t vertex2;
+    /*0x16*/ Vec3t vertex3;
     /*0x1C*/ struct {
         f32 x;
         f32 y;
@@ -315,4 +383,4 @@ struct MarioState {
     /*0xC4*/ f32 gettingBlownGravity;
 };
 
-#endif // TYPES_H
+#endif // _SM64_TYPES_H_

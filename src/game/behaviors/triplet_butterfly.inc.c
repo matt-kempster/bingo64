@@ -13,7 +13,7 @@ static struct ObjectHitbox sTripletButterflyExplodeHitbox = {
 };
 
 struct TripletButterflyActivationData {
-    s32 model;
+    ModelID32 model;
     const BehaviorScript *behavior;
     f32 scale;
 };
@@ -55,9 +55,11 @@ static void triplet_butterfly_act_init(void) {
 }
 
 static void triplet_butterfly_act_wander(void) {
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario > 1500.0f) {
         obj_mark_for_deletion(o);
     } else {
+#endif
         approach_f32_ptr(&o->oTripletButterflySpeed, 8.0f, 0.5f);
         if (o->oTimer < 60) {
             o->oTripletButterflyTargetYaw = cur_obj_angle_to_home();
@@ -83,7 +85,9 @@ static void triplet_butterfly_act_wander(void) {
 
         obj_move_pitch_approach(o->oTripletButterflyTargetPitch, 400);
         cur_obj_rotate_yaw_toward(o->oTripletButterflyTargetYaw, random_linear_offset(400, 800));
+#ifndef NODRAWINGDISTANCE
     }
+#endif
 }
 
 static void triplet_butterfly_act_activate(void) {

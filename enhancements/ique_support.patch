@@ -1,0 +1,320 @@
+diff --git a/include/PR/console_type.h b/include/PR/console_type.h
+new file mode 100644
+index 00000000..e60550ab
+--- /dev/null
++++ b/include/PR/console_type.h
+@@ -0,0 +1,7 @@
++enum ConsoleType {
++    CONSOLE_N64,
++    CONSOLE_IQUE
++};
++
++extern enum ConsoleType gConsoleType;
++extern enum ConsoleType get_console_type(void);
+diff --git a/lib/asm/skGetId.s b/lib/asm/skGetId.s
+new file mode 100644
+index 00000000..58e7d4f9
+--- /dev/null
++++ b/lib/asm/skGetId.s
+@@ -0,0 +1,18 @@
++// Code by stuckpixel
++
++.set noreorder
++.set gp=64
++
++#include "macros.inc"
++
++glabel skGetId
++    li  $v0, 0
++    li  $t0, 0xA4300014
++    lw  $t1, 0x00($t0)
++    nop
++    jr  $ra
++    nop
++    nop
++    nop
++    nop
++    nop
+diff --git a/lib/src/__osViSwapContext.c b/lib/src/__osViSwapContext.c
+index 990cb11f..22756e91 100644
+--- a/lib/src/__osViSwapContext.c
++++ b/lib/src/__osViSwapContext.c
+@@ -54,7 +54,9 @@ void __osViSwapContext() {
+     IO_WRITE(VI_INTR_REG, s0->fldRegs[field].vIntr);
+     IO_WRITE(VI_X_SCALE_REG, s1->unk20);
+     IO_WRITE(VI_Y_SCALE_REG, s1->unk2c);
+-    IO_WRITE(VI_CONTROL_REG, s1->features);
++    /* Make sure bit 13 is cleared. Otherwise, graphics will be corrupted on
++     * iQue Player. This has no effect on N64. */
++    IO_WRITE(VI_CONTROL_REG, s1->features & ~(1 << 13));
+     __osViNext = __osViCurr;
+     __osViCurr = s1;
+     *__osViNext = *__osViCurr;
+diff --git a/lib/src/consoleType.c b/lib/src/consoleType.c
+new file mode 100644
+index 00000000..ef08d1ef
+--- /dev/null
++++ b/lib/src/consoleType.c
+@@ -0,0 +1,12 @@
++#include "libultra_internal.h"
++#include <PR/console_type.h>
++
++enum ConsoleType gConsoleType;
++
++void skGetId(u32 *out);
++
++enum ConsoleType get_console_type(void) {
++    u32 id = 0;
++    skGetId(&id);
++    return (id == 0) ? CONSOLE_N64 : CONSOLE_IQUE;
++}
+diff --git a/lib/src/osEepromProbe.c b/lib/src/osEepromProbe.c
+index d550b846..bbaf2bcc 100644
+--- a/lib/src/osEepromProbe.c
++++ b/lib/src/osEepromProbe.c
+@@ -1,4 +1,5 @@
+ #include "libultra_internal.h"
++#include <PR/console_type.h>
+ 
+ // TODO: merge with osEepromWrite
+ typedef struct {
+@@ -13,11 +14,23 @@ s32 osEepromProbe(OSMesgQueue *mq) {
+     unkStruct sp18;
+ 
+     __osSiGetAccess();
+-    status = __osEepStatus(mq, &sp18);
+-    if (status == 0 && (sp18.unk00 & 0x8000) != 0) {
+-        status = 1;
+-    } else {
+-        status = 0;
++    if (gConsoleType == CONSOLE_N64) {
++        status = __osEepStatus(mq, &sp18);
++        if (status == 0 && (sp18.unk00 & 0x8000) != 0) {
++            status = 1;
++        } else {
++            status = 0;
++        }
++    } else if (gConsoleType == CONSOLE_IQUE) {
++        s32 __osBbEepromSize = * (s32*) 0x80000360;
++
++        if (__osBbEepromSize == 0x200) {
++            status = 1;
++        }
++
++        if (__osBbEepromSize == 0x800) {
++            status = 2;
++        }
+     }
+     __osSiRelAccess();
+     return status;
+diff --git a/lib/src/osEepromRead.c b/lib/src/osEepromRead.c
+index 7f3a0292..15dc1f06 100644
+--- a/lib/src/osEepromRead.c
++++ b/lib/src/osEepromRead.c
+@@ -1,4 +1,5 @@
+ #include "libultra_internal.h"
++#include <PR/console_type.h>
+ #include "controller.h"
+ #include "macros.h"
+ 
+ 
+@@ -8,37 +9,48 @@ s32 osEepromRead(OSMesgQueue *mq, u8 address, u8 *buffer) {
+         return -1;
+     }
+     __osSiGetAccess();
+-    ret = __osEepStatus(mq, &sdata);
+-    if (ret != 0 || sdata.type != CONT_EEPROM) {
++    if (gConsoleType == CONSOLE_N64) {
++        ret = __osEepStatus(mq, &sdata);
++        if (ret != 0 || sdata.type != CONT_EEPROM) {
+ 
+-        return CONT_NO_RESPONSE_ERROR;
+-    }
+-    while (sdata.status & CONT_EEPROM_BUSY) {
+-        __osEepStatus(mq, &sdata);
+-    }
+-    __osPackEepReadData(address);
+-
+-    ret = __osSiRawStartDma(OS_WRITE, &__osEepPifRam);
+-    osRecvMesg(mq, NULL, OS_MESG_BLOCK);
+-
+-    for (i = 0; i < ARRAY_COUNT(__osEepPifRam.ramarray); i++) {
+-        __osEepPifRam.ramarray[i] = CONT_CMD_NOP;
+-    }
+-    __osEepPifRam.s.pifstatus = 0;
+-
+-    ret = __osSiRawStartDma(OS_READ, __osEepPifRam);
+-    __osContLastCmd = CONT_CMD_READ_EEPROM;
+-    osRecvMesg(mq, NULL, OS_MESG_BLOCK);
+-
+-    for (i = 0; i < 4; i++) {
+-        ptr++;
+-    }
+-
+-    eepromformat = *(__OSContEepromFormat *) ptr;
+-    ret = CHNL_ERR(eepromformat);
+-    if (ret == 0) {
+-        for (i = 0; i < 8; i++) {
+-            *buffer++ = eepromformat.data[i];
++            return CONT_NO_RESPONSE_ERROR;
++        }
++        while (sdata.status & CONT_EEPROM_BUSY) {
++            __osEepStatus(mq, &sdata);
++        }
++        __osPackEepReadData(address);
++        ret = __osSiRawStartDma(OS_WRITE, &__osEepPifRam);
++        osRecvMesg(mq, NULL, OS_MESG_BLOCK);
++        for (i = 0; i < 0x10; i++) {
++            __osEepPifRam.ramarray[i] = CONT_CMD_NOP;
+         }
++        __osEepPifRam.s.pifstatus = 0;
++        ret = __osSiRawStartDma(OS_READ, __osEepPifRam);
++        __osContLastCmd = CONT_CMD_READ_EEPROM;
++        osRecvMesg(mq, NULL, OS_MESG_BLOCK);
++        for (i = 0; i < 4; i++) {
++            ptr++;
++        }
++        eepromformat = *(__OSContEepromFormat *) ptr;
++        ret = CHNL_ERR(eepromformat);
++        if (ret == 0) {
++            for (i = 0; i < 8; i++) {
++                *buffer++ = ((u8 *) &eepromformat.unk04)[i];
++            }
++        }
++    } else if (gConsoleType == CONSOLE_IQUE) {
++        u8 *__osBbEepromAddress = * (u8**) 0x8000035C;
++        s32 i;
++
++        for (i = 0; i < 8; i++) {
++            buffer[i] = __osBbEepromAddress[(address << 3) + i];
++        }
++
++        ret = 0;
+     }
+     __osSiRelAccess();
+     return ret;
+diff --git a/lib/src/osEepromWrite.c b/lib/src/osEepromWrite.c
+index 67c42a59..f2c029cc 100644
+--- a/lib/src/osEepromWrite.c
++++ b/lib/src/osEepromWrite.c
+@@ -1,5 +1,6 @@
+ #include "libultra_internal.h"
+ #include "osContInternal.h"
+ #include "controller.h"
++#include <PR/console_type.h>
+ 
+ OSPifRam __osEepPifRam;
+@@ -19,36 +20,47 @@ s32 osEepromWrite(OSMesgQueue *mq, u8 address, u8 *buffer) {
+     }
+ 
+     __osSiGetAccess();
+-    ret = __osEepStatus(mq, &sdata);
++    if (gConsoleType == CONSOLE_N64) {
++        ret = __osEepStatus(mq, &sdata);
+ 
+-    if (ret != 0 || sdata.type != CONT_EEPROM) {
+-        return CONT_NO_RESPONSE_ERROR;
+-    }
++        if (ret != 0 || sdata.type != CONT_EEPROM) {
++            return 8;
++        }
+ 
+-    while (sdata.status & CONT_EEPROM_BUSY) {
+-        __osEepStatus(mq, &sdata);
+-    }
++        while (sdata.status & CONT_EEPROM_BUSY) {
++            __osEepStatus(mq, &sdata);
++        }
+ 
+-    __osPackEepWriteData(address, buffer);
++        __osPackEepWriteData(address, buffer);
+ 
+-    ret = __osSiRawStartDma(OS_WRITE, &__osEepPifRam);
+-    osRecvMesg(mq, NULL, OS_MESG_BLOCK);
++        ret = __osSiRawStartDma(OS_WRITE, &__osEepPifRam);
++        osRecvMesg(mq, NULL, OS_MESG_BLOCK);
+ 
+-    for (i = 0; i < ARRAY_COUNT(__osEepPifRam.ramarray); i++) {
+-        __osEepPifRam.ramarray[i] = CONT_CMD_NOP;
+-    }
++        for (i = 0; i < ARRAY_COUNT(__osEepPifRam.ramarray); i++) {
++            __osEepPifRam.ramarray[i] = CONT_CMD_NOP;
++        }
+ 
+-    __osEepPifRam.s.pifstatus = 0;
+-    ret = __osSiRawStartDma(OS_READ, &__osEepPifRam);
+-    __osContLastCmd = CONT_CMD_WRITE_EEPROM;
+-    osRecvMesg(mq, NULL, OS_MESG_BLOCK);
++        __osEepPifRam.s.pifstatus = 0;
++        ret = __osSiRawStartDma(OS_READ, &__osEepPifRam);
++        __osContLastCmd = CONT_CMD_WRITE_EEPROM;
++        osRecvMesg(mq, NULL, OS_MESG_BLOCK);
+ 
+-    for (i = 0; i < 4; i++) {
+-        ptr++;
+-    }
++        for (i = 0; i < 4; i++) {
++            ptr++;
++        }
++
++        eepromformat = *(__OSContEepromFormat *) ptr;
++        ret = CHNL_ERR(eepromformat);
++    } else if (gConsoleType == CONSOLE_IQUE) {
++        u8 *__osBbEepromAddress = * (u8**) 0x8000035C;
++
+ 
+-    eepromformat = *(__OSContEepromFormat *) ptr;
+-    ret = CHNL_ERR(eepromformat);
++        for (i = 0; i < 8; i++) {
++            __osBbEepromAddress[(address << 3) + i] = buffer[i];
++        }
++
++        ret = 0;
++    }
+     __osSiRelAccess();
+     return ret;
+ }
+diff --git a/lib/src/osInitialize.c b/lib/src/osInitialize.c
+index ba73024b..6deaf407 100644
+--- a/lib/src/osInitialize.c
++++ b/lib/src/osInitialize.c
+@@ -3,6 +3,7 @@
+ #include "piint.h"
+ #include "PR/rcp.h"
+ #include <macros.h>
++#include <PR/console_type.h>
+ 
+ typedef struct {
+
+@@ -45,8 +45,9 @@ void osInitialize(void) {
+     u32 status;
+ #endif
+
+     UNUSED u32 ptr;
+
++    gConsoleType = get_console_type();
+     __osFinalrom = TRUE;
+     __osSetSR(__osGetSR() | SR_CU1);
+     __osSetFpcCsr(FPCSR_FS | FPCSR_EV);
+diff --git a/sm64.ld b/sm64.ld
+index da9bc4dd..9c1cebba 100755
+--- a/sm64.ld
++++ b/sm64.ld
+@@ -310,6 +310,8 @@ SECTIONS
+ #if ENABLE_RUMBLE
+         BUILD_DIR/libultra.a:pfsgetstatus.o(.text);
+ #endif
++        BUILD_DIR/libultra.a:consoleType.o(.text);
++        BUILD_DIR/libultra.a:skGetId.o(.text);
+         BUILD_DIR/lib/rsp.o(.text);
+ #else
+         BUILD_DIR/src/game*.o(.text);
+@@ -432,6 +434,8 @@ SECTIONS
+ #if ENABLE_RUMBLE
+         BUILD_DIR/libultra.a:pfsgetstatus.o(.text);
+ #endif
++        BUILD_DIR/libultra.a:consoleType.o(.text);
++        BUILD_DIR/libultra.a:skGetId.o(.text);
+         BUILD_DIR/lib/rsp.o(.text);
+ #endif
+ 

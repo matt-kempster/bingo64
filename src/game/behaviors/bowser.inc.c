@@ -1503,17 +1503,21 @@ s32 bowser_check_fallen_off_stage(void) {
         }
         if (o->oMoveFlags & OBJ_MOVE_LANDED) {
             // Check for Fire Sea
-            if (o->oFloorType == SURFACE_BURNING) {
+            if (o->oFloor->type == SURFACE_BURNING) {
                 return TRUE;
             }
             // Check for Dark World - Sky
-            if (o->oFloorType == SURFACE_DEATH_PLANE) {
+            if (o->oFloor->type == SURFACE_DEATH_PLANE) {
                 return TRUE;
             }
         }
     }
     return FALSE;
 }
+
+#if PLATFORM_DISPLACEMENT_2
+struct PlatformDisplacementInfo sBowserDisplacementInfo;
+#endif
 
 /**
  * Set Bowser's actions
@@ -1589,12 +1593,15 @@ s8 sBowserHealth[] = { 1, 1, 3 };
  */
 void bowser_free_update(void) {
     struct Surface *floor;
-    struct Object *platform;
-    UNUSED f32 floorHeight;
+    struct Object *platform = o->platform;
 
     // Platform displacement check (for BitFS)
-    if ((platform = o->platform) != NULL) {
+    if (platform != NULL) {
+#if PLATFORM_DISPLACEMENT_2
+        apply_platform_displacement(&sBowserDisplacementInfo, &o->oPosX, (s16 *) &o->oFaceAngleYaw, platform);
+#else
         apply_platform_displacement(FALSE, platform);
+#endif
     }
     // Reset grabbed status
     o->oBowserGrabbedStatus = BOWSER_GRAB_STATUS_NONE;
@@ -1607,7 +1614,7 @@ void bowser_free_update(void) {
         o->oAction = BOWSER_ACT_JUMP_ONTO_STAGE;
     }
     // Check floor height and platform
-    floorHeight = find_floor(o->oPosX, o->oPosY, o->oPosZ, &floor);
+    find_floor(o->oPosX, o->oPosY, o->oPosZ, &floor);
     if ((floor != NULL) && (floor->object != NULL)) {
         o->platform = floor->object;
     } else {
@@ -1624,6 +1631,10 @@ void bowser_held_update(void) {
     // Reset fire sky status and make him intangible
     o->oBowserStatus &= ~BOWSER_STATUS_FIRE_SKY;
     cur_obj_become_intangible();
+#if FIX_BOWSER_TRANSPARENT_HELD
+    // Reset Opacity
+    o->oBowserTargetOpacity = 255;
+#endif
 
     switch (o->oBowserGrabbedStatus) {
         // Play pickup sound, start grabbed animation, and set throw action

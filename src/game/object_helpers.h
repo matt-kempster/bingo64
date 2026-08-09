@@ -27,7 +27,7 @@ struct ChainSegment {
 // Call spawn_water_droplet with this struct to spawn an object.
 struct WaterDropletParams {
     s16 flags; // Droplet spawn flags, see defines above
-    s16 model;
+    ModelID16 model;
     const BehaviorScript *behavior;
     s16 moveAngleRange; // Only used for RAND_ANGLE_INCR flags
     s16 moveRange;      // Only used for RAND_OFFSET flags
@@ -52,7 +52,7 @@ struct Struct802A272C {
 struct SpawnParticlesInfo {
     /*0x00*/ s8 bhvParam;
     /*0x01*/ s8 count;
-    /*0x02*/ u8 model;
+    /*0x02*/ ModelID16 model;
     /*0x03*/ s8 offsetY;
     /*0x04*/ s8 forwardVelBase;
     /*0x05*/ s8 forwardVelRange;
@@ -66,54 +66,42 @@ struct SpawnParticlesInfo {
 
 Gfx *geo_update_projectile_pos_from_parent(s32 callContext, UNUSED struct GraphNode *node, Mat4 mtx);
 Gfx *geo_update_layer_transparency(s32 callContext, struct GraphNode *node, UNUSED void *context);
-#ifdef AVOID_UB
 Gfx *geo_switch_anim_state(s32 callContext, struct GraphNode *node, UNUSED void *context);
 Gfx *geo_switch_area(s32 callContext, struct GraphNode *node, UNUSED void *context);
-#else
-Gfx *geo_switch_anim_state(s32 callContext, struct GraphNode *node);
-Gfx *geo_switch_area(s32 callContext, struct GraphNode *node);
-#endif
 void obj_update_pos_from_parent_transformation(Mat4 a0, struct Object *a1);
 void obj_apply_scale_to_matrix(struct Object *obj, Mat4 dst, Mat4 src);
-void create_transformation_from_matrices(Mat4 a0, Mat4 a1, Mat4 a2);
 void obj_set_held_state(struct Object *obj, const BehaviorScript *heldBehavior);
 f32 lateral_dist_between_objects(struct Object *obj1, struct Object *obj2);
 f32 dist_between_objects(struct Object *obj1, struct Object *obj2);
 void cur_obj_forward_vel_approach_upward(f32 target, f32 increment);
-s32 approach_f32_signed(f32 *value, f32 target, f32 increment);
-f32 approach_f32_symmetric(f32 value, f32 target, f32 increment);
-s16 approach_s16_symmetric(s16 value, s16 target, s16 increment);
 s32 cur_obj_rotate_yaw_toward(s16 target, s16 increment);
 s16 obj_angle_to_object(struct Object *obj1, struct Object *obj2);
 s16 obj_turn_toward_object(struct Object *obj, struct Object *target, s16 angleIndex, s16 turnAmount);
 void obj_set_parent_relative_pos(struct Object *obj, s16 relX, s16 relY, s16 relZ);
 void obj_set_pos(struct Object *obj, s16 x, s16 y, s16 z);
 void obj_set_angle(struct Object *obj, s16 pitch, s16 yaw, s16 roll);
-struct Object *spawn_object_abs_with_rot(struct Object *parent, s16 uselessArg, u32 model,
+struct Object *spawn_object_abs_with_rot(struct Object *parent, s16 uselessArg, ModelID32 model,
                                          const BehaviorScript *behavior,
                                          s16 x, s16 y, s16 z, s16 pitch, s16 yaw, s16 roll);
-struct Object *spawn_object_rel_with_rot(struct Object *parent, u32 model, const BehaviorScript *behavior,
+struct Object *spawn_object_rel_with_rot(struct Object *parent, ModelID32 model, const BehaviorScript *behavior,
                                          s16 xOff, s16 yOff, s16 zOff, s16 pitch, s16 yaw, UNUSED s16 roll);
-struct Object *spawn_obj_with_transform_flags(struct Object *sp20, s32 model, const BehaviorScript *sp28);
+struct Object *spawn_obj_with_transform_flags(struct Object *sp20, ModelID32 model, const BehaviorScript *sp28);
 struct Object *spawn_water_droplet(struct Object *parent, struct WaterDropletParams *params);
-struct Object *spawn_object_at_origin(struct Object *, s32, u32, const BehaviorScript *);
-struct Object *spawn_object_at_origin(struct Object *parent, UNUSED s32 unusedArg, u32 model, const BehaviorScript *behavior);
-struct Object *spawn_object(struct Object *parent, s32 model, const BehaviorScript *behavior);
-struct Object *try_to_spawn_object(s16 offsetY, f32 scale, struct Object *parent, s32 model, const BehaviorScript *behavior);
-struct Object *spawn_object_with_scale(struct Object *parent, s32 model, const BehaviorScript *behavior, f32 scale);
+struct Object *spawn_object_at_origin(struct Object *parent, UNUSED s32 unusedArg, ModelID32 model, const BehaviorScript *behavior);
+struct Object *spawn_object(struct Object *parent, ModelID32 model, const BehaviorScript *behavior);
+struct Object *try_to_spawn_object(s16 offsetY, f32 scale, struct Object *parent, ModelID32 model, const BehaviorScript *behavior);
+struct Object *spawn_object_with_scale(struct Object *parent, ModelID32 model, const BehaviorScript *behavior, f32 scale);
 struct Object *spawn_object_relative(s16 behaviorParam, s16 relativePosX, s16 relativePosY, s16 relativePosZ,
-                                     struct Object *parent, s32 model, const BehaviorScript *behavior);
+                                     struct Object *parent, ModelID32 model, const BehaviorScript *behavior);
 struct Object *spawn_object_relative_with_scale(s16 behaviorParam, s16 relativePosX, s16 relativePosY,
                                                 s16 relativePosZ, f32 scale, struct Object *parent,
-                                                s32 model, const BehaviorScript *behavior);
+                                                ModelID32 model, const BehaviorScript *behavior);
 void cur_obj_move_using_vel(void);
 void obj_copy_graph_y_offset(struct Object *dst, struct Object *src);
 void obj_copy_pos_and_angle(struct Object *dst, struct Object *src);
 void obj_copy_pos(struct Object *dst, struct Object *src);
 void obj_copy_angle(struct Object *dst, struct Object *src);
 void obj_set_gfx_pos_from_pos(struct Object *obj);
-void linear_mtxf_mul_vec3f(Mat4 m, Vec3f dst, Vec3f v);
-void linear_mtxf_transpose_mul_vec3f(Mat4 m, Vec3f dst, Vec3f v);
 void obj_apply_scale_to_transform(struct Object *obj);
 void obj_copy_scale(struct Object *dst, struct Object *src);
 void obj_scale_xyz(struct Object *obj, f32 xScale, f32 yScale, f32 zScale);
@@ -154,7 +142,7 @@ void cur_obj_set_y_vel_and_animation(f32 sp18, s32 sp1C);
 void cur_obj_unrender_set_action_and_anim(s32 sp18, s32 sp1C);
 void cur_obj_get_thrown_or_placed(f32 forwardVel, f32 velY, s32 thrownAction);
 void cur_obj_get_dropped(void);
-void cur_obj_set_model(s32 modelID);
+void cur_obj_set_model(ModelID16 modelID);
 void mario_set_flag(s32 flag);
 s32 cur_obj_clear_interact_status_flag(s32 flag);
 void obj_mark_for_deletion(struct Object *obj);
@@ -167,7 +155,6 @@ struct Surface *cur_obj_update_floor_height_and_get_floor(void);
 void cur_obj_apply_drag_xz(f32 dragStrength);
 void cur_obj_move_y(f32 gravity, f32 bounciness, f32 buoyancy);
 void cur_obj_unused_resolve_wall_collisions(f32 offsetY, f32 radius);
-s16 abs_angle_diff(s16 x0, s16 x1);
 void cur_obj_move_xz_using_fvel_and_yaw(void);
 void cur_obj_move_y_with_terminal_vel(void);
 void cur_obj_compute_vel_xz(void);
@@ -204,7 +191,7 @@ void obj_set_throw_matrix_from_transform(struct Object *obj);
 void obj_build_transform_relative_to_parent(struct Object *obj);
 void obj_create_transform_from_self(struct Object *obj);
 void  cur_obj_rotate_face_angle_using_vel(void);
-s32 cur_obj_follow_path(UNUSED s32 unused);
+s32 cur_obj_follow_path(void);
 void chain_segment_init(struct ChainSegment *segment);
 f32 random_f32_around_zero(f32 diameter);
 void obj_scale_random(struct Object *obj, f32 rangeLength, f32 minScale);
@@ -219,14 +206,19 @@ s16 cur_obj_reflect_move_angle_off_wall(void);
 #define WAYPOINT_MASK_00FF 0x00FF
 #define WAYPOINT_FLAGS_PLATFORM_ON_TRACK_PAUSE 3
 
-#define PATH_NONE 0
-#define PATH_REACHED_END -1
-#define PATH_REACHED_WAYPOINT 1
+enum PathStatus {
+    PATH_REACHED_END = -1,
+    PATH_NONE,
+    PATH_REACHED_WAYPOINT,
+};
+
+enum MarioRoomStates {
+    MARIO_ROOM_UNDEFINED = -1,
+    MARIO_OUTSIDE_ROOM,
+    MARIO_INSIDE_ROOM
+};
 
 void obj_set_hitbox(struct Object *obj, struct ObjectHitbox *hitbox);
-s32 signum_positive(s32 x);
-f32 absf(f32 x);
-s32 absi(s32 a0);
 s32 cur_obj_wait_then_blink(s32 timeUntilBlinking, s32 numBlinks);
 s32 cur_obj_is_mario_ground_pounding_platform(void);
 void spawn_mist_particles(void);
@@ -242,12 +234,14 @@ s32 cur_obj_is_mario_on_platform(void);
 s32 jiggle_bbh_stair(s32 a0);
 void cur_obj_call_action_function(void (*actionFunctions[])(void));
 void spawn_base_star_with_no_lvl_exit(void);
-s32 bit_shift_left(s32 a0);
 s32 cur_obj_mario_far_away(void);
 s32 is_mario_moving_fast_or_in_air(s32 speedThreshold);
 s32 is_item_in_array(s8 item, s8 *array);
 extern void bhv_init_room(void); // 802A3978
 void cur_obj_enable_rendering_if_mario_in_room(void);
+s32 cur_obj_is_mario_in_room(void);
+void cur_obj_enable_rendering_in_room(void);
+void cur_obj_disable_rendering_in_room(void);
 s32 cur_obj_set_hitbox_and_die_if_attacked(struct ObjectHitbox *hitbox, s32 deathSound, s32 noLootCoins);
 s32 obj_set_hitbox_and_die_if_attacked_bingo(struct ObjectHitbox *hitbox, s32 deathSound, s32 noLootCoins, enum BingoObjectiveUpdate update);
 void obj_explode_and_spawn_coins(f32 mistParticleSize, s32 sp1C);
@@ -265,7 +259,7 @@ s32 cur_obj_can_mario_activate_textbox(f32 radius, f32 height, UNUSED s32 unused
 s32 cur_obj_can_mario_activate_textbox_2(f32 radius, f32 height);
 s32 cur_obj_update_dialog(s32 actionArg, s32 dialogFlags, s32 dialogID, UNUSED s32 unused);
 s32 cur_obj_update_dialog_with_cutscene(s32 actionArg, s32 dialogFlags, s32 cutsceneTable, s32 dialogID);
-s32 cur_obj_has_model(u16 modelID);
+s32 cur_obj_has_model(ModelID16 modelID);
 void cur_obj_align_gfx_with_floor(void);
 s32 mario_is_within_rectangle(s16 minX, s16 maxX, s16 minZ, s16 maxZ);
 void cur_obj_shake_screen(s32 shake);
@@ -283,12 +277,19 @@ void disable_time_stop_including_mario(void);
 s32 cur_obj_check_interacted(void);
 void cur_obj_spawn_loot_blue_coin(void);
 
-#ifndef VERSION_JP
+#ifdef VERSION_JP
+#define cur_obj_spawn_star_at_y_offset(x, y, z, o) spawn_default_star(x, y, z)
+#else
 void cur_obj_spawn_star_at_y_offset(f32 targetX, f32 targetY, f32 targetZ, f32 offsetY);
 #endif
 
 void obj_disable_rendering_func(struct Object *obj);
 void obj_enable_rendering_func(struct Object *obj);
 
+// Extra functions
+void obj_set_model(struct Object *obj, ModelID16 modelID);
+s32 obj_has_model(struct Object *obj, ModelID16 modelID);
+ModelID32 obj_get_model(struct Object *obj);
+s32 mario_is_close_to_a_ceiling(void);
 
-#endif /* OBJECT_HELPERS_H */
+#endif // OBJECT_HELPERS_H

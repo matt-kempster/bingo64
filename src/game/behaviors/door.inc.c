@@ -27,23 +27,31 @@ void set_door_camera_event(void) {
     gPlayerCameraState->usedObj = o;
 }
 
+#if FIX_METAL_DOOR_CASTLE_SOUND
+#define METAL_DOOR_CHECK(x, y) cur_obj_has_model(x) || cur_obj_has_model(y)
+#else
+#define METAL_DOOR_CHECK(x, y) cur_obj_has_model(x)
+#endif
+
 void play_door_open_noise(void) {
-    s32 sp1C = cur_obj_has_model(MODEL_HMC_METAL_DOOR);
+    s32 isMetalDoor = METAL_DOOR_CHECK(MODEL_HMC_METAL_DOOR, MODEL_CASTLE_METAL_DOOR);
     if (o->oTimer == 0) {
-        cur_obj_play_sound_2(sDoorOpenSounds[sp1C]);
+        cur_obj_play_sound_2(sDoorOpenSounds[isMetalDoor]);
         gTimeStopState |= TIME_STOP_MARIO_OPENED_DOOR;
     }
     if (o->oTimer == 70) {
-        cur_obj_play_sound_2(sDoorCloseSounds[sp1C]);
+        cur_obj_play_sound_2(sDoorCloseSounds[isMetalDoor]);
     }
 }
 
 void play_warp_door_open_noise(void) {
-    s32 sp1C = cur_obj_has_model(MODEL_HMC_METAL_DOOR);
+    s32 isMetalDoor = METAL_DOOR_CHECK(MODEL_HMC_METAL_DOOR, MODEL_CASTLE_METAL_DOOR);
     if (o->oTimer == 30) {
-        cur_obj_play_sound_2(sDoorCloseSounds[sp1C]);
+        cur_obj_play_sound_2(sDoorCloseSounds[isMetalDoor]);
     }
 }
+
+#undef METAL_DOOR_CHECK
 
 void bhv_door_loop(void) {
     s32 sp1C = 0;
@@ -59,6 +67,7 @@ void bhv_door_loop(void) {
     switch (o->oAction) {
         case 0:
             cur_obj_init_animation_with_sound(0);
+            load_object_collision_model();
             break;
         case 1:
             door_animation_and_reset(1);
@@ -78,76 +87,75 @@ void bhv_door_loop(void) {
             break;
     }
 
-    if (o->oAction == 0) {
-        load_object_collision_model();
-    }
-
-    bhv_star_door_loop_2();
+    bhv_door_rendering_loop();
 }
+
+#if BETTER_ROOM_CHECKS
+#define GET_ROOM_DOOR(x, y, z, r) r = get_room_at_pos(x, y, z);
+#else
+#define GET_ROOM_DOOR(x, y, z, r)      \
+    find_room_floor(x, y, z, &floor);  \
+    if (floor != NULL) r = floor->room;
+#endif
 
 void bhv_door_init(void) {
-    f32 x;
-    f32 z;
+    const f32 checkDist = 200.0f;
+
+#if !BETTER_ROOM_CHECKS
     struct Surface *floor;
+#endif
 
-    x = o->oPosX;
-    z = o->oPosZ;
-    find_floor(x, o->oPosY, z, &floor);
-    if (floor != NULL) {
-        o->oDoorUnkF8 = floor->room;
-    }
+    f32 x = o->oPosX;
+    f32 y = o->oPosY;
+    f32 z = o->oPosZ;
 
-    x = o->oPosX + sins(o->oMoveAngleYaw) * 200.0f;
-    z = o->oPosZ + coss(o->oMoveAngleYaw) * 200.0f;
-    find_floor(x, o->oPosY, z, &floor);
-    if (floor != NULL) {
-        o->oDoorUnkFC = floor->room;
-    }
+    GET_ROOM_DOOR(x, y, z, o->oDoorSelfRoom);
 
-    x = o->oPosX + sins(o->oMoveAngleYaw) * -200.0f;
-    z = o->oPosZ + coss(o->oMoveAngleYaw) * -200.0f;
-    find_floor(x, o->oPosY, z, &floor);
-    if (floor != NULL) {
-        o->oDoorUnk100 = floor->room;
-    }
+    x = o->oPosX + sins(o->oMoveAngleYaw) * checkDist;
+    z = o->oPosZ + coss(o->oMoveAngleYaw) * checkDist;
 
-    if (o->oDoorUnkF8 > 0 && o->oDoorUnkF8 < 60) {
-        gDoorAdjacentRooms[o->oDoorUnkF8][0] = o->oDoorUnkFC;
-        gDoorAdjacentRooms[o->oDoorUnkF8][1] = o->oDoorUnk100;
+    GET_ROOM_DOOR(x, y, z, o->oDoorForwardRoom);
+
+    x = o->oPosX + sins(o->oMoveAngleYaw) * -checkDist;
+    z = o->oPosZ + coss(o->oMoveAngleYaw) * -checkDist;
+
+    GET_ROOM_DOOR(x, y, z, o->oDoorBackwardRoom);
+
+    if (
+        // Ensure the room number is in bounds.
+        o->oDoorSelfRoom > 0 && o->oDoorSelfRoom < ARRAY_COUNT(gDoorAdjacentRooms)
+#if !FIX_DOOR_NO_ROOM_VISIBLE
+        // Only set gDoorAdjacentRooms for transition rooms.
+        && o->oDoorSelfRoom    != o->oDoorForwardRoom
+        && o->oDoorSelfRoom    != o->oDoorBackwardRoom
+        && o->oDoorForwardRoom != o->oDoorBackwardRoom
+#endif
+    ) {
+        gDoorAdjacentRooms[o->oDoorSelfRoom].forwardRoom  = o->oDoorForwardRoom;
+        gDoorAdjacentRooms[o->oDoorSelfRoom].backwardRoom = o->oDoorBackwardRoom;
     }
 }
 
-void bhv_star_door_loop_2(void) {
-    s32 sp4 = FALSE;
+#undef GET_ROOM_DOOR
 
-    if (gMarioCurrentRoom != 0) {
-        if (o->oDoorUnkF8 == gMarioCurrentRoom) {
-            sp4 = TRUE;
-        } else if (gMarioCurrentRoom == o->oDoorUnkFC) {
-            sp4 = TRUE;
-        } else if (gMarioCurrentRoom == o->oDoorUnk100) {
-            sp4 = TRUE;
-        } else if (gDoorAdjacentRooms[gMarioCurrentRoom][0] == o->oDoorUnkFC) {
-            sp4 = TRUE;
-        } else if (gDoorAdjacentRooms[gMarioCurrentRoom][0] == o->oDoorUnk100) {
-            sp4 = TRUE;
-        } else if (gDoorAdjacentRooms[gMarioCurrentRoom][1] == o->oDoorUnkFC) {
-            sp4 = TRUE;
-        } else if (gDoorAdjacentRooms[gMarioCurrentRoom][1] == o->oDoorUnk100) {
-            sp4 = TRUE;
-        }
-    } else {
-        sp4 = TRUE;
-    }
+void bhv_door_rendering_loop(void) {
+    struct TransitionRoomData* transitionRoom = &gDoorAdjacentRooms[gMarioCurrentRoom];
 
-    if (sp4 == TRUE) {
+    o->oDoorIsRendering = (
+        gMarioCurrentRoom            == 0                    || // Mario is in the "global" room.
+        gMarioCurrentRoom            == o->oDoorSelfRoom     || // Mario is in the same room as the door.
+        gMarioCurrentRoom            == o->oDoorForwardRoom  || // Mario is in the door's  forward room.
+        gMarioCurrentRoom            == o->oDoorBackwardRoom || // Mario is in the door's backward room.
+        transitionRoom->forwardRoom  == o->oDoorForwardRoom  || // The transition room's  forward room is in the same room as this door's  forward room.
+        transitionRoom->forwardRoom  == o->oDoorBackwardRoom || // The transition room's  forward room is in the same room as this door's backward room.
+        transitionRoom->backwardRoom == o->oDoorForwardRoom  || // The transition room's backward room is in the same room as this door's  forward room.
+        transitionRoom->backwardRoom == o->oDoorBackwardRoom    // The transition room's backward room is in the same room as this door's backward room.
+    );
+
+    if (o->oDoorIsRendering) {
         o->header.gfx.node.flags |= GRAPH_RENDER_ACTIVE;
-        D_8035FEE4++;
-    }
-
-    if (!sp4) {
+        gNumDoorRenderCount++;
+    } else {
         o->header.gfx.node.flags &= ~GRAPH_RENDER_ACTIVE;
     }
-
-    o->oDoorUnk88 = sp4;
 }

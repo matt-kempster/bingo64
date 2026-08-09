@@ -23,7 +23,12 @@
 /**
  * The maximum number of objects that can be loaded at once.
  */
+
+#ifdef NODRAWINGDISTANCE
+#define OBJECT_POOL_CAPACITY 960
+#else
 #define OBJECT_POOL_CAPACITY 240
+#endif
 
 /**
  * Every object is categorized into an object list, which controls the order
@@ -79,7 +84,6 @@ extern s16 gDebugInfoOverwrite[][8];
 
 extern u32 gTimeStopState;
 extern struct Object gObjectPool[];
-extern struct Object gMacroObjectDefaultParent;
 extern struct ObjectNode *gObjectLists;
 extern struct ObjectNode gFreeObjectList;
 
@@ -97,14 +101,32 @@ extern s32 gNumStaticSurfaces;
 
 extern struct MemoryPool *gObjectMemoryPool;
 
-extern s16 gCheckingSurfaceCollisionsForCamera;
-extern s16 gFindFloorIncludeSurfaceIntangible;
+enum CollisionFlags {
+    COLLISION_FLAGS_NONE              = (0 << 0),
+    COLLISION_FLAG_CAMERA             = (1 << 1),
+    COLLISION_FLAG_INCLUDE_INTANGIBLE = (1 << 2),
+};
+
+extern s16 gCollisionFlags;
+
 extern TerrainData *gEnvironmentRegions;
 extern s32 gEnvironmentLevels[20];
-extern RoomData gDoorAdjacentRooms[60][2];
+
+/**
+ * The maximum number of door/transition rooms that load two rooms of objects at once.
+ */
+#define MAX_NUM_TRANSITION_ROOMS 60
+
+struct TransitionRoomData {
+    /*0x00*/ RoomData forwardRoom;
+    /*0x01*/ RoomData backwardRoom;
+}; /*0x02*/
+
+extern struct TransitionRoomData gDoorAdjacentRooms[MAX_NUM_TRANSITION_ROOMS];
+
 extern s16 gMarioCurrentRoom;
 extern s16 D_8035FEE2;
-extern s16 D_8035FEE4;
+extern s16 gNumDoorRenderCount;
 extern s16 gTHIWaterDrained;
 extern s16 gTTCSpeedSetting;
 extern s16 gMarioShotFromCannon;
@@ -113,13 +135,17 @@ extern s16 gNumRoomedObjectsInMarioRoom;
 extern s16 gNumRoomedObjectsNotInMarioRoom;
 extern s16 gWDWWaterLevelChanging;
 extern s16 gMarioOnMerryGoRound;
-
+#ifdef PORT_MOP_OBJS
+extern s16 gMOPSwitchBlockState;
+extern s16 gMOPFlipSwitchStarSpawned;
+#endif
 
 void bhv_mario_update(void);
 void set_object_respawn_info_bits(struct Object *obj, u8 bits);
 void unload_objects_from_area(UNUSED s32 unused, s32 areaIndex);
 void spawn_objects_from_info(UNUSED s32 unused, struct SpawnInfo *spawnInfo);
 void clear_objects(void);
+void clear_dynamic_surface_references(void);
 void update_objects(UNUSED s32 unused);
 
 

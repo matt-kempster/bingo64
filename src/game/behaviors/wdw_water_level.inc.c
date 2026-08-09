@@ -31,7 +31,6 @@ void bhv_water_level_diamond_loop(void) {
                     gWDWWaterLevelChanging = TRUE;
                 }
                 break;
-
             case WATER_LEVEL_DIAMOND_ACT_CHANGE_WATER_LEVEL:
                 o->oAngleVelYaw = 0;
                 gEnvironmentLevels[0] = (s32) approach_f32_symmetric(
@@ -53,8 +52,8 @@ void bhv_water_level_diamond_loop(void) {
                         }
                     }
                     o->oAngleVelYaw = 0x800;
-#if ENABLE_RUMBLE
-                    reset_rumble_timers_2(2);
+#ifdef RUMBLE_FEEDBACK
+                    reset_rumble_timers_viblate(2);
 #endif
                 }
                 break;

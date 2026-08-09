@@ -180,7 +180,7 @@ void play_anim_sound(struct MarioState *m, u32 actionState, s32 animFrame, u32 s
 
 s32 act_start_sleeping(struct MarioState *m) {
 #ifndef VERSION_JP
-    s32 animFrame;
+    s32 animFrame = 0;
 #endif
 
     if (check_common_idle_cancels(m)) {
@@ -792,14 +792,14 @@ s32 act_shockwave_bounce(struct MarioState *m) {
     f32 sp18;
 
     if (m->marioObj->oInteractStatus & INT_STATUS_MARIO_SHOCKWAVE) {
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         queue_rumble_data(70, 40);
 #endif
         return hurt_and_set_mario_action(m, ACT_SHOCKED, 0, 4);
     }
 
     if (m->actionTimer == 0) {
-#if ENABLE_RUMBLE
+#ifdef RUMBLE_FEEDBACK
         queue_rumble_data(70, 40);
 #endif
         if (m->marioObj->oInteractStatus & INT_STATUS_MARIO_KNOCKBACK_DMG) {
@@ -911,9 +911,11 @@ s32 act_triple_jump_land_stop(struct MarioState *m) {
 }
 
 s32 act_backflip_land_stop(struct MarioState *m) {
+#if !FIX_ACTION_LAND_EAT_INPUT
     if (!(m->input & INPUT_Z_DOWN) || m->marioObj->header.gfx.animInfo.animFrame >= 6) {
         m->input &= ~INPUT_A_PRESSED;
     }
+#endif
 
     if (check_common_landing_cancels(m, ACT_BACKFLIP)) {
         return TRUE;
@@ -935,7 +937,9 @@ s32 act_lava_boost_land(struct MarioState *m) {
 }
 
 s32 act_long_jump_land_stop(struct MarioState *m) {
+#if !FIX_ACTION_LAND_EAT_INPUT
     m->input &= ~INPUT_B_PRESSED;
+#endif
     if (check_common_landing_cancels(m, ACT_JUMP)) {
         return TRUE;
     }
@@ -1004,6 +1008,14 @@ s32 act_air_throw_land(struct MarioState *m) {
     return FALSE;
 }
 
+#if TWIRL_WITH_OBJECT
+#define ACT_IDLE_DEF(a, b, c) (a ? b : c)
+#define CHECK(a, b) if (!a) { b; }
+#else
+#define ACT_IDLE_DEF(a, b, c) c
+#define CHECK(a, b) b;
+#endif
+
 s32 act_twirl_land(struct MarioState *m) {
     m->actionState = 1;
     if (m->input & INPUT_STOMPED) {
@@ -1015,7 +1027,7 @@ s32 act_twirl_land(struct MarioState *m) {
     }
 
     stationary_ground_step(m);
-    set_mario_animation(m, MARIO_ANIM_TWIRL_LAND);
+    CHECK(m->heldObj, set_mario_animation(m, MARIO_ANIM_TWIRL_LAND));
     if (m->angleVel[1] > 0) {
         m->angleVel[1] -= 0x400;
         if (m->angleVel[1] < 0) {
@@ -1028,11 +1040,13 @@ s32 act_twirl_land(struct MarioState *m) {
     m->marioObj->header.gfx.angle[1] += m->twirlYaw;
     if (is_anim_at_end(m) && m->angleVel[1] == 0) {
         m->faceAngle[1] += m->twirlYaw;
-        set_mario_action(m, ACT_IDLE, 0);
+        set_mario_action(m, ACT_IDLE_DEF(m->heldObj, ACT_HOLD_IDLE, ACT_IDLE), 0);
     }
 
     return FALSE;
 }
+#undef ACT_IDLE_DEF
+#undef CHECK
 
 s32 act_ground_pound_land(struct MarioState *m) {
     m->actionState = 1;
@@ -1053,13 +1067,13 @@ s32 act_ground_pound_land(struct MarioState *m) {
 }
 
 s32 act_first_person(struct MarioState *m) {
-    s32 sp1C = (m->input & (INPUT_OFF_FLOOR | INPUT_ABOVE_SLIDE | INPUT_STOMPED)) != 0;
+    s32 exitInput = (m->input & (INPUT_OFF_FLOOR | INPUT_ABOVE_SLIDE | INPUT_STOMPED)) != 0;
 
     if (m->actionState == 0) {
         lower_background_noise(2);
         set_camera_mode(m->area->camera, CAMERA_MODE_C_UP, 0x10);
         m->actionState = 1;
-    } else if (!(m->input & INPUT_FIRST_PERSON) || sp1C) {
+    } else if (!(m->input & INPUT_FIRST_PERSON) || exitInput) {
         raise_background_noise(2);
         // Go back to the last camera mode
         set_camera_mode(m->area->camera, -1, 1);
@@ -1067,11 +1081,11 @@ s32 act_first_person(struct MarioState *m) {
     }
 
     if (m->floor->type == SURFACE_LOOK_UP_WARP
-        && save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= 10) {
-        s16 sp1A = m->statusForCamera->headRotation[0];
-        s16 sp18 = ((m->statusForCamera->headRotation[1] * 4) / 3) + m->faceAngle[1];
-        if (sp1A == -0x1800 && (sp18 < -0x6FFF || sp18 >= 0x7000)) {
-            level_trigger_warp(m, WARP_OP_UNKNOWN_01);
+        && save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= WING_CAP_WARP_STAR_REQ) {
+        s16 rotX = m->statusForCamera->headRotation[0];
+        s16 rotY = ((m->statusForCamera->headRotation[1] * 4) / 3) + m->faceAngle[1];
+        if (rotX == -0x1800 && (rotY <= -0x7000 || rotY >= 0x7000)) {
+            level_trigger_warp(m, WARP_OP_LOOK_UP);
         }
     }
 
@@ -1104,7 +1118,7 @@ s32 check_common_stationary_cancels(struct MarioState *m) {
 }
 
 s32 mario_execute_stationary_action(struct MarioState *m) {
-    s32 cancel;
+    s32 cancel = FALSE;
 
     if (check_common_stationary_cancels(m)) {
         return TRUE;

@@ -38,19 +38,27 @@ void bhv_bubble_cannon_barrel_loop(void) {
 }
 
 void water_bomb_cannon_act_0(void) {
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario < 2000.0f) {
+#endif
         spawn_object(o, MODEL_CANNON_BARREL, bhvCannonBarrelBubbles);
         cur_obj_unhide();
 
         o->oAction = 1;
         o->oMoveAnglePitch = o->oWaterCannonUnkFC = 0x1C00;
+#ifndef NODRAWINGDISTANCE
     }
+#endif
 }
 
 void water_bomb_cannon_act_1(void) {
+#ifndef NODRAWINGDISTANCE
     if (o->oDistanceToMario > 2500.0f) {
         o->oAction = 2;
     } else if (o->oBhvParams2ndByte == 0) {
+#else
+    if (o->oBhvParams2ndByte == 0) {
+#endif
         if (o->oWaterCannonUnkF4 != 0) {
             o->oWaterCannonUnkF4--;
         } else {
@@ -61,7 +69,7 @@ void water_bomb_cannon_act_1(void) {
                 if (o->oWaterCannonUnkF8 != 0) {
                     o->oWaterCannonUnkF8--;
                 } else {
-                    cur_obj_play_sound_2(SOUND_OBJ_CANNON4);
+                    cur_obj_play_sound_2(SOUND_OBJ_WATER_BOMB_CANNON);
                     o->oWaterCannonUnkF4 = 70;
                     o->oWaterCannonUnkFC = 0x1000 + 0x400 * (random_u16() & 0x03);
                     o->oWaterCannonUnk100 = -0x2000 + o->oMoveAngleYaw + 0x1000 * (random_u16() % 5);

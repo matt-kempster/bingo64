@@ -8,15 +8,7 @@
 #include "game/rendering_graph_node.h"
 #include "game/area.h"
 #include "geo_layout.h"
-
-// unused Mtx(s)
-s16 identityMtx[4][4] = { { 1, 0, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0, 1, 0 }, { 0, 0, 0, 1 } };
-s16 zeroMtx[4][4] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
-
-Vec3f gVec3fZero = { 0.0f, 0.0f, 0.0f };
-Vec3s gVec3sZero = { 0, 0, 0 };
-Vec3f gVec3fOne = { 1.0f, 1.0f, 1.0f };
-UNUSED Vec3s gVec3sOne = { 1, 1, 1 };
+#include "game/shadow.h"
 
 /**
  * Initialize a geo node with a given type. Sets all links such that there
@@ -79,7 +71,7 @@ init_graph_node_ortho_projection(struct AllocOnlyPool *pool, struct GraphNodeOrt
  */
 struct GraphNodePerspective *init_graph_node_perspective(struct AllocOnlyPool *pool,
                                                          struct GraphNodePerspective *graphNode,
-                                                         f32 fov, s16 near, s16 far,
+                                                         f32 fov, u16 near, u16 far,
                                                          GraphNodeFunc nodeFunc, s32 unused) {
     if (pool != NULL) {
         graphNode = alloc_only_pool_alloc(pool, sizeof(struct GraphNodePerspective));
@@ -312,6 +304,10 @@ struct GraphNodeObject *init_graph_node_object(struct AllocOnlyPool *pool,
         vec3f_copy(graphNode->pos, pos);
         vec3f_copy(graphNode->scale, scale);
         vec3s_copy(graphNode->angle, angle);
+#ifdef USE_SYSTEM_MALLOC
+        // To avoid uninitialised memory usage in audio code
+        vec3f_copy(graphNode->cameraToObject, gVec3fZero);
+#endif
         graphNode->sharedChild = sharedChild;
         graphNode->throwMatrix = NULL;
         graphNode->animInfo.animID = 0;
@@ -416,6 +412,17 @@ struct GraphNodeShadow *init_graph_node_shadow(struct AllocOnlyPool *pool,
     }
 
     if (graphNode != NULL) {
+#if OPTIMIZED_SHADOWS
+    #if 1 // LEGACY_SHADOW_IDS, will be enforced until Fast64 support name values
+        if (shadowType == 0 || shadowType == 1 || shadowType == 2 || shadowType == 99) {
+            shadowType = SHADOW_CIRCLE;
+        } else if (shadowType == 11 || shadowType == 12) {
+            shadowType = SHADOW_SQUARE;
+        } else if (shadowType == 10) {
+            shadowType = SHADOW_SQUARE_PERMANENT;
+        }
+    #endif
+#endif
         init_scene_graph_node_links(&graphNode->node, GRAPH_NODE_TYPE_SHADOW);
         graphNode->shadowScale = shadowScale;
         graphNode->shadowSolidity = shadowSolidity;
@@ -612,15 +619,21 @@ struct GraphNode *geo_make_first_child(struct GraphNode *newFirstChild) {
  */
 void geo_call_global_function_nodes_helper(struct GraphNode *graphNode, s32 callContext) {
     struct GraphNode **globalPtr;
-    struct GraphNode *curNode;
+    struct GraphNode *curNode = graphNode;
     struct FnGraphNode *asFnNode;
-
-    curNode = graphNode;
+    s16 type;
 
     do {
         asFnNode = (struct FnGraphNode *) curNode;
+        type = curNode->type;
 
-        if (curNode->type & GRAPH_NODE_TYPE_FUNCTIONAL) {
+        // Whether the type's corresponding struct has a FnGraphNode fnNode struct.
+        if (type == GRAPH_NODE_TYPE_PERSPECTIVE
+         || type == GRAPH_NODE_TYPE_SWITCH_CASE
+         || type == GRAPH_NODE_TYPE_CAMERA
+         || type == GRAPH_NODE_TYPE_GENERATED_LIST
+         || type == GRAPH_NODE_TYPE_BACKGROUND
+         || type == GRAPH_NODE_TYPE_HELD_OBJ) {
             if (asFnNode->func != NULL) {
                 asFnNode->func(callContext, curNode, NULL);
             }
@@ -673,7 +686,7 @@ void geo_call_global_function_nodes(struct GraphNode *graphNode, s32 callContext
             geo_call_global_function_nodes_helper(graphNode->children, callContext);
         }
 
-        gCurGraphNodeRoot = 0;
+        gCurGraphNodeRoot = NULL;
     }
 }
 
@@ -792,6 +805,10 @@ s32 retrieve_animation_index(s32 frame, u16 **attributes) {
 s16 geo_update_animation_frame(struct AnimInfo *obj, s32 *accelAssist) {
     s32 result;
     struct Animation *anim = obj->curAnim;
+
+    if (anim == NULL) { // Failsafe is no animations are found
+        return obj->animFrame;
+    }
 
     if (obj->animTimer == gAreaUpdateCounter || anim->flags & ANIM_FLAG_2) {
         if (accelAssist != NULL) {

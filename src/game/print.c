@@ -2,7 +2,6 @@
 #include <PR/gbi.h>
 
 #include "config.h"
-#include "gfx_dimensions.h"
 #include "game_init.h"
 #include "memory.h"
 #include "save_file.h"
@@ -16,6 +15,8 @@
 #include "geo_misc.h"
 #include "print.h"
 #include "segment2.h"
+
+#include "gfx_dimensions.h"
 
 /**
 * This file handles printing and formatting the colorful text that
@@ -39,7 +40,7 @@ extern u8 seg2_dl_0200EC98[];
  * Stores the text to be rendered on screen
  * and how they are to be rendered.
  */
-FORCE_BSS struct TextLabel *sTextLabels[520];
+struct TextLabel *sTextLabels[520];
 s16 sTextLabelsCount = 0;
 
 /**
@@ -546,40 +547,13 @@ s8 char_to_glyph_index(char a) {
 /**
  * Adds an individual glyph to be rendered.
  */
-void add_glyph_texture(s8 glyphIndex) {
+void add_glyph_texture(u8 glyphIndex) {
     const u8 *const *glyphs = segmented_to_virtual(main_hud_lut);
 
     gDPPipeSync(gDisplayListHead++);
-#ifdef VERSION_CN
-    gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[(u8) glyphIndex]);
-#else
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, glyphs[glyphIndex]);
-#endif
     gSPDisplayList(gDisplayListHead++, dl_hud_img_load_tex_block);
 }
-
-#ifndef WIDESCREEN
-/**
- * Clips textrect into the boundaries defined.
- */
-void clip_to_bounds(s32 *x, s32 *y) {
-    if (*x < TEXRECT_MIN_X) {
-        *x = TEXRECT_MIN_X;
-    }
-
-    if (*x > TEXRECT_MAX_X) {
-        *x = TEXRECT_MAX_X;
-    }
-
-    if (*y < TEXRECT_MIN_Y) {
-        *y = TEXRECT_MIN_Y;
-    }
-
-    if (*y > TEXRECT_MAX_Y) {
-        *y = TEXRECT_MAX_Y;
-    }
-}
-#endif
 
 /**
  * Renders the glyph that's set at the given position.
@@ -591,10 +565,6 @@ void render_textrect(s32 x, s32 y, s32 pos, u8 alpha) {
     s32 rectX;
     s32 rectY;
 
-#ifndef WIDESCREEN
-    // For widescreen we must allow drawing outside the usual area
-    clip_to_bounds(&rectBaseX, &rectBaseY);
-#endif
     rectX = rectBaseX;
     rectY = rectBaseY;
     if (gOptionSelectIconOpacity == 255) {

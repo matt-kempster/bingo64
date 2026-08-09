@@ -1,5 +1,4 @@
 #include <ultra64.h>
-
 #include "sm64.h"
 #include "game_init.h"
 #include "main.h"
@@ -13,11 +12,11 @@
 #include "level_table.h"
 #include "course_table.h"
 #include "rumble_init.h"
-
-#define MENU_DATA_MAGIC 0x4849
-#define SAVE_FILE_MAGIC 0x4441
-
-STATIC_ASSERT(sizeof(struct SaveBuffer) == EEPROM_SIZE, "eeprom buffer size must match");
+#include "macros.h"
+#include "pc/ini.h"
+#ifdef TEXTSAVES
+#include "extras/text_save.h"
+#endif
 
 extern struct SaveBuffer gSaveBuffer;
 
@@ -28,10 +27,9 @@ s8 gSaveFileModified;
 
 u8 gLastCompletedCourseNum = COURSE_NONE;
 u8 gLastCompletedStarNum = 0;
-s8 sUnusedGotGlobalCoinHiScore = FALSE;
+u8 sUnusedGotGlobalCoinHiScore = FALSE;
 u8 gGotFileCoinHiScore = FALSE;
 u8 gCurrCourseStarFlags = 0;
-
 u8 gSpecialTripleJump = FALSE;
 
 #define STUB_LEVEL(_0, _1, courseenum, _3, _4, _5, _6, _7, _8) courseenum,
@@ -70,6 +68,42 @@ void unlock_full_game(void) {
     gSaveBuffer.files[0][0].courseStars[24] = 0x01;
 }
 
+#ifdef SWAP_ENDIAN_SAVE_FILE
+/**
+ * Byteswap all multibyte fields in a SaveBlockSignature.
+ */
+static inline void bswap_signature(struct SaveBlockSignature *data) {
+    data->magic = BSWAP16(data->magic);
+    data->chksum = BSWAP16(data->chksum); // valid as long as the checksum is a literal sum
+}
+
+/**
+ * Byteswap all multibyte fields in a MainMenuSaveData.
+ */
+static inline void bswap_menudata(struct MainMenuSaveData *data) {
+    int i;
+    for (i = 0; i < NUM_SAVE_FILES; i++) {
+        data->coinScoreAges[i] = BSWAP32(data->coinScoreAges[i]);
+    }
+    data->soundMode = BSWAP16(data->soundMode);
+#ifdef VERSION_EU
+    data->language = BSWAP16(data->language);
+#endif
+    bswap_signature(&data->signature);
+}
+
+/**
+ * Byteswap all multibyte fields in a SaveFile.
+ */
+static inline void bswap_savefile(struct SaveFile *data) {
+    data->capPos[0] = BSWAP16(data->capPos[0]);
+    data->capPos[1] = BSWAP16(data->capPos[1]);
+    data->capPos[2] = BSWAP16(data->capPos[2]);
+    data->flags = BSWAP32(data->flags);
+    bswap_signature(&data->signature);
+}
+#endif
+
 /**
  * Read from EEPROM to a given address.
  * The EEPROM address is computed using the offset of the destination address from gSaveBuffer.
@@ -94,11 +128,16 @@ static s32 read_eeprom_data(void *buffer, s32 size) {
 
 /**
  * Write data to EEPROM.
- * The EEPROM address is computed using the offset of the source address from gSaveBuffer.
+ * The EEPROM address was originally (is in N64) computed using the offset of the source address from gSaveBuffer.
  * Try at most 4 times, and return 0 on success. On failure, return the status returned from
  * osEepromLongWrite. Unlike read_eeprom_data, return 1 if EEPROM isn't loaded.
  */
-static s32 write_eeprom_data(void *buffer, s32 size) {
+#ifdef SWAP_ENDIAN_SAVE_FILE
+static s32 write_eeprom_data(void *buffer, s32 size, const uintptr_t baseofs)
+#else
+static s32 write_eeprom_data(void *buffer, s32 size)
+#endif
+{
     s32 status = 1;
 
     // if (gEepromProbe != 0) {
@@ -113,6 +152,42 @@ static s32 write_eeprom_data(void *buffer, s32 size) {
 
     return status;
 }
+
+#ifdef SWAP_ENDIAN_SAVE_FILE
+/**
+ * Wrappers that byteswap the data on LE platforms before writing it to 'EEPROM'
+ */
+
+static inline s32 write_eeprom_savefile(const u32 file, const u32 slot, const u32 num) {
+    // calculate the EEPROM address using the file number and slot
+    const uintptr_t ofs = (u8*)&gSaveBuffer.files[file][slot] - (u8*)&gSaveBuffer;
+
+#if IS_BIG_ENDIAN
+    return write_eeprom_data(&gSaveBuffer.files[file][slot], num * sizeof(struct SaveFile), ofs);
+#else
+    // byteswap the data and then write it
+    struct SaveFile sf[num];
+    bcopy(&gSaveBuffer.files[file][slot], sf, num * sizeof(sf[0]));
+    for (u32 i = 0; i < num; i++) bswap_savefile(&sf[i]);
+    return write_eeprom_data(&sf, sizeof(sf), ofs);
+#endif
+}
+
+static inline s32 write_eeprom_menudata(const u32 slot, const u32 num) {
+    // calculate the EEPROM address using the slot
+    const uintptr_t ofs = (u8*)&gSaveBuffer.menuData[slot] - (u8*)&gSaveBuffer;
+
+#if IS_BIG_ENDIAN
+    return write_eeprom_data(&gSaveBuffer.menuData[slot], num * sizeof(struct MainMenuSaveData), ofs);
+#else
+    // byteswap the data and then write it
+    struct MainMenuSaveData md[num];
+    bcopy(&gSaveBuffer.menuData[slot], md, num * sizeof(md[0]));
+    for (u32 i = 0; i < num; i++) bswap_menudata(&md[i]);
+    return write_eeprom_data(&md, sizeof(md), ofs);
+#endif
+}
+#endif
 
 /**
  * Sum the bytes in data to data + size - 2. The last two bytes are ignored
@@ -165,7 +240,11 @@ static void restore_main_menu_data(s32 srcSlot) {
     bcopy(&gSaveBuffer.menuData[srcSlot], &gSaveBuffer.menuData[destSlot], sizeof(gSaveBuffer.menuData[destSlot]));
 
     // Write destination data to EEPROM
+#ifdef SWAP_ENDIAN_SAVE_FILE
+    write_eeprom_menudata(destSlot, 1);
+#else
     write_eeprom_data(&gSaveBuffer.menuData[destSlot], sizeof(gSaveBuffer.menuData[destSlot]));
+#endif
 }
 
 static void save_main_menu_data(void) {
@@ -177,7 +256,11 @@ static void save_main_menu_data(void) {
         bcopy(&gSaveBuffer.menuData[0], &gSaveBuffer.menuData[1], sizeof(gSaveBuffer.menuData[1]));
 
         // Write to EEPROM
+#ifdef SWAP_ENDIAN_SAVE_FILE
+        write_eeprom_menudata(0, 2);
+#else
         write_eeprom_data(gSaveBuffer.menuData, sizeof(gSaveBuffer.menuData));
+#endif
 
         gMainMenuDataModified = FALSE;
     }
@@ -253,12 +336,60 @@ static void restore_save_file_data(s32 fileIndex, s32 srcSlot) {
           sizeof(gSaveBuffer.files[fileIndex][destSlot]));
 
     // Write destination data to EEPROM
-    write_eeprom_data(&gSaveBuffer.files[fileIndex][destSlot],
-                      sizeof(gSaveBuffer.files[fileIndex][destSlot]));
+#ifdef SWAP_ENDIAN_SAVE_FILE
+    write_eeprom_savefile(fileIndex, destSlot, 1);
+#else
+    write_eeprom_data(&gSaveBuffer.files[fileIndex][destSlot], sizeof(gSaveBuffer.files[fileIndex][destSlot]));
+#endif
 }
 
+#ifdef SWAP_ENDIAN_SAVE_FILE
+/**
+ * Check if the 'EEPROM' save has different endianness (e.g. it's from an actual N64).
+ */
+static u8 save_file_need_bswap(const struct SaveBuffer *buf) {
+    // check all signatures just in case
+    int i, j;
+    for (i = 0; i < 2; i++) {
+        if (buf->menuData[i].signature.magic == BSWAP16(MENU_DATA_MAGIC)) {
+            return TRUE;
+        }
+        for (j = 0; j < NUM_SAVE_FILES; j++) {
+            if (buf->files[j][i].signature.magic == BSWAP16(SAVE_FILE_MAGIC))
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/**
+ * Byteswap all multibyte fields in a SaveBuffer.
+ */
+static void save_file_bswap(struct SaveBuffer *buf) {
+    int i;
+    bswap_menudata(buf->menuData + 0);
+    bswap_menudata(buf->menuData + 1);
+    for (i = 0; i < NUM_SAVE_FILES; i++) {
+        bswap_savefile(buf->files[i] + 0);
+        bswap_savefile(buf->files[i] + 1);
+    }
+}
+#endif
+
 void save_file_do_save(s32 fileIndex) {
-    if (gSaveFileModified) {
+    if (fileIndex < 0 || fileIndex >= NUM_SAVE_FILES)
+        return;
+
+    if (gSaveFileModified)
+#ifdef TEXTSAVES
+    {
+        // Write to text file
+        write_text_save(fileIndex);
+        gSaveFileModified = FALSE;
+        gMainMenuDataModified = FALSE;
+    }
+#else
+    {
         // Compute checksum
         add_save_block_signature(&gSaveBuffer.files[fileIndex][0],
                                  sizeof(gSaveBuffer.files[fileIndex][0]), SAVE_FILE_MAGIC);
@@ -268,15 +399,21 @@ void save_file_do_save(s32 fileIndex) {
               sizeof(gSaveBuffer.files[fileIndex][1]));
 
         // Write to EEPROM
+#ifdef SWAP_ENDIAN_SAVE_FILE
+        write_eeprom_savefile(fileIndex, 0, 2);
+#else
         write_eeprom_data(gSaveBuffer.files[fileIndex], sizeof(gSaveBuffer.files[fileIndex]));
-
+#endif
         gSaveFileModified = FALSE;
     }
-
     save_main_menu_data();
+#endif
 }
 
 void save_file_erase(s32 fileIndex) {
+    if (fileIndex < 0 || fileIndex >= NUM_SAVE_FILES)
+        return;
+
     touch_high_score_ages(fileIndex);
     bzero(&gSaveBuffer.files[fileIndex][0], sizeof(gSaveBuffer.files[fileIndex][0]));
 
@@ -284,9 +421,9 @@ void save_file_erase(s32 fileIndex) {
     save_file_do_save(fileIndex);
 }
 
-//! Needs to be s32 to match on -O2, despite no return value.
-BAD_RETURN(s32) save_file_copy(s32 srcFileIndex, s32 destFileIndex) {
-    UNUSED u8 filler[4];
+void save_file_copy(s32 srcFileIndex, s32 destFileIndex) {
+    if (srcFileIndex < 0 || srcFileIndex >= NUM_SAVE_FILES || destFileIndex < 0 || destFileIndex >= NUM_SAVE_FILES)
+        return;
 
     touch_high_score_ages(destFileIndex);
     bcopy(&gSaveBuffer.files[srcFileIndex][0], &gSaveBuffer.files[destFileIndex][0],
@@ -298,14 +435,28 @@ BAD_RETURN(s32) save_file_copy(s32 srcFileIndex, s32 destFileIndex) {
 
 void save_file_load_all(void) {
     s32 file;
-    s32 validSlots;
 
     gMainMenuDataModified = FALSE;
     gSaveFileModified = FALSE;
 
     bzero(&gSaveBuffer, sizeof(gSaveBuffer));
+
+#ifdef TEXTSAVES
+    for (file = 0; file < NUM_SAVE_FILES; file++) {
+        read_text_save(file);
+    }
+    gSaveFileModified = TRUE;
+    gMainMenuDataModified = TRUE;
+#else
     read_eeprom_data(&gSaveBuffer, sizeof(gSaveBuffer));
 
+#ifdef SWAP_ENDIAN_SAVE_FILE
+    if (save_file_need_bswap(&gSaveBuffer)) {
+        save_file_bswap(&gSaveBuffer);
+    }
+#endif
+
+    s32 validSlots;
     // Verify the main menu data and create a backup copy if only one of the slots is valid.
     validSlots = verify_save_block_signature(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]), MENU_DATA_MAGIC);
     validSlots |= verify_save_block_signature(&gSaveBuffer.menuData[1], sizeof(gSaveBuffer.menuData[1]),MENU_DATA_MAGIC) << 1;
@@ -337,6 +488,7 @@ void save_file_load_all(void) {
                 break;
         }
     }
+#endif // TEXTSAVES
 
     // unlock_full_game();
 }
@@ -448,7 +600,7 @@ u32 save_file_get_max_coin_score(s32 courseIndex) {
             }
         }
     }
-    return (maxScoreFileNum << 16) + max(maxCoinScore, 0);
+    return (maxScoreFileNum << 16) + MAX(maxCoinScore, 0);
 }
 
 s32 save_file_get_course_star_count(s32 fileIndex, s32 courseIndex) {
@@ -457,7 +609,7 @@ s32 save_file_get_course_star_count(s32 fileIndex, s32 courseIndex) {
     u8 flag = 1;
     u8 starFlags = save_file_get_star_flags(fileIndex, courseIndex);
 
-    for (i = 0; i < 7; i++, flag <<= 1) {
+    for (i = 0; i < (STAR_INDEX_100_COINS + 1); i++, flag <<= 1) {
         if (starFlags & flag) {
             count++;
         }
@@ -530,6 +682,10 @@ s32 save_file_get_course_coin_score(s32 fileIndex, s32 courseIndex) {
     return gSaveBuffer.files[fileIndex][0].courseCoinScores[courseIndex];
 }
 
+u32 save_file_get_cannon_flags(s32 fileIndex, s32 courseIndex) {
+    return gSaveBuffer.files[fileIndex][0].courseStars[courseIndex] & (1 << 7);
+}
+
 /**
  * Return TRUE if the cannon is unlocked in the current course.
  */
@@ -580,6 +736,10 @@ void save_file_set_sound_mode(u16 mode) {
 }
 
 u16 save_file_get_sound_mode(void) {
+    // Check if the sound is in range, in case we loaded a shifted save file
+    if (gSaveBuffer.menuData[0].soundMode > 2) {
+        save_file_set_sound_mode(0); // Reset it to stereo if not
+    }
     return gSaveBuffer.menuData[0].soundMode;
 }
 
@@ -608,7 +768,27 @@ void eu_set_language(u16 language) {
 }
 
 u16 eu_get_language(void) {
+    // Check if the language is in range, in case we loaded a non-eu save with garbage values or a shifted save
+    if (gSaveBuffer.menuData[0].language >= LANGUAGE_MAX) {
+        eu_set_language(LANGUAGE_ENGLISH); // Reset it to english if not
+    }
     return gSaveBuffer.menuData[0].language;
+}
+#endif
+
+#ifdef EXT_DEBUG_MENU
+void get_complete_save_file(s16 saveNum) {
+    int i, j;
+    // Apply all stars flags, including cannon
+    for (i = 0; i < COURSE_MAX; i++) {
+        for (j = 0; j < STAR_INDEX_CANNON + 1; j++) {
+            save_file_set_star_flags(saveNum - 1, i, 1 << j);
+        }
+    }
+
+    // Apply every save flag expect caps
+    u32 capFlags = (SAVE_FLAG_CAP_ON_GROUND | SAVE_FLAG_CAP_ON_KLEPTO | SAVE_FLAG_CAP_ON_UKIKI | SAVE_FLAG_CAP_ON_MR_BLIZZARD);
+    save_file_set_flags(0xFFFFFFFF - capFlags);
 }
 #endif
 

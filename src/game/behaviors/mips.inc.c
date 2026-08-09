@@ -12,7 +12,7 @@ void bhv_mips_init(void) {
     u8 starFlags = save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(COURSE_NONE));
 
     // If the player has >= 15 stars and hasn't collected first MIPS star...
-    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= 15
+    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= MIPS1_STAR_REQ
         && !(starFlags & SAVE_FLAG_TO_STAR_FLAG(SAVE_FLAG_COLLECTED_MIPS_STAR_1))) {
         o->oBhvParams2ndByte = MIPS_BP_15_STARS;
 #ifndef VERSION_JP
@@ -20,7 +20,7 @@ void bhv_mips_init(void) {
 #endif
     }
     // If the player has >= 50 stars and hasn't collected second MIPS star...
-    else if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= 50
+    else if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= MIPS2_STAR_REQ
              && !(starFlags & SAVE_FLAG_TO_STAR_FLAG(SAVE_FLAG_COLLECTED_MIPS_STAR_2))) {
         o->oBhvParams2ndByte = MIPS_BP_50_STARS;
 #ifndef VERSION_JP
@@ -107,21 +107,13 @@ void bhv_mips_act_wait_for_nearby_mario(void) {
  * Continue to follow our path around the basement area.
  */
 void bhv_mips_act_follow_path(void) {
-    s16 collisionFlags = 0;
-    s32 followStatus;
-
     // Retrieve current waypoint.
     struct Waypoint **pathBase = segmented_to_virtual(&inside_castle_seg7_trajectory_mips);
     struct Waypoint *waypoint = segmented_to_virtual(*(pathBase + o->oMipsStartWaypointIndex));
 
-#ifdef AVOID_UB
-    followStatus = 0;
-#endif
-
     // Set start waypoint and follow the path from there.
     o->oPathedStartWaypoint = waypoint;
-    //! Uninitialized parameter, but the parameter is unused in the called function
-    followStatus = cur_obj_follow_path(followStatus);
+    s32 followStatus = cur_obj_follow_path();
 
     // Update velocity and angle and do movement.
 #ifndef VERSION_JP
@@ -130,7 +122,7 @@ void bhv_mips_act_follow_path(void) {
     o->oForwardVel = 45.0f;
 #endif
     o->oMoveAngleYaw = o->oPathedTargetYaw;
-    collisionFlags = object_step();
+    s16 collisionFlags = object_step();
 
     // If we are at the end of the path, do idle animation and wait for Mario.
     if (followStatus == PATH_REACHED_END) {

@@ -18,21 +18,46 @@
 #include "make_const_nonconst.h"
 #include "levels/intro/header.h"
 
+#if defined(TARGET_N64) && defined(N64_USE_EXTENDED_RAM)
+const LevelScript level_intro_entry_error_screen[] = {
+    INIT_LEVEL(),
+#ifdef GODDARD_MFACE
+    FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
+#endif
+    LOAD_MIO0(/*seg*/ 0x07, _intro_segment_7SegmentRomStart, _intro_segment_7SegmentRomEnd),
+    ALLOC_LEVEL_POOL(),
+
+    AREA(/*index*/ 1, intro_geo_error_screen),
+    END_AREA(),
+
+    FREE_LEVEL_POOL(),
+    LOAD_AREA(/*area*/ 1),
+    SLEEP(/*frames*/ 32767),
+    EXIT_AND_EXECUTE(/*seg*/ 0x14, _introSegmentRomStart, _introSegmentRomEnd, level_intro_entry_error_screen),
+};
+#endif
+
 const LevelScript level_intro_splash_screen[] = {
     INIT_LEVEL(),
+#ifdef GODDARD_MFACE
     FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
+#endif
     LOAD_RAW (/*seg*/ 0x13, _behaviorSegmentRomStart, _behaviorSegmentRomEnd),
     LOAD_MIO0(/*seg*/ 0x07, _intro_segment_7SegmentRomStart, _intro_segment_7SegmentRomEnd),
-
     // Load "Super Mario 64" logo
     ALLOC_LEVEL_POOL(),
+
     AREA(/*index*/ 1, intro_geo_0002D0),
     END_AREA(),
-    FREE_LEVEL_POOL(),
 
+    FREE_LEVEL_POOL(),
     // Start animation
     LOAD_AREA(/*area*/ 1),
 
+    GET_OR_SET(/*op*/ OP_GET, /*var*/ VAR_CURR_GAME_SKIPS),
+    JUMP_IF(/*op*/ OP_AND, /*arg*/ GAME_SKIP_TITLE_SCREEN, level_intro_mario_head_regular),
+
+    SET_MENU_MUSIC(/*seq*/ SEQ_SOUND_PLAYER),
     CALL(/*arg*/ LVL_INTRO_PLAY_ITS_A_ME_MARIO, /*func*/ lvl_intro_update),
     SLEEP(/*frames*/ 75),
     TRANSITION(/*transType*/ WARP_TRANSITION_FADE_INTO_COLOR, /*time*/ 16, /*color*/ 0x00, 0x00, 0x00),
@@ -44,6 +69,9 @@ const LevelScript level_intro_splash_screen[] = {
 };
 
 const LevelScript level_intro_mario_head_regular[] = {
+#ifndef GODDARD_MFACE
+    JUMP(level_intro_mario_head_regular_skip),
+#else
     INIT_LEVEL(),
     BLACKOUT(/*active*/ TRUE),
     FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
@@ -59,6 +87,10 @@ const LevelScript level_intro_mario_head_regular[] = {
     SLEEP(/*frames*/ 2),
     BLACKOUT(/*active*/ FALSE),
     LOAD_AREA(/*area*/ 1),
+
+    GET_OR_SET(/*op*/ OP_GET, /*var*/ VAR_CURR_GAME_SKIPS),
+    JUMP_IF(/*op*/ OP_AND, /*arg*/ GAME_SKIP_GODDARD, level_intro_mario_head_regular_skip),
+
     SET_MENU_MUSIC(/*seq*/ SEQ_MENU_TITLE_SCREEN),
     TRANSITION(/*transType*/ WARP_TRANSITION_FADE_FROM_STAR, /*time*/ 20, /*color*/ 0x00, 0x00, 0x00),
     SLEEP(/*frames*/ 20),
@@ -66,9 +98,13 @@ const LevelScript level_intro_mario_head_regular[] = {
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ 100, script_intro_L1),
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ 101, script_intro_L2),
     JUMP(script_intro_L4),
+#endif
 };
 
 const LevelScript level_intro_mario_head_dizzy[] = {
+#ifndef GODDARD_MFACE
+    JUMP(level_intro_mario_head_dizzy_skip),
+#else
     INIT_LEVEL(),
     BLACKOUT(/*active*/ TRUE),
     FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
@@ -91,6 +127,25 @@ const LevelScript level_intro_mario_head_dizzy[] = {
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ 100, script_intro_L1),
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ 101, script_intro_L2),
     JUMP(script_intro_L4),
+#endif
+};
+
+const LevelScript level_intro_mario_head_regular_skip[] = {
+    INIT_LEVEL(),
+    PUSH_POOL(),
+    CALL_LOOP(/*arg*/ LVL_INTRO_REGULAR, /*func*/ lvl_intro_update),
+    JUMP_IF(/*op*/ OP_EQ, /*arg*/ 100, script_intro_L1),
+    JUMP_IF(/*op*/ OP_EQ, /*arg*/ 101, script_intro_L2),
+    EXIT_AND_EXECUTE(/*seg*/ 0x14, _menuSegmentRomStart, _menuSegmentRomEnd, level_main_menu_entry_1),
+};
+
+const LevelScript level_intro_mario_head_dizzy_skip[] = {
+    INIT_LEVEL(),
+    PUSH_POOL(),
+    CALL_LOOP(/*arg*/ LVL_INTRO_GAME_OVER, /*func*/ lvl_intro_update),
+    JUMP_IF(/*op*/ OP_EQ, /*arg*/ 100, script_intro_L1),
+    JUMP_IF(/*op*/ OP_EQ, /*arg*/ 101, script_intro_L2),
+    EXIT_AND_EXECUTE(/*seg*/ 0x14, _introSegmentRomStart, _introSegmentRomEnd, level_intro_splash_screen),
 };
 
 const LevelScript level_intro_entry_4[] = {
@@ -98,7 +153,12 @@ const LevelScript level_intro_entry_4[] = {
     LOAD_RAW         (/*seg*/ 0x13, _behaviorSegmentRomStart, _behaviorSegmentRomEnd),
     LOAD_MIO0_TEXTURE(/*seg*/ 0x0A, _title_screen_bg_mio0SegmentRomStart, _title_screen_bg_mio0SegmentRomEnd),
     LOAD_MIO0        (/*seg*/ 0x07, _debug_level_select_mio0SegmentRomStart, _debug_level_select_mio0SegmentRomEnd),
+#ifdef GODDARD_MFACE
     FIXED_LOAD(/*loadAddr*/ _goddardSegmentStart, /*romStart*/ _goddardSegmentRomStart, /*romEnd*/ _goddardSegmentRomEnd),
+#endif
+#if ZELDA_STYLE_LEVEL_SELECT
+    CALL(/*arg*/ 0, /*func*/ lvl_init_intro_level_select),
+#endif
     ALLOC_LEVEL_POOL(),
 
     AREA(/*index*/ 1, intro_geo_000414),

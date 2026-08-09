@@ -118,7 +118,7 @@
 #define /*0x17C*/ oOpacity                    OBJECT_FIELD_S32(0x3D)
 #define /*0x180*/ oDamageOrCoinValue          OBJECT_FIELD_S32(0x3E)
 #define /*0x184*/ oHealth                     OBJECT_FIELD_S32(0x3F)
-#define /*0x188*/ oBhvParams                  OBJECT_FIELD_S32(0x40)
+#define /*0x188*/ oBhvParams                  OBJECT_FIELD_U32(0x40)
 #define /*0x18C*/ oPrevAction                 OBJECT_FIELD_S32(0x41)
 #define /*0x190*/ oInteractionSubtype         OBJECT_FIELD_U32(0x42)
 #define /*0x194*/ oCollisionDistance          OBJECT_FIELD_F32(0x43)
@@ -129,8 +129,7 @@
 #define /*0x1A8*/ oUnusedBhvParams            OBJECT_FIELD_U32(0x48)
 // 0x1AC-0x1B2 (0x48-0x4A) are object specific and defined below the common fields.
 #define /*0x1B4*/ oWallAngle                  OBJECT_FIELD_S32(0x4B)
-#define /*0x1B8*/ oFloorType                  OBJECT_FIELD_S16(0x4C, 0)
-#define /*0x1BA*/ oFloorRoom                  OBJECT_FIELD_S16(0x4C, 1)
+// 0x1B8-0x1BA (0x4C) were oFloorType and oFloorRoom, but their use was redundant so it was freed
 #define /*0x1BC*/ oAngleToHome                OBJECT_FIELD_S32(0x4D)
 #define /*0x1C0*/ oFloor                      OBJECT_FIELD_SURFACE(0x4E)
 #define /*0x1C4*/ oDeathSound                 OBJECT_FIELD_S32(0x4F)
@@ -432,10 +431,10 @@
 #define /*0x0F4*/ oDonutPlatformSpawnerSpawnedPlatforms OBJECT_FIELD_S32(0x1B)
 
 /* Door */
-#define /*0x088*/ oDoorUnk88  OBJECT_FIELD_S32(0x00)
-#define /*0x0F8*/ oDoorUnkF8  OBJECT_FIELD_S32(0x1C)
-#define /*0x0FC*/ oDoorUnkFC  OBJECT_FIELD_S32(0x1D)
-#define /*0x100*/ oDoorUnk100 OBJECT_FIELD_S32(0x1E)
+#define /*0x088*/ oDoorIsRendering  OBJECT_FIELD_S32(0x00)
+#define /*0x0F8*/ oDoorSelfRoom     OBJECT_FIELD_S32(0x1C)
+#define /*0x0FC*/ oDoorForwardRoom  OBJECT_FIELD_S32(0x1D)
+#define /*0x100*/ oDoorBackwardRoom OBJECT_FIELD_S32(0x1E)
 
 /* Dorrie */
 #define /*0x0F4*/ oDorrieDistToHome         OBJECT_FIELD_F32(0x1B)
@@ -597,6 +596,9 @@
 #define /*0x100*/ oKingBobombUnk100 OBJECT_FIELD_S32(0x1E)
 #define /*0x104*/ oKingBobombUnk104 OBJECT_FIELD_S32(0x1F)
 #define /*0x108*/ oKingBobombUnk108 OBJECT_FIELD_S32(0x20)
+#if KING_BOBOMB_BLINK_EYES
+#define /*0x108*/ oKingBobombBlinkTimer OBJECT_FIELD_S32(0x21)
+#endif
 
 /* Klepto */
 #define /*0x0F4*/ oKleptoDistanceToTarget      OBJECT_FIELD_F32(0x1B)
@@ -897,10 +899,7 @@
 #define /*0x104*/ oSnufitBodyScalePeriod OBJECT_FIELD_S32(0x1F)
 #define /*0x108*/ oSnufitBodyBaseScale   OBJECT_FIELD_S32(0x20)
 #define /*0x10C*/ oSnufitBullets         OBJECT_FIELD_S32(0x21)
-#define /*0x1AC*/ oSnufitXOffset         OBJECT_FIELD_S16(0x49, 0)
-#define /*0x1AE*/ oSnufitYOffset         OBJECT_FIELD_S16(0x49, 1)
-#define /*0x1B0*/ oSnufitZOffset         OBJECT_FIELD_S16(0x4A, 0)
-#define /*0x1B2*/ oSnufitBodyScale       OBJECT_FIELD_S16(0x4A, 1)
+#define /*0x1B2*/ oSnufitBodyScale       OBJECT_FIELD_S16(0x49, 0)
 
 /* Spindel */
 #define /*0x0F4*/ oSpindelUnkF4 OBJECT_FIELD_S32(0x1B)
@@ -936,7 +935,7 @@
 #define /*0x110*/ oUnlockDoorStarYawVel OBJECT_FIELD_S32(0x22)
 
 /* Celebration Star */
-#define /*0x0F4*/ oCelebStarUnkF4              OBJECT_FIELD_S32(0x1B)
+#define /*0x0F4*/ oCelebStarIsBowserKey        OBJECT_FIELD_S32(0x1B)
 #define /*0x108*/ oCelebStarDiameterOfRotation OBJECT_FIELD_S32(0x20)
 
 /* Star Selector */
@@ -963,7 +962,6 @@
 #define /*0x0F4*/ oTiltingPyramidNormalX         OBJECT_FIELD_F32(0x1B)
 #define /*0x0F8*/ oTiltingPyramidNormalY         OBJECT_FIELD_F32(0x1C)
 #define /*0x0FC*/ oTiltingPyramidNormalZ         OBJECT_FIELD_F32(0x1D)
-#define /*0x10C*/ oTiltingPyramidMarioOnPlatform OBJECT_FIELD_S32(0x21)
 
 /* Toad Message */
 #define /*0x108*/ oToadMessageDialogID       OBJECT_FIELD_U32(0x20)
@@ -1030,7 +1028,8 @@
 #define /*0x0F8*/ oTTCChangeDirTimer OBJECT_FIELD_S32(0x1C)
 
 /* Beta Trampoline */
-#define /*0x110*/ oBetaTrampolineMarioOnTrampoline OBJECT_FIELD_S32(0x22)
+#define /*0x110*/ oBetaTrampolineMarioOnTrampoline OBJECT_FIELD_S32(0x1B)
+#define /*0x114*/ oBetaTrampolineAdditiveYVel      OBJECT_FIELD_F32(0x1C)
 
 /* Treasure Chest */
 #define /*0x0F4*/ oTreasureChestUnkF4 OBJECT_FIELD_S32(0x1B)
@@ -1164,5 +1163,20 @@
 #define /*0x0F4*/ oYoshiBlinkTimer OBJECT_FIELD_S32(0x1B)
 #define /*0x0FC*/ oYoshiChosenHome OBJECT_FIELD_S32(0x1D)
 #define /*0x100*/ oYoshiTargetYaw  OBJECT_FIELD_S32(0x1E)
+
+#ifdef PORT_MOP_OBJS
+
+/* Moving Rotating */
+#define oMopMovingRotatingPath      OBJECT_FIELD_S32(0x1B)
+#define oMopMovingRotatingTimer     OBJECT_FIELD_S32(0x1D)
+
+/* Green Switchboard */
+#define oMopGreenSwitchboardGear    OBJECT_FIELD_VPTR(0x1B)
+
+/* Jukebox */
+#define oMopJukeboxChangeMusic      OBJECT_FIELD_S32(0x1B)
+#define oMopJukeboxIndexMusic       OBJECT_FIELD_S32(0x1C)
+
+#endif
 
 #endif // OBJECT_FIELDS_H

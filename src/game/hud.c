@@ -1,3 +1,6 @@
+#ifndef TARGET_N64
+#include <stdbool.h>
+#endif
 #include <PR/ultratypes.h>
 #include <stdio.h>
 
@@ -19,6 +22,18 @@
 #include "bingo_ui.h"
 #include "strcpy.h"
 
+#ifdef EXT_OPTIONS_MENU
+#ifndef TARGET_N64
+#include "pc/configfile.h"
+#else
+int configHUD = TRUE;
+#endif
+#endif
+
+#ifdef BETTERCAMERA
+#include "extras/bettercamera.h"
+#endif
+
 /* @file hud.c
  * This file implements HUD rendering and power meter animations.
  * That includes stars, lives, coins, camera status, power meter, timer
@@ -38,8 +53,8 @@ static s16 sPowerMeterStoredHealth;
 
 static struct PowerMeterHUD sPowerMeterHUD = {
     POWER_METER_HIDDEN,
-    140,
-    166,
+    POWER_X,
+    POWER_Y,
     1.0,
 };
 
@@ -48,15 +63,33 @@ static struct PowerMeterHUD sPowerMeterHUD = {
 // when the power meter is hidden.
 s32 sPowerMeterVisibleTimer = 0;
 
-// TODO: fakediff?
-#ifndef VERSION_CN
-UNUSED static s32 sUnusedHUDValue1 = 0;
-UNUSED static s16 sUnusedHUDValue2 = 10;
-#else
-UNUSED static s32 sUnusedHUDValue2 = 10;
-#endif
+s16 sCameraHUDStatus = CAM_STATUS_NONE;
 
-static s16 sCameraHUDStatus = CAM_STATUS_NONE;
+s32 set_hud_auto_x_pos(s32 x) {
+    if (x > 200) {
+        return GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(SCREEN_WIDTH - x);
+    } else if (x <= 200 && x >= 120) {
+        return x;
+    } else {
+        return GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(x);
+    }
+}
+
+#ifdef HIGH_FPS_PC
+static u32 sPowerMeterLastRenderTimestamp;
+static s16 sPowerMeterLastY;
+static Gfx *sPowerMeterDisplayListPos;
+
+void patch_interpolated_hud(void) {
+    if (sPowerMeterDisplayListPos != NULL) {
+        Mtx *mtx = alloc_display_list(sizeof(Mtx));
+        guTranslate(mtx, (f32) set_hud_auto_x_pos(sPowerMeterHUD.x), (f32) sPowerMeterHUD.y, 0);
+        gSPMatrix(sPowerMeterDisplayListPos, VIRTUAL_TO_PHYSICAL(mtx),
+              G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);
+        sPowerMeterDisplayListPos = NULL;
+    }
+}
+#endif
 
 /**
  * Renders a rgba16 16x16 glyph texture from a table list.
@@ -108,13 +141,28 @@ void render_power_meter_health_segment(s16 numHealthWedges) {
  * That includes the "POWER" base and the colored health segment textures.
  */
 void render_dl_power_meter(s16 numHealthWedges) {
+#ifdef HIGH_FPS_PC
+    f32 interpolatedY;
+#endif
     Mtx *mtx = alloc_display_list(sizeof(Mtx));
 
     if (mtx == NULL) {
         return;
     }
 
-    guTranslate(mtx, (f32) sPowerMeterHUD.x, (f32) sPowerMeterHUD.y, 0);
+#ifdef HIGH_FPS_PC
+    if (gGlobalTimer == sPowerMeterLastRenderTimestamp + 1) {
+        interpolatedY = (sPowerMeterLastY + sPowerMeterHUD.y) / 2.0f;
+    } else {
+        interpolatedY = sPowerMeterHUD.y;
+    }
+    guTranslate(mtx, (f32) set_hud_auto_x_pos(sPowerMeterHUD.x), interpolatedY, 0);
+    sPowerMeterLastY = sPowerMeterHUD.y;
+    sPowerMeterLastRenderTimestamp = gGlobalTimer;
+    sPowerMeterDisplayListPos = gDisplayListHead;
+#else
+    guTranslate(mtx, (f32) set_hud_auto_x_pos(sPowerMeterHUD.x), (f32) sPowerMeterHUD.y, 0);
+#endif
 
     gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx++),
               G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);
@@ -152,22 +200,22 @@ void animate_power_meter_emphasized(void) {
 static void animate_power_meter_deemphasizing(void) {
     s16 speed = 5;
 
-    if (sPowerMeterHUD.y > 180) {
+    if (sPowerMeterHUD.y > POWER_Y + 14) {
         speed = 3;
     }
 
-    if (sPowerMeterHUD.y > 190) {
+    if (sPowerMeterHUD.y > POWER_Y + 24) {
         speed = 2;
     }
 
-    if (sPowerMeterHUD.y > 195) {
+    if (sPowerMeterHUD.y > POWER_Y + 29) {
         speed = 1;
     }
 
     sPowerMeterHUD.y += speed;
 
-    if (sPowerMeterHUD.y > 200) {
-        sPowerMeterHUD.y = 200;
+    if (sPowerMeterHUD.y > POWER_Y + 34) {
+        sPowerMeterHUD.y = POWER_Y + 34;
         sPowerMeterHUD.animation = POWER_METER_VISIBLE;
     }
 }
@@ -178,7 +226,7 @@ static void animate_power_meter_deemphasizing(void) {
  */
 static void animate_power_meter_hiding(void) {
     sPowerMeterHUD.y += 20;
-    if (sPowerMeterHUD.y > 300) {
+    if (sPowerMeterHUD.y > POWER_Y + 134) {
         sPowerMeterHUD.animation = POWER_METER_HIDDEN;
         sPowerMeterVisibleTimer = 0;
     }
@@ -192,7 +240,7 @@ void handle_power_meter_actions(s16 numHealthWedges) {
     if (numHealthWedges < 8 && sPowerMeterStoredHealth == 8
         && sPowerMeterHUD.animation == POWER_METER_HIDDEN) {
         sPowerMeterHUD.animation = POWER_METER_EMPHASIZED;
-        sPowerMeterHUD.y = 166;
+        sPowerMeterHUD.y = POWER_Y;
     }
 
     // Show power meter if health is full, has 8
@@ -213,7 +261,7 @@ void handle_power_meter_actions(s16 numHealthWedges) {
         if (sPowerMeterHUD.animation == POWER_METER_HIDDEN
             || sPowerMeterHUD.animation == POWER_METER_EMPHASIZED) {
             sPowerMeterHUD.animation = POWER_METER_DEEMPHASIZING;
-            sPowerMeterHUD.y = 166;
+            sPowerMeterHUD.y = POWER_Y;
         }
         sPowerMeterVisibleTimer = 0;
     }
@@ -258,9 +306,9 @@ void render_hud_power_meter(void) {
  * Renders the amount of lives Mario has.
  */
 void render_hud_mario_lives(void) {
-    print_text(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(22), HUD_TOP_Y, ","); // 'Mario Head' glyph
-    print_text(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(38), HUD_TOP_Y, "*"); // 'X' glyph
-    print_text_fmt_int(GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(54), HUD_TOP_Y, "%d", gHudDisplay.lives);
+    print_text(set_hud_auto_x_pos(HUD_LIVES_MARIO_X), HUD_LIVES_MARIO_Y, ","); // 'Mario Head' glyph
+    print_text(set_hud_auto_x_pos(HUD_LIVES_CROSS_X), HUD_LIVES_CROSS_Y, "*"); // 'X' glyph
+    print_text_fmt_int(set_hud_auto_x_pos(HUD_LIVES_NUM_X), HUD_LIVES_NUM_Y, "%d", gHudDisplay.lives);
 }
 
 void render_hud_click_game(void) {
@@ -282,16 +330,10 @@ void render_hud_reverse_joystick(void) {
  * Renders the amount of coins collected.
  */
 void render_hud_coins(void) {
-    print_text(168, HUD_TOP_Y, "+"); // 'Coin' glyph
-    print_text(184, HUD_TOP_Y, "*"); // 'X' glyph
-    print_text_fmt_int(198, HUD_TOP_Y, "%d", gHudDisplay.coins);
+    print_text(set_hud_auto_x_pos(HUD_COINS_X), HUD_COINS_Y, "+"); // 'Coin' glyph
+    print_text(set_hud_auto_x_pos(HUD_COINS_CROSS_X), HUD_COINS_Y, "*"); // 'X' glyph
+    print_text_fmt_int(set_hud_auto_x_pos(HUD_COINS_NUM_X), HUD_COINS_Y, "%d", gHudDisplay.coins);
 }
-
-#ifdef VERSION_JP
-#define HUD_STARS_X 73
-#else
-#define HUD_STARS_X 78
-#endif
 
 /**
  * Renders the amount of stars collected.
@@ -308,12 +350,11 @@ void render_hud_stars(void) {
         showX = 1;
     }
 
-    print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(HUD_STARS_X), HUD_TOP_Y, "-"); // 'Star' glyph
+    print_text(set_hud_auto_x_pos(HUD_STARS_X), HUD_STARS_Y, "-"); // 'Star' glyph
     if (showX == 1) {
-        print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(HUD_STARS_X) + 16, HUD_TOP_Y, "*"); // 'X' glyph
+        print_text(set_hud_auto_x_pos(HUD_STARS_CROSS_X), HUD_STARS_CROSS_Y, "*"); // 'X' glyph
     }
-    print_text_fmt_int((showX * 14) + GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(HUD_STARS_X - 16),
-                       HUD_TOP_Y, "%d", gHudDisplay.stars);
+    print_text_fmt_int((showX * 14) + set_hud_auto_x_pos(HUD_STARS_NUM_X), HUD_STARS_NUM_Y, "%d", gHudDisplay.stars);
 }
 
 /**
@@ -334,40 +375,43 @@ void render_hud_keys(void) {
 void render_hud_timer(void) {
     u8 *(*hudLUT)[58] = segmented_to_virtual(&main_hud_lut);
     u16 timerValFrames = gHudDisplay.timer;
-    u16 timerMins = timerValFrames / (30 * 60);
+    // 30 frames * 60 seconds (1 minute) = 1800
+    u16 timerMins = timerValFrames / 1800;
     u16 timerSecs = (timerValFrames - (timerMins * 1800)) / 30;
     u16 timerFracSecs = ((u16) (timerValFrames - (timerMins * 1800) - (timerSecs * 30))) / 3;
 #ifdef VERSION_CN
     u8 timeString[2];
-#endif
-
+    timeString[0] = 0xC0; // 时间
+    timeString[1] = 0x00;
+    print_text_centered(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(SCREEN_WIDTH - HUD_TIME_X), HUD_TIME_Y, (const char *) timeString);
+#else
+    char *str;
 #ifdef VERSION_EU
     switch (eu_get_language()) {
         case LANGUAGE_ENGLISH:
-            print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(150), 185, "TIME");
+            str = "TIME";
             break;
         case LANGUAGE_FRENCH:
-            print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(155), 185, "TEMPS");
+            str = "TEMPS";
             break;
         case LANGUAGE_GERMAN:
-            print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(150), 185, "ZEIT");
+            str = "ZEIT";
             break;
     }
-#elif defined(VERSION_CN)
-    timeString[0] = 0xC0; // TODO: iQue colorful text
-    timeString[1] = 0x00;
-    print_text_centered(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(150), 185, (const char *) timeString);
 #else
-    print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(150), 185, "TIME");
+    str = "TIME";
+    // If set_hud_auto_x_pos is used, the "TIME" text will be very separate from the actual timer
+    print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(SCREEN_WIDTH - HUD_TIME_X), HUD_TIME_Y, str);
+#endif
 #endif
 
-    print_text_fmt_int(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(91), 185, "%0d", timerMins);
-    print_text_fmt_int(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(71), 185, "%02d", timerSecs);
-    print_text_fmt_int(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(37), 185, "%d", timerFracSecs);
+    print_text_fmt_int(set_hud_auto_x_pos(HUD_TIME_MIN_X), HUD_TIME_Y, "%0d", timerMins);
+    print_text_fmt_int(set_hud_auto_x_pos(HUD_TIME_SEC_X), HUD_TIME_Y, "%02d", timerSecs);
+    print_text_fmt_int(set_hud_auto_x_pos(HUD_TIME_FSEC_X), HUD_TIME_Y, "%d", timerFracSecs);
 
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
-    render_hud_tex_lut(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(81), 32, (*hudLUT)[GLYPH_APOSTROPHE]);
-    render_hud_tex_lut(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(46), 32, (*hudLUT)[GLYPH_DOUBLE_QUOTE]);
+    render_hud_tex_lut(set_hud_auto_x_pos(HUD_TIME_MIN_A_X), HUD_TIME_A_Y, (*hudLUT)[GLYPH_APOSTROPHE]);
+    render_hud_tex_lut(set_hud_auto_x_pos(HUD_TIME_SEC_AA_X), HUD_TIME_A_Y, (*hudLUT)[GLYPH_DOUBLE_QUOTE]);
     gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
 }
 
@@ -391,6 +435,13 @@ void render_hud_camera_status(void) {
     if (sCameraHUDStatus == CAM_STATUS_NONE) {
         return;
     }
+
+#ifdef BETTERCAMERA
+    if (gPuppyCam.enabled && !gCurrDemoInput) {
+        puppycam_hud();
+        return;
+    }
+#endif
 
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
     render_hud_tex_lut(x, y, (*cameraLUT)[GLYPH_CAM_CAMERA]);
@@ -647,5 +698,6 @@ void render_hud(void) {
                 render_hud_timer();
             }
         }
+#endif
     }
 }

@@ -24,9 +24,8 @@ void bhv_bobomb_init(void) {
 }
 
 void bobomb_spawn_coin(void) {
-    if (!((o->oBhvParams >> 8) & 0x01)) {
+    if (!(o->respawnInfo & 1)) {
         obj_spawn_yellow_coins(o, 1);
-        o->oBhvParams = 0x100;
         set_object_respawn_info_bits(o, 1);
         if (is_new_kill(BINGO_UPDATE_KILLED_BOBOMB, o->oBingoId)) {
             bingo_update(BINGO_UPDATE_KILLED_BOBOMB);

@@ -36,22 +36,30 @@ extern u8 main_menu_seg7_table_0700ABD0[];
 #include "sm64.h"
 #include "text_strings.h"
 #include "types.h"
+#include "macros.h"
 
 #ifdef VERSION_EU
 #undef LANGUAGE_FUNCTION
 #define LANGUAGE_FUNCTION gInGameLanguage
 #endif
 
-FORCE_BSS u16 gMenuTextColorTransTimer;
-FORCE_BSS s8 gLastDialogLineNum;
-FORCE_BSS s32 gDialogVariable;
-FORCE_BSS u16 gMenuTextAlpha;
+#ifdef CHEATS_ACTIONS
+#include "extras/cheats.h"
+#endif
+#ifdef EXT_OPTIONS_MENU
+#include "extras/options_menu.h"
+#endif
+
+u16 gMenuTextColorTransTimer;
+s8 gLastDialogLineNum;
+s32 gDialogVariable;
+u16 gMenuTextAlpha;
 #ifdef VERSION_EU
 s16 gDialogX;
 s16 gDialogY;
 #endif
-FORCE_BSS s16 gCutsceneMsgXOffset;
-FORCE_BSS s16 gCutsceneMsgYOffset;
+s16 gCutsceneMsgXOffset;
+s16 gCutsceneMsgYOffset;
 s8 gRedCoinsCollected;
 
 extern u8 gLastCompletedCourseNum;
@@ -159,6 +167,58 @@ u8 gMenuHoldKeyIndex = 0;
 u8 gMenuHoldKeyTimer = 0;
 s32 gDialogResponse = DIALOG_RESPONSE_NONE;
 
+#if !defined(EXTERNAL_DATA) && (defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH))
+#if defined(VERSION_EU)
+#define CHCACHE_BUFLEN (8 * 8)  // EU only converts 8x8
+#elif defined(VERSION_CN)
+#define CHCACHE_BUFLEN (8 * 8) // iQue uses 2 8x8 textures for one character
+#else // JP & SH
+#define CHCACHE_BUFLEN (8 * 16) // JP only converts 8x16 or 16x8 characters
+#endif
+
+// stores char data unpacked from ia1 to ia8 or ia4
+// so that it won't be reconverted every time a character is rendered
+static struct CachedChar { u8 used; u8 data[CHCACHE_BUFLEN]; } charCache[256];
+#endif // VERSION
+
+#ifdef HIGH_FPS_PC
+static Gfx *sInterpolatedDialogOffsetPos;
+static f32 sInterpolatedDialogOffset;
+static Gfx *sInterpolatedDialogRotationPos;
+static f32 sInterpolatedDialogScale;
+static f32 sInterpolatedDialogRotation;
+static Gfx *sInterpolatedDialogZoomPos;
+
+void patch_interpolated_dialog(void) {
+    Mtx *matrix;
+
+    if (sInterpolatedDialogOffsetPos != NULL) {
+        matrix = (Mtx *) alloc_display_list(sizeof(Mtx));
+        guTranslate(matrix, 0, sInterpolatedDialogOffset, 0);
+        gSPMatrix(sInterpolatedDialogOffsetPos, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH);
+        sInterpolatedDialogOffsetPos = NULL;
+    }
+    if (sInterpolatedDialogRotationPos != NULL) {
+        matrix = (Mtx *) alloc_display_list(sizeof(Mtx));
+        guScale(matrix, 1.0 / sInterpolatedDialogScale, 1.0 / sInterpolatedDialogScale, 1.0f);
+        gSPMatrix(sInterpolatedDialogRotationPos++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH);
+        matrix = (Mtx *) alloc_display_list(sizeof(Mtx));
+        guRotate(matrix, sInterpolatedDialogRotation * 4.0f, 0, 0, 1.0f);
+        gSPMatrix(sInterpolatedDialogRotationPos, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH);
+        sInterpolatedDialogRotationPos = NULL;
+    }
+    if (sInterpolatedDialogZoomPos != NULL) {
+        matrix = (Mtx *) alloc_display_list(sizeof(Mtx));
+        guTranslate(matrix, 65.0 - (65.0 / sInterpolatedDialogScale), (40.0 / sInterpolatedDialogScale) - 40, 0);
+        gSPMatrix(sInterpolatedDialogZoomPos++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH);
+        matrix = (Mtx *) alloc_display_list(sizeof(Mtx));
+        guScale(matrix, 1.0 / sInterpolatedDialogScale, 1.0 / sInterpolatedDialogScale, 1.0f);
+        gSPMatrix(sInterpolatedDialogZoomPos, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH);
+        sInterpolatedDialogZoomPos = NULL;
+    }
+}
+#endif
+
 
 s32 strlen_tiny(const char *str) {
     s32 i = 0;
@@ -177,14 +237,10 @@ void create_dl_identity_matrix(void) {
         return;
     }
 
-#ifndef GBI_FLOATS
-    matrix->m[0][0] = 0x00010000;    matrix->m[1][0] = 0x00000000;    matrix->m[2][0] = 0x00000000;    matrix->m[3][0] = 0x00000000;
-    matrix->m[0][1] = 0x00000000;    matrix->m[1][1] = 0x00010000;    matrix->m[2][1] = 0x00000000;    matrix->m[3][1] = 0x00000000;
-    matrix->m[0][2] = 0x00000001;    matrix->m[1][2] = 0x00000000;    matrix->m[2][2] = 0x00000000;    matrix->m[3][2] = 0x00000000;
-    matrix->m[0][3] = 0x00000000;    matrix->m[1][3] = 0x00000001;    matrix->m[2][3] = 0x00000000;    matrix->m[3][3] = 0x00000000;
-#else
+    // ex-alo change
+    // Originally for GBI_FLOATS but it works on N64 and
+    // its smaller that the original long matrix code
     guMtxIdent(matrix);
-#endif
 
     gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_PROJECTION | G_MTX_LOAD | G_MTX_NOPUSH);
@@ -258,12 +314,10 @@ void create_dl_ortho_matrix(void) {
     // Should produce G_RDPHALF_1 in Fast3D
     gSPPerspNormalize(gDisplayListHead++, 0xFFFF);
 
-    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_PROJECTION | G_MTX_MUL | G_MTX_NOPUSH)
+    gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(matrix), G_MTX_PROJECTION | G_MTX_MUL | G_MTX_NOPUSH);
 }
 
-#if defined(VERSION_US) || defined(VERSION_EU)
-UNUSED
-#endif
+#if defined(VERSION_JP) || defined(VERSION_SH) || defined(VERSION_CN)
 #ifdef VERSION_CN
 static u8 *alloc_ia8_text_from_i1(u8 *in) {
     s32 i, j;
@@ -290,24 +344,21 @@ static u8 *alloc_ia8_text_from_i1(u8 *in) {
 
     return out;
 }
+
 #else
-static u8 *alloc_ia8_text_from_i1(u16 *in, s16 width, s16 height) {
+
+static void alloc_ia8_text_from_i1(u8 *out, u16 *in, s16 width, s16 height) {
     s32 inPos;
     u16 bitMask;
-    u8 *out;
+    u16 inWord;
     s16 outPos = 0;
 
-    out = (u8 *) alloc_display_list((u32) width * (u32) height);
-
-    if (out == NULL) {
-        return NULL;
-    }
-
     for (inPos = 0; inPos < (width * height) / 16; inPos++) {
+        inWord = BE_TO_HOST16(in[inPos]);
         bitMask = 0x8000;
 
         while (bitMask != 0) {
-            if (in[inPos] & bitMask) {
+            if (inWord & bitMask) {
                 out[outPos] = 0xFF;
             } else {
                 out[outPos] = 0x00;
@@ -317,9 +368,25 @@ static u8 *alloc_ia8_text_from_i1(u16 *in, s16 width, s16 height) {
             outPos++;
         }
     }
-
-    return out;
 }
+#endif
+
+#ifndef VERSION_CN
+static u8 *convert_ia8_char(u8 c, u16 *tex, s16 w, s16 h)
+{
+#ifdef EXTERNAL_DATA
+    return (u8 *)tex; // the data's just a name
+#else
+    if (!tex) return NULL;
+    if (!charCache[c].used) {
+        charCache[c].used = 1;
+        alloc_ia8_text_from_i1(charCache[c].data, tex, w, h);
+    }
+    return charCache[c].data;
+#endif
+}
+#endif
+
 #endif
 
 void render_generic_char_but_tiny(u8 c) {
@@ -359,7 +426,7 @@ void render_generic_char(u8 c)
     void **fontLUT = segmented_to_virtual(main_font_lut);
     void *packedTexture = segmented_to_virtual(fontLUT[c]);
 #if defined(VERSION_JP) || defined(VERSION_SH)
-    void *unpackedTexture = alloc_ia8_text_from_i1(packedTexture, 8, 16);
+    void *unpackedTexture = convert_ia8_char(c, packedTexture, 8, 16);
 #endif
 
 #ifndef VERSION_EU
@@ -378,18 +445,10 @@ void render_generic_char(u8 c)
 }
 
 #ifdef VERSION_EU
-u8 *alloc_ia4_tex_from_i1(u8 *in, s16 width, s16 height) {
-    u32 size = (u32) width * (u32) height;
-    u8 *out;
+static void alloc_ia4_tex_from_i1(u8 *out, u8 *in, s16 width, s16 height) {
     s32 inPos;
     s16 outPos = 0;
     u8 bitMask;
-
-    out = (u8 *) alloc_display_list(size);
-
-    if (out == NULL) {
-        return NULL;
-    }
 
     for (inPos = 0; inPos < (width * height) / 4; inPos++) {
         bitMask = 0x80;
@@ -402,14 +461,25 @@ u8 *alloc_ia4_tex_from_i1(u8 *in, s16 width, s16 height) {
             outPos++;
         }
     }
+}
 
-    return out;
+static u8 *convert_ia4_char(u8 c, u8 *tex, s16 w, s16 h) {
+#ifdef EXTERNAL_DATA
+    return tex; // the data's just a name
+#else
+    if (!tex) return NULL;
+    if (!charCache[c].used) {
+        charCache[c].used = 1;
+        alloc_ia4_tex_from_i1(charCache[c].data, tex, w, h);
+    }
+    return charCache[c].data;
+#endif
 }
 
 void render_generic_char_at_pos(s16 xPos, s16 yPos, u8 c) {
     void **fontLUT = segmented_to_virtual(main_font_lut);
     void *packedTexture = segmented_to_virtual(fontLUT[c]);
-    void *unpackedTexture = alloc_ia4_tex_from_i1(packedTexture, 8, 8);
+    void *unpackedTexture = convert_ia4_char(c, packedTexture, 8, 8);
 
     gDPPipeSync(gDisplayListHead++);
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_IA, G_IM_SIZ_16b, 1, VIRTUAL_TO_PHYSICAL(unpackedTexture));
@@ -444,9 +514,9 @@ void render_generic_char_cn(u16 c) {
 #endif
 
 #if defined(VERSION_US) || defined(VERSION_EU) || defined(VERSION_CN)
-// First byte is length, rest is string
 struct MultiTextEntry {
-    u8 str[5];
+    u8 length;
+    u8 str[4];
 };
 
 #define TEXT_THE_RAW ASCII_TO_DIALOG('t'), ASCII_TO_DIALOG('h'), ASCII_TO_DIALOG('e'), 0x00
@@ -467,18 +537,18 @@ void render_multi_text_string(s16 *xPos, s16 *yPos, s8 multiTextID)
 {
     s8 i;
     struct MultiTextEntry textLengths[2] = {
-        { { 3, TEXT_THE_RAW } },
-        { { 3, TEXT_YOU_RAW } },
+        { 3, { TEXT_THE_RAW } },
+        { 3, { TEXT_YOU_RAW } },
     };
 
-    for (i = 0; i < textLengths[multiTextID].str[0]; i++) {
+    for (i = 0; i < textLengths[multiTextID].length; i++) {
 #if defined(VERSION_US) || defined(VERSION_CN)
-        render_generic_char(textLengths[multiTextID].str[1 + i]);
+        render_generic_char(textLengths[multiTextID].str[i]);
         create_dl_translation_matrix(
-            MENU_MTX_NOPUSH, (f32)(gDialogCharWidths[textLengths[multiTextID].str[1 + i]]), 0.0f, 0.0f);
+            MENU_MTX_NOPUSH, (f32)(gDialogCharWidths[textLengths[multiTextID].str[i]]), 0.0f, 0.0f);
 #elif defined(VERSION_EU)
-        render_generic_char_at_pos(*xPos, *yPos, textLengths[multiTextID].str[1 + i]);
-        *xPos += gDialogCharWidths[textLengths[multiTextID].str[1 + i]];
+        render_generic_char_at_pos(*xPos, *yPos, textLengths[multiTextID].str[i]);
+        *xPos += gDialogCharWidths[textLengths[multiTextID].str[i]];
 #endif
     }
 }
@@ -487,8 +557,8 @@ void render_multi_text_string(s16 *xPos, s16 *yPos, s8 multiTextID)
 #if defined(VERSION_JP) || defined(VERSION_SH)
     #define CUR_CHAR str[strPos]
     #define MAX_STRING_WIDTH 18
-    #define CHAR_WIDTH_SPACE 5.0f
-    #define CHAR_WIDTH_DEFAULT 10.0f
+    #define CHAR_WIDTH_SPACE (JP_DIALOG_CHAR_WIDTH / 2)
+    #define CHAR_WIDTH_DEFAULT JP_DIALOG_CHAR_WIDTH
 #elif defined(VERSION_CN)
     #define CUR_CHAR strChar
     #define MAX_STRING_WIDTH 18
@@ -716,11 +786,7 @@ void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
     if (hudLUT == HUD_LUT_JPMENU) {
         xStride = 16;
     } else { // HUD_LUT_GLOBAL
-#ifdef VERSION_JP
-        xStride = 14;
-#else
-        xStride = 12; //? Shindou uses this.
-#endif
+        xStride = HUD_LUT_STRIDE_GLOBAL;
     }
 #endif
 
@@ -753,6 +819,11 @@ void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
                 curX += 8;
                 break;
 #endif
+#ifdef VERSION_CN
+            // Hack, still broken but better than before
+            case 0x00:
+                if (hudLUT == HUD_LUT_CNFIX) break;
+#endif
             default:
 #endif
                 gDPPipeSync(gDisplayListHead++);
@@ -768,7 +839,6 @@ void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
 #ifndef VERSION_CN
                 }
 #endif
-
                 gSPDisplayList(gDisplayListHead++, dl_rgba16_load_tex_block);
                 gSPTextureRectangle(gDisplayListHead++, curX << 2, curY << 2, (curX + 16) << 2,
                                     (curY + 16) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
@@ -859,7 +929,7 @@ void print_menu_generic_string(s16 x, s16 y, const u8 *str) {
                 }
 #endif
 #if defined(VERSION_JP) || defined(VERSION_SH) || defined(VERSION_CN)
-                curX += 9;
+                curX += JP_DIALOG_CHAR_WIDTH - 1;
 #else
                 curX += gDialogCharWidths[str[strPos]];
 #endif
@@ -929,6 +999,7 @@ void print_generic_string_but_tiny(s16 x, s16 y, const u8 *str) {
     }
 }
 
+#if !CREDITS_TEXT_STRING_FONT
 void print_credits_string(s16 x, s16 y, const u8 *str) {
     s32 strPos = 0;
     void **fontLUT = segmented_to_virtual(main_credits_font_lut);
@@ -960,56 +1031,55 @@ void print_credits_string(s16 x, s16 y, const u8 *str) {
         strPos++;
     }
 }
+#endif
 
 void handle_menu_scrolling(s8 scrollDirection, s8 *currentIndex, s8 minIndex, s8 maxIndex) {
     u8 index = 0;
 
     if (scrollDirection == MENU_SCROLL_VERTICAL) {
-        if (gPlayer3Controller->rawStickY > 60) {
-            index++;
+        if (gPlayer1Controller->rawStickY > 60) {
+            index |= 0b01; // Up
         }
-
-        if (gPlayer3Controller->rawStickY < -60) {
-            index += 2;
+        if (gPlayer1Controller->rawStickY < -60) {
+            index |= 0b10; // Down
         }
     } else if (scrollDirection == MENU_SCROLL_HORIZONTAL) {
-        if (gPlayer3Controller->rawStickX > 60) {
-            index += 2;
+        if (gPlayer1Controller->rawStickX > 60) {
+            index |= 0b10; // Right
         }
 
-        if (gPlayer3Controller->rawStickX < -60) {
-            index++;
+        if (gPlayer1Controller->rawStickX < -60) {
+            index |= 0b01; // Left
         }
     }
 
-    if (((index ^ gMenuHoldKeyIndex) & index) == 2) {
-        if (*currentIndex == maxIndex) {
-            //! Probably originally a >=, but later replaced with an == and an else statement.
-            *currentIndex = maxIndex;
-        } else {
+    // Only increase/decrese if not holding that direction on the previous frame:
+
+    if (((index ^ gMenuHoldKeyIndex) & index) == 0b10) {
+        if (*currentIndex != maxIndex) {
             play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
             (*currentIndex)++;
         }
     }
 
-    if (((index ^ gMenuHoldKeyIndex) & index) == 1) {
-        if (*currentIndex == minIndex) {
-            // Same applies to here as above
-        } else {
+    if (((index ^ gMenuHoldKeyIndex) & index) == 0b01) {
+        if (*currentIndex != minIndex) {
             play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
             (*currentIndex)--;
         }
     }
 
+    // If there has been input for 10 frames, set the timer to 8 and set gMenuHoldKeyIndex to 0 so the above becomes true.
     if (gMenuHoldKeyTimer == 10) {
         gMenuHoldKeyTimer = 8;
-        gMenuHoldKeyIndex = 0;
+        gMenuHoldKeyIndex = 0b00;
     } else {
+        // Otherwise, increment the timer while there is input.
         gMenuHoldKeyTimer++;
         gMenuHoldKeyIndex = index;
     }
 
-    if ((index & 3) == 0) {
+    if (index == 0) {
         gMenuHoldKeyTimer = 0;
     }
 }
@@ -1065,7 +1135,8 @@ s16 get_str_x_pos_from_center_scale(s16 centerPos, u8 *str, f32 scale) {
 }
 #endif
 
-#if defined(VERSION_US) || defined(VERSION_EU) || defined(VERSION_CN)
+// ex-alo change
+// Set a fixed value for JP regions
 s16 get_string_width(u8 *str) {
     s16 strPos = 0;
     s16 width = 0;
@@ -1082,13 +1153,16 @@ s16 get_string_width(u8 *str) {
     }
 #else
     while (str[strPos] != DIALOG_CHAR_TERMINATOR) {
+        #if defined(VERSION_US) || defined(VERSION_EU)
         width += gDialogCharWidths[str[strPos]];
+        #else
+        width += JP_DIALOG_CHAR_WIDTH;
+        #endif
         strPos++;
     }
 #endif
     return width;
 }
-#endif
 
 u8 gHudSymCoin[] = { GLYPH_COIN, GLYPH_SPACE };
 u8 gHudSymX[] = { GLYPH_MULTIPLY, GLYPH_SPACE };
@@ -1275,6 +1349,16 @@ void render_dialog_box_type(struct DialogEntry *dialog, s8 linesPerBox) {
     switch (gDialogBoxType) {
         case DIALOG_TYPE_ROTATE: // Renders a dialog black box with zoom and rotation
             if (gMenuState == MENU_STATE_DIALOG_OPENING || gMenuState == MENU_STATE_DIALOG_CLOSING) {
+#ifdef HIGH_FPS_PC
+                sInterpolatedDialogRotationPos = gDisplayListHead;
+                if (gMenuState == MENU_STATE_DIALOG_OPENING) {
+                    sInterpolatedDialogScale = gDialogBoxScale - 2 / 2;
+                    sInterpolatedDialogRotation = gDialogBoxAngle - 7.5f / 2;
+                } else {
+                    sInterpolatedDialogScale = gDialogBoxScale + 2 / 2;
+                    sInterpolatedDialogRotation = gDialogBoxAngle + 7.5f / 2;
+                }
+#endif
                 create_dl_scale_matrix(MENU_MTX_NOPUSH, 1.0 / gDialogBoxScale, 1.0 / gDialogBoxScale, 1.0f);
                 // convert the speed into angle
                 create_dl_rotation_matrix(MENU_MTX_NOPUSH, gDialogBoxAngle * 4.0f, 0, 0, 1.0f);
@@ -1283,6 +1367,14 @@ void render_dialog_box_type(struct DialogEntry *dialog, s8 linesPerBox) {
             break;
         case DIALOG_TYPE_ZOOM: // Renders a dialog white box with zoom
             if (gMenuState == MENU_STATE_DIALOG_OPENING || gMenuState == MENU_STATE_DIALOG_CLOSING) {
+#ifdef HIGH_FPS_PC
+                sInterpolatedDialogZoomPos = gDisplayListHead;
+                if (gMenuState == MENU_STATE_DIALOG_OPENING) {
+                    sInterpolatedDialogScale = gDialogBoxScale - 2 / 2;
+                } else {
+                    sInterpolatedDialogScale = gDialogBoxScale + 2 / 2;
+                }
+#endif
                 create_dl_translation_matrix(MENU_MTX_NOPUSH, 65.0 - (65.0 / gDialogBoxScale),
                                               (40.0 / gDialogBoxScale) - 40, 0);
                 create_dl_scale_matrix(MENU_MTX_NOPUSH, 1.0 / gDialogBoxScale, 1.0 / gDialogBoxScale, 1.0f);
@@ -1338,7 +1430,7 @@ void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y,
 
     void **fontLUT = segmented_to_virtual(main_font_lut);
     void *packedTexture = segmented_to_virtual(fontLUT[c]);
-    void *unpackedTexture = alloc_ia4_tex_from_i1(packedTexture, 8, 8);
+    void *unpackedTexture = convert_ia4_char(c, packedTexture, 8, 8);
 
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_IA, G_IM_SIZ_16b, 1, VIRTUAL_TO_PHYSICAL(unpackedTexture));
     gSPDisplayList(gDisplayListHead++, dl_ia_text_tex_settings);
@@ -1466,8 +1558,8 @@ void render_multi_text_string_lines(s8 multiTextId, s8 lineNum, s16 *linePos, s8
 {
     s8 i;
     struct MultiTextEntry textLengths[2] = {
-        { { 3, TEXT_THE_RAW } },
-        { { 3, TEXT_YOU_RAW } },
+        { 3, { TEXT_THE_RAW } },
+        { 3, { TEXT_YOU_RAW } },
     };
 
     if (lineNum >= lowerBound && lineNum <= (lowerBound + linesPerBox)) {
@@ -1477,14 +1569,14 @@ void render_multi_text_string_lines(s8 multiTextId, s8 lineNum, s16 *linePos, s8
                 MENU_MTX_NOPUSH, (gDialogCharWidths[DIALOG_CHAR_SPACE] * (xMatrix - 1)), 0, 0);
         }
 #endif
-        for (i = 0; i < textLengths[multiTextId].str[0]; i++) {
+        for (i = 0; i < textLengths[multiTextId].length; i++) {
 #ifdef VERSION_EU
-            render_generic_dialog_char_at_pos(dialog, gDialogX, gDialogY, textLengths[multiTextId].str[1 + i]);
-            gDialogX += gDialogCharWidths[textLengths[multiTextId].str[1 + i]];
+            render_generic_dialog_char_at_pos(dialog, gDialogX, gDialogY, textLengths[multiTextId].str[i]);
+            gDialogX += gDialogCharWidths[textLengths[multiTextId].str[i]];
 #else
-            render_generic_char(textLengths[multiTextId].str[1 + i]);
+            render_generic_char(textLengths[multiTextId].str[i]);
             create_dl_translation_matrix(
-                MENU_MTX_NOPUSH, (gDialogCharWidths[textLengths[multiTextId].str[1 + i]]), 0, 0);
+                MENU_MTX_NOPUSH, (gDialogCharWidths[textLengths[multiTextId].str[i]]), 0, 0);
 #endif
         }
     }
@@ -1523,7 +1615,6 @@ void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog)
 void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog, s8 lowerBound)
 #endif
 {
-    UNUSED u64 filler;
 #ifdef VERSION_EU
     s16 startY = 14;
 #endif
@@ -1573,6 +1664,10 @@ void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog, s8 l
 #ifdef VERSION_EU
         gDialogY -= gDialogScrollOffsetY;
 #else
+#ifdef HIGH_FPS_PC
+        sInterpolatedDialogOffset = gDialogScrollOffsetY + dialog->linesPerBox;
+        sInterpolatedDialogOffsetPos = gDisplayListHead;
+#endif
         create_dl_translation_matrix(MENU_MTX_NOPUSH, 0, (f32) gDialogScrollOffsetY, 0);
 #endif
     }
@@ -1583,7 +1678,6 @@ void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog, s8 l
 
     while (pageState == DIALOG_PAGE_STATE_NONE) {
         change_and_flash_dialog_text_color_lines(colorMode, lineNum);
-
 #ifdef VERSION_CN
         strChar = str[strIndex] << 8 | str[strIndex + 1];
 #else
@@ -2094,13 +2188,10 @@ s8 gDialogCourseActNum = 1;
 #endif
 
 void render_dialog_entries(void) {
-#ifdef VERSION_EU
-    s8 lowerBound;
-#endif
     void **dialogTable;
     struct DialogEntry *dialog;
-#if defined(VERSION_US) || defined(VERSION_SH) || defined(VERSION_CN)
-    s8 lowerBound;
+#ifndef VERSION_JP
+    s8 lowerBound = 0;
 #endif
 
 #ifdef VERSION_EU
@@ -2159,8 +2250,8 @@ void render_dialog_entries(void) {
         case MENU_STATE_DIALOG_OPEN:
             gDialogBoxAngle = 0.0f;
 
-            if ((gPlayer3Controller->buttonPressed & A_BUTTON)
-             || (gPlayer3Controller->buttonPressed & B_BUTTON)) {
+            if ((gPlayer1Controller->buttonPressed & A_BUTTON)
+             || (gPlayer1Controller->buttonPressed & B_BUTTON)) {
                 if (gNextDialogPageStartStrIndex == -1) {
                     handle_special_dialog_text(gDialogID);
                     gMenuState = MENU_STATE_DIALOG_CLOSING;
@@ -2218,20 +2309,6 @@ void render_dialog_entries(void) {
 
     render_dialog_box_type(dialog, dialog->linesPerBox);
 
-#ifdef VERSION_CN
-// This isn't really a diff. The iQue compiler doesn't allow the use of ifdefs inside a macro for some reason, so those were eliminated.
-#ifdef WIDESCREEN
-#define ulx 0
-#define lrx SCREEN_WIDTH
-#else
-#define ulx ensure_nonnegative(dialog->leftOffset)
-#define lrx ensure_nonnegative(dialog->leftOffset + DIAG_VAL3)
-#endif
-    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, ulx, ensure_nonnegative(DIAG_VAL2 - dialog->width),
-        lrx, ensure_nonnegative((256 - dialog->width) + (dialog->linesPerBox * 80 / DIAG_VAL4)));
-#undef ulx
-#undef lrx
-#else
     gDPSetScissor(
         gDisplayListHead++, G_SC_NON_INTERLACE,
         // Horizontal scissoring isn't really required and can potentially mess up widescreen enhancements.
@@ -2252,12 +2329,11 @@ void render_dialog_entries(void) {
 #ifdef WIDESCREEN
         SCREEN_WIDTH,
 #else
-        ensure_nonnegative(dialog->leftOffset + DIAG_VAL3),
+        ensure_nonnegative(DIAG_VAL3 + dialog->leftOffset),
 #endif
         ensure_nonnegative((240 - dialog->width) + (dialog->linesPerBox * 80 / DIAG_VAL4))
 #endif
     );
-#endif
 
 #ifdef VERSION_JP
     handle_dialog_text_and_pages(0, dialog);
@@ -2268,17 +2344,7 @@ void render_dialog_entries(void) {
     if (gNextDialogPageStartStrIndex == -1 && gDialogWithChoice == TRUE) {
         render_dialog_triangle_choice();
     }
-
-    #ifdef VERSION_EU
-    #undef BORDER_HEIGHT
-    #define BORDER_HEIGHT 8
-    #endif
     gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 2, 2, SCREEN_WIDTH - BORDER_HEIGHT / 2, SCREEN_HEIGHT - BORDER_HEIGHT / 2);
-    #ifdef VERSION_EU
-    #undef BORDER_HEIGHT
-    #define BORDER_HEIGHT 1
-    #endif
-
     if (gNextDialogPageStartStrIndex != -1 && gMenuState == MENU_STATE_DIALOG_OPEN) {
         render_dialog_triangle_next(dialog->linesPerBox);
     }
@@ -2295,13 +2361,20 @@ void reset_cutscene_msg_fade(void) {
     gCutsceneMsgFade = 0;
 }
 
+#if CREDITS_TEXT_STRING_FONT
+#define DL_CREDIT_TEXT_START    dl_ia_text_begin
+#define DL_CREDIT_TEXT_END      dl_ia_text_end
+#else
+#define DL_CREDIT_TEXT_START    dl_rgba16_text_begin
+#define DL_CREDIT_TEXT_END      dl_rgba16_text_end
+#endif
 void dl_rgba16_begin_cutscene_msg_fade(void) {
-    gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
+    gSPDisplayList(gDisplayListHead++, DL_CREDIT_TEXT_START);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, gCutsceneMsgFade);
 }
 
 void dl_rgba16_stop_cutscene_msg_fade(void) {
-    gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
+    gSPDisplayList(gDisplayListHead++, DL_CREDIT_TEXT_END);
 
     if (gCutsceneMsgFade < 250) {
         gCutsceneMsgFade += 25;
@@ -2309,7 +2382,10 @@ void dl_rgba16_stop_cutscene_msg_fade(void) {
         gCutsceneMsgFade = 255;
     }
 }
+#undef DL_CREDIT_TEXT_START
+#undef DL_CREDIT_TEXT_END
 
+#if !CREDITS_TEXT_STRING_FONT
 u8 ascii_to_credits_char(u8 c) {
     if (c >= 'A' && c <= 'Z') {
         return (c - ('A' - 0xA));
@@ -2356,6 +2432,7 @@ void print_credits_str_ascii(s16 x, s16 y, const char *str) {
 
     print_credits_string(x, y, creditStr);
 }
+#endif
 
 void set_cutscene_message(s16 xOffset, s16 yOffset, s16 msgIndex, s16 msgDuration) {
     // is message done printing?
@@ -2563,21 +2640,19 @@ void change_dialog_camera_angle(void) {
     }
 }
 
+// ex-alo change
+// properly shades the screen using a rectangle instead of a triangle
+// Bingo64: parameterized alpha (bingo UI shades darker than the pause menu).
 void shade_screen_opacity(s32 alpha) {
-    create_dl_translation_matrix(MENU_MTX_PUSH, GFX_DIMENSIONS_FROM_LEFT_EDGE(0), SCREEN_HEIGHT, 0);
+    Gfx* dlHead = gDisplayListHead;
 
-    // This is a bit weird. It reuses the dialog text box (width 130, height -80),
-    // so scale to at least fit the screen.
-#ifdef WIDESCREEN
-    create_dl_scale_matrix(MENU_MTX_NOPUSH,
-                           GFX_DIMENSIONS_ASPECT_RATIO * SCREEN_HEIGHT / 130.0f, 3.0f, 1.0f);
-#else
-    create_dl_scale_matrix(MENU_MTX_NOPUSH, 2.6f, 3.4f, 1.0f);
-#endif
+    gSPDisplayList(dlHead++, dl_shade_screen_begin);
+    gDPSetPrimColor(dlHead++, 0, 0, 0, 0, 0, alpha);
+    gDPFillRectangle(dlHead++, GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(0), BORDER_HEIGHT,
+        (GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(0)), ((SCREEN_HEIGHT - BORDER_HEIGHT)));
+    gSPDisplayList(dlHead++, dl_shade_screen_end);
 
-    gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, alpha);
-    gSPDisplayList(gDisplayListHead++, dl_draw_text_bg_box);
-    gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+    gDisplayListHead = dlHead;
 }
 
 void shade_screen(void) {
@@ -2846,6 +2921,7 @@ void render_pause_course_options(s16 x, s16 y, s8 *index, s16 yIndex) {
         { TEXT_EXIT_COURSE_FR },
         { TEXT_EXIT_COURSE_DE }
     };
+
     u8 textCameraAngleR[][24] = {
         { TEXT_CAMERA_ANGLE_R },
         { TEXT_CAMERA_ANGLE_R_FR },
@@ -3112,19 +3188,35 @@ s32 gCourseCompleteScreenTimer = 0;
 s32 gCourseCompleteCoins = 0;
 s8 gHudFlash = 0;
 
+// ex-alo change
+// Make this a function due to diffs
+#if EXIT_COURSE_ANYWHERE
+#define should_render_pause_options(m) TRUE
+#else
+u8 should_render_pause_options(struct MarioState *m) {
+    return (m->action & ACT_FLAG_PAUSE_EXIT)
+#ifdef CHEATS_ACTIONS
+    || (Cheats.EnableCheats && Cheats.ExitAnywhere) // Added support for the "Exit course at any time" cheat
+#endif
+    ;
+}
+#endif
+
 s16 render_pause_screen(void) {
     s16 index;
 
 #ifdef VERSION_EU
     gInGameLanguage = eu_get_language();
 #endif
-
+#ifdef EXT_OPTIONS_MENU
+    if (optmenu_open == 0) {
+#endif
     switch (gMenuState) {
         case MENU_STATE_PAUSE_SCREEN_OPENING:
             gMenuLineNum = MENU_OPT_DEFAULT;
             gMenuTextAlpha = 0;
             level_set_transition(-1, NULL);
-            play_sound(SOUND_MENU_PAUSE, gGlobalSoundSource);
+            play_sound(SOUND_MENU_PAUSE_OPEN, gGlobalSoundSource);
 
             if (gCurrCourseNum >= COURSE_MIN && gCurrCourseNum <= COURSE_MAX) {
                 change_dialog_camera_angle();
@@ -3140,19 +3232,13 @@ s16 render_pause_screen(void) {
             render_pause_my_score_coins();
             render_pause_red_coins();
 
-            if (gMarioStates[0].action & ACT_FLAG_PAUSE_EXIT) {
+            if (should_render_pause_options(gMarioState)) {
                 render_pause_course_options(99, 93, &gMenuLineNum, 15);
             }
 
-#ifdef VERSION_EU
-            if (gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | Z_TRIG))
-#else
-            if ((gPlayer3Controller->buttonPressed & A_BUTTON)
-             || (gPlayer3Controller->buttonPressed & START_BUTTON))
-#endif
-            {
+            if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | START_BUTTON)) {
                 level_set_transition(0, NULL);
-                play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);
+                play_sound(SOUND_MENU_PAUSE_CLOSE, gGlobalSoundSource);
                 gMenuState = MENU_STATE_DEFAULT;
                 gMenuMode = MENU_MODE_NONE;
 
@@ -3175,15 +3261,9 @@ s16 render_pause_screen(void) {
             render_pause_castle_menu_box(160, 143);
             render_pause_castle_main_strings(104, 60);
 
-#ifdef VERSION_EU
-            if (gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | Z_TRIG))
-#else
-            if ((gPlayer3Controller->buttonPressed & A_BUTTON)
-             || (gPlayer3Controller->buttonPressed & START_BUTTON))
-#endif
-            {
+            if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | START_BUTTON)) {
                 level_set_transition(0, NULL);
-                play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);
+                play_sound(SOUND_MENU_PAUSE_CLOSE, gGlobalSoundSource);
                 gMenuMode = MENU_MODE_NONE;
                 gMenuState = MENU_STATE_DEFAULT;
 
@@ -3191,7 +3271,14 @@ s16 render_pause_screen(void) {
             }
             break;
     }
-
+#ifdef EXT_OPTIONS_MENU
+    } else {
+        shade_screen();
+        optmenu_draw();
+    }
+    optmenu_check_buttons();
+    optmenu_draw_prompt();
+#endif
     if (gMenuTextAlpha < 250) {
         gMenuTextAlpha += 25;
     }
@@ -3288,20 +3375,25 @@ void print_hud_course_complete_coins(s16 x, s16 y) {
             gCourseCompleteCoins++;
             play_sound(SOUND_MENU_YOSHI_GAIN_LIVES, gGlobalSoundSource);
 
-            if (gCourseCompleteCoins == 50 || gCourseCompleteCoins == 100 || gCourseCompleteCoins == 150) {
+#if QOL_FIX_COMPLETE_COURSE_50_COINS
+            if (gCourseCompleteCoins % 50 == 0)
+#else
+            if (gCourseCompleteCoins == 50 || gCourseCompleteCoins == 100 || gCourseCompleteCoins == 150)
+#endif
+            {
                 play_sound(SOUND_GENERAL_COLLECT_1UP, gGlobalSoundSource);
                 gMarioState->numLives++;
             }
         }
 
-        if (gCourseCompleteCoins == gHudDisplay.coins && gGotFileCoinHiScore) {
-            play_sound(SOUND_MENU_MARIO_CASTLE_WARP2, gGlobalSoundSource);
+        if (gHudDisplay.coins == gCourseCompleteCoins && gGotFileCoinHiScore) {
+            play_sound(SOUND_MENU_HIGH_SCORE, gGlobalSoundSource);
         }
     }
 }
 
 void play_star_fanfare_and_flash_hud(s32 arg, u8 starFlag) {
-    if (gCourseCompleteCoins == gHudDisplay.coins && !(gCurrCourseStarFlags & starFlag) && gHudFlash == 0) {
+    if (gHudDisplay.coins == gCourseCompleteCoins && !(gCurrCourseStarFlags & starFlag) && gHudFlash == 0) {
         play_star_fanfare();
         gHudFlash = arg;
     }
@@ -3458,9 +3550,14 @@ void render_course_complete_lvl_info_and_hud_str(void) {
 #if defined(VERSION_JP) || defined(VERSION_SH)
     #define X_VAL9 x
     #define TXT_SAVEOPTIONS_X x + 10
-    #define TXT_SAVECONT_Y 2
-    #define TXT_SAVEQUIT_Y 18
-    #define TXT_CONTNOSAVE_Y 38
+    #define TXT_SAVECONT_Y +2-0
+    #define TXT_SAVEQUIT_Y +2-20
+    #ifdef TARGET_N64
+        #define TXT_CONTNOSAVE_Y +2-40
+    #else
+        #define TXT_SAVE_EXIT_GAME_Y +2-40
+        #define TXT_CONTNOSAVE_Y +2-60
+    #endif
 #else
 #ifdef VERSION_EU
     #define X_VAL9 xOffset - 12
@@ -3471,7 +3568,18 @@ void render_course_complete_lvl_info_and_hud_str(void) {
 #endif
     #define TXT_SAVECONT_Y 0
     #define TXT_SAVEQUIT_Y 20
-    #define TXT_CONTNOSAVE_Y 40
+    #ifdef TARGET_N64
+        #define TXT_CONTNOSAVE_Y 40
+    #else
+        #define TXT_SAVE_EXIT_GAME_Y 40
+        #define TXT_CONTNOSAVE_Y 60
+    #endif
+#endif
+
+#ifndef TARGET_N64
+#define SAVE_CONFIRM_INDEX 4 // Increased to '4' to handle Exit Game 
+#else
+#define SAVE_CONFIRM_INDEX 3
 #endif
 
 #if 0
@@ -3492,6 +3600,15 @@ void render_save_confirmation(s16 x, s16 y, s8 *index, s16 yOffset)
         { TEXT_SAVE_AND_QUIT_FR },
         { TEXT_SAVE_AND_QUIT_DE }
     };
+
+#ifndef TARGET_N64
+    u8 textSaveExitGame[][28] = { // New text to exit game
+        { TEXT_SAVE_EXIT_GAME },
+        { TEXT_SAVE_EXIT_GAME_FR },
+        { TEXT_SAVE_EXIT_GAME_DE }
+    };
+#endif
+
     u8 textContinueWithoutSave[][27] = {
         { TEXT_CONTINUE_WITHOUT_SAVING },
         { TEXT_CONTINUE_WITHOUT_SAVING_FR },
@@ -3501,16 +3618,22 @@ void render_save_confirmation(s16 x, s16 y, s8 *index, s16 yOffset)
 #else
     u8 textSaveAndContinue[] = { TEXT_SAVE_AND_CONTINUE };
     u8 textSaveAndQuit[] = { TEXT_SAVE_AND_QUIT };
+#ifndef TARGET_N64
+    u8 textSaveExitGame[] = { TEXT_SAVE_EXIT_GAME }; // New text to exit game
+#endif
     u8 textContinueWithoutSave[] = { TEXT_CONTINUE_WITHOUT_SAVING };
 #endif
 
-    handle_menu_scrolling(MENU_SCROLL_VERTICAL, index, 1, 3);
+    handle_menu_scrolling(MENU_SCROLL_VERTICAL, index, 1, SAVE_CONFIRM_INDEX);
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, gMenuTextAlpha);
 
     print_generic_string(TXT_SAVEOPTIONS_X, y + TXT_SAVECONT_Y, LANGUAGE_ARRAY(textSaveAndContinue));
     print_generic_string(TXT_SAVEOPTIONS_X, y - TXT_SAVEQUIT_Y, LANGUAGE_ARRAY(textSaveAndQuit));
+#ifndef TARGET_N64
+    print_generic_string(TXT_SAVEOPTIONS_X, y - TXT_SAVE_EXIT_GAME_Y, LANGUAGE_ARRAY(textSaveExitGame));
+#endif
     print_generic_string(TXT_SAVEOPTIONS_X, y - TXT_CONTNOSAVE_Y, LANGUAGE_ARRAY(textContinueWithoutSave));
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
@@ -3526,6 +3649,7 @@ void render_save_confirmation(s16 x, s16 y, s8 *index, s16 yOffset)
 void render_save_confirmation(s16 x, s16 y, s8 *index, s16 sp6e) {
 
 }
+#undef SAVE_CONFIRM_INDEX
 
 #if 0
 s16 render_course_complete_screen(void) {
@@ -3554,13 +3678,7 @@ s16 render_course_complete_screen(void) {
             render_save_confirmation(100, 86, &gMenuLineNum, 20);
 #endif
 
-            if (gCourseCompleteScreenTimer > 110
-                && ((gPlayer3Controller->buttonPressed & A_BUTTON)
-                 || (gPlayer3Controller->buttonPressed & START_BUTTON)
-#ifdef VERSION_EU
-                 || (gPlayer3Controller->buttonPressed & Z_TRIG)
-#endif
-                )) {
+            if (gCourseCompleteScreenTimer > 110 && (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | START_BUTTON))) {
                 level_set_transition(0, NULL);
                 play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
                 gMenuState = MENU_STATE_DEFAULT;

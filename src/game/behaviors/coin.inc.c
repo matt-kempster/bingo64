@@ -93,16 +93,29 @@ void bhv_spawned_coin_loop(void) {
         cur_obj_become_tangible();
     }
 
+#if QOL_FEATURE_COIN_LAVA_FLICKER
     if (o->oMoveFlags & OBJ_MOVE_LANDED) {
-#ifndef VERSION_JP
-        if (o->oMoveFlags & (OBJ_MOVE_ABOVE_DEATH_BARRIER | OBJ_MOVE_ABOVE_LAVA))
+    #ifndef VERSION_JP
+        if (o->oMoveFlags & OBJ_MOVE_ABOVE_DEATH_BARRIER) {
+            obj_mark_for_deletion(o);
+        }
+    #endif
+        if (o->oMoveFlags & OBJ_MOVE_ABOVE_LAVA && cur_obj_wait_then_blink(0, 20)) {
+            obj_mark_for_deletion(o);
+        }
+    }
 #else
+    if (o->oMoveFlags & OBJ_MOVE_LANDED) {
+    #ifndef VERSION_JP
+        if (o->oMoveFlags & (OBJ_MOVE_ABOVE_DEATH_BARRIER | OBJ_MOVE_ABOVE_LAVA))
+    #else
         if (o->oMoveFlags & OBJ_MOVE_ABOVE_LAVA)
-#endif
+    #endif
         {
             obj_mark_for_deletion(o);
         }
     }
+#endif
 
     if (o->oMoveFlags & OBJ_MOVE_BOUNCE) {
 #ifndef VERSION_JP
@@ -129,6 +142,21 @@ void bhv_coin_formation_spawn_loop(void) {
         bhv_init_room();
 
         if (o->oCoinOnGround) {
+#if BETTER_COIN_FORMATION_GROUND
+            // Get initial coin floor height
+            cur_obj_update_floor_height();
+            // Rise the coin y position if is below it's height, and update it's floor height again
+            if (find_floor_height(o->oPosX, o->oPosY + FIND_FLOOR_BUFFER, o->oPosZ) > o->oFloorHeight) {
+                o->oPosY += FIND_FLOOR_BUFFER;
+                cur_obj_update_floor_height();
+            }
+            // Delete if the coin is out of bounds
+            if (o->oFloorHeight < FLOOR_LOWER_LIMIT_MISC) {
+                obj_mark_for_deletion(o);
+            }
+            // Set it's final y position with it's proper floor height
+            o->oPosY = o->oFloorHeight;
+#else
             o->oPosY += 300.0f;
             cur_obj_update_floor_height();
 
@@ -137,6 +165,7 @@ void bhv_coin_formation_spawn_loop(void) {
             } else {
                 o->oPosY = o->oFloorHeight;
             }
+#endif
         } else {
             cur_obj_update_floor_height();
 
@@ -146,7 +175,7 @@ void bhv_coin_formation_spawn_loop(void) {
         }
     } else {
         if (bhv_coin_sparkles_init()) {
-            o->parentObj->oCoinCollectedFlags |= bit_shift_left(o->oBhvParams2ndByte);
+            o->parentObj->oCoinCollectedFlags |= (1 << o->oBhvParams2ndByte);
         }
         o->oAnimState++;
     }
@@ -212,6 +241,18 @@ void spawn_coin_in_formation(s32 coinIndex, s32 coinFormationFlags) {
         onGround = FALSE;
     }
 
+#if BETTER_COIN_FORMATION_GROUND
+    if (onGround) {
+        // Originally coins created by the spawner gets it's y position raised by 300
+        // In our case we instead raise the spawner by 250, the remaining values
+        // are set depending on where the coin is located
+        f32 nextHeight = find_floor_height(o->oPosX, o->oPosY + 250.0f, o->oPosZ);
+        if (o->oPosY < nextHeight) {
+            o->oPosY = nextHeight;
+        }
+    }
+#endif
+
     if (setSpawner) {
         coinSpawner = spawn_object_relative(coinIndex, pos[0], pos[1], pos[2], o,
                                             MODEL_YELLOW_COIN, bhvCoinFormationSpawn);
@@ -220,28 +261,33 @@ void spawn_coin_in_formation(s32 coinIndex, s32 coinFormationFlags) {
 }
 
 void bhv_coin_formation_init(void) {
-    o->oCoinCollectedFlags = (o->oBhvParams >> 8) & 0xFF;
+    o->oCoinCollectedFlags = o->respawnInfo;
 }
 
 void bhv_coin_formation_loop(void) {
     s32 coinIndex;
-
     switch (o->oAction) {
         case COIN_FORMATION_ACT_SPAWN_COINS:
+#ifndef NODRAWINGDISTANCE
             if (o->oDistanceToMario < 2000.0f) {
+#endif
                 for (coinIndex = 0; coinIndex <= 7; coinIndex++) {
                     if (!(o->oCoinCollectedFlags & (1 << coinIndex))) {
                         spawn_coin_in_formation(coinIndex, o->oBhvParams2ndByte);
                     }
                 }
                 o->oAction++;
+#ifndef NODRAWINGDISTANCE
             }
+#endif
             break;
 
         case COIN_FORMATION_ACT_IDLE:
+#ifndef NODRAWINGDISTANCE
             if (o->oDistanceToMario > 2100.0f) {
                 o->oAction++;
             }
+#endif
             break;
 
         case COIN_FORMATION_ACT_RESPAWN_COINS:
@@ -249,7 +295,7 @@ void bhv_coin_formation_loop(void) {
             break;
     }
 
-    set_object_respawn_info_bits(o, o->oCoinCollectedFlags & 0xFF);
+    set_object_respawn_info_bits(o, o->oCoinCollectedFlags);
 }
 
 void coin_inside_boo_act_1(void) {

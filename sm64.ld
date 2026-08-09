@@ -1,32 +1,26 @@
 OUTPUT_ARCH (mips)
 
-/* include/segments.h defines SEG_POOL_START, SEG_POOL_END, SEG_BUFFERS,
- * SEG_GODDARD, SEG_ENGINE, SEG_FRAMEBUFFERS */
+#define LINKER /* Removes externs from preprocessed script */
 #include "segments.h"
-#include "config.h"
-
-#ifndef USE_EXT_RAM
-#define ADDR_OR_ALIGN(addr) (addr)
-#else
-#define ADDR_OR_ALIGN(addr) ALIGN(0x1000)
-#endif
+#undef LINKER
 
 #define BEGIN_SEG(name, addr) \
-    _##name##SegmentStart = ADDR(.name); \
-    _##name##SegmentRomStart = __romPos; \
-    .name (addr) : AT(__romPos)
+     _##name##SegmentStart = ADDR(.name); \
+     _##name##SegmentRomStart = __romPos; \
+     .name (addr) : AT(__romPos)
 
 #define END_SEG(name) \
-    _##name##SegmentEnd = ADDR(.name) + SIZEOF(.name); \
-    _##name##SegmentRomEnd = __romPos + SIZEOF(.name); \
-    __romPos += SIZEOF(.name);
+     _##name##SegmentEnd = ADDR(.name) + SIZEOF(.name); \
+     _##name##SegmentRomEnd = __romPos + SIZEOF(.name); \
+     __romPos += SIZEOF(.name);
 
 #define BEGIN_NOLOAD(name) \
-    _##name##SegmentNoloadStart = ADDR(.name.noload); \
-    .name.noload (NOLOAD) :
+     _##name##SegmentBssStart = ADDR(.name.noload); \
+     .name.noload (NOLOAD) :
 
 #define END_NOLOAD(name) \
-    _##name##SegmentNoloadEnd = ADDR(.name.noload) + SIZEOF(.name.noload);
+     _##name##SegmentBssEnd = ADDR(.name.noload) + SIZEOF(.name.noload); \
+     _##name##SegmentBssSize = SIZEOF(.name.noload);
 
 #define MIO0_SEG(name, segAddr) \
     BEGIN_SEG(name##_mio0, segAddr) \
@@ -51,12 +45,29 @@ OUTPUT_ARCH (mips)
         . = ALIGN(0x10); \
     } \
     END_SEG(name##_segment_7) \
-    BEGIN_SEG(name, 0x0E000000) \
+    BEGIN_SEG(name, 0x1A000000) \
     { \
         BUILD_DIR/levels/name/script.o(.data); \
         BUILD_DIR/levels/name/geo.o(.data); \
     } \
     END_SEG(name)
+
+#ifdef RM2C
+#define CUSTOM_LEVEL(name) \
+   BEGIN_SEG(name##_segment_E, 0x0E000000) \
+   { \
+      BUILD_DIR/levels/name/custom.leveldata.o(.data); \
+   } \
+   END_SEG(name##_segment_E) \
+   BEGIN_SEG(name##_segment_1B, 0x1B000000) \
+   { \
+	  BUILD_DIR/levels/name/custom.geo.o(.data); \
+	  BUILD_DIR/levels/name/custom.script.o(.data); \
+      . = ALIGN(0x10); \
+   } \
+   END_SEG(name##_segment_1B)
+
+#endif
 
 #define STANDARD_OBJECTS(name, segAddr, geoAddr) \
     BEGIN_SEG(name##_mio0, segAddr) \
@@ -71,10 +82,6 @@ OUTPUT_ARCH (mips)
     } \
     END_SEG(name##_geo)
 
-#define CREATE_LO_HI_PAIR(name, value) \
-    name##Hi = (value) >> 16; \
-    name##Lo = (value) & 0xffff;
-
 SECTIONS
 {
     __romPos = 0;
@@ -88,1067 +95,139 @@ SECTIONS
     END_SEG(boot)
 
     . = 0x80000400;
-    BEGIN_NOLOAD(zbuffer) {
+    BEGIN_NOLOAD(zbuffer) 
+    {
         BUILD_DIR/src/buffers/zbuffer.o(.bss*);
     }
+    END_NOLOAD(zbuffer)
 
-#ifdef VERSION_CN
-    gZBufferEnd = .;
-#endif
-
-    . = SEG_BUFFERS;
+    . = _zbufferSegmentBssEnd;
     BEGIN_NOLOAD(buffers)
     {
         BUILD_DIR/src/buffers/buffers.o(.bss*);
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/port_sh.o(.bss*);
-#else
-        BUILD_DIR/src/audio/globals_start.o(.bss*);
-        BUILD_DIR/src/audio/synthesis.o(.bss*);
-        BUILD_DIR/src/audio/heap.o(.bss*);
-        BUILD_DIR/src/audio/load.o(.bss*);
-        BUILD_DIR/src/audio/data.o(.bss*);
-#endif
-
-#ifdef VERSION_EU
-        . = ALIGN(0x200);
-#else
-        . = ALIGN(0x1000);
-#endif
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        . += 0xB000;
-#endif
+        . = ALIGN(0x10);
         BUILD_DIR/src/buffers/gfx_output_buffer.o(.bss*);
     }
     END_NOLOAD(buffers)
 
-    /* lib/src/__osDevMgrMain.c and lib/src/osCreateViManager.c contain infinite
-     * loops compiled without -g, which cause the return statements and the .o
-     * files themselves to be aligned to 32-byte boundaries. But the linker
-     * Nintendo used did not respect .o file alignment, and aligned the files
-     * only to 16 bytes, in some cases misaligning them. We force the same to
-     * happen using the SUBALIGN directive. This is harmless; the alignment is
-     * just an optimization. */
-    BEGIN_SEG(main, )
-#ifndef VERSION_CN
-        SUBALIGN(16)
-#endif
+    . = _buffersSegmentBssEnd;
+
+    // The way audio bss is cleared in vanilla is weird.
+    // Originally they used "start and end markers" defined on specific audio files and
+    // they get cleaned using a weird for loop that could break if you move audio bss order.
+    // Now we move audio bss into it's own segment to clean those properly using bzero.
+    BEGIN_NOLOAD(audio)
+    {
+        BUILD_DIR/src/audio*.o(.bss*);
+        . = ALIGN(0x10);
+    }
+    END_NOLOAD(audio)
+
+    . = _audioSegmentBssEnd;
+
+    BEGIN_SEG(main, .)
     {
         BUILD_DIR/asm/entry.o(.text);
-        BUILD_DIR/src/game/crash_screen.o(.text);
-        BUILD_DIR/src/game/main.o(.text);
-        BUILD_DIR/src/game/game_init.o(.text);
-#ifdef VERSION_CN
-        . += 0x10;
-#endif
-        BUILD_DIR/src/game/sound_init.o(.text);
-#if ENABLE_RUMBLE
-      BUILD_DIR/src/game/rumble_init.o(.text);
-#endif
-      BUILD_DIR/src/game/level_update.o(.text);
-      BUILD_DIR/src/game/bingo.o(.text);
-      BUILD_DIR/src/game/bingo_ui.o(.text);
-      BUILD_DIR/src/game/bingo_tracking_star.o(.text);
-      BUILD_DIR/src/game/bingo_board_setup.o(.text);
-      BUILD_DIR/src/game/bingo_const.o(.text);
-      BUILD_DIR/src/game/bingo_objective_func.o(.text);
-      BUILD_DIR/src/game/bingo_titles.o(.text);
-      BUILD_DIR/src/game/bingo_descriptions.o(.text);
-      BUILD_DIR/src/game/bingo_objective_init.o(.text);
-      BUILD_DIR/src/game/strcpy.o(.text);
-      BUILD_DIR/src/game/interaction.o(.text);
-      BUILD_DIR/src/game/mario.o(.text);
-      BUILD_DIR/src/game/mario_step.o(.text);
-      BUILD_DIR/src/game/mario_actions_cutscene.o(.text);
-      BUILD_DIR/src/game/mario_actions_automatic.o(.text);
-      BUILD_DIR/src/game/mario_actions_stationary.o(.text);
-      BUILD_DIR/src/game/mario_actions_moving.o(.text);
-      BUILD_DIR/src/game/mario_actions_airborne.o(.text);
-      BUILD_DIR/src/game/mario_actions_submerged.o(.text);
-      BUILD_DIR/src/game/mario_actions_object.o(.text);
-      BUILD_DIR/src/game/level_geo.o(.text);
-      BUILD_DIR/src/game/mario_misc.o(.text);
-      BUILD_DIR/src/game/memory.o(.text);
-      BUILD_DIR/src/game/save_file.o(.text);
-      BUILD_DIR/src/game/area.o(.text);
-      BUILD_DIR/src/game/rendering_graph_node.o(.text);
-      BUILD_DIR/src/game/profiler.o(.text);
-      BUILD_DIR/asm/decompress.o(.text);
-      BUILD_DIR/src/game/camera.o(.text);
-      BUILD_DIR/src/game/debug_course.o(.text);
-      BUILD_DIR/src/game/object_list_processor.o(.text);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_helpers.o(.text);
-#endif
-        BUILD_DIR/src/game/behavior_actions.o(.text);
-        BUILD_DIR/src/game/platform_displacement.o(.text);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_collision.o(.text);
-        BUILD_DIR/src/game/spawn_object.o(.text);
-#endif
-        BUILD_DIR/src/game/spawn_sound.o(.text);
-        BUILD_DIR/src/game/debug.o(.text);
-        BUILD_DIR/src/game/screen_transition.o(.text);
-        BUILD_DIR/src/game/shadow.o(.text);
-        BUILD_DIR/src/game/skybox.o(.text);
-        BUILD_DIR/src/game/moving_texture.o(.text);
-        BUILD_DIR/src/game/geo_misc.o(.text);
-        BUILD_DIR/src/game/paintings.o(.text);
-        BUILD_DIR/src/game/print.o(.text);
-        BUILD_DIR/src/game/ingame_menu.o(.text);
-        BUILD_DIR/src/game/envfx_snow.o(.text);
-        BUILD_DIR/src/game/envfx_bubbles.o(.text);
-        BUILD_DIR/src/game/macro_special_objects.o(.text);
-        BUILD_DIR/src/game/hud.o(.text);
-        BUILD_DIR/src/game/obj_behaviors.o(.text);
-        BUILD_DIR/src/game/obj_behaviors_2.o(.text);
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/synthesis_sh.o(.text);
-#else
-        BUILD_DIR/src/audio/synthesis.o(.text);
-#endif
-        BUILD_DIR/src/audio/heap.o(.text);
-        BUILD_DIR/src/audio/load.o(.text);
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/load_sh.o(.text);
-        BUILD_DIR/src/audio/port_sh.o(.text);
-#endif
-        BUILD_DIR/src/audio/playback.o(.text);
-        BUILD_DIR/src/audio/effects.o(.text);
-        BUILD_DIR/src/audio/seqplayer.o(.text);
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/libultra.a:osDriveRomInit.o(.text);
-#endif
-        BUILD_DIR/src/audio/external.o(.text);
-        BUILD_DIR/src/audio/port_eu.o(.text);
-
-#if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:osInitializeIQueWrapper.o(.text);
-        BUILD_DIR/libultra.a:osAiGetLength.o(.text);
-        BUILD_DIR/libultra.a:osAiSetFrequency.o(.text);
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.text);
-        BUILD_DIR/libultra.a:osInvalDCache.o(.text);
-        BUILD_DIR/libultra.a:osInvalICache.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCacheAll.o(.text);
-        BUILD_DIR/libultra.a:osContStartReadData.o(.text);
-        BUILD_DIR/libultra.a:osContInit.o(.text);
-        BUILD_DIR/libultra.a:osVirtualToPhysical.o(.text);
-        BUILD_DIR/libultra.a:sqrtf.o(.text);
-        BUILD_DIR/libultra.a:cosf.o(.text);
-        BUILD_DIR/libultra.a:guOrthoF.o(.text);
-        BUILD_DIR/libultra.a:guPerspectiveF.o(.text);
-        BUILD_DIR/libultra.a:sinf.o(.text);
-        BUILD_DIR/libultra.a:bcopy.o(.text);
-        BUILD_DIR/libultra.a:bzero.o(.text);
-        BUILD_DIR/libultra.a:llmuldiv.o(.text);
-        BUILD_DIR/libultra.a:llconv.o(.text);
-#endif
-        BUILD_DIR/libultra.a:string.o(.text);
-        BUILD_DIR/libultra.a:_Printf.o(.text);
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:sprintf.o(.text);
-        BUILD_DIR/libultra.a:osSyncPrintf.o(.text);
-        BUILD_DIR/libultra.a:osCreateMesgQueue.o(.text);
-        BUILD_DIR/libultra.a:osRecvMesg.o(.text);
-        BUILD_DIR/libultra.a:osSendMesg.o(.text);
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.text);
-        BUILD_DIR/libultra.a:osGetCount.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYield.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYielded.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:osCreateThread.o(.text);
-        BUILD_DIR/libultra.a:osSetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:osStartThread.o(.text);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.text);
-        BUILD_DIR/libultra.a:__osGetCurrFaultedThread.o(.text);
-        BUILD_DIR/libultra.a:osGetTime.o(.text);
-        BUILD_DIR/libultra.a:osSetTime.o(.text);
-        BUILD_DIR/libultra.a:osSetTimer.o(.text);
-        BUILD_DIR/libultra.a:osTimer.o(.text);
-        BUILD_DIR/libultra.a:osMapTLB.o(.text);
-        BUILD_DIR/libultra.a:__osProbeTLB.o(.text);
-        BUILD_DIR/libultra.a:osUnmapTLBAll.o(.text);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.text);
-        BUILD_DIR/libultra.a:osViSetEvent.o(.text);
-        BUILD_DIR/libultra.a:osViSetMode.o(.text);
-        BUILD_DIR/libultra.a:osViSetSpecialFeatures.o(.text);
-        BUILD_DIR/libultra.a:osViSwapBuffer.o(.text);
-        BUILD_DIR/libultra.a:__osViSwapContext.o(.text);
-        BUILD_DIR/libultra.a:osViBlack.o(.text);
-        BUILD_DIR/libultra.a:guMtxIdentF.o(.text);
-        BUILD_DIR/libultra.a:guMtxF2L.o(.text);
-        BUILD_DIR/libultra.a:guScale.o(.text);
-        BUILD_DIR/libultra.a:guTranslate.o(.text);
-        BUILD_DIR/libultra.a:guRotateF.o(.text);
-        BUILD_DIR/libultra.a:osEepromProbe.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongWrite.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongRead.o(.text);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.text);
-        BUILD_DIR/libultra.a:__osDisableInt.o(.text);
-        BUILD_DIR/libultra.a:__osRestoreInt.o(.text);
-        BUILD_DIR/libultra.a:osSetIntMask.o(.text);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.text);
-        BUILD_DIR/libultra.a:osEPiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:epidma.o(.text);
-        BUILD_DIR/libultra.a:osCartRomInit.o(.text);
-        BUILD_DIR/libultra.a:__osDevMgrMain.o(.text);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:osPiStartDma.o(.text);
-        BUILD_DIR/libultra.a:iQueKernelCalls.o(.text);
-        BUILD_DIR/libultra.a:motor.o(.text);
-        BUILD_DIR/libultra.a:parameters.o(.text);
-        BUILD_DIR/libultra.a:osInitialize.o(.text);
-        BUILD_DIR/libultra.a:__osAiDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCache.o(.text);
-        BUILD_DIR/libultra.a:_Litob.o(.text);
-        BUILD_DIR/libultra.a:_Ldtob.o(.text);
-        BUILD_DIR/libultra.a:osJamMesg.o(.text);
-        BUILD_DIR/libultra.a:__osGetCause.o(.text);
-        BUILD_DIR/libultra.a:__osGetSR.o(.text);
-        BUILD_DIR/libultra.a:__osSetFpcCsr.o(.text);
-        BUILD_DIR/libultra.a:__osSetSR.o(.text);
-        BUILD_DIR/libultra.a:__osSetWatchLo.o(.text);
-        BUILD_DIR/libultra.a:__osSetCompare.o(.text);
-        BUILD_DIR/libultra.a:__osSpDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:__osSpGetStatus.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetStatus.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetPc.o(.text);
-        BUILD_DIR/libultra.a:__osSpRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawWriteIo.o(.text);
-        BUILD_DIR/libultra.a:osDestroyThread.o(.text);
-        BUILD_DIR/libultra.a:osGetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:osYieldThread.o(.text);
-        BUILD_DIR/libultra.a:osMapTLBRdb.o(.text);
-        BUILD_DIR/libultra.a:__osViInit.o(.text);
-        BUILD_DIR/libultra.a:__osViGetCurrentContext.o(.text);
-        BUILD_DIR/libultra.a:guNormalize.o(.text);
-        BUILD_DIR/libultra.a:osEepromRead.o(.text);
-        BUILD_DIR/libultra.a:osEepromWrite.o(.text);
-        BUILD_DIR/libultra.a:__osSetGlobalIntMask.o(.text);
-        BUILD_DIR/libultra.a:__osResetGlobalIntMask.o(.text);
-        BUILD_DIR/libultra.a:osPiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:osPiGetCmdQueue.o(.text);
-        BUILD_DIR/libultra.a:osEPiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:osEPiRawWriteIo.o(.text);
-        BUILD_DIR/libultra.a:ldiv.o(.text);
-        BUILD_DIR/libultra.a:__osSiDeviceBusy.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:llmuldiv.o(.text);
-        BUILD_DIR/libultra.a:osInitialize.o(.text);
-        BUILD_DIR/libultra.a:osSetTime.o(.text);
-        BUILD_DIR/libultra.a:osGetTime.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCacheAll.o(.text);
-        BUILD_DIR/libultra.a:osViBlack.o(.text);
-        BUILD_DIR/libultra.a:osViSwapBuffer.o(.text);
-        BUILD_DIR/libultra.a:__osGetCurrFaultedThread.o(.text);
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.text);
-        BUILD_DIR/libultra.a:osRecvMesg.o(.text);
-        BUILD_DIR/libultra.a:parameters.o(.text);
-        BUILD_DIR/libultra.a:osCreateMesgQueue.o(.text);
-        BUILD_DIR/libultra.a:osCreateThread.o(.text);
-        BUILD_DIR/libultra.a:osStartThread.o(.text);
-        BUILD_DIR/libultra.a:osMapTLB.o(.text);
-        BUILD_DIR/libultra.a:osUnmapTLBAll.o(.text);
-        BUILD_DIR/libultra.a:sprintf.o(.text);
-        BUILD_DIR/libultra.a:osViSetEvent.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYield.o(.text);
-        BUILD_DIR/libultra.a:osSendMesg.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYielded.o(.text);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.text);
-        BUILD_DIR/libultra.a:osViSetMode.o(.text);
-        BUILD_DIR/libultra.a:osViSetSpecialFeatures.o(.text);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.text);
-        BUILD_DIR/libultra.a:osSetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:sqrtf.o(.text);
-        BUILD_DIR/libultra.a:osContStartReadData.o(.text);
-        BUILD_DIR/libultra.a:osContInit.o(.text);
-        BUILD_DIR/libultra.a:osEepromProbe.o(.text);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.text);
-#endif
-        BUILD_DIR/libultra.a:osInvalDCache.o(.text);
-        BUILD_DIR/libultra.a:osPiStartDma.o(.text);
-        BUILD_DIR/libultra.a:bzero.o(.text);
-        BUILD_DIR/libultra.a:osInvalICache.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongRead.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongWrite.o(.text);
-        BUILD_DIR/libultra.a:bcopy.o(.text);
-        BUILD_DIR/libultra.a:guOrthoF.o(.text);
-        BUILD_DIR/libultra.a:guPerspectiveF.o(.text);
-        BUILD_DIR/libultra.a:llconv.o(.text);
-        BUILD_DIR/libultra.a:cosf.o(.text);
-        BUILD_DIR/libultra.a:sinf.o(.text);
-        BUILD_DIR/libultra.a:guTranslateF.o(.text);
-        BUILD_DIR/libultra.a:guRotateF.o(.text);
-        BUILD_DIR/libultra.a:guScaleF.o(.text);
-        BUILD_DIR/libultra.a:osAiSetFrequency.o(.text);
-#endif
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osCartRomInit.o(.text);
-        BUILD_DIR/libultra.a:epidma.o(.text);
-#endif
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:alBnkfNew.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:osAiGetLength.o(.text);
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.text);
-#endif
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osGetCount.o(.text);
-        BUILD_DIR/libultra.a:__osDisableInt.o(.text);
-        BUILD_DIR/libultra.a:__osRestoreInt.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:_Litob.o(.text);
-        BUILD_DIR/libultra.a:_Ldtob.o(.text);
-        BUILD_DIR/libultra.a:__osSetSR.o(.text);
-        BUILD_DIR/libultra.a:__osGetSR.o(.text);
-        BUILD_DIR/libultra.a:__osSetFpcCsr.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawWriteIo.o(.text);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCache.o(.text);
-        BUILD_DIR/libultra.a:osMapTLBRdb.o(.text);
-#endif
-        BUILD_DIR/libultra.a:osPiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:__osSetHWintrRoutine.o(.text);
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:leointerrupt.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:osTimer.o(.text);
-#endif
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:__osDisableInt.o(.text);
-        BUILD_DIR/libultra.a:__osRestoreInt.o(.text);
-        BUILD_DIR/libultra.a:osGetCount.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:__osViInit.o(.text);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.text);
-        BUILD_DIR/libultra.a:osVirtualToPhysical.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetStatus.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetPc.o(.text);
-        BUILD_DIR/libultra.a:__osSpRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osSpDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:__osSpGetStatus.o(.text);
-        BUILD_DIR/libultra.a:osGetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:__osViGetCurrentContext.o(.text);
-        BUILD_DIR/libultra.a:__osViSwapContext.o(.text);
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osLeoDiskInit.o(.text);
-#endif
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:osPiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:osEPiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osDevMgrMain.o(.text);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:osSetTimer.o(.text);
-        BUILD_DIR/libultra.a:osEepromWrite.o(.text);
-#endif
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:osPfsIsPlug.o(.text);
-        BUILD_DIR/libultra.a:crc.o(.text);
-        BUILD_DIR/libultra.a:contramwrite.o(.text);
-        BUILD_DIR/libultra.a:contramread.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:osJamMesg.o(.text);
-        BUILD_DIR/libultra.a:osPiGetCmdQueue.o(.text);
-        BUILD_DIR/libultra.a:osEepromRead.o(.text);
-        BUILD_DIR/libultra.a:guMtxF2L.o(.text);
-        BUILD_DIR/libultra.a:guNormalize.o(.text);
-        BUILD_DIR/libultra.a:__osAiDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:ldiv.o(.text);
-        BUILD_DIR/libultra.a:__osSiDeviceBusy.o(.text);
-#endif
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:leointerrupt.o(.text);
-#endif
-        BUILD_DIR/libultra.a:osSetIntMask.o(.text);
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:osDestroyThread.o(.text);
-#endif
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:osLeoDiskInit.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:__osSetCompare.o(.text);
-        BUILD_DIR/libultra.a:__osProbeTLB.o(.text);
-        BUILD_DIR/libultra.a:__osResetGlobalIntMask.o(.text);
-        BUILD_DIR/libultra.a:osEPiRawWriteIo.o(.text);
-#endif
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osEPiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:__osSetGlobalIntMask.o(.text);
-#endif
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:osYieldThread.o(.text);
-#endif
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:pfsgetstatus.o(.text);
-#endif
-#ifdef VERSION_CN
-        BUILD_DIR/libgcc.a:_divdi3.o(.text);
-        BUILD_DIR/libgcc.a:_moddi3.o(.text);
-        BUILD_DIR/libgcc.a:_udivdi3.o(.text);
-        BUILD_DIR/libgcc.a:_umoddi3.o(.text);
-        BUILD_DIR/libgcc.a:_cmpdi2.o(.text);
-        BUILD_DIR/libgcc.a:_floatdidf.o(.text);
-        BUILD_DIR/libgcc.a:_floatdisf.o(.text);
-        BUILD_DIR/libgcc.a:_fixunsdfdi.o(.text);
-        BUILD_DIR/libgcc.a:_fixdfdi.o(.text);
-        BUILD_DIR/libgcc.a:_fixunssfdi.o(.text);
-        BUILD_DIR/libgcc.a:_fixsfdi.o(.text);
-#endif
-        BUILD_DIR/lib/rsp.o(.text);
-#else
-        BUILD_DIR/src/game*.o(.text);
+        BUILD_DIR/src/boot*.o(.text);
         BUILD_DIR/src/audio*.o(.text);
-        BUILD_DIR/libultra.a:parameters.o(.text);
-        BUILD_DIR/libultra.a:osSetTime.o(.text);
-        BUILD_DIR/libultra.a:osMapTLB.o(.text);
-        BUILD_DIR/libultra.a:osUnmapTLBAll.o(.text);
-        BUILD_DIR/libultra.a:sprintf.o(.text);
-        BUILD_DIR/libultra.a:osCreateMesgQueue.o(.text);
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.text);
-        BUILD_DIR/libultra.a:osViSetEvent.o(.text);
-        BUILD_DIR/libultra.a:osCreateThread.o(.text);
-        BUILD_DIR/libultra.a:osRecvMesg.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYield.o(.text);
-        BUILD_DIR/libultra.a:osSendMesg.o(.text);
-        BUILD_DIR/libultra.a:osSpTaskYielded.o(.text);
-        BUILD_DIR/libultra.a:osStartThread.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCacheAll.o(.text);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.text);
-        BUILD_DIR/libultra.a:osViSetMode.o(.text);
-        BUILD_DIR/libultra.a:osViBlack.o(.text);
-        BUILD_DIR/libultra.a:osViSetSpecialFeatures.o(.text);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.text);
-        BUILD_DIR/libultra.a:osSetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:osInitialize.o(.text);
-        BUILD_DIR/libultra.a:osViSwapBuffer.o(.text);
-        BUILD_DIR/libultra.a:sqrtf.o(.text);
-        BUILD_DIR/libultra.a:osContStartReadData.o(.text);
-        BUILD_DIR/libultra.a:osContInit.o(.text);
-        BUILD_DIR/libultra.a:osEepromProbe.o(.text);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.text);
-#endif
-        BUILD_DIR/libultra.a:llmuldiv.o(.text);
-        BUILD_DIR/libultra.a:llmuldiv_gcc.o(.text);
-        BUILD_DIR/libultra.a:osInvalDCache.o(.text);
-        BUILD_DIR/libultra.a:osPiStartDma.o(.text);
-        BUILD_DIR/libultra.a:bzero.o(.text);
-        BUILD_DIR/libultra.a:osInvalICache.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongRead.o(.text);
-        BUILD_DIR/libultra.a:osEepromLongWrite.o(.text);
-        BUILD_DIR/libultra.a:bcopy.o(.text);
-        BUILD_DIR/libultra.a:guOrthoF.o(.text);
-        BUILD_DIR/libultra.a:guPerspectiveF.o(.text);
-        BUILD_DIR/libultra.a:osGetTime.o(.text);
-        BUILD_DIR/libultra.a:llconv.o(.text);
-        BUILD_DIR/libultra.a:cosf.o(.text);
-        BUILD_DIR/libultra.a:sinf.o(.text);
-        BUILD_DIR/libultra.a:guTranslateF.o(.text);
-        BUILD_DIR/libultra.a:guRotateF.o(.text);
-        BUILD_DIR/libultra.a:guScaleF.o(.text);
-        BUILD_DIR/libultra.a:osAiSetFrequency.o(.text);
-        BUILD_DIR/libultra.a:alBnkfNew.o(.text);
-        BUILD_DIR/libultra.a:osWritebackDCache.o(.text);
-        BUILD_DIR/libultra.a:osAiGetLength.o(.text);
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.text);
-        BUILD_DIR/libultra.a:osTimer.o(.text);
-        BUILD_DIR/libultra.a:_Printf.o(.text);
-        BUILD_DIR/libultra.a:string.o(.text);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.text);
-        BUILD_DIR/libultra.a:__osDisableInt.o(.text);
-        BUILD_DIR/libultra.a:__osRestoreInt.o(.text);
-        BUILD_DIR/libultra.a:__osViInit.o(.text);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.text);
-        BUILD_DIR/libultra.a:osVirtualToPhysical.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetStatus.o(.text);
-        BUILD_DIR/libultra.a:__osSpSetPc.o(.text);
-        BUILD_DIR/libultra.a:__osSpRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osSpDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:__osSpGetStatus.o(.text);
-        BUILD_DIR/libultra.a:osGetThreadPri.o(.text);
-        BUILD_DIR/libultra.a:__osViGetCurrentContext.o(.text);
-        BUILD_DIR/libultra.a:__osViSwapContext.o(.text);
-        BUILD_DIR/libultra.a:osGetCount.o(.text);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:osPiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:__osDevMgrMain.o(.text);
-        BUILD_DIR/libultra.a:__osSetSR.o(.text);
-        BUILD_DIR/libultra.a:__osGetSR.o(.text);
-        BUILD_DIR/libultra.a:__osSetFpcCsr.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawReadIo.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawWriteIo.o(.text);
-        BUILD_DIR/libultra.a:osMapTLBRdb.o(.text);
-        BUILD_DIR/libultra.a:osPiRawReadIo.o(.text);
-#ifdef VERSION_JP
-        . += 0x40;
-#endif
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.text);
-        BUILD_DIR/libultra.a:__osSiRawStartDma.o(.text);
-        BUILD_DIR/libultra.a:osSetTimer.o(.text);
-        BUILD_DIR/libultra.a:osEepromWrite.o(.text);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:osPfsIsPlug.o(.text);
-        BUILD_DIR/libultra.a:crc.o(.text);
-        BUILD_DIR/libultra.a:contramwrite.o(.text);
-        BUILD_DIR/libultra.a:contramread.o(.text);
-#endif
-        BUILD_DIR/libultra.a:osJamMesg.o(.text);
-        BUILD_DIR/libultra.a:osPiGetCmdQueue.o(.text);
-        BUILD_DIR/libultra.a:osEepromRead.o(.text);
-        BUILD_DIR/libultra.a:guMtxF2L.o(.text);
-        BUILD_DIR/libultra.a:guMtxIdentF.o(.text);
-        BUILD_DIR/libultra.a:guNormalize.o(.text);
-        BUILD_DIR/libultra.a:__osAiDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:__osSetCompare.o(.text);
-        BUILD_DIR/libultra.a:_Litob.o(.text);
-        BUILD_DIR/libultra.a:_Ldtob.o(.text);
-        BUILD_DIR/libultra.a:kdebugserver.o(.text);
-        BUILD_DIR/libultra.a:__osSyncPutChars.o(.text);
-        BUILD_DIR/libultra.a:osSetIntMask.o(.text);
-        BUILD_DIR/libultra.a:osDestroyThread.o(.text);
-        BUILD_DIR/libultra.a:__osProbeTLB.o(.text);
-        BUILD_DIR/libultra.a:__osSiDeviceBusy.o(.text);
-        BUILD_DIR/libultra.a:ldiv.o(.text);
-        BUILD_DIR/libultra.a:__osGetCause.o(.text);
-        BUILD_DIR/libultra.a:__osAtomicDec.o(.text);
-        BUILD_DIR/libultra.a:guLookAtRef.o(.text); /* Fast3DEX2 only */
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:pfsgetstatus.o(.text);
-#endif
+        BUILD_DIR/libultra.a:*.o(.text);
+        BUILD_DIR/libgcc.a:*.o(.text);
         BUILD_DIR/lib/rsp.o(.text);
-#endif
 
         /* data */
-        BUILD_DIR/src/game/crash_screen.o(.data*);
-        BUILD_DIR/src/game/main.o(.data*);
-        BUILD_DIR/src/game/game_init.o(.data*);
-        BUILD_DIR/src/game/sound_init.o(.data*);
-#if ENABLE_RUMBLE
-      BUILD_DIR/src/game/rumble_init.o(.data*);
-#endif
-      BUILD_DIR/src/game/level_update.o(.data*);
-      BUILD_DIR/src/game/bingo.o(.data*);
-      BUILD_DIR/src/game/bingo_ui.o(.data*);
-      BUILD_DIR/src/game/bingo_tracking_star.o(.data*);
-      BUILD_DIR/src/game/bingo_board_setup.o(.data*);
-      BUILD_DIR/src/game/bingo_const.o(.data*);
-      BUILD_DIR/src/game/bingo_objective_func.o(.data*);
-      BUILD_DIR/src/game/bingo_titles.o(.data*);
-      BUILD_DIR/src/game/bingo_descriptions.o(.data*);
-      BUILD_DIR/src/game/bingo_objective_init.o(.data*);
-      BUILD_DIR/src/game/strcpy.o(.data*);
-      BUILD_DIR/src/game/interaction.o(.data*);
-      BUILD_DIR/src/game/mario.o(.data*);
-      BUILD_DIR/src/game/mario_step.o(.data*);
-      BUILD_DIR/src/game/mario_actions_cutscene.o(.data*);
-      BUILD_DIR/src/game/mario_actions_moving.o(.data*);
-      BUILD_DIR/src/game/mario_actions_submerged.o(.data*);
-      BUILD_DIR/src/game/mario_actions_object.o(.data*);
-      BUILD_DIR/src/game/mario_misc.o(.data*);
-      BUILD_DIR/src/game/memory.o(.data*);
-      BUILD_DIR/src/game/save_file.o(.data*);
-      BUILD_DIR/src/game/area.o(.data*);
-      BUILD_DIR/src/game/rendering_graph_node.o(.data*);
-      BUILD_DIR/src/game/profiler.o(.data*);
-      BUILD_DIR/src/game/camera.o(.data*);
-      BUILD_DIR/src/game/object_list_processor.o(.data*);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_helpers.o(.data*);
-#endif
-        BUILD_DIR/src/game/behavior_actions.o(.data*);
-        BUILD_DIR/src/game/platform_displacement.o(.data*);
-        BUILD_DIR/src/game/spawn_sound.o(.data*);
-        BUILD_DIR/src/game/debug.o(.data*);
-        BUILD_DIR/src/game/screen_transition.o(.data*);
-        BUILD_DIR/src/game/shadow.o(.data*);
-        BUILD_DIR/src/game/skybox.o(.data*);
-        BUILD_DIR/src/game/moving_texture.o(.data*);
-        BUILD_DIR/src/game/geo_misc.o(.data*);
-        BUILD_DIR/src/game/paintings.o(.data*);
-        BUILD_DIR/src/game/print.o(.data*);
-        BUILD_DIR/src/game/ingame_menu.o(.data*);
-        BUILD_DIR/src/game/envfx_snow.o(.data*);
-        BUILD_DIR/src/game/envfx_bubbles.o(.data*);
-        BUILD_DIR/src/game/macro_special_objects.o(.data*);
-        BUILD_DIR/src/game/hud.o(.data*);
-        BUILD_DIR/src/game/obj_behaviors.o(.data*);
-        BUILD_DIR/src/game/obj_behaviors_2.o(.data*);
-#ifndef VERSION_EU
-        /* wildcard doesn't match on EU due to files being moved to engine/ */
-        BUILD_DIR/src/game*.o(.data*);
-#endif
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/synthesis_sh.o(.data*);
-#else
-        BUILD_DIR/src/audio/synthesis.o(.data*);
-#endif
-        BUILD_DIR/src/audio/heap.o(.data*);
-        BUILD_DIR/src/audio/load.o(.data*);
-        BUILD_DIR/src/audio/playback.o(.data*);
-        BUILD_DIR/src/audio/effects.o(.data*);
-        BUILD_DIR/src/audio/seqplayer.o(.data*);
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/data.o(.data*);
-        BUILD_DIR/src/audio/shindou_debug_prints.o(.data*);
-        BUILD_DIR/src/audio/port_sh.o(.data*);
-        BUILD_DIR/src/audio/external.o(.data*);
-        BUILD_DIR/src/audio/audio_session_presets_sh.o(.data*);
-#else
-        BUILD_DIR/src/audio/external.o(.data*);
-        BUILD_DIR/src/audio/port_eu.o(.data*);
-        BUILD_DIR/src/audio/data.o(.data*);
-#endif
-
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.data*);
-        BUILD_DIR/libultra.a:osContInit.o(.data*);
-        BUILD_DIR/libultra.a:_Printf.o(.data*);
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.data*);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.data*);
-        BUILD_DIR/libultra.a:osTimer.o(.data*);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.data*);
-        BUILD_DIR/libultra.a:osViTable.o(.data*);
-        BUILD_DIR/libultra.a:guRotateF.o(.data*);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.data*);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.data*);
-        BUILD_DIR/libultra.a:osCartRomInit.o(.data*);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:osInitialize.o(.data*);
-        BUILD_DIR/libultra.a:_Litob.o(.data*);
-        BUILD_DIR/libultra.a:__osViInit.o(.data*);
-        BUILD_DIR/libultra.a:osViData.o(.data*);
-#endif
-
-#if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/libultra.a:_Printf.o(.data*);
-        BUILD_DIR/libultra.a:osInitialize.o(.data*);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.data*);
-        BUILD_DIR/libultra.a:osViTable.o(.data*);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.data*);
-        BUILD_DIR/libultra.a:osContInit.o(.data*);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.data*);
-#endif
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.data*);
-        BUILD_DIR/libultra.a:_Litob.o(.data*);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.data*);
-        BUILD_DIR/libultra.a:osTimer.o(.data*);
-        BUILD_DIR/libultra.a:__osViInit.o(.data*);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.data*);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:osViData.o(.data*);
-#else
-        BUILD_DIR/libultra.a:osViTable.o(.data*);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.data*);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.data*);
-        BUILD_DIR/libultra.a:osInitialize.o(.data*);
-        BUILD_DIR/libultra.a:osContInit.o(.data*);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.data*);
-#endif
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.data*);
-        BUILD_DIR/libultra.a:osTimer.o(.data*);
-        BUILD_DIR/libultra.a:_Printf.o(.data*);
-        BUILD_DIR/libultra.a:__osDequeueThread.o(.data*);
-        BUILD_DIR/libultra.a:__osViInit.o(.data*);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.data*);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.data*);
-        BUILD_DIR/libultra.a:_Litob.o(.data*);
-        BUILD_DIR/libultra.a:_Ldtob.o(.data*);
-        BUILD_DIR/libultra.a:osViData.o(.data*);
-        BUILD_DIR/libultra.a:kdebugserver.o(.data*);
-        BUILD_DIR/libultra.a:__osSyncPutChars.o(.data*);
-        BUILD_DIR/libultra.a:guRotateF.o(.data*);
+        BUILD_DIR/src/boot*.o(.data*);
+        BUILD_DIR/src/audio*.o(.data*);
         BUILD_DIR/libultra.a:*.o(.data*);
-#endif
+        BUILD_DIR/libgcc.a:*.o(.data*);
+        BUILD_DIR/lib/rsp.o(.data*);
 
-      /* rodata */
-      BUILD_DIR/src/game/crash_screen.o(.rodata*);
-      BUILD_DIR/src/game/main.o(.rodata*);
-      BUILD_DIR/src/game/game_init.o(.rodata*);
-      BUILD_DIR/src/game/sound_init.o(.rodata*);
-      BUILD_DIR/src/game/level_update.o(.rodata*);
-      BUILD_DIR/src/game/bingo.o(.rodata*);
-      BUILD_DIR/src/game/bingo_ui.o(.rodata*);
-      BUILD_DIR/src/game/bingo_tracking_star.o(.rodata*);
-      BUILD_DIR/src/game/bingo_board_setup.o(.rodata*);
-      BUILD_DIR/src/game/bingo_const.o(.rodata*);
-      BUILD_DIR/src/game/bingo_objective_func.o(.rodata*);
-      BUILD_DIR/src/game/bingo_titles.o(.rodata*);
-      BUILD_DIR/src/game/bingo_descriptions.o(.rodata*);
-      BUILD_DIR/src/game/bingo_objective_init.o(.rodata*);
-      BUILD_DIR/src/game/strcpy.o(.rodata*);
-      BUILD_DIR/src/game/interaction.o(.rodata*);
-      BUILD_DIR/src/game/mario.o(.rodata*);
-      BUILD_DIR/src/game/mario_step.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_cutscene.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_automatic.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_stationary.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_moving.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_airborne.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_submerged.o(.rodata*);
-      BUILD_DIR/src/game/mario_actions_object.o(.rodata*);
-      BUILD_DIR/src/game/mario_misc.o(.rodata*);
-      BUILD_DIR/src/game/save_file.o(.rodata*);
-      BUILD_DIR/src/game/area.o(.rodata*);
-      BUILD_DIR/src/game/rendering_graph_node.o(.rodata*);
-      BUILD_DIR/src/game/camera.o(.rodata*);
-      BUILD_DIR/src/game/object_list_processor.o(.rodata*);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_helpers.o(.rodata*);
-#endif
-        BUILD_DIR/src/game/behavior_actions.o(.rodata*);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_collision.o(.rodata*);
-        BUILD_DIR/src/game/spawn_object.o(.rodata*);
-#endif
-        BUILD_DIR/libultra.a:__osDisableInt.o(.text);
-        BUILD_DIR/libultra.a:__osRestoreInt.o(.text);
-        BUILD_DIR/src/game/spawn_sound.o(.rodata*);
-        BUILD_DIR/src/game/debug.o(.rodata*);
-        BUILD_DIR/src/game/screen_transition.o(.rodata*);
-        BUILD_DIR/src/game/shadow.o(.rodata*);
-        BUILD_DIR/src/game/skybox.o(.rodata*);
-        BUILD_DIR/src/game/moving_texture.o(.rodata*);
-        BUILD_DIR/src/game/geo_misc.o(.rodata*);
-        BUILD_DIR/src/game/paintings.o(.rodata*);
-        BUILD_DIR/src/game/print.o(.rodata*);
-        BUILD_DIR/src/game/ingame_menu.o(.rodata*);
-        BUILD_DIR/src/game/envfx_snow.o(.rodata*);
-        BUILD_DIR/src/game/envfx_bubbles.o(.rodata*);
-        BUILD_DIR/src/game/macro_special_objects.o(.rodata*);
-        BUILD_DIR/src/game/hud.o(.rodata*);
-        BUILD_DIR/src/game/obj_behaviors.o(.rodata*);
-        BUILD_DIR/src/game/obj_behaviors_2.o(.rodata*);
-#if defined(VERSION_JP) || defined(VERSION_US)
-        BUILD_DIR/src/game*.o(.rodata*);
-#endif
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/synthesis_sh.o(.rodata*);
-        BUILD_DIR/src/audio/heap.o(.rodata*);
-        BUILD_DIR/src/audio/load_sh.o(.rodata*);
-        BUILD_DIR/src/audio/port_sh.o(.rodata*);
-#else
-        BUILD_DIR/src/audio/synthesis.o(.rodata*);
-        BUILD_DIR/src/audio/heap.o(.rodata*);
-        BUILD_DIR/src/audio/load.o(.rodata*);
-#endif
-        BUILD_DIR/src/audio/playback.o(.rodata*);
-        BUILD_DIR/src/audio/effects.o(.rodata*);
-        BUILD_DIR/src/audio/seqplayer.o(.rodata*);
-        BUILD_DIR/src/audio/external.o(.rodata*);
-        BUILD_DIR/src/audio/port_eu.o(.rodata*);
+        /* rodata */
+        BUILD_DIR/src/boot*.o(.rodata*);
         BUILD_DIR/src/audio*.o(.rodata*);
-
-#if defined(VERSION_EU) || defined(VERSION_SH)
-        BUILD_DIR/libultra.a:_Printf.o(.rodata*);
-#endif
-
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:guPerspectiveF.o(.rodata*);
-#endif
-        BUILD_DIR/libultra.a:llconv.o(.rodata*);
-        BUILD_DIR/libultra.a:cosf.o(.rodata*);
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:guPerspectiveF.o(.rodata*);
-#endif
-        BUILD_DIR/libultra.a:sinf.o(.rodata*);
-        BUILD_DIR/libultra.a:guRotateF.o(.rodata*);
-
-#if defined(VERSION_EU) || defined(VERSION_SH)
-        BUILD_DIR/libultra.a:_Litob.o(.rodata*);
-        BUILD_DIR/libultra.a:_Ldtob.o(.rodata*);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.rodata*);
-        BUILD_DIR/libultra.a:__osDevMgrMain.o(.rodata*);
-        BUILD_DIR/libultra.a:NaN.o(.rodata*);
-#else
-        BUILD_DIR/libultra.a:_Printf.o(.rodata*);
-        BUILD_DIR/libultra.a:__osExceptionPreamble.o(.rodata*);
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:osSetIntMask.o(.rodata*);
-        BUILD_DIR/libultra.a:__osDevMgrMain.o(.rodata*);
-#endif
-        BUILD_DIR/libultra.a:NaN.o(.rodata*);
-        BUILD_DIR/libultra.a:_Litob.o(.rodata*);
-        BUILD_DIR/libultra.a:_Ldtob.o(.rodata*);
-#endif
-
-        BUILD_DIR/libultra.a:osSetIntMask.o(.rodata*);
-        BUILD_DIR/libultra.a:guLookAtRef.o(.rodata*); /* Fast3DEX2 only */
-
-#ifdef VERSION_CN
-        BUILD_DIR/libgcc.a:_divdi3.o(.rodata*);
-        BUILD_DIR/libgcc.a:_moddi3.o(.rodata*);
-        BUILD_DIR/libgcc.a:_udivdi3.o(.rodata*);
-        BUILD_DIR/libgcc.a:_umoddi3.o(.rodata*);
-        BUILD_DIR/libgcc.a:_cmpdi2.o(.rodata*);
-        BUILD_DIR/libgcc.a:_floatdidf.o(.rodata*);
-        BUILD_DIR/libgcc.a:_floatdisf.o(.rodata*);
-        BUILD_DIR/libgcc.a:_fixunsdfdi.o(.rodata*);
-        BUILD_DIR/libgcc.a:_fixdfdi.o(.rodata*);
-        BUILD_DIR/libgcc.a:_fixunssfdi.o(.rodata*);
-        BUILD_DIR/libgcc.a:_fixsfdi.o(.rodata*);
-#endif
-#ifndef VERSION_EU
         BUILD_DIR/libultra.a:*.o(.rodata*);
-#endif
-        /* audio blobs, should really be moved into a separate file */
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/load_sh.o(.data*);
-#endif
+        BUILD_DIR/libgcc.a:*.o(.rodata*);
         BUILD_DIR/lib/rsp.o(.rodata*);
     }
     END_SEG(main)
-
+    #ifndef PRELIMINARY
+        ASSERT((_mainSegmentRomEnd <= 0x101000), "Error: Please shrink your main segment to under 1MB.")
+    #endif
     BEGIN_NOLOAD(main)
     {
-        BUILD_DIR/src/game/cn_common_syms_1.o(.bss*);
-        BUILD_DIR/src/game/crash_screen.o(.bss*);
-        BUILD_DIR/src/game/main.o(.bss*);
-        BUILD_DIR/src/game/game_init.o(.bss*);
-        BUILD_DIR/src/game/sound_init.o(.bss*);
-#if ENABLE_RUMBLE
-      BUILD_DIR/src/game/rumble_init.o(.bss*);
-#endif
-      BUILD_DIR/src/game/level_update.o(.bss*);
-      BUILD_DIR/src/game/bingo.o(.bss*);
-      BUILD_DIR/src/game/bingo_ui.o(.bss*);
-      BUILD_DIR/src/game/bingo_tracking_star.o(.bss*);
-      BUILD_DIR/src/game/bingo_board_setup.o(.bss*);
-      BUILD_DIR/src/game/bingo_const.o(.bss*);
-      BUILD_DIR/src/game/bingo_objective_func.o(.bss*);
-      BUILD_DIR/src/game/bingo_titles.o(.bss*);
-      BUILD_DIR/src/game/bingo_descriptions.o(.bss*);
-      BUILD_DIR/src/game/bingo_objective_init.o(.bss*);
-      BUILD_DIR/src/game/strcpy.o(.bss*);
-      BUILD_DIR/src/game/interaction.o(.bss*);
-      BUILD_DIR/src/game/mario.o(.bss*);
-      BUILD_DIR/src/game/mario_actions_cutscene.o(.bss*);
-      BUILD_DIR/src/game/mario_actions_moving.o(.bss*);
-      BUILD_DIR/src/game/mario_actions_submerged.o(.bss*);
-      BUILD_DIR/src/game/mario_misc.o(.bss*);
-      BUILD_DIR/src/game/memory.o(.bss*);
-      BUILD_DIR/src/game/save_file.o(.bss*);
-      BUILD_DIR/src/game/area.o(.bss*);
-      BUILD_DIR/src/game/rendering_graph_node.o(.bss*);
-      BUILD_DIR/src/game/profiler.o(.bss*);
-      BUILD_DIR/src/game/camera.o(.bss*);
-      BUILD_DIR/src/game/object_list_processor.o(.bss*);
-#ifndef VERSION_EU
-      BUILD_DIR/src/game/object_helpers.o(.bss*);
-#endif
-      BUILD_DIR/src/game/behavior_actions.o(.bss*);
-      BUILD_DIR/src/game/debug.o(.bss*);
-      BUILD_DIR/src/game/shadow.o(.bss*);
-      BUILD_DIR/src/game/skybox.o(.bss*);
-      BUILD_DIR/src/game/moving_texture.o(.bss*);
-      BUILD_DIR/src/game/geo_misc.o(.bss*);
-      BUILD_DIR/src/game/paintings.o(.bss*);
-      BUILD_DIR/src/game/print.o(.bss*);
-      BUILD_DIR/src/game/ingame_menu.o(.bss*);
-      BUILD_DIR/src/game/envfx_snow.o(.bss*);
-      BUILD_DIR/src/game/envfx_bubbles.o(.bss*);
-      BUILD_DIR/src/game/macro_special_objects.o(.bss*);
-      BUILD_DIR/src/game/hud.o(.bss*);
-      BUILD_DIR/src/game/obj_behaviors.o(.bss*);
-      BUILD_DIR/src/game/obj_behaviors_2.o(.bss*);
-#ifndef VERSION_EU
-        BUILD_DIR/src/game/object_helpers.o(.bss*);
-#endif
-        BUILD_DIR/src/game/behavior_actions.o(.bss*);
-        BUILD_DIR/src/game/debug.o(.bss*);
-        BUILD_DIR/src/game/shadow.o(.bss*);
-        BUILD_DIR/src/game/skybox.o(.bss*);
-        BUILD_DIR/src/game/moving_texture.o(.bss*);
-        BUILD_DIR/src/game/geo_misc.o(.bss*);
-        BUILD_DIR/src/game/paintings.o(.bss*);
-        BUILD_DIR/src/game/print.o(.bss*);
-        BUILD_DIR/src/game/ingame_menu.o(.bss*);
-        BUILD_DIR/src/game/envfx_snow.o(.bss*);
-        BUILD_DIR/src/game/envfx_bubbles.o(.bss*);
-        BUILD_DIR/src/game/macro_special_objects.o(.bss*);
-        BUILD_DIR/src/game/hud.o(.bss*);
-        BUILD_DIR/src/game/obj_behaviors.o(.bss*);
-        BUILD_DIR/src/game/obj_behaviors_2.o(.bss*);
-#if !defined(VERSION_EU) && !defined(VERSION_CN)
-        BUILD_DIR/src/game*.o(.bss*);
-#endif
-        BUILD_DIR/src/audio/external.o(.bss*);
-#ifdef VERSION_EU
-        BUILD_DIR/src/audio/port_eu.o(.bss*);
-#endif
-#if defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/src/audio/globals_start.o(.bss*);
-        BUILD_DIR/src/audio/synthesis_sh.o(.bss*);
-        BUILD_DIR/src/audio/heap.o(.bss*);
-        BUILD_DIR/src/audio/load_sh.o(.bss*);
-        BUILD_DIR/src/audio/data.o(.bss*);
-#endif
-
-#if defined(VERSION_EU) || defined(VERSION_SH) || defined(VERSION_CN)
-        BUILD_DIR/libultra.a:osInitialize.o(.bss*);
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.bss*);
-        BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.bss*);
-#ifdef VERSION_CN
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:osCreateViManager.o(.bss*);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.bss*);
-        BUILD_DIR/libultra.a:osContStartReadData.o(.bss*);
-        BUILD_DIR/libultra.a:osContInit.o(.bss*);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:guRotateF.o(.bss*);
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osCartRomInit.o(.bss*);
-#endif
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:leointerrupt.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:osTimer.o(.bss*);
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:osLeoDiskInit.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.bss*);
-#ifndef VERSION_CN
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.bss*);
-#endif
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:osPfsIsPlug.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:osEepromWrite.o(.bss*);
-        BUILD_DIR/libultra.a:kdebugserver.o(.bss*);
-#ifdef VERSION_SH
-        BUILD_DIR/libultra.a:leointerrupt.o(.bss*);
-#endif
-#ifdef VERSION_EU
-        BUILD_DIR/libultra.a:osLeoDiskInit.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:_Printf.o(.bss*);
-        BUILD_DIR/libultra.a:osAiSetNextBuffer.o(.bss*);
-        BUILD_DIR/libultra.a:__osSetHWintrRoutine.o(.bss*);
-#else
-        BUILD_DIR/libultra.a:osSetEventMesg.o(.bss*);
-        BUILD_DIR/libultra.a:osSpTaskLoadGo.o(.bss*);
-        BUILD_DIR/libultra.a:osCreateViManager.o(.bss*);
-        BUILD_DIR/libultra.a:osCreatePiManager.o(.bss*);
-        BUILD_DIR/libultra.a:osInitialize.o(.bss*);
-        BUILD_DIR/libultra.a:osContStartReadData.o(.bss*);
-        BUILD_DIR/libultra.a:osContInit.o(.bss*);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:motor.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:guRotateF.o(.bss*);
-        BUILD_DIR/libultra.a:osTimer.o(.bss*);
-        BUILD_DIR/libultra.a:_Printf.o(.bss*);
-        BUILD_DIR/libultra.a:__osPiCreateAccessQueue.o(.bss*);
-        BUILD_DIR/libultra.a:__osSiCreateAccessQueue.o(.bss*);
-#if ENABLE_RUMBLE
-        BUILD_DIR/libultra.a:osPfsIsPlug.o(.bss*);
-#endif
-        BUILD_DIR/libultra.a:osEepromWrite.o(.bss*);
-        BUILD_DIR/libultra.a:kdebugserver_stack.o(.bss*);
-        BUILD_DIR/libultra.a:kdebugserver.o(.bss*);
-#endif
-
-        BUILD_DIR/libultra.a:*.o(.bss*);
-
-        . = ALIGN(0x8);
+        BUILD_DIR/src/boot*.o(.*bss*);
+        BUILD_DIR/src/game*.o(.*bss*);
+        BUILD_DIR/libultra.a:*.o(.*bss*);
+        BUILD_DIR/lib/rsp.o(.*bss*);
+        . = ALIGN(0x10);
     }
     END_NOLOAD(main)
 
-    CREATE_LO_HI_PAIR(_mainSegmentNoloadSize, SIZEOF (.main.noload))
+    . = _mainSegmentBssEnd;
 
-   BEGIN_SEG(engine, SEG_ENGINE)
-   {
-      BUILD_DIR/src/engine/math_util.o(.text);
-      BUILD_DIR/src/engine/graph_node.o(.text);
-      BUILD_DIR/src/engine/graph_node_manager.o(.text);
-      BUILD_DIR/src/engine/geo_layout.o(.text);
-      BUILD_DIR/src/engine/level_script.o(.text);
-      BUILD_DIR/src/engine/surface_collision.o(.text);
-      BUILD_DIR/src/engine/surface_load.o(.text);
-      BUILD_DIR/src/engine/behavior_script.o(.text);
-      BUILD_DIR/src/engine/rand.o(.text);
-#ifdef VERSION_EU
-      BUILD_DIR/src/game/object_collision.o(.text);
-      BUILD_DIR/src/game/spawn_object.o(.text);
-      BUILD_DIR/src/game/object_helpers.o(.text);
+    BEGIN_SEG(engine, .)
+    {
+      BUILD_DIR/src/game*.o(.text*);
+      BUILD_DIR/src/game/behavior_actions.o(.text*);
+      BUILD_DIR/src/game/obj_behaviors_2.o(.text*);
+      BUILD_DIR/src/game/obj_behaviors.o(.text*);
+      BUILD_DIR/src/game/object_helpers.o(.text*);
+      BUILD_DIR/src/game/rendering_graph_node.o(.text*);
+      BUILD_DIR/src/engine/math_util.o(.text*);
+      BUILD_DIR/src/engine/surface_collision.o(.text*);
+      BUILD_DIR/src/engine/surface_load.o(.text*);
+      BUILD_DIR/src/engine/graph_node.o(.text*);
+      BUILD_DIR/src/engine*.o(.text*);
+#ifndef GODDARD_MFACE
+      BUILD_DIR/src/menu*.o(.text);
 #endif
-      BUILD_DIR/src/engine*.o(.text);
+      BUILD_DIR/src/extras*.o(.text);
+
       /* data */
-      BUILD_DIR/src/engine/graph_node.o(.data*);
-      BUILD_DIR/src/engine/graph_node_manager.o(.data*);
-      BUILD_DIR/src/engine/math_util.o(.data*);
-      BUILD_DIR/src/engine/geo_layout.o(.data*);
-      BUILD_DIR/src/engine/level_script.o(.data*);
-      BUILD_DIR/src/engine/behavior_script.o(.data*);
-      BUILD_DIR/src/engine/rand.o(.data*);
-#ifdef VERSION_EU
-      BUILD_DIR/src/game/object_collision.o(.data*);
-      BUILD_DIR/src/game/spawn_object.o(.data*);
-      BUILD_DIR/src/game/object_helpers.o(.data*);
-#endif
+      BUILD_DIR/src/game*.o(.data*);
       BUILD_DIR/src/engine*.o(.data*);
+#ifndef GODDARD_MFACE
+      BUILD_DIR/src/menu*.o(.data*);
+#endif
+      BUILD_DIR/src/extras*.o(.data*);
+
       /* rodata */
-      BUILD_DIR/src/engine/math_util.o(.rodata*);
-      BUILD_DIR/src/engine/level_script.o(.rodata*);
-      BUILD_DIR/src/engine/surface_collision.o(.rodata*);
-      BUILD_DIR/src/engine/surface_load.o(.rodata*);
-      BUILD_DIR/src/engine/rand.o(.rodata*);
-#ifdef VERSION_EU
-      BUILD_DIR/src/game/object_collision.o(.rodata*);
-      BUILD_DIR/src/game/spawn_object.o(.rodata*);
-      BUILD_DIR/src/game/object_helpers.o(.rodata*);
-#endif
+      BUILD_DIR/src/game*.o(.rodata*);
       BUILD_DIR/src/engine*.o(.rodata*);
-   }
-   END_SEG(engine)
-   BEGIN_NOLOAD(engine)
-   {
-      BUILD_DIR/src/engine/math_util.o(.bss*);
-      BUILD_DIR/src/engine/geo_layout.o(.bss*);
-      BUILD_DIR/src/engine/level_script.o(.bss*);
-      BUILD_DIR/src/engine/surface_collision.o(.bss*);
-      BUILD_DIR/src/engine/surface_load.o(.bss*);
-      BUILD_DIR/src/engine/behavior_script.o(.bss*);
-      BUILD_DIR/src/engine/rand.o(.bss*);
-#ifdef VERSION_EU
-        BUILD_DIR/src/game/object_collision.o(.bss*);
-        BUILD_DIR/src/game/spawn_object.o(.bss*);
-        BUILD_DIR/src/game/object_helpers.o(.bss*);
+#ifndef GODDARD_MFACE
+      BUILD_DIR/src/menu*.o(.rodata*);
 #endif
-        BUILD_DIR/src/engine*.o(.bss*);
+      BUILD_DIR/src/extras*.o(.rodata*);
+      . = ALIGN(0x10);
+    }
+    END_SEG(engine)
+    
+    // load_engine_code_segment had to be modified to clear bss section.
+    // Without it, any code you add in would get garbage data, causing a crash on boot.
+    BEGIN_NOLOAD(engine)
+    {
+      BUILD_DIR/src/game*.o(.*bss*);
+      BUILD_DIR/src/engine*.o(.bss*);
+#ifndef GODDARD_MFACE
+      BUILD_DIR/src/menu*.o(.bss*);
+#endif
+      BUILD_DIR/src/extras*.o(.bss*);
+      . = ALIGN(0x40);
     }
     END_NOLOAD(engine)
 
-    . = ADDR_OR_ALIGN(SEG_FRAMEBUFFERS);
+    . = _engineSegmentBssEnd;
     BEGIN_NOLOAD(framebuffers)
     {
         BUILD_DIR/src/buffers/framebuffers.o(.bss*);
     }
     END_NOLOAD(framebuffers)
 
+    __expansionRamStart = 0x80400000;
+    #ifndef N64_USE_EXTENDED_RAM
+        #ifndef PRELIMINARY
+            ASSERT((. <= __expansionRamStart), "Error: RDRAM expanded into Expansion RAM, despite Expansion RAM not being defined.")
+        #endif
+    #endif
     BEGIN_SEG(entry, 0x10000000)
     {
         BUILD_DIR/levels/entry.o(.data);
@@ -1196,40 +275,16 @@ SECTIONS
     }
     END_SEG(behavior)
 
+#ifdef GODDARD_MFACE
     /* 0x8016F000 21D7D0-255EC0 [386F0] */
-    BEGIN_SEG(goddard, SEG_GODDARD)
+    BEGIN_SEG(goddard, (SEG_RAM_END - GODDARD_SIZE))
     {
-        BUILD_DIR/src/menu/title_screen.o(.text);
-        BUILD_DIR/src/menu/intro_geo.o(.text);
-        BUILD_DIR/src/menu/file_select.o(.text);
-        BUILD_DIR/src/menu/star_select.o(.text);
         BUILD_DIR/src/menu*.o(.text);
-        BUILD_DIR/libgoddard.a:gd_main.o(.text);
-        BUILD_DIR/libgoddard.a:gd_memory.o(.text);
-        BUILD_DIR/libgoddard.a:sfx.o(.text);
-        BUILD_DIR/libgoddard.a:draw_objects.o(.text);
-        BUILD_DIR/libgoddard.a:objects.o(.text);
-        BUILD_DIR/libgoddard.a:skin_movement.o(.text);
-        BUILD_DIR/libgoddard.a:particles.o(.text);
-        BUILD_DIR/libgoddard.a:dynlist_proc.o(.text);
-        BUILD_DIR/libgoddard.a:old_menu.o(.text);
-        BUILD_DIR/libgoddard.a:debug_utils.o(.text);
-        BUILD_DIR/libgoddard.a:joints.o(.text);
-        BUILD_DIR/libgoddard.a:skin.o(.text);
-        BUILD_DIR/libgoddard.a:gd_math.o(.text);
-        BUILD_DIR/libgoddard.a:shape_helper.o(.text);
-        BUILD_DIR/libgoddard.a:renderer.o(.text);
-        BUILD_DIR/libgoddard.a:*.o(.text);
-        /* data, rodata, per file */
-        BUILD_DIR/src/menu/title_screen.o(.data*);
-        BUILD_DIR/src/menu/title_screen.o(.rodata*);
-        BUILD_DIR/src/menu/intro_geo.o(.data*);
-        BUILD_DIR/src/menu/file_select.o(.data*);
-        BUILD_DIR/src/menu/file_select.o(.rodata*);
-        BUILD_DIR/src/menu/star_select.o(.data*);
-        BUILD_DIR/src/menu/star_select.o(.rodata*);
         BUILD_DIR/src/menu*.o(.data*);
         BUILD_DIR/src/menu*.o(.rodata*);
+
+        BUILD_DIR/libgoddard.a:*.o(.text);
+
         /* goddard subsystem data */
         BUILD_DIR/libgoddard.a:gd_main.o(.data*);
         BUILD_DIR/libgoddard.a:draw_objects.o(.data*);
@@ -1259,27 +314,22 @@ SECTIONS
     END_SEG(goddard)
     BEGIN_NOLOAD(goddard)
     {
-        BUILD_DIR/src/menu/intro_geo.o(.bss*);
-        BUILD_DIR/src/menu/file_select.o(.bss*);
-        BUILD_DIR/src/menu/star_select.o(.bss*);
         BUILD_DIR/src/menu*.o(.bss*);
-        BUILD_DIR/libgoddard.a:gd_main.o(.bss*);
-        BUILD_DIR/libgoddard.a:gd_memory.o(.bss*);
-        BUILD_DIR/libgoddard.a:sfx.o(.bss*);
-        BUILD_DIR/libgoddard.a:draw_objects.o(.bss*);
-        BUILD_DIR/libgoddard.a:objects.o(.bss*);
-        BUILD_DIR/libgoddard.a:skin_movement.o(.bss*);
-        BUILD_DIR/libgoddard.a:particles.o(.bss*);
-        BUILD_DIR/libgoddard.a:dynlist_proc.o(.bss*);
-        BUILD_DIR/libgoddard.a:old_menu.o(.bss*);
-        BUILD_DIR/libgoddard.a:debug_utils.o(.bss*);
-        BUILD_DIR/libgoddard.a:joints.o(.bss*);
-        BUILD_DIR/libgoddard.a:skin.o(.bss*);
-        BUILD_DIR/libgoddard.a:shape_helper.o(.bss*);
-        BUILD_DIR/libgoddard.a:renderer.o(.bss*);
+
         BUILD_DIR/libgoddard.a:*.o(.bss*);
     }
     END_NOLOAD(goddard)
+#endif
+
+    #ifndef PRELIMINARY
+        ASSERT((. <= (SEG_POOL_START + POOL_SIZE)), "Error: extended past pool end.")
+    #endif
+    #ifdef PRELIMINARY
+        GODDARD_SIZE = SIZEOF(.goddard) + SIZEOF(.goddard.noload);
+    #endif
+
+    __mainPoolStart = .;
+    __mainPoolSize = SEG_RAM_END - .;
 
     /* 0x268020 0x268020-0 [0] */
     BEGIN_SEG(intro, 0x14000000)
@@ -1298,6 +348,7 @@ SECTIONS
     MIO0_SEG(debug_level_select, 0x07000000)
     MIO0_SEG(title_screen_bg, 0x0A000000)
 
+#ifdef GODDARD_MFACE
     /* 271B20-2A42A0 [32780] */
     BEGIN_SEG(gd_dynlists, 0x04000000)
     {
@@ -1320,6 +371,7 @@ SECTIONS
         BUILD_DIR/libgoddard.a:*.o(.rodata);
     }
     END_SEG(gd_dynlists)
+#endif
 
     gMainLevels = __romPos;
 
@@ -1353,6 +405,11 @@ SECTIONS
     MIO0_SEG(bidw_skybox, 0x0A000000)
     MIO0_SEG(bits_skybox, 0x0A000000)
 
+   // Custom Skyboxes from RM2C. In base repo dummy file exists
+#ifdef RM2C
+   #include "textures/skyboxes/Skybox_Rules.ld"
+#endif
+
     // Texture bins
     MIO0_SEG(fire, 0x09000000)
     MIO0_SEG(spooky, 0x09000000)
@@ -1376,6 +433,13 @@ SECTIONS
 #undef STUB_LEVEL
 #undef DEFINE_LEVEL
 
+#ifdef RM2C
+//So RM2C can partially output custom levels instead of forcing all levels to have custom content
+#define DEFINE_LEVEL(folder,_0) CUSTOM_LEVEL(folder)
+   #include "levels/custom_level_defines.h"
+#undef DEFINE_LEVEL
+#endif
+
     /* 4E9FA0-? [?] */
     BEGIN_SEG(assets, __romPos)
     {
@@ -1391,9 +455,4 @@ SECTIONS
     {
         *(*);
     }
-
-    ASSERT((_goddardSegmentNoloadEnd <= SEG_POOL_END), "Error: menu segment extended past pool end")
-    ASSERT((_mainSegmentNoloadEnd <= _engineSegmentStart), "Error: main segment extended into engine.")
-    ASSERT((_engineSegmentNoloadEnd <= _framebuffersSegmentNoloadStart), "Error: engine segment extended into framebuffers.")
-    ASSERT((_framebuffersSegmentNoloadEnd <= RDRAM_END), "Error: framebuffers segment extended past RDRAM end")
 }

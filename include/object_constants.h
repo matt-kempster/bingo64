@@ -14,14 +14,9 @@
 #define ACTIVE_FLAG_INITIATED_TIME_STOP    (1 <<  5) // 0x0020
 #define ACTIVE_FLAG_MOVE_THROUGH_GRATE     (1 <<  6) // 0x0040
 #define ACTIVE_FLAG_DITHERED_ALPHA         (1 <<  7) // 0x0080
-#define ACTIVE_FLAG_UNK8                   (1 <<  8) // 0x0100
+#define ACTIVE_FLAG_ALLOCATED              (1 <<  8) // 0x0100
 #define ACTIVE_FLAG_UNK9                   (1 <<  9) // 0x0200
 #define ACTIVE_FLAG_UNK10                  (1 << 10) // 0x0400
-
-/* respawnInfoType */
-#define RESPAWN_INFO_TYPE_NULL 0
-#define RESPAWN_INFO_TYPE_32   1
-#define RESPAWN_INFO_TYPE_16   2
 
 /* respawnInfo */
 #define RESPAWN_INFO_DONT_RESPAWN 0xFF
@@ -42,8 +37,28 @@
 #define OBJ_FLAG_1000                             (1 << 12) // 0x00001000
 #define OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO           (1 << 13) // 0x00002000
 #define OBJ_FLAG_PERSISTENT_RESPAWN               (1 << 14) // 0x00004000
-#define OBJ_FLAG_8000                             (1 << 15) // 0x00008000
-#define OBJ_FLAG_30                               (1 << 30) // 0x40000000
+#if PLATFORM_DISPLACEMENT_2
+#define OBJ_FLAG_NO_AUTO_DISPLACEMENT             (1 << 15) // 0x00008000
+#else
+#define OBJ_FLAG_NO_AUTO_DISPLACEMENT             (0 << 0)
+#endif
+#if AUTO_COLLISION_DISTANCE
+#define OBJ_FLAG_DONT_CALC_COLL_DIST              (1 << 16) // 0x00010000
+#else
+#define OBJ_FLAG_DONT_CALC_COLL_DIST              (0 << 0)
+#endif
+#if OBJ_OPACITY_BY_CAM_DIST
+#define OBJ_FLAG_OPACITY_FROM_CAMERA_DIST         (1 << 21) // 0x00200000
+#else
+#define OBJ_FLAG_OPACITY_FROM_CAMERA_DIST         (0 << 0)
+#endif
+#if PROCESS_ONLY_ON_ROOM_PARENT
+#define OBJ_FLAG_ONLY_PROCESS_INSIDE_ROOM         (1 << 23) // 0x00800000
+#else
+#define OBJ_FLAG_ONLY_PROCESS_INSIDE_ROOM         (0 << 0)
+#endif
+
+#define OBJ_FLAG_HITBOX_WAS_SET                   (1 << 30) // 0x40000000
 
 /* oHeldState */
 #define HELD_FREE    0
@@ -129,6 +144,7 @@
 #define STAR_INDEX_ACT_5     4
 #define STAR_INDEX_ACT_6     5
 #define STAR_INDEX_100_COINS 6
+#define STAR_INDEX_CANNON    7
 
 /* gTTCSpeedSetting */
 #define TTC_SPEED_SLOW    0
@@ -180,9 +196,10 @@
 
 /* Blue Coin Switch */
     /* oAction */
-    #define BLUE_COIN_SWITCH_ACT_IDLE     0
-    #define BLUE_COIN_SWITCH_ACT_RECEDING 1
-    #define BLUE_COIN_SWITCH_ACT_TICKING  2
+    #define BLUE_COIN_SWITCH_ACT_IDLE      0
+    #define BLUE_COIN_SWITCH_ACT_RECEDING  1
+    #define BLUE_COIN_SWITCH_ACT_TICKING   2
+    #define BLUE_COIN_SWITCH_ACT_EXTENDING 3 // Used in QOL_FEATURES
 
 /* Moving Blue Coin */
     /* oAction */
@@ -706,10 +723,6 @@
     /* oBhvParams2ndByte */
     #define CHAIN_CHOMP_CHAIN_PART_BP_PIVOT 0
 
-/* Wooden Post */
-    /* oBhvParams */
-    #define WOODEN_POST_BP_NO_COINS_MASK 0x0000FF00
-
 /* Wiggler */
     /* oAction */
     #define WIGGLER_ACT_UNINITIALIZED      0
@@ -844,12 +857,10 @@
     #define UKIKI_ANIM_HELD         12
 
     /* oAnimState */
-    #define UKIKI_ANIM_STATE_DEFAULT    0
-    #define UKIKI_ANIM_STATE_EYE_CLOSED 1
-    #define UKIKI_ANIM_STATE_CAP_ON     2
-
-    /* oUkikiHasCap */
-    #define UKIKI_CAP_ON 1
+    #define UKIKI_ANIM_STATE_DEFAULT           0
+    #define UKIKI_ANIM_STATE_EYE_CLOSED        1
+    #define UKIKI_ANIM_STATE_CAP_ON            2
+    #define UKIKI_ANIM_STATE_CAP_ON_EYE_CLOSED 3
 
 /* Ukiki Cage Star */
     /* oAction */
@@ -1084,9 +1095,10 @@
     #define KLEPTO_ACT_RETREAT                 7
 
     /* oAnimState */
-    #define KLEPTO_ANIM_STATE_HOLDING_NOTHING 0
-    #define KLEPTO_ANIM_STATE_HOLDING_CAP     1
-    #define KLEPTO_ANIM_STATE_HOLDING_STAR    2
+    #define KLEPTO_ANIM_STATE_HOLDING_NOTHING          0
+    #define KLEPTO_ANIM_STATE_HOLDING_CAP              1
+    #define KLEPTO_ANIM_STATE_HOLDING_STAR             2
+    #define KLEPTO_ANIM_STATE_HOLDING_TRANSPARENT_STAR 3
 
 /* Bird */
     /* oAction */
@@ -1237,8 +1249,15 @@
     #define EXCLAMATION_BOX_BP_WING_CAP         0
     #define EXCLAMATION_BOX_BP_METAL_CAP        1
     #define EXCLAMATION_BOX_BP_VANISH_CAP       2
-    #define EXCLAMATION_BOX_BP_SPECIAL_CAP_END  2
     #define EXCLAMATION_BOX_BP_KOOPA_SHELL      3
+    #define EXCLAMATION_BOX_BP_SPECIAL_CAP_END  EXCLAMATION_BOX_BP_VANISH_CAP
+
+#if KOOPA_SHELL_BOXES_RESPAWN
+    #define EXCLAMATION_BOX_BP_RESPAWN_END      EXCLAMATION_BOX_BP_KOOPA_SHELL
+#else
+    #define EXCLAMATION_BOX_BP_RESPAWN_END      EXCLAMATION_BOX_BP_VANISH_CAP
+#endif
+
     #define EXCLAMATION_BOX_BP_ONE_COIN         4
     #define EXCLAMATION_BOX_BP_THREE_COINS      5
     #define EXCLAMATION_BOX_BP_TEN_COINS        6

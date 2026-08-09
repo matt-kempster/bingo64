@@ -2,7 +2,7 @@
 import sys
 import os
 import json
-
+import platform
 
 def read_asset_map():
     with open("assets.json") as f:
@@ -46,10 +46,16 @@ def remove_file(fname):
         pass
 
 
-def clean_assets(local_asset_file):
+def clean_assets(local_asset_file, folder):
     assets = set(read_asset_map().keys())
     assets.update(read_local_asset_list(local_asset_file))
-    for fname in list(assets) + [".assets-local.txt"]:
+
+    if folder:
+        assets = {asset for asset in assets if asset.startswith(folder)}
+    else:
+        assets.add(".assets-local.txt")
+
+    for fname in list(assets):
         if fname.startswith("@"):
             continue
         try:
@@ -72,8 +78,12 @@ def main():
         local_version = -1
 
     langs = sys.argv[1:]
-    if langs == ["--clean"]:
-        clean_assets(local_asset_file)
+    if langs and langs[0] == "--clean":
+        if len(langs) > 1:
+            folder = langs[1]
+        else:
+            folder = None
+        clean_assets(local_asset_file, folder)
         sys.exit(0)
 
     all_langs = ["jp", "us", "eu", "sh", "cn"]
@@ -154,11 +164,24 @@ def main():
             )
             sys.exit(1)
 
-    # Make sure tools exist
+    make = "make"
+    winext = ""
+
+    # FreeBSD and macOS uses an updated make
+    for path in os.environ["PATH"].split(os.pathsep):
+        if os.path.isfile(os.path.join(path, "gmake")):
+            make = "gmake"
+
+    # Explicitly set file extension on Windows
+    if platform.system() == "Windows":
+        winext = ".exe"
+
+    # Extract textures from the compressed MIO0 block
     subprocess.check_call(
         ["make", "-s", "-C", "tools/sm64tools/", "n64graphics", "mio0"]
     )
 
+    # Extract sky textures unified along with extracting aiff audio
     subprocess.check_call(
         ["make", "-s", "-C", "tools/", "skyconv", "aifc_decode"]
     )
@@ -200,7 +223,7 @@ def main():
         if mio0 is not None:
             image = subprocess.run(
                 [
-                    "./tools/sm64tools/mio0",
+                    "./tools/sm64tools/mio0" + winext,
                     "-d",
                     "-o",
                     str(mio0),
@@ -231,7 +254,7 @@ def main():
                         print(imagetype, png_file.name, asset)
                         subprocess.run(
                             [
-                                "./tools/skyconv",
+                                "./tools/skyconv" + winext,
                                 "--type",
                                 imagetype,
                                 "--combine",
@@ -245,7 +268,7 @@ def main():
                         fmt = asset.split(".")[-2]
                         subprocess.run(
                             [
-                                "./tools/sm64tools/n64graphics",
+                                "./tools/sm64tools/n64graphics" + winext,
                                 "-e",
                                 png_file.name,
                                 "-g",
@@ -287,4 +310,4 @@ def main():
         f.write(output)
 
 
-main()
+main() if __name__ == "__main__" else None

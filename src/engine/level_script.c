@@ -17,14 +17,24 @@
 #include "game/profiler.h"
 #include "game/save_file.h"
 #include "game/sound_init.h"
-#include "goddard/renderer.h"
 #include "geo_layout.h"
 #include "graph_node.h"
 #include "level_script.h"
 #include "level_misc_macros.h"
+#include "level_commands.h"
 #include "math_util.h"
 #include "surface_collision.h"
 #include "surface_load.h"
+#include "level_table.h"
+#ifdef GODDARD_MFACE
+#include "goddard/renderer.h"
+#endif
+
+#ifdef BETTERCAMERA
+#include "extras/bettercamera.h"
+#endif
+
+#define NUM_PAINTINGS 45
 
 #define CMD_GET(type, offset) (*(type *) (CMD_PROCESS_OFFSET(offset) + (u8 *) sCurrentCmd))
 
@@ -55,6 +65,10 @@ static uintptr_t *sStackBase = NULL;
 static s16 sScriptStatus;
 static s32 sRegister;
 static struct LevelCommand *sCurrentCmd;
+
+#ifdef USE_SYSTEM_MALLOC
+static struct MemoryPool *sMemPoolForGoddard;
+#endif
 
 static s32 eval_script_op(s8 op, s32 arg) {
     s32 result = 0;
@@ -281,7 +295,25 @@ static void level_cmd_load_mio0(void) {
     sCurrentCmd = CMD_NEXT;
 }
 
+#if defined(USE_SYSTEM_MALLOC) && defined(GODDARD_MFACE)
+static void *alloc_for_goddard(u32 size) {
+    return mem_pool_alloc(sMemPoolForGoddard, size);
+}
+
+static void free_for_goddard(void *ptr) {
+    mem_pool_free(sMemPoolForGoddard, ptr);
+}
+#endif
+
 static void level_cmd_load_mario_head(void) {
+#ifdef GODDARD_MFACE
+
+#ifdef USE_SYSTEM_MALLOC
+    sMemPoolForGoddard = mem_pool_init(0, 0);
+    gdm_init(alloc_for_goddard, free_for_goddard);
+    gdm_setup();
+    gdm_maketestdl(CMD_GET(s16, 2));
+#else
     // TODO: Fix these hardcoded sizes
     void *addr = main_pool_alloc(DOUBLE_SIZE_ON_64_BIT(0xE1000), MEMORY_POOL_LEFT);
     if (addr != NULL) {
@@ -293,12 +325,14 @@ static void level_cmd_load_mario_head(void) {
     } else {
         CN_DEBUG_PRINTF(("face anime memory overflow\n"));
     }
+#endif
 
+#endif
     sCurrentCmd = CMD_NEXT;
 }
 
 static void level_cmd_load_mio0_texture(void) {
-    load_segment_decompress_heap(CMD_GET(s16, 2), CMD_GET(void *, 4), CMD_GET(void *, 8));
+    load_segment_decompress(CMD_GET(s16, 2), CMD_GET(void *, 4), CMD_GET(void *, 8));
     sCurrentCmd = CMD_NEXT;
 }
 
@@ -316,14 +350,21 @@ static void level_cmd_clear_level(void) {
     clear_area_graph_nodes();
     clear_areas();
     main_pool_pop_state();
+    // The game does a push on level load and a pop on level unload, we need to add another
+    // push to store state after the level has been loaded, so one more pop is needed
+    main_pool_pop_state();
 
     sCurrentCmd = CMD_NEXT;
 }
 
 static void level_cmd_alloc_level_pool(void) {
     if (sLevelPool == NULL) {
+#ifdef USE_SYSTEM_MALLOC
+        sLevelPool = alloc_only_pool_init();
+#else
         sLevelPool = alloc_only_pool_init(main_pool_available() - sizeof(struct AllocOnlyPool),
                                           MEMORY_POOL_LEFT);
+#endif
     }
 
     sCurrentCmd = CMD_NEXT;
@@ -332,7 +373,9 @@ static void level_cmd_alloc_level_pool(void) {
 static void level_cmd_free_level_pool(void) {
     s32 i;
 
+#ifndef USE_SYSTEM_MALLOC
     alloc_only_pool_resize(sLevelPool, sLevelPool->usedSpace);
+#endif
     sLevelPool = NULL;
 
     for (i = 0; i < 8; i++) {
@@ -341,6 +384,7 @@ static void level_cmd_free_level_pool(void) {
             break;
         }
     }
+    main_pool_push_state();
 
     sCurrentCmd = CMD_NEXT;
 }
@@ -374,46 +418,40 @@ static void level_cmd_end_area(void) {
 }
 
 static void level_cmd_load_model_from_dl(void) {
-    s16 val1 = CMD_GET(s16, 2) & 0x0FFF;
-    s16 val2 = ((u16)CMD_GET(s16, 2)) >> 12;
-    void *val3 = CMD_GET(void *, 4);
+    ModelID16 model = CMD_GET(ModelID16, 0xA);
+    s16 layer = CMD_GET(u16, 0x8);
+    void *dl_ptr = CMD_GET(void *, 4);
 
-    if (val1 < 256) {
-        gLoadedGraphNodes[val1] =
-            (struct GraphNode *) init_graph_node_display_list(sLevelPool, 0, val2, val3);
+    if (model < MODEL_ID_COUNT) {
+        gLoadedGraphNodes[model] =
+            (struct GraphNode *) init_graph_node_display_list(sLevelPool, 0, layer, dl_ptr);
     }
 
     sCurrentCmd = CMD_NEXT;
 }
 
 static void level_cmd_load_model_from_geo(void) {
-    s16 arg0 = CMD_GET(s16, 2);
-    void *arg1 = CMD_GET(void *, 4);
+    ModelID16 model = CMD_GET(ModelID16, 2);
+    void *geo = CMD_GET(void *, 4);
 
-    if (arg0 < 256) {
-        gLoadedGraphNodes[arg0] = process_geo_layout(sLevelPool, arg1);
+    if (model < MODEL_ID_COUNT) {
+        gLoadedGraphNodes[model] = process_geo_layout(sLevelPool, geo);
     }
 
     sCurrentCmd = CMD_NEXT;
 }
 
 static void level_cmd_23(void) {
-    union {
-        s32 i;
-        f32 f;
-    } arg2;
+    ModelID16 model = (CMD_GET(ModelID16, 2) & 0x0FFF);
+    s16 layer = (((u16)CMD_GET(s16, 2)) >> 12);
+    void *dl  = CMD_GET(void *, 4);
+    s32 scale = CMD_GET(s32, 8);
 
-    s16 model = CMD_GET(s16, 2) & 0x0FFF;
-    s16 arg0H = ((u16)CMD_GET(s16, 2)) >> 12;
-    void *arg1 = CMD_GET(void *, 4);
-    // load an f32, but using an integer load instruction for some reason (hence the union)
-    arg2.i = CMD_GET(s32, 8);
-
-    if (model < 256) {
+    if (model < MODEL_ID_COUNT) {
         // GraphNodeScale has a GraphNode at the top. This
         // is being stored to the array, so cast the pointer.
         gLoadedGraphNodes[model] =
-            (struct GraphNode *) init_graph_node_scale(sLevelPool, 0, arg0H, arg1, arg2.f);
+            (struct GraphNode *) init_graph_node_scale(sLevelPool, 0, layer, dl, scale);
     }
 
     sCurrentCmd = CMD_NEXT;
@@ -425,33 +463,31 @@ static void level_cmd_init_mario(void) {
 
     gMarioSpawnInfo->activeAreaIndex = -1;
     gMarioSpawnInfo->areaIndex = 0;
+    gMarioSpawnInfo->respawnInfo = 0;
     gMarioSpawnInfo->behaviorArg = CMD_GET(u32, 4);
     gMarioSpawnInfo->behaviorScript = CMD_GET(void *, 8);
-    gMarioSpawnInfo->model = gLoadedGraphNodes[CMD_GET(u8, 3)];
+    gMarioSpawnInfo->model = gLoadedGraphNodes[CMD_GET(ModelID16, 0x2)];
     gMarioSpawnInfo->next = NULL;
 
     sCurrentCmd = CMD_NEXT;
 }
 
 static void level_cmd_place_object(void) {
-    u8 val7 = 1 << (gCurrActNum - 1);
-    u16 model;
-    struct SpawnInfo *spawnInfo;
-
-    if (sCurrAreaIndex != -1 && ((CMD_GET(u8, 2) & val7) || CMD_GET(u8, 2) == 0x1F)) {
-        model = CMD_GET(u8, 3);
-        spawnInfo = alloc_only_pool_alloc(sLevelPool, sizeof(struct SpawnInfo));
+    if (sCurrAreaIndex != -1 && ((CMD_GET(u8, 2) & (1 << (gCurrActNum - 1))) || CMD_GET(u8, 2) == 0x1F)) {
+        ModelID16 model = CMD_GET(u32, 0x18);
+        struct SpawnInfo *spawnInfo = alloc_only_pool_alloc(sLevelPool, sizeof(struct SpawnInfo));
 
         spawnInfo->startPos[0] = CMD_GET(s16, 4);
         spawnInfo->startPos[1] = CMD_GET(s16, 6);
         spawnInfo->startPos[2] = CMD_GET(s16, 8);
 
-        spawnInfo->startAngle[0] = CMD_GET(s16, 10) * 0x8000 / 180;
-        spawnInfo->startAngle[1] = CMD_GET(s16, 12) * 0x8000 / 180;
-        spawnInfo->startAngle[2] = CMD_GET(s16, 14) * 0x8000 / 180;
+        spawnInfo->startAngle[0] = degrees_to_angle(CMD_GET(s16, 10));
+        spawnInfo->startAngle[1] = degrees_to_angle(CMD_GET(s16, 12));
+        spawnInfo->startAngle[2] = degrees_to_angle(CMD_GET(s16, 14));
 
         spawnInfo->areaIndex = sCurrAreaIndex;
         spawnInfo->activeAreaIndex = sCurrAreaIndex;
+        spawnInfo->respawnInfo = 0;
 
         spawnInfo->behaviorArg = CMD_GET(u32, 16);
         spawnInfo->behaviorScript = CMD_GET(void *, 20);
@@ -525,9 +561,9 @@ static void level_cmd_create_painting_warp_node(void) {
     if (sCurrAreaIndex != -1) {
         if (gAreas[sCurrAreaIndex].paintingWarpNodes == NULL) {
             gAreas[sCurrAreaIndex].paintingWarpNodes =
-                alloc_only_pool_alloc(sLevelPool, 45 * sizeof(struct WarpNode));
+                alloc_only_pool_alloc(sLevelPool, NUM_PAINTINGS * sizeof(struct WarpNode));
 
-            for (i = 0; i < 45; i++) {
+            for (i = 0; i < NUM_PAINTINGS; i++) {
                 gAreas[sCurrAreaIndex].paintingWarpNodes[i].id = 0;
             }
         }
@@ -565,25 +601,25 @@ static void level_cmd_3A(void) {
 static void level_cmd_create_whirlpool(void) {
     struct Whirlpool *whirlpool;
     s32 index = CMD_GET(u8, 2);
-    s32 beatBowser2;
-    if (gBingoFullGameUnlocked) {
-        beatBowser2 = (gCurrActNum != 1);
-    } else {
-        beatBowser2 =
-            (save_file_get_flags() & (SAVE_FLAG_HAVE_KEY_2 | SAVE_FLAG_UNLOCKED_UPSTAIRS_DOOR)) != 0;
+    // ex-alo change
+    // Make whirlpool spawn using acts instead of weird bowser 2 checks
+    u8 actMask = CMD_GET(u8, 3);
+    s32 spawn = (actMask & (1 << (gCurrActNum - 1))) || actMask == 0x1F;
+    // Bingo64: outside full-game-unlocked mode, act-masked whirlpools (the DDD
+    // one that replaces the sub) keep the vanilla Bowser 2 key gating.
+    if (!gBingoFullGameUnlocked && actMask != 0x1F && actMask != 0x3F) {
+        spawn = spawn
+            && (save_file_get_flags() & (SAVE_FLAG_HAVE_KEY_2 | SAVE_FLAG_UNLOCKED_UPSTAIRS_DOOR)) != 0;
     }
 
-    if (CMD_GET(u8, 3) == 0 || (CMD_GET(u8, 3) == 1 && !beatBowser2)
-        || (CMD_GET(u8, 3) == 2 && beatBowser2) || (CMD_GET(u8, 3) == 3 && gCurrActNum >= 2)) {
-        if (sCurrAreaIndex != -1 && index < 2) {
-            if ((whirlpool = gAreas[sCurrAreaIndex].whirlpools[index]) == NULL) {
-                whirlpool = alloc_only_pool_alloc(sLevelPool, sizeof(struct Whirlpool));
-                gAreas[sCurrAreaIndex].whirlpools[index] = whirlpool;
-            }
-
-            vec3s_set(whirlpool->pos, CMD_GET(s16, 4), CMD_GET(s16, 6), CMD_GET(s16, 8));
-            whirlpool->strength = CMD_GET(s16, 10);
+    if (sCurrAreaIndex != -1 && index < ARRAY_COUNT(gAreas[sCurrAreaIndex].whirlpools) && spawn) {
+        if ((whirlpool = gAreas[sCurrAreaIndex].whirlpools[index]) == NULL) {
+            whirlpool = alloc_only_pool_alloc(sLevelPool, sizeof(struct Whirlpool));
+            gAreas[sCurrAreaIndex].whirlpools[index] = whirlpool;
         }
+
+        vec3s_set(whirlpool->pos, CMD_GET(s16, 4), CMD_GET(s16, 6), CMD_GET(s16, 8));
+        whirlpool->strength = CMD_GET(s16, 10);
     }
 
     sCurrentCmd = CMD_NEXT;
@@ -723,44 +759,88 @@ static void level_cmd_38(void) {
 static void level_cmd_get_or_set_var(void) {
     if (CMD_GET(u8, 2) == 0) {
         switch (CMD_GET(u8, 3)) {
-            case 0:
+            case VAR_CURR_SAVE_FILE_NUM:
                 gCurrSaveFileNum = sRegister;
                 break;
-            case 1:
+            case VAR_CURR_COURSE_NUM:
                 gCurrCourseNum = sRegister;
                 break;
-            case 2:
+            case VAR_CURR_ACT_NUM:
                 gCurrActNum = sRegister;
                 break;
-            case 3:
+            case VAR_CURR_LEVEL_NUM:
                 gCurrLevelNum = sRegister;
                 break;
-            case 4:
+            case VAR_CURR_AREA_INDEX:
                 gCurrAreaIndex = sRegister;
+                break;
+            case VAR_CURR_GAME_SKIPS:
+                gGlobalGameSkips = sRegister;
                 break;
         }
     } else {
         switch (CMD_GET(u8, 3)) {
-            case 0:
+            case VAR_CURR_SAVE_FILE_NUM:
                 sRegister = gCurrSaveFileNum;
                 break;
-            case 1:
+            case VAR_CURR_COURSE_NUM:
                 sRegister = gCurrCourseNum;
                 break;
-            case 2:
+            case VAR_CURR_ACT_NUM:
                 sRegister = gCurrActNum;
                 break;
-            case 3:
+            case VAR_CURR_LEVEL_NUM:
                 sRegister = gCurrLevelNum;
                 break;
-            case 4:
+            case VAR_CURR_AREA_INDEX:
                 sRegister = gCurrAreaIndex;
+                break;
+            case VAR_CURR_GAME_SKIPS:
+                sRegister = gGlobalGameSkips;
                 break;
         }
     }
 
     sCurrentCmd = CMD_NEXT;
 }
+
+#ifdef BETTERCAMERA
+static void level_cmd_puppyvolume(void) {
+    sPuppyVolumeStack[gPuppyVolumeCount] = mem_pool_alloc(gPuppyMemoryPool, sizeof(struct sPuppyVolume));
+
+    if (sPuppyVolumeStack[gPuppyVolumeCount] == NULL) {
+        sCurrentCmd = CMD_NEXT;
+        gPuppyError |= PUPPY_ERROR_POOL_FULL;
+        return;
+    }
+
+    vec3s_set(sPuppyVolumeStack[gPuppyVolumeCount]->pos, CMD_GET(s16, 2),
+                                                         CMD_GET(s16, 4),
+                                                         CMD_GET(s16, 6));
+
+    vec3s_set(sPuppyVolumeStack[gPuppyVolumeCount]->radius, CMD_GET(s16,  8),
+                                                            CMD_GET(s16, 10),
+                                                            CMD_GET(s16, 12));
+
+    sPuppyVolumeStack[gPuppyVolumeCount]->rot = CMD_GET(s16, 14);
+
+    sPuppyVolumeStack[gPuppyVolumeCount]->func   = CMD_GET(void *, 16);
+    sPuppyVolumeStack[gPuppyVolumeCount]->angles = segmented_to_virtual(CMD_GET(void *, 20));
+
+    sPuppyVolumeStack[gPuppyVolumeCount]->flagsAdd    = CMD_GET(s32, 24);
+    sPuppyVolumeStack[gPuppyVolumeCount]->flagsRemove = CMD_GET(s32, 28);
+
+    sPuppyVolumeStack[gPuppyVolumeCount]->flagPersistance = CMD_GET(u8, 32);
+
+    sPuppyVolumeStack[gPuppyVolumeCount]->shape = CMD_GET(u8,  33);
+    sPuppyVolumeStack[gPuppyVolumeCount]->room  = CMD_GET(s16, 34);
+    sPuppyVolumeStack[gPuppyVolumeCount]->fov  = CMD_GET(u8, 36);
+    sPuppyVolumeStack[gPuppyVolumeCount]->area  = sCurrAreaIndex;
+
+    gPuppyVolumeCount++;
+    sCurrentCmd = CMD_NEXT;
+}
+#endif
 
 static void (*LevelScriptJumpTable[])(void) = {
     /*00*/ level_cmd_load_and_execute,
@@ -824,7 +904,14 @@ static void (*LevelScriptJumpTable[])(void) = {
     /*3A*/ level_cmd_3A,
     /*3B*/ level_cmd_create_whirlpool,
     /*3C*/ level_cmd_get_or_set_var,
+#ifdef BETTERCAMERA
+    /*3D*/ level_cmd_puppyvolume,
+#endif
 };
+
+#ifdef TOUCH_CONTROLS
+extern void render_touch_controls(void);
+#endif
 
 struct LevelCommand *level_script_execute(struct LevelCommand *cmd) {
     sScriptStatus = SCRIPT_RUNNING;
@@ -840,6 +927,9 @@ struct LevelCommand *level_script_execute(struct LevelCommand *cmd) {
     profiler_log_thread5_time(LEVEL_SCRIPT_EXECUTE);
     init_rcp();
     render_game();
+#ifdef TOUCH_CONTROLS
+    render_touch_controls();
+#endif
     end_master_display_list();
     alloc_display_list(0);
 

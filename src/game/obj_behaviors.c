@@ -47,6 +47,10 @@
 #define OBJ_COL_FLAG_NO_Y_VEL   (1 << 3)
 #define OBJ_COL_FLAGS_LANDED    (OBJ_COL_FLAG_GROUNDED | OBJ_COL_FLAG_NO_Y_VEL)
 
+#ifdef RM2C_HAS_TRAJECTORIES
+#include "src/extras/rm2c/trajectories.inc.c"
+#endif
+
 /**
  * Current object floor as defined in object_step.
  */
@@ -106,8 +110,7 @@ Gfx UNUSED *geo_obj_transparency_something(s32 callContext, struct GraphNode *no
 
         gfxHead = alloc_display_list(3 * sizeof(Gfx));
         gfx = gfxHead;
-        obj->header.gfx.node.flags =
-            (obj->header.gfx.node.flags & 0xFF) | (GRAPH_NODE_TYPE_FUNCTIONAL | GRAPH_NODE_TYPE_400);
+        obj->header.gfx.node.flags = (obj->header.gfx.node.flags & 0xFF) | (LAYER_TRANSPARENT << 8);
 
         gDPSetEnvColor(gfx++, 255, 255, 255, heldObject->oOpacity);
 
@@ -115,16 +118,6 @@ Gfx UNUSED *geo_obj_transparency_something(s32 callContext, struct GraphNode *no
     }
 
     return gfxHead;
-}
-
-/**
- * An absolute value function.
- */
-f32 absf_2(f32 f) {
-    if (f < 0) {
-        f *= -1.0f;
-    }
-    return f;
 }
 
 /**
@@ -181,8 +174,9 @@ s8 turn_obj_away_from_steep_floor(struct Surface *objFloor, f32 floorY, f32 objV
     f32 floor_nX, floor_nY, floor_nZ, objVelXCopy, objVelZCopy, objYawX, objYawZ;
 
     if (objFloor == NULL) {
-        //! (OOB Object Crash) TRUNC overflow exception after 36 minutes
-        o->oMoveAngleYaw += 32767.999200000002; /* ¯\_(ツ)_/¯ */
+        // ex-alo change
+        // replaces weird trunc value to an actual degree value (originally 32767.999200000002)
+        o->oMoveAngleYaw += 0x8000;
         return FALSE;
     }
 
@@ -525,10 +519,12 @@ s8 is_point_close_to_object(struct Object *obj, f32 x, f32 y, f32 z, s32 dist) {
 /**
  * Sets an object as visible if within a certain distance of Mario's graphical position.
  */
+#ifndef NODRAWINGDISTANCE
 void set_object_visibility(struct Object *obj, s32 dist) {
     f32 objX = obj->oPosX;
     f32 objY = obj->oPosY;
     f32 objZ = obj->oPosZ;
+
 
     if (is_point_within_radius_of_mario(objX, objY, objZ, dist) == TRUE) {
         obj->header.gfx.node.flags &= ~GRAPH_RENDER_INVISIBLE;
@@ -536,6 +532,11 @@ void set_object_visibility(struct Object *obj, s32 dist) {
         obj->header.gfx.node.flags |= GRAPH_RENDER_INVISIBLE;
     }
 }
+#else
+void set_object_visibility(UNUSED struct Object *obj, UNUSED s32 dist) {
+    obj->header.gfx.node.flags &= ~GRAPH_RENDER_INVISIBLE;
+}
+#endif
 
 /**
  * Turns an object towards home if Mario is not near to it.
@@ -714,6 +715,9 @@ void obj_check_floor_death(s16 collisionFlags, struct Surface *floor) {
                 break;
             //! @BUG Doesn't check for the vertical wind death floor.
             case SURFACE_DEATH_PLANE:
+            #if FIX_OBJ_FLOOR_WIND_DEATH
+            case SURFACE_VERTICAL_WIND:
+            #endif
                 o->oAction = OBJ_ACT_DEATH_PLANE_DEATH;
                 break;
             default:
@@ -738,7 +742,7 @@ s8 obj_lava_death(void) {
     }
 
     if ((o->oTimer % 8) == 0) {
-        cur_obj_play_sound_2(SOUND_OBJ_BULLY_EXPLODE_2);
+        cur_obj_play_sound_2(SOUND_OBJ_BULLY_EXPLODE_LAVA);
         deathSmoke = spawn_object(o, MODEL_SMOKE, bhvBobombBullyDeathSmoke);
         deathSmoke->oPosX += random_float() * 20.0f;
         deathSmoke->oPosY += random_float() * 20.0f;
@@ -813,6 +817,7 @@ UNUSED s8 debug_sequence_tracker(s16 debugInputSequence[]) {
 #include "behaviors/water_wave.inc.c"
 #include "behaviors/explosion.inc.c"
 #include "behaviors/corkbox.inc.c"
+#include "behaviors/respawner.inc.c"
 #include "behaviors/bully.inc.c"
 #include "behaviors/water_ring.inc.c"
 #include "behaviors/bowser_bomb.inc.c"

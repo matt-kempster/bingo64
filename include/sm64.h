@@ -14,13 +14,26 @@
 #include "surface_terrains.h"
 #include "macros.h"
 
-// Crash handler enhancement
-#include "../enhancements/crash.h"
-#ifdef CRASH_SCREEN_INCLUDED
-#define DEBUG_ASSERT(exp) do { if (!(exp)) _n64_assert(__FILE__, __LINE__, #exp, 1); } while (0)
+// Misc tweaks defines usually changed in binary roms
+#ifdef RM2C
+#include "rm2c.h"
+#include "src/extras/rm2c/tweaks.h"
 #else
-#define DEBUG_ASSERT(exp)
+#include "include/tweaks.h"
 #endif
+
+#if defined(__GNUC__) && defined(TARGET_N64)
+void *memset(void *dest, int c, size_t n);
+int memcmp(const void *str1, const void *str2, size_t n);
+void *memmove(void *str1, const void *str2, size_t n);
+int strcmp(char *s, char *t);
+#endif
+
+// Crashes are handled by src/boot/crash_screen.c (from ex-alo/HackerSM64).
+#define DEBUG_ASSERT(exp)
+
+// Number of possible unique model ID's (keep it higher than 256).
+#define MODEL_ID_COUNT 256
 
 // Pointer casting is technically UB, and avoiding it gets rid of endian issues
 // as well as a nice side effect.
@@ -40,15 +53,23 @@
 #define SET_HIGH_S16_OF_32(var, x) ((((s16 *)&(var))[0]) = (x))
 #endif
 
-// Layers
-#define LAYER_FORCE             0
-#define LAYER_OPAQUE            1
-#define LAYER_OPAQUE_DECAL      2
-#define LAYER_OPAQUE_INTER      3
-#define LAYER_ALPHA             4
-#define LAYER_TRANSPARENT       5
-#define LAYER_TRANSPARENT_DECAL 6
-#define LAYER_TRANSPARENT_INTER 7
+// Render layer defines (see graph_node and rendering_graph_node).
+enum RenderLayers {
+    LAYER_FORCE,
+    LAYER_OPAQUE,
+    LAYER_OPAQUE_DECAL,
+    LAYER_OPAQUE_INTER,
+    LAYER_ALPHA,
+    LAYER_TRANSPARENT,
+    LAYER_TRANSPARENT_DECAL,
+    LAYER_TRANSPARENT_INTER,
+    LAYER_COUNT
+};
+
+#define LAYER_FIRST                         LAYER_FORCE
+#define LAYER_LAST                          (LAYER_COUNT - 1)
+
+#define LAYER_ZB_FIRST                      LAYER_OPAQUE
 
 #define INPUT_NONZERO_ANALOG         0x0001
 #define INPUT_A_PRESSED              0x0002
@@ -81,6 +102,7 @@
 #define AIR_STEP_HIT_WALL        2
 #define AIR_STEP_GRABBED_LEDGE   3
 #define AIR_STEP_GRABBED_CEILING 4
+#define AIR_STEP_HIT_CEILING     5 // used when BETTER_RESOLVE_WALL_COLLISION is set
 #define AIR_STEP_HIT_LAVA_WALL   6
 
 #define WATER_STEP_NONE        0
@@ -122,6 +144,7 @@
 #define MARIO_METAL_SHOCK               0x00000040
 #define MARIO_TELEPORTING               0x00000080
 #define MARIO_UNKNOWN_08                0x00000100
+#define MARIO_NO_FALL_DAMAGE            0X00000200
 #define MARIO_UNKNOWN_13                0x00002000
 #define MARIO_ACTION_SOUND_PLAYED       0x00010000
 #define MARIO_MARIO_SOUND_PLAYED        0x00020000
@@ -130,7 +153,7 @@
 #define MARIO_KICKING                   0x00200000
 #define MARIO_TRIPPING                  0x00400000
 #define MARIO_UNKNOWN_25                0x02000000
-#define MARIO_UNKNOWN_30                0x40000000
+#define MARIO_AIR_HIT_WALL              0x40000000
 #define MARIO_UNKNOWN_31                0x80000000
 
 #define MARIO_SPECIAL_CAPS (MARIO_VANISH_CAP | MARIO_METAL_CAP | MARIO_WING_CAP)
@@ -346,7 +369,11 @@
 #define ACT_READING_SIGN               0x00001308 // (0x108 | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE)
 #define ACT_JUMBO_STAR_CUTSCENE        0x00001909 // (0x109 | ACT_FLAG_AIR | ACT_FLAG_INTANGIBLE)
 #define ACT_WAITING_FOR_DIALOG         0x0000130A // (0x10A | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE)
+#ifdef EXT_DEBUG_MENU
+#define ACT_DEBUG_FREE_MOVE            0x0000190F // (0x10F | ACT_FLAG_AIR | ACT_FLAG_INTANGIBLE)
+#else
 #define ACT_DEBUG_FREE_MOVE            0x0000130F // (0x10F | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE)
+#endif
 #define ACT_STANDING_DEATH             0x00021311 // (0x111 | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE | ACT_FLAG_INVULNERABLE)
 #define ACT_QUICKSAND_DEATH            0x00021312 // (0x112 | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE | ACT_FLAG_INVULNERABLE)
 #define ACT_ELECTROCUTION              0x00021313 // (0x113 | ACT_FLAG_STATIONARY | ACT_FLAG_INTANGIBLE | ACT_FLAG_INVULNERABLE)

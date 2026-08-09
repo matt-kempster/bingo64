@@ -398,7 +398,6 @@ static char *convert_string(char *pos, FILE *fout, const char *inputFileName, ch
             pos = last_valid_pos;
             if (entry == NULL)
                 parse_error(inputFileName, count_line_num(start, pos), "no charmap entry for U+%X", input.unicode[0]);
-
             for (i = 0; i < entry->bytesCount; i++) {
                 if (entry->bytesCount > 1 && cnOneByte && i % 2 == 0) {
                     continue;

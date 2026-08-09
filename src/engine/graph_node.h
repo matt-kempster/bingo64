@@ -5,6 +5,7 @@
 #include <PR/gbi.h>
 
 #include "types.h"
+#include "sm64.h"
 #include "game/memory.h"
 
 #define GRAPH_RENDER_ACTIVE         (1 << 0)
@@ -13,40 +14,33 @@
 #define GRAPH_RENDER_Z_BUFFER       (1 << 3)
 #define GRAPH_RENDER_INVISIBLE      (1 << 4)
 #define GRAPH_RENDER_HAS_ANIMATION  (1 << 5)
-
-// Whether the node type has a function pointer of type GraphNodeFunc
-#define GRAPH_NODE_TYPE_FUNCTIONAL            0x100
-
-// Type used for Bowser and an unused geo function in obj_behaviors.c
-#define GRAPH_NODE_TYPE_400                   0x400
+#define GRAPH_RENDER_CYLBOARD       (1 << 6)
 
 // The discriminant for different types of geo nodes
-#define GRAPH_NODE_TYPE_ROOT                  0x001
-#define GRAPH_NODE_TYPE_ORTHO_PROJECTION      0x002
-#define GRAPH_NODE_TYPE_PERSPECTIVE          (0x003 | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_MASTER_LIST           0x004
-#define GRAPH_NODE_TYPE_START                 0x00A
-#define GRAPH_NODE_TYPE_LEVEL_OF_DETAIL       0x00B
-#define GRAPH_NODE_TYPE_SWITCH_CASE          (0x00C | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_CAMERA               (0x014 | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_TRANSLATION_ROTATION  0x015
-#define GRAPH_NODE_TYPE_TRANSLATION           0x016
-#define GRAPH_NODE_TYPE_ROTATION              0x017
-#define GRAPH_NODE_TYPE_OBJECT                0x018
-#define GRAPH_NODE_TYPE_ANIMATED_PART         0x019
-#define GRAPH_NODE_TYPE_BILLBOARD             0x01A
-#define GRAPH_NODE_TYPE_DISPLAY_LIST          0x01B
-#define GRAPH_NODE_TYPE_SCALE                 0x01C
-#define GRAPH_NODE_TYPE_SHADOW                0x028
-#define GRAPH_NODE_TYPE_OBJECT_PARENT         0x029
-#define GRAPH_NODE_TYPE_GENERATED_LIST       (0x02A | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_BACKGROUND           (0x02C | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_HELD_OBJ             (0x02E | GRAPH_NODE_TYPE_FUNCTIONAL)
-#define GRAPH_NODE_TYPE_CULLING_RADIUS        0x02F
-
-// The number of master lists. A master list determines the order and render
-// mode with which display lists are drawn.
-#define GFX_NUM_MASTER_LISTS 8
+enum GraphNodeTypes {
+    GRAPH_NODE_TYPE_ORTHO_PROJECTION,
+    GRAPH_NODE_TYPE_PERSPECTIVE,
+    GRAPH_NODE_TYPE_MASTER_LIST,
+    GRAPH_NODE_TYPE_LEVEL_OF_DETAIL,
+    GRAPH_NODE_TYPE_SWITCH_CASE,
+    GRAPH_NODE_TYPE_CAMERA,
+    GRAPH_NODE_TYPE_TRANSLATION_ROTATION,
+    GRAPH_NODE_TYPE_TRANSLATION,
+    GRAPH_NODE_TYPE_ROTATION,
+    GRAPH_NODE_TYPE_OBJECT,
+    GRAPH_NODE_TYPE_ANIMATED_PART,
+    GRAPH_NODE_TYPE_BILLBOARD,
+    GRAPH_NODE_TYPE_DISPLAY_LIST,
+    GRAPH_NODE_TYPE_SCALE,
+    GRAPH_NODE_TYPE_SHADOW,
+    GRAPH_NODE_TYPE_OBJECT_PARENT,
+    GRAPH_NODE_TYPE_GENERATED_LIST,
+    GRAPH_NODE_TYPE_BACKGROUND,
+    GRAPH_NODE_TYPE_HELD_OBJ,
+    GRAPH_NODE_TYPE_CULLING_RADIUS,
+    GRAPH_NODE_TYPE_ROOT,
+    GRAPH_NODE_TYPE_START,
+};
 
 // Passed as first argument to a GraphNodeFunc to give information about in
 // which context it was called and what it is expected to do.
@@ -103,8 +97,12 @@ struct GraphNodePerspective {
     /*0x00*/ struct FnGraphNode fnNode;
     /*0x18*/ s32 unused;
     /*0x1C*/ f32 fov;   // horizontal field of view in degrees
-    /*0x20*/ s16 near;  // near clipping plane
-    /*0x22*/ s16 far;   // far clipping plane
+    /*0x20*/ u16 near;  // near clipping plane
+    /*0x22*/ u16 far;   // far clipping plane
+#ifdef HIGH_FPS_PC
+    f32 prevFov;
+    f32 prevTimestamp;
+#endif
 };
 
 /** An entry in the master list. It is a linked list of display lists
@@ -113,6 +111,10 @@ struct GraphNodePerspective {
 struct DisplayListNode {
     Mtx *transform;
     void *displayList;
+#ifdef HIGH_FPS_PC
+    void *transformInterpolated;
+    void *displayListInterpolated;
+#endif
     struct DisplayListNode *next;
 };
 
@@ -123,8 +125,8 @@ struct DisplayListNode {
  */
 struct GraphNodeMasterList {
     /*0x00*/ struct GraphNode node;
-    /*0x14*/ struct DisplayListNode *listHeads[GFX_NUM_MASTER_LISTS];
-    /*0x34*/ struct DisplayListNode *listTails[GFX_NUM_MASTER_LISTS];
+    /*0x14*/ struct DisplayListNode *listHeads[LAYER_COUNT];
+    /*0x34*/ struct DisplayListNode *listTails[LAYER_COUNT];
 };
 
 /** Simply used as a parent to group multiple children.
@@ -175,6 +177,12 @@ struct GraphNodeCamera {
     /*0x1C*/ Vec3f pos;
     /*0x28*/ Vec3f focus;
     /*0x34*/ Mat4 *matrixPtr; // pointer to look-at matrix of this camera as a Mat4
+#ifdef HIGH_FPS_PC
+    Vec3f prevPos;
+    Vec3f prevFocus;
+    u32 prevTimestamp;
+    Mat4 *matrixPtrInterpolated;
+#endif
     /*0x38*/ s16 roll; // roll in look at matrix. Doesn't account for light direction unlike rollScreen.
     /*0x3A*/ s16 rollScreen; // rolls screen while keeping the light direction consistent
 };
@@ -212,7 +220,10 @@ struct GraphNodeRotation {
     /*0x00*/ struct GraphNode node;
     /*0x14*/ void *displayList;
     /*0x18*/ Vec3s rotation;
-    u8 filler[2];
+#ifdef HIGH_FPS_PC
+    Vec3s prevRotation;
+    u32 prevTimestamp;
+#endif    
 };
 
 /** GraphNode part that transforms itself and its children based on animation
@@ -301,6 +312,11 @@ struct GraphNodeBackground {
     /*0x00*/ struct FnGraphNode fnNode;
     /*0x18*/ s32 unused;
     /*0x1C*/ s32 background; // background ID, or rgba5551 color if fnNode.func is null
+#ifdef HIGH_FPS_PC
+    Vec3f prevCameraPos;
+    Vec3f prevCameraFocus;
+    u32 prevCameraTimestamp;
+#endif
 };
 
 /** Renders the object that Mario is holding.
@@ -310,6 +326,10 @@ struct GraphNodeHeldObject {
     /*0x18*/ s32 playerIndex;
     /*0x1C*/ struct Object *objNode;
     /*0x20*/ Vec3s translation;
+#ifdef HIGH_FPS_PC
+    Vec3f prevShadowPos;
+    u32 prevShadowPosTimestamp;
+#endif
 };
 
 /** A node that allows an object to specify a different culling radius than the
@@ -345,7 +365,7 @@ struct GraphNodeRoot *init_graph_node_root(struct AllocOnlyPool *pool, struct Gr
                                            s16 areaIndex, s16 x, s16 y, s16 width, s16 height);
 struct GraphNodeOrthoProjection *init_graph_node_ortho_projection(struct AllocOnlyPool *pool, struct GraphNodeOrthoProjection *graphNode, f32 scale);
 struct GraphNodePerspective *init_graph_node_perspective(struct AllocOnlyPool *pool, struct GraphNodePerspective *graphNode,
-                                                         f32 fov, s16 near, s16 far, GraphNodeFunc nodeFunc, s32 unused);
+                                                         f32 fov, u16 near, u16 far, GraphNodeFunc nodeFunc, s32 unused);
 struct GraphNodeStart *init_graph_node_start(struct AllocOnlyPool *pool, struct GraphNodeStart *graphNode);
 struct GraphNodeMasterList *init_graph_node_master_list(struct AllocOnlyPool *pool, struct GraphNodeMasterList *graphNode, s16 on);
 struct GraphNodeLevelOfDetail *init_graph_node_render_range(struct AllocOnlyPool *pool, struct GraphNodeLevelOfDetail *graphNode,
