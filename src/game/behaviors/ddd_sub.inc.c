@@ -1,4 +1,4 @@
-// ddd_sub.c.inc
+// ddd_sub.inc.c
 #include "game/bingo.h"
 
 void bhv_bowsers_sub_loop(void) {

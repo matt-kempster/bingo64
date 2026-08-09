@@ -1,4 +1,4 @@
-// falling_rising_platform.c.inc
+// falling_rising_platform.inc.c
 #include "game/bingo.h"
 #include "game/bingo_tracking_collectables.h"
 
@@ -8,9 +8,8 @@ void bhv_squishable_platform_loop(void) {
 }
 
 void bhv_bitfs_sinking_platform_loop(void) {
-    o->oPosY -=
-        sins(o->oBitfsPlatformTimer)
-        * 0.58; //! f32 double conversion error accumulates on Wii VC causing the platform to rise up
+    //! f32 double conversion error accumulates on Wii VC causing the platform to rise up
+    o->oPosY -= sins(o->oBitfsPlatformTimer) * 0.58;
     o->oBitfsPlatformTimer += 0x100;
 }
 
@@ -24,10 +23,13 @@ void bhv_ddd_moving_pole_loop(void) {
 
 void bhv_bitfs_sinking_cage_platform_loop(void) {
     if (o->oBehParams2ndByte != 0) {
-        if (o->oTimer == 0)
+        if (o->oTimer == 0) {
             o->oPosY -= 300.0f;
+        }
         o->oPosY += sins(o->oBitfsPlatformTimer) * 7.0f;
-    } else
+    } else {
         o->oPosY -= sins(o->oBitfsPlatformTimer) * 3.0f;
+    }
+
     o->oBitfsPlatformTimer += 0x100;
 }

@@ -1,17 +1,25 @@
-// exclamation_box.c.inc
+// exclamation_box.inc.c
 #include "game/bingo.h"
 #include "game/bingo_tracking_collectables.h"
 
 struct ObjectHitbox sExclamationBoxHitbox = {
-    /* interactType: */ INTERACT_BREAKABLE,
-    /* downOffset: */ 5,
+    /* interactType:      */ INTERACT_BREAKABLE,
+    /* downOffset:        */ 5,
     /* damageOrCoinValue: */ 0,
-    /* health: */ 1,
-    /* numLootCoins: */ 0,
-    /* radius: */ 40,
-    /* height: */ 30,
-    /* hurtboxRadius: */ 40,
-    /* hurtboxHeight: */ 30,
+    /* health:            */ 1,
+    /* numLootCoins:      */ 0,
+    /* radius:            */ 40,
+    /* height:            */ 30,
+    /* hurtboxRadius:     */ 40,
+    /* hurtboxHeight:     */ 30,
+};
+
+struct Struct802C0DF0 {
+    u8 unk0;
+    u8 unk1;
+    u8 unk2;
+    u8 model;
+    const BehaviorScript *behavior;
 };
 
 struct Struct802C0DF0 sExclamationBoxContents[] = {
@@ -34,8 +42,9 @@ struct Struct802C0DF0 sExclamationBoxContents[] = {
 };
 
 void bhv_rotating_exclamation_box_loop(void) {
-    if (o->parentObj->oAction != 1)
+    if (o->parentObj->oAction != 1) {
         obj_mark_for_deletion(o);
+    }
 }
 
 void exclamation_box_act_0(void) {
@@ -65,10 +74,11 @@ void exclamation_box_act_0(void) {
     if (o->oBehParams2ndByte < 3) {
         o->oAnimState = o->oBehParams2ndByte;
         if ((save_file_get_flags() & sCapSaveFlags[o->oBehParams2ndByte])
-            || ((o->oBehParams >> 24) & 0xFF) != 0)
+            || ((o->oBehParams >> 24) & 0xFF)) {
             o->oAction = 2;
-        else
+        } else {
             o->oAction = 1;
+        }
     } else {
         o->oAnimState = 3;
         o->oAction = 2;
@@ -82,7 +92,7 @@ void exclamation_box_act_1(void) {
         cur_obj_set_model(MODEL_EXCLAMATION_BOX_OUTLINE);
     }
     if ((save_file_get_flags() & sCapSaveFlags[o->oBehParams2ndByte])
-        || ((o->oBehParams >> 24) & 0xFF) != 0) {
+        || ((o->oBehParams >> 24) & 0xFF)) {
         o->oAction = 2;
         cur_obj_set_model(MODEL_EXCLAMATION_BOX);
     }
@@ -112,7 +122,7 @@ void exclamation_box_act_2(void) {
 }
 
 void exclamation_box_act_3(void) {
-    UNUSED s32 unused;
+    UNUSED u8 filler[4];
     cur_obj_move_using_fvel_and_gravity();
     if (o->oVelY < 0.0f) {
         o->oVelY = 0.0f;
@@ -125,8 +135,9 @@ void exclamation_box_act_3(void) {
     o->header.gfx.scale[0] = o->oExclamationBoxUnkF4 * 2.0f;
     o->header.gfx.scale[1] = o->oExclamationBoxUnkF8 * 2.0f;
     o->header.gfx.scale[2] = o->oExclamationBoxUnkF4 * 2.0f;
-    if (o->oTimer == 7)
+    if (o->oTimer == 7) {
         o->oAction = 4;
+    }
 }
 
 void exclamation_box_spawn_contents(struct Struct802C0DF0 *a0, u8 a1) {
@@ -139,8 +150,9 @@ void exclamation_box_spawn_contents(struct Struct802C0DF0 *a0, u8 a1) {
             sp1C->oForwardVel = 3.0f;
             sp1C->oMoveAngleYaw = gMarioObject->oMoveAngleYaw;
             o->oBehParams |= a0->unk2 << 24;
-            if (a0->model == 122)
-                o->oFlags |= 0x4000;
+            if (a0->model == MODEL_STAR) {
+                o->oFlags |= OBJ_FLAG_PERSISTENT_RESPAWN;
+            }
             break;
         }
         a0++;
@@ -180,13 +192,19 @@ void exclamation_box_act_4(void) {
 }
 
 void exclamation_box_act_5(void) {
-    if (o->oTimer > 300)
+    if (o->oTimer > 300) {
         o->oAction = 2;
+    }
 }
 
-void (*sExclamationBoxActions[])(void) = { exclamation_box_act_0, exclamation_box_act_1,
-                                           exclamation_box_act_2, exclamation_box_act_3,
-                                           exclamation_box_act_4, exclamation_box_act_5 };
+void (*sExclamationBoxActions[])(void) = {
+    exclamation_box_act_0,
+    exclamation_box_act_1,
+    exclamation_box_act_2,
+    exclamation_box_act_3,
+    exclamation_box_act_4,
+    exclamation_box_act_5,
+};
 
 void bhv_exclamation_box_loop(void) {
     cur_obj_scale(2.0f);

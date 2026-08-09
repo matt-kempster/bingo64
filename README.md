@@ -91,7 +91,7 @@ brew install capstone coreutils make pkg-config tehzz/n64-dev/mips64-elf-binutil
 
 #### Step 2: Copy baserom(s) for asset extraction
 
-For each version (jp/us/eu) for which you want to build a ROM, put an existing ROM at
+For each version (jp/us/eu/sh) for which you want to build a ROM, put an existing ROM at
 `./baserom.<VERSION>.z64` for asset extraction.
 
 ##### Step 3: Build the ROM

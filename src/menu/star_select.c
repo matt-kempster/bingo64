@@ -23,7 +23,6 @@
 #include "game/camera.h"
 #include "game/splatoon.h"
 #include "text_strings.h"
-#include "prevent_bss_reordering.h"
 
 /**
  * @file star_select.c
@@ -186,7 +185,7 @@ void render_bingo_modifier_star(void) {
 void bhv_act_selector_init(void) {
     s16 i = 0;
     s32 selectorModelIDs[10];
-    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, gCurrCourseNum - 1);
+    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum));
 
     gStarSelectScreenActive = 1;
 
@@ -283,7 +282,7 @@ void bhv_act_selector_init(void) {
 void bhv_act_selector_loop(void) {
     s8 i;
     u8 starIndexCounter;
-    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, gCurrCourseNum - 1);
+    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum));
 
     if (sObtainedStars != 6) {
         // Sometimes, stars are not selectable even if they appear on the screen.
@@ -455,14 +454,12 @@ void print_act_selector_strings(void) {
     u8 **actNameTbl;
 #else
     u8 **levelNameTbl = segmented_to_virtual(seg2_course_name_table);
-    u8 *currLevelName = segmented_to_virtual(levelNameTbl[gCurrCourseNum - 1]);
+    u8 *currLevelName = segmented_to_virtual(levelNameTbl[COURSE_NUM_TO_INDEX(gCurrCourseNum)]);
     u8 **actNameTbl = segmented_to_virtual(seg2_act_name_table);
 #endif
     u8 *selectedActName;
-#ifndef VERSION_EU
     s16 lvlNameX;
     s16 actNameX;
-#endif
     s8 i;
 #ifdef VERSION_EU
     s16 language = eu_get_language();
@@ -576,13 +573,14 @@ Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node) {
  * Also load how much stars a course has, without counting the 100 coin star.
  */
 s32 lvl_init_act_selector_values_and_stars(UNUSED s32 arg, UNUSED s32 unused) {
-    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, gCurrCourseNum - 1);
+    u8 stars = save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum));
 
     sLoadedActNum = 0;
     sInitSelectedActNum = 0;
     sVisibleStars = 0;
     sActSelectorMenuTimer = 0;
-    sObtainedStars = save_file_get_course_star_count(gCurrSaveFileNum - 1, gCurrCourseNum - 1);
+    sObtainedStars =
+        save_file_get_course_star_count(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(gCurrCourseNum));
 
     // Don't count 100 coin star
     if (stars & (1 << 6)) {
@@ -610,7 +608,7 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
 #else
         if ((gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))) {
 #endif
-#if defined(VERSION_JP)
+#ifdef VERSION_JP
             play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
 #else
             play_sound(SOUND_MENU_STAR_SOUND_LETS_A_GO, gGlobalSoundSource);

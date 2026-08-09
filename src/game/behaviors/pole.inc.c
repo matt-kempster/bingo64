@@ -1,3 +1,4 @@
+
 /**
  * Behaviors for bhvPoleGrabbing and bhvGiantPole.
  *
@@ -18,7 +19,7 @@ void bhv_pole_init(void) {
      * This is equivalent to using `o->oBehParams2ndByte` according to
      * `spawn_objects_from_info`.
      */
-    s32 tenthHitboxHeight = o->oBehParams >> 0x10 & 0xFF;
+    s32 tenthHitboxHeight = (o->oBehParams >> 16) & 0xFF;
     o->hitboxHeight = tenthHitboxHeight * 10;
     o->oBingoId = get_unique_id(BINGO_UPDATE_GRABBED_POLE, o->oPosX, o->oPosY, o->oPosZ);
 }
@@ -29,10 +30,9 @@ void bhv_pole_init(void) {
  * first frame.
  */
 void bhv_giant_pole_loop(void) {
-    struct Object *topBall;
     if (o->oTimer == 0) {
+        struct Object *topBall = spawn_object(o, MODEL_YELLOW_SPHERE, bhvYellowBall);
         o->oBingoId = get_unique_id(BINGO_UPDATE_GRABBED_POLE, o->oPosX, o->oPosY, o->oPosZ);
-        topBall = spawn_object(o, MODEL_YELLOW_SPHERE, bhvYellowBall);
         topBall->oPosY += o->hitboxHeight + 50.0f;
     }
     bhv_pole_base_loop();
