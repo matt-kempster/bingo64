@@ -37,6 +37,16 @@
 #define LANGUAGE_FUNCTION sLanguageMode
 #endif
 
+#ifdef VERSION_CN
+#define FILE_SELECT_PRINT_STRING print_generic_string
+#define FILE_SELECT_TEXT_DL_BEGIN dl_ia_text_begin
+#define FILE_SELECT_TEXT_DL_END dl_ia_text_end
+#else
+#define FILE_SELECT_PRINT_STRING print_menu_generic_string
+#define FILE_SELECT_TEXT_DL_BEGIN dl_menu_ia8_text_begin
+#define FILE_SELECT_TEXT_DL_END dl_menu_ia8_text_end
+#endif
+
 /**
  * @file file_select.c
  * This file implements how the file select and it's menus render and function.
@@ -70,6 +80,12 @@ static s16 sCenteredX;
 
 // The button that is selected when it is clicked.
 static s8 sSelectedButtonID = MENU_BUTTON_NONE;
+
+// On iQue, the courses can't all fit on one screen; there are two pages,
+// switched between with the L and R triggers.
+#ifdef VERSION_CN
+static s8 sScorePage = 0;
+#endif
 
 // Whether we are on the main menu or one of the submenus.
 static s8 sCurrentMenuLevel = MENU_LAYER_MAIN;
@@ -124,9 +140,9 @@ static unsigned char textMarioC[] = { TEXT_FILE_MARIO_C };
 static unsigned char textMarioD[] = { TEXT_FILE_MARIO_D };
 
 #ifndef VERSION_EU
-static unsigned char textNew[] = { TEXT_NEW };
-static unsigned char starIcon[] = { GLYPH_STAR, GLYPH_SPACE };
-static unsigned char xIcon[] = { GLYPH_MULTIPLY, GLYPH_SPACE };
+static u8 textNew[] = { TEXT_NEW };
+static u8 starIcon[] = { GLYPH_STAR, GLYPH_SPACE };
+static u8 xIcon[] = { GLYPH_MULTIPLY, GLYPH_SPACE };
 #endif
 
 static unsigned char textSelectFile[] = { TEXT_SELECT_FILE };
@@ -813,12 +829,14 @@ void print_menu_cursor(void) {
     handle_controller_cursor_input();
     create_dl_translation_matrix(MENU_MTX_PUSH, sCursorPos[0] + 160.0f - 5.0, sCursorPos[1] + 120.0f - 25.0, 0.0f);
     // Get the right graphic to use for the cursor.
-    if (sCursorClickingTimer == 0)
+    if (sCursorClickingTimer == 0) {
         // Idle
         gSPDisplayList(gDisplayListHead++, dl_menu_idle_hand);
-    if (sCursorClickingTimer != 0)
+    }
+    if (sCursorClickingTimer != 0) {
         // Grabbing
         gSPDisplayList(gDisplayListHead++, dl_menu_grabbing_hand);
+    }
     gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
     if (sCursorClickingTimer != 0) {
         sCursorClickingTimer++; // This is a very strange way to implement a timer? It counts up and
@@ -832,7 +850,7 @@ void print_menu_cursor(void) {
 /**
  * Prints a hud string depending of the hud table list defined with text fade properties.
  */
-void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const unsigned char *text) {
+void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const u8 *text) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha - sTextFadeAlpha);
     print_hud_lut_string(hudLUT, x, y, text);
@@ -842,7 +860,7 @@ void print_hud_lut_string_fade(s8 hudLUT, s16 x, s16 y, const unsigned char *tex
 /**
  * Prints a generic white string with text fade properties.
  */
-void print_generic_string_fade(s16 x, s16 y, const unsigned char *text) {
+void print_generic_string_fade(s16 x, s16 y, const u8 *text) {
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha - sTextFadeAlpha);
     print_generic_string(x, y, text);
@@ -1342,12 +1360,18 @@ static void print_bingo_options(void) {
 #undef ROW_HEIGHT
 
 
+#undef PRINT_COURSE_NAME_CN
+#undef PRINT_COURSE_SCORES_CN
+#undef PRINT_COURSE_NAME_AND_SCORES
+
 /**
  * Prints file select strings depending on the menu selected.
  * Also checks if all saves exists and defines text and main menu timers.
  */
 static void print_file_select_strings(void) {
+#ifndef VERSION_CN
     UNUSED u8 filler[8];
+#endif
 
     create_dl_ortho_matrix();
     switch (sSelectedButtonID) {
@@ -1391,7 +1415,7 @@ Gfx *geo_file_select_strings_and_menu_cursor(s32 callContext, UNUSED struct Grap
  */
 s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 #ifdef VERSION_EU
-    s8 fileNum;
+    s8 fileIndex;
 #endif
     sSelectedButtonID = MENU_BUTTON_NONE;
     sCurrentMenuLevel = MENU_LAYER_MAIN;
@@ -1409,8 +1433,8 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 #ifdef VERSION_EU
     sLanguageMode = eu_get_language();
 
-    for (fileNum = 0; fileNum < 4; fileNum++) {
-        if (save_file_exists(fileNum) == TRUE) {
+    for (fileIndex = 0; fileIndex <= 3; fileIndex++) {
+        if (save_file_exists(fileIndex) == TRUE) {
             sOpenLangSettings = FALSE;
             break;
         } else {
@@ -1458,3 +1482,7 @@ s32 lvl_update_obj_and_load_file_selected(UNUSED s32 arg, UNUSED s32 unused) {
     }
     return sSelectedFileNum;
 }
+
+#undef FILE_SELECT_PRINT_STRING
+#undef FILE_SELECT_TEXT_DL_BEGIN
+#undef FILE_SELECT_TEXT_DL_END

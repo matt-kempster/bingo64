@@ -16,10 +16,10 @@
  */
 void bhv_pole_init(void) {
     /**
-     * This is equivalent to using `o->oBehParams2ndByte` according to
+     * This is equivalent to using `o->oBhvParams2ndByte` according to
      * `spawn_objects_from_info`.
      */
-    s32 tenthHitboxHeight = (o->oBehParams >> 16) & 0xFF;
+    s32 tenthHitboxHeight = (o->oBhvParams >> 16) & 0xFF;
     o->hitboxHeight = tenthHitboxHeight * 10;
     o->oBingoId = get_unique_id(BINGO_UPDATE_GRABBED_POLE, o->oPosX, o->oPosY, o->oPosZ);
 }

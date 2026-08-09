@@ -292,7 +292,7 @@ void bhv_act_selector_loop(void) {
         starIndexCounter = sSelectableStarIndex;
         for (i = 0; i < sVisibleStars; i++) {
             // Can the star be selected (is it either already completed or the first non-completed mission)
-            if ((stars & (1 << i)) || i + 1 == sInitSelectedActNum) {
+            if ((stars & (1 << i)) || i == sInitSelectedActNum - 1) {
                 if (starIndexCounter == 0) { // We have reached the sSelectableStarIndex-th selectable star.
                     sSelectedActIndex = i;
                     break;
@@ -446,6 +446,7 @@ void print_act_selector_strings(void) {
 #else
     unsigned char myScore[] = { TEXT_MYSCORE };
 #endif
+
     unsigned char starNumbers[] = { TEXT_ZERO };
 
 #ifdef VERSION_EU
@@ -500,8 +501,13 @@ void print_act_selector_strings(void) {
     print_course_number();
 #endif
 
+#ifdef VERSION_CN
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+#else
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
+#endif
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
+
     // Print the name of the selected act.
     if (sVisibleStars != 0) {
         if (gCurrCourseNum <= COURSE_STAGES_MAX) {
@@ -513,6 +519,13 @@ void print_act_selector_strings(void) {
         actNameX = get_str_x_pos_from_center(ACT_NAME_X, selectedActName, 8.0f);
         print_menu_generic_string(actNameX, 63, selectedActName);
     }
+
+#ifdef VERSION_CN
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
+    gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
+#endif
 
     // Print the numbers above each star.
     for (i = 1; i <= sVisibleStars; i++) {
@@ -558,10 +571,11 @@ void print_act_selector_strings(void) {
  *!@bug: This geo function is missing the third param. Harmless in practice due to o32 convention.
  */
 #ifdef AVOID_UB
-Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node, UNUSED void *context) {
+Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node, UNUSED void *context)
 #else
-Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node) {
+Gfx *geo_act_selector_strings(s16 callContext, UNUSED struct GraphNode *node)
 #endif
+{
     if (callContext == GEO_CONTEXT_RENDER) {
         print_act_selector_strings();
     }
@@ -604,10 +618,11 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
 #ifndef VERSION_EU
         if ((gPlayer3Controller->buttonPressed & A_BUTTON)
          || (gPlayer3Controller->buttonPressed & START_BUTTON)
-         || (gPlayer3Controller->buttonPressed & B_BUTTON)) {
+         || (gPlayer3Controller->buttonPressed & B_BUTTON))
 #else
-        if ((gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))) {
+        if (gPlayer3Controller->buttonPressed & (A_BUTTON | START_BUTTON | B_BUTTON | Z_TRIG))
 #endif
+        {
 #ifdef VERSION_JP
             play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
 #else
