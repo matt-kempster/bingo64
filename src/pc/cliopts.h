@@ -13,6 +13,7 @@ struct PCCLIOptions  {
     unsigned int LevelActOverride;
     unsigned int Profiler;
     unsigned int Debug;
+    unsigned int Mute;
     unsigned int PoolSize;
     char ConfigFile[SYS_MAX_PATH];
     char SavePath[SYS_MAX_PATH];

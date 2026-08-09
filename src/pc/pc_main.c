@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifdef TARGET_WEB
 #include <emscripten.h>
@@ -72,6 +73,10 @@ bool gShowProfiler;
 bool gShowDebugText;
 
 static struct AudioAPI *audio_api;
+
+// When set, the mixed audio buffer is zeroed before playback: a hard
+// per-window mute (M key, or --mute) for running several instances at once.
+unsigned char gAudioMuted = 0;
 static struct GfxWindowManagerAPI *wm_api;
 static struct GfxRenderingAPI *rendering_api;
 
@@ -131,6 +136,11 @@ static inline void audio_frame(void) {
         create_next_audio_buffer(audio_buffer + i * (num_audio_samples * 2), num_audio_samples);
     }
 
+    if (gAudioMuted) {
+        for (u32 i = 0; i < 2 * num_audio_samples * 2; i++) {
+            audio_buffer[i] = 0;
+        }
+    }
     audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
 }
 #endif
@@ -258,7 +268,34 @@ void move_to_new_dir_user(char* file) {
 }
 #endif
 
+#if defined(__linux__) && !defined(__ANDROID__)
+// WSLg's GPU-accelerated GL pays a heavy cost per draw call (the bingo
+// board's ~300 textured rects drop the game to ~25% speed); llvmpipe runs
+// SM64 at full speed at this resolution. Prefer software GL under WSL
+// unless the user already picked a driver themselves.
+static void wsl_prefer_software_gl(void) {
+    char buf[256];
+    FILE *f;
+    if (getenv("LIBGL_ALWAYS_SOFTWARE") != NULL) {
+        return;
+    }
+    f = fopen("/proc/version", "r");
+    if (f == NULL) {
+        return;
+    }
+    if (fgets(buf, sizeof(buf), f) != NULL
+        && (strstr(buf, "microsoft") != NULL || strstr(buf, "Microsoft") != NULL)) {
+        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+        printf("WSL detected: using software GL (set LIBGL_ALWAYS_SOFTWARE=0 to override)\n");
+    }
+    fclose(f);
+}
+#endif
+
 void main_func(void) {
+#if defined(__linux__) && !defined(__ANDROID__)
+    wsl_prefer_software_gl();
+#endif
 #ifdef __ANDROID__
     //Move old stuff to new path
     const char *basedir = SDL_AndroidGetExternalStoragePath();
@@ -395,6 +432,7 @@ void main_func(void) {
     sound_init();
 
 #ifdef COMMAND_LINE_OPTIONS
+    if (gCLIOpts.Mute) gAudioMuted = 1;
     network_init_from_cli();
 #endif
 

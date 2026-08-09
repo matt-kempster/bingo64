@@ -8,6 +8,8 @@ extern "C" {
 void game_deinit(void);
 void game_exit(void);
 
+extern unsigned char gAudioMuted;
+
 #ifdef __cplusplus
 }
 #endif

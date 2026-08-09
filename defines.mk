@@ -9,11 +9,14 @@ EXT_OPTIONS_MENU ?= 1
 # Enable debug options menu (Enabled if DEBUG is not 0)
 EXT_DEBUG_MENU ?= 0
 # Enable better camera (Puppycam 2)
-BETTERCAMERA ?= 1
+# Off for bingo64: vanilla SM64 camera only.
+BETTERCAMERA ?= 0
 # Enable cheats
 CHEATS_ACTIONS ?= 1
 # Enable rumble functions (Originally in Shindou)
-RUMBLE_FEEDBACK ?= 1
+# Off for bingo64: the US original had no Rumble Pak support, and the
+# "ready to rumble" title banner comes with it.
+RUMBLE_FEEDBACK ?= 0
 # Disable no drawing distance by default
 NODRAWINGDISTANCE ?= 0
 # Enable Goddard (Mario Face)

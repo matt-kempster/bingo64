@@ -45,6 +45,7 @@ static void print_cli_help(void) {
     printf("%-20s\tOffers the user a level select menu.\n", "--levelselect");
     printf("%-20s\tEnables profiler bar on the screen bottom (Not functional).\n", "--profiler");
     printf("%-20s\tEnables simple debug display.\n", "--debug");
+    printf("%-20s\tStarts with audio muted; the M key toggles mute any time.\n", "--mute");
     printf("%-20s\tConnect to a bingo relay server (see server/relay.py).\n", "--net-server HOST[:PORT]");
     printf("%-20s\tRoom to join on the relay server (default: bingo).\n", "--net-room ROOM");
     printf("%-20s\tYour player name for online play (default: mario).\n", "--net-name NAME");
@@ -115,6 +116,9 @@ void parse_cli_opts(int argc, char* argv[]) {
 
         else if (strcmp(argv[i], "--debug") == 0) // Enable simple debug info
             gCLIOpts.Debug = true;
+
+        else if (strcmp(argv[i], "--mute") == 0) // Start with audio muted (toggle in-game with M)
+            gCLIOpts.Mute = true;
 
 #ifdef CHEATS_ACTIONS
         else if (strcmp(argv[i], "--cheats") == 0) // Enable cheats menu

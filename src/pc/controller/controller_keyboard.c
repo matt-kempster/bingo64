@@ -31,8 +31,15 @@ static int keyboard_map_scancode(int scancode) {
     return ret;
 }
 
+#define SCANCODE_M 0x32
+
 bool keyboard_on_key_down(int scancode) {
     int mapped = keyboard_map_scancode(scancode);
+    // M toggles this window's audio mute, unless the user bound M to a button.
+    if (scancode == SCANCODE_M && mapped == 0) {
+        extern unsigned char gAudioMuted;
+        gAudioMuted = !gAudioMuted;
+    }
     keyboard_buttons_down |= mapped;
     keyboard_lastkey = scancode;
     return mapped != 0;
