@@ -10,6 +10,7 @@
 #include "area.h"
 #include "save_file.h"
 #include "bingo.h"
+#include "bingo_net.h"
 #include "ingame_menu.h"
 #include "menu/file_select.h"
 #include "engine/behavior_script.h"
@@ -86,6 +87,7 @@ void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveSt
         case BINGO_STATE_COMPLETE:
             play_sound(SOUND_GENERAL2_RIGHT_ANSWER, gGlobalSoundSource);
             bingo_hud_update_state(objective->icon, BINGO_ICON_SUCCESS);
+            bingo_net_on_local_complete(objective);
             break;
         case BINGO_STATE_FAILED_IN_THIS_COURSE:
             play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);

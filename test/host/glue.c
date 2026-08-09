@@ -58,6 +58,10 @@ void bingo_hud_update_number(s32 icon, s32 number) {
     gGlueHudNumberLast = number;
 }
 
+void bingo_net_on_local_complete(struct BingoObjective *objective) {
+    (void) objective;
+}
+
 void bingo_hud_update_state(s32 icon, s32 state) {
     (void) icon;
     (void) state;

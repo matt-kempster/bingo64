@@ -1,6 +1,9 @@
 # Plan: Online Bingo64
 
-Status: agreed 2026-08-08. Work has not started.
+Status: agreed 2026-08-08. Parts A and B step 1 are done (the `web/`
+directory). Part D is in progress on the `alo-port` branch: the move to the
+alo code base is done (2026-08-09), and the first version of the relay
+server, the shared board, and ghost Mario is done. See section 9.
 
 Note: this document uses ASD-STE100 (Simplified Technical English) style.
 
@@ -149,7 +152,36 @@ Ship binaries without Nintendo assets. The user supplies a ROM at the first star
 
 Parts A and B do not depend on Part D. Part D does not make parts A and B unnecessary. Emulator and console players continue to use parts A and B.
 
-## 9. References
+## 9. Part D progress (2026-08-09)
+
+The `alo-port` branch builds two targets from one tree:
+
+- N64: `make TARGET_N64=1 VERSION=us` makes `build/us/sm64.us.f3dzex.z64`.
+  The ROM runs on a stock 4MB console. All emulator tests pass.
+- PC: `make VERSION=us` makes `build/us_pc/sm64.us.f3dex2e` (Linux; Windows
+  needs winsock work in `src/pc/network/`).
+
+The online components:
+
+- `server/relay.py`: the relay server. Rooms, one shared seed for each
+  room, ghost-state relay, and claim arbitration. The default mode is
+  co-op (all players share one board). The `--lockout` flag makes the
+  first claim of a cell the only claim. Each player has a team number
+  for future group battles.
+- `src/pc/network/`: the game client. Start the game with
+  `--net-server HOST[:PORT] --net-room ROOM --net-name NAME [--net-team N]`.
+  The client gets the room seed before file select, so every player
+  makes the same board.
+- `src/game/bingo_net.c`: ghost Mario puppets (up to 15, animated, no
+  collision) and the claim hooks in `set_objective_state`.
+- `test/net/protocol_test.py` proves the server. The emulator and host
+  tests prove the game still plays the same offline.
+
+Not done yet: name tags over ghosts, team colors, lockout UI (cells
+claimed by others look the same as own claims), Windows sockets, and a
+public server.
+
+## 10. References
 
 - Bingosync source: https://github.com/kbuzsaki/bingosync
 - Bingosync API client (read only): https://github.com/GamesDoneQuick/bingosync-api

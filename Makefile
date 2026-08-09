@@ -589,7 +589,7 @@ else
 # Specify target folders
   PLATFORM_DIR := platform
 
-  SRC_DIRS += src/pc src/pc/audio src/pc/controller src/pc/crash src/pc/fs src/pc/fs/packtypes src/pc/gfx
+  SRC_DIRS += src/pc src/pc/audio src/pc/controller src/pc/crash src/pc/fs src/pc/fs/packtypes src/pc/gfx src/pc/network
   ifeq ($(WINDOWS_BUILD),1)
     PLATFORM_DIR := $(PLATFORM_DIR)/win
   else ifeq ($(TARGET_N3DS),1)

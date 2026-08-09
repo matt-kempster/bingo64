@@ -17,6 +17,11 @@ struct PCCLIOptions  {
     char ConfigFile[SYS_MAX_PATH];
     char SavePath[SYS_MAX_PATH];
     char GameDir[SYS_MAX_PATH];
+    // Online bingo (see server/relay.py)
+    char NetServer[128];
+    char NetRoom[32];
+    char NetName[16];
+    unsigned int NetTeam;
 };
 
 extern struct PCCLIOptions gCLIOpts;

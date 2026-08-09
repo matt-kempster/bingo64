@@ -45,6 +45,10 @@ static void print_cli_help(void) {
     printf("%-20s\tOffers the user a level select menu.\n", "--levelselect");
     printf("%-20s\tEnables profiler bar on the screen bottom (Not functional).\n", "--profiler");
     printf("%-20s\tEnables simple debug display.\n", "--debug");
+    printf("%-20s\tConnect to a bingo relay server (see server/relay.py).\n", "--net-server HOST[:PORT]");
+    printf("%-20s\tRoom to join on the relay server (default: bingo).\n", "--net-room ROOM");
+    printf("%-20s\tYour player name for online play (default: mario).\n", "--net-name NAME");
+    printf("%-20s\tTeam number for group modes (default: 0, no team).\n", "--net-team N");
 }
 
 static void print_cli_level_list(void) {
@@ -140,6 +144,25 @@ void parse_cli_opts(int argc, char* argv[]) {
 
         else if (strcmp(argv[i], "--savepath") == 0 && (i + 1) < argc)
             arg_string("--savepath", argv[++i], gCLIOpts.SavePath);
+
+        // Online bingo (server/relay.py)
+        else if (strcmp(argv[i], "--net-server") == 0 && (i + 1) < argc) {
+            strncpy(gCLIOpts.NetServer, argv[++i], sizeof(gCLIOpts.NetServer) - 1);
+            gCLIOpts.NetServer[sizeof(gCLIOpts.NetServer) - 1] = '\0';
+        }
+
+        else if (strcmp(argv[i], "--net-room") == 0 && (i + 1) < argc) {
+            strncpy(gCLIOpts.NetRoom, argv[++i], sizeof(gCLIOpts.NetRoom) - 1);
+            gCLIOpts.NetRoom[sizeof(gCLIOpts.NetRoom) - 1] = '\0';
+        }
+
+        else if (strcmp(argv[i], "--net-name") == 0 && (i + 1) < argc) {
+            strncpy(gCLIOpts.NetName, argv[++i], sizeof(gCLIOpts.NetName) - 1);
+            gCLIOpts.NetName[sizeof(gCLIOpts.NetName) - 1] = '\0';
+        }
+
+        else if (strcmp(argv[i], "--net-team") == 0 && (i + 1) < argc)
+            arg_uint("--net-team", argv[++i], &gCLIOpts.NetTeam);
 
         // Print level list to use with args
         else if (strcmp(argv[i], "--listlevels") == 0) {

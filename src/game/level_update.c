@@ -23,6 +23,7 @@
 #include "obj_behaviors.h"
 #include "save_file.h"
 #include "bingo.h"
+#include "bingo_net.h"
 #include "bingo_tracking_star.h"
 #include "debug_course.h"
 #include "interaction.h"
@@ -1048,6 +1049,8 @@ s32 play_mode_normal(void) {
     if (gPlayer1Controller->buttonDown & Z_TRIG) {
         bingo_update(BINGO_UPDATE_Z_PRESSED);
     }
+
+    bingo_net_update();
 
     warp_area();
     check_instant_warp();

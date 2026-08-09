@@ -41,6 +41,7 @@
 #endif
 
 #include "configfile.h"
+#include "network/network.h"
 #include "controller/controller_api.h"
 #include "controller/controller_keyboard.h"
 #include "controller/controller_touchscreen.h"
@@ -140,6 +141,7 @@ void produce_one_frame(void) {
     change_audio_volumes();
 
     game_loop_one_iteration();
+    network_update();
 #ifdef RUMBLE_FEEDBACK
     thread6_rumble_loop(NULL);
 #endif
@@ -168,6 +170,7 @@ void audio_shutdown(void) {
 }
 
 void game_deinit(void) {
+    network_shutdown();
 #ifdef DISCORDRPC
     discord_shutdown();
 #endif
@@ -390,6 +393,10 @@ void main_func(void) {
 
     audio_init();
     sound_init();
+
+#ifdef COMMAND_LINE_OPTIONS
+    network_init_from_cli();
+#endif
 
     thread5_game_loop(NULL);
 

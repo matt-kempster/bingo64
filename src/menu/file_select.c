@@ -1636,6 +1636,16 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 }
 
 u32 get_seed(void) {
+#if !defined(TARGET_N64) && !defined(_WIN32)
+    // Online play: every player in the room uses the server's shared seed.
+    {
+        extern s32 network_has_seed(u32 *seed);
+        u32 netSeed;
+        if (network_has_seed(&netSeed)) {
+            return netSeed;
+        }
+    }
+#endif
     if (!gBingoSeedIsSet) {
         init_genrand(gGlobalTimer);
         return random_u32() % 999999999;

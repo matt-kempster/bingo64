@@ -6,6 +6,7 @@
 #include "game/object_list_processor.h"
 #include "game/interaction.h"
 #include "game/behavior_actions.h"
+#include "game/bingo_net.h"
 #include "game/mario_actions_cutscene.h"
 #include "game/mario_misc.h"
 #include "game/object_helpers.h"
@@ -4994,6 +4995,16 @@ const BehaviorScript bhvBingoOrangeNumber[] = {
     CALL_NATIVE(bhv_bingo_orange_number_init),
     BEGIN_LOOP(),
         CALL_NATIVE(bhv_bingo_orange_number_loop),
+    END_LOOP(),
+};
+
+// Online bingo: a remote player's Mario, driven from network state.
+// No hitbox, no interaction — a pure visual puppet.
+const BehaviorScript bhvNetGhost[] = {
+    BEGIN(OBJ_LIST_DEFAULT),
+    OR_INT(oFlags, (OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE | OBJ_FLAG_COMPUTE_DIST_TO_MARIO)),
+    BEGIN_LOOP(),
+        CALL_NATIVE(bhv_net_ghost_update),
     END_LOOP(),
 };
 
