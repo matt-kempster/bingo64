@@ -973,7 +973,7 @@ ifeq ($(WINDOW_API),DXGI)
     BACKEND_CFLAGS += -Iinclude/dxsdk
   endif
   BACKEND_LDFLAGS += -ld3dcompiler -ldxgi -ldxguid
-  BACKEND_LDFLAGS += -lsetupapi -ldinput8 -luser32 -lgdi32 -limm32 -lole32 -loleaut32 -lshell32 -lwinmm -lversion -luuid -static
+  BACKEND_LDFLAGS += -lsetupapi -ldinput8 -luser32 -lgdi32 -limm32 -lole32 -loleaut32 -lshell32 -lwinmm -lversion -luuid -lws2_32 -static
 else ifeq ($(findstring SDL,$(WINDOW_API)),SDL)
   ifeq ($(WINDOWS_BUILD),1)
     BACKEND_LDFLAGS += -lglew32 -lglu32 -lopengl32
@@ -1033,7 +1033,7 @@ ifneq ($(SDL1_USED)$(SDL2_USED),00)
   else
     BACKEND_CFLAGS += $(shell $(SDLCONFIG) --cflags)
     ifeq ($(WINDOWS_BUILD),1)
-      BACKEND_LDFLAGS += $(shell $(SDLCONFIG) --static-libs) -lsetupapi -luser32 -limm32 -lole32 -loleaut32 -lshell32 -lwinmm -lversion
+      BACKEND_LDFLAGS += $(shell $(SDLCONFIG) --static-libs) -lsetupapi -luser32 -limm32 -lole32 -loleaut32 -lshell32 -lwinmm -lversion -lws2_32
     else
       BACKEND_LDFLAGS += $(shell $(SDLCONFIG) --libs)
     endif
@@ -1044,6 +1044,9 @@ endif
 
 ifeq ($(WINDOWS_BUILD),1)
   CFLAGS := $(BACKEND_CFLAGS) $(DEF_INC_CFLAGS) -fno-strict-aliasing -fwrapv
+  # Original bingo64 code has vestigial s32 returns with bare `return;`
+  # (never read by callers); clang makes that an error by default.
+  CFLAGS += -Wno-error=return-type
   ifeq ($(TARGET_BITS), 32)
     BACKEND_LDFLAGS += -ldbghelp
   endif

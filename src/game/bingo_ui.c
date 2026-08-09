@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include <ultra64.h>
 #include <PR/os_cont.h>
 #include <PR/os_libc.h>

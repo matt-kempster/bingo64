@@ -38,7 +38,7 @@ s32 random_star_main_course_except_100c(enum CourseNum *course, s32 *star) {
     *star = (random_u16() % 6); // zero-indexed
 }
 
-s32 random_star_except_mips_toad(enum CourseNum *course, s32 *star) {
+void random_star_except_mips_toad(enum CourseNum *course, s32 *star) {
     // This is gonna be a bit janky since I want every star to have equal prob.
     s32 starIndex = (random_u16() % 115); // 120 - (mips * 2) - (toad * 3)
     if (starIndex < (15 * 7)) {
@@ -93,7 +93,7 @@ s32 random_star_except_mips_toad(enum CourseNum *course, s32 *star) {
     return;
 }
 
-s32 random_bbc(enum CourseNum *course, s32 *star) {
+void random_bbc(enum CourseNum *course, s32 *star) {
 retry:
     random_star_except_mips_toad(course, star);
     if (*course == COURSE_BOB && *star == 0) {
@@ -114,7 +114,7 @@ retry:
     }
 }
 
-s32 random_zbc(enum CourseNum *course, s32 *star) {
+void random_zbc(enum CourseNum *course, s32 *star) {
 retry:
     random_star_except_mips_toad(course, star);
     if (*course == COURSE_WF && *star == 0) {
@@ -671,9 +671,9 @@ s32 bingo_objective_bowser_init(
 }
 
 s32 bingo_objective_roof_without_cannon_init(
-    struct BingoObjective *objective, enum BingoObjectiveClass class
+    UNUSED struct BingoObjective *objective, UNUSED enum BingoObjectiveClass class
 ) {
-    return;
+    return 0;
 }
 
 s32 bingo_objective_lose_mario_hat_init(enum BingoObjectiveClass class) {

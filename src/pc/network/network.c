@@ -1,5 +1,5 @@
 // Online bingo client: TCP line protocol to server/relay.py.
-// POSIX sockets; on Windows this compiles to an inactive stub for now.
+// POSIX sockets on Linux/macOS, winsock2 on Windows.
 
 #include "network.h"
 
@@ -16,20 +16,48 @@
 #include "game/object_list_processor.h"
 #include "engine/math_util.h"
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+typedef SOCKET net_sock_t;
+#define NET_BAD_SOCK INVALID_SOCKET
+#define net_close closesocket
+#else
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#define NET_SOCKETS_AVAILABLE 1
+typedef int net_sock_t;
+#define NET_BAD_SOCK (-1)
+#define net_close close
 #endif
+#define NET_SOCKETS_AVAILABLE 1
+
+// send/recv failed only because the nonblocking socket has no data/space?
+static s32 net_would_block(void) {
+#ifdef _WIN32
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+#endif
+}
+
+static const char *net_strerror(void) {
+#ifdef _WIN32
+    static char buf[32];
+    snprintf(buf, sizeof(buf), "winsock error %d", WSAGetLastError());
+    return buf;
+#else
+    return strerror(errno);
+#endif
+}
 
 struct NetGhost gNetGhosts[NET_MAX_GHOSTS];
 
 static s32 sActive = 0;
-static s32 sSocket = -1;
+static net_sock_t sSocket = NET_BAD_SOCK;
 static s32 sLocalId = 0;
 static u32 sSharedSeed = 0;
 static s32 sSeedValid = 0;
@@ -52,13 +80,13 @@ static s8 sIdToSlot[MAX_ID];
 #ifdef NET_SOCKETS_AVAILABLE
 
 static void net_send_line(const char *line) {
-    if (sSocket < 0) {
+    if (sSocket == NET_BAD_SOCK) {
         return;
     }
-    if (send(sSocket, line, strlen(line), 0) < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-        printf("net: connection lost (%s)\n", strerror(errno));
-        close(sSocket);
-        sSocket = -1;
+    if (send(sSocket, line, (int) strlen(line), 0) < 0 && !net_would_block()) {
+        printf("net: connection lost (%s)\n", net_strerror());
+        net_close(sSocket);
+        sSocket = NET_BAD_SOCK;
         sActive = 0;
     }
 }
@@ -168,11 +196,11 @@ static void handle_line(char *line) {
 }
 
 static void pump_inbound(void) {
-    if (sSocket < 0) {
+    if (sSocket == NET_BAD_SOCK) {
         return;
     }
     for (;;) {
-        ssize_t n = recv(sSocket, sInBuf + sInLen, sizeof(sInBuf) - sInLen - 1, 0);
+        int n = (int) recv(sSocket, sInBuf + sInLen, (int) (sizeof(sInBuf) - sInLen - 1), 0);
         if (n > 0) {
             char *nl;
             sInLen += n;
@@ -188,15 +216,15 @@ static void pump_inbound(void) {
             }
         } else if (n == 0) {
             printf("net: server closed the connection\n");
-            close(sSocket);
-            sSocket = -1;
+            net_close(sSocket);
+            sSocket = NET_BAD_SOCK;
             sActive = 0;
             return;
         } else {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                printf("net: recv error (%s)\n", strerror(errno));
-                close(sSocket);
-                sSocket = -1;
+            if (!net_would_block()) {
+                printf("net: recv error (%s)\n", net_strerror());
+                net_close(sSocket);
+                sSocket = NET_BAD_SOCK;
                 sActive = 0;
             }
             return;
@@ -216,6 +244,16 @@ void network_init_from_cli(void) {
     if (gCLIOpts.NetServer[0] == '\0') {
         return;
     }
+
+#ifdef _WIN32
+    {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+            printf("net: WSAStartup failed\n");
+            return;
+        }
+    }
+#endif
 
     for (i = 0; i < MAX_ID; i++) {
         sIdToSlot[i] = -1;
@@ -246,24 +284,31 @@ void network_init_from_cli(void) {
     }
     for (ai = res; ai != NULL; ai = ai->ai_next) {
         sSocket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if (sSocket < 0) {
+        if (sSocket == NET_BAD_SOCK) {
             continue;
         }
-        if (connect(sSocket, ai->ai_addr, ai->ai_addrlen) == 0) {
+        if (connect(sSocket, ai->ai_addr, (int) ai->ai_addrlen) == 0) {
             break;
         }
-        close(sSocket);
-        sSocket = -1;
+        net_close(sSocket);
+        sSocket = NET_BAD_SOCK;
     }
     freeaddrinfo(res);
-    if (sSocket < 0) {
+    if (sSocket == NET_BAD_SOCK) {
         printf("net: cannot connect to %s\n", gCLIOpts.NetServer);
         return;
     }
+#ifdef _WIN32
+    {
+        u_long nonblock = 1;
+        ioctlsocket(sSocket, FIONBIO, &nonblock);
+    }
+#else
     fcntl(sSocket, F_SETFL, O_NONBLOCK);
+#endif
     {
         int one = 1;
-        setsockopt(sSocket, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+        setsockopt(sSocket, IPPROTO_TCP, TCP_NODELAY, (const char *) &one, sizeof(one));
     }
 
     snprintf(line, sizeof(line), "J %s %s %u\n",
@@ -278,9 +323,9 @@ void network_init_from_cli(void) {
 }
 
 void network_shutdown(void) {
-    if (sSocket >= 0) {
-        close(sSocket);
-        sSocket = -1;
+    if (sSocket != NET_BAD_SOCK) {
+        net_close(sSocket);
+        sSocket = NET_BAD_SOCK;
     }
     sActive = 0;
 }
@@ -343,14 +388,4 @@ s32 network_poll_claim(s32 *cell, s32 *claimerId) {
     return 1;
 }
 
-#else // !NET_SOCKETS_AVAILABLE (Windows: stub until winsock support lands)
-
-void network_init_from_cli(void) {}
-void network_shutdown(void) {}
-void network_update(void) {}
-s32 network_active(void) { return 0; }
-s32 network_has_seed(UNUSED u32 *seed) { return 0; }
-void network_notify_local_claim(UNUSED s32 cell) {}
-s32 network_poll_claim(UNUSED s32 *cell, UNUSED s32 *claimerId) { return 0; }
-
-#endif
+#endif // NET_SOCKETS_AVAILABLE
