@@ -32,7 +32,7 @@ void bhv_boo_init(void) {
 
 static s32 boo_should_be_stopped(void) {
     if (cur_obj_has_behavior(bhvMerryGoRoundBigBoo) || cur_obj_has_behavior(bhvMerryGoRoundBoo)) {
-        if (gMarioOnMerryGoRound == FALSE) {
+        if (!gMarioOnMerryGoRound) {
             return TRUE;
         } else {
             return FALSE;
@@ -313,7 +313,7 @@ static s32 boo_get_attack_status(void) {
     s32 attackStatus = BOO_NOT_ATTACKED;
 
     if (o->oInteractStatus & INT_STATUS_INTERACTED) {
-        if ((o->oInteractStatus & INT_STATUS_WAS_ATTACKED) && obj_has_attack_type(ATTACK_FROM_ABOVE) == FALSE) {
+        if ((o->oInteractStatus & INT_STATUS_WAS_ATTACKED) && !obj_has_attack_type(ATTACK_FROM_ABOVE)) {
             cur_obj_become_intangible();
 
             o->oInteractStatus = 0;
@@ -555,7 +555,7 @@ static void big_boo_act_1(void) {
 
     // redundant; this check is in boo_should_be_stopped
     if (cur_obj_has_behavior(bhvMerryGoRoundBigBoo)) {
-        if (gMarioOnMerryGoRound == FALSE) {
+        if (!gMarioOnMerryGoRound) {
             o->oAction = 0;
         }
     } else if (boo_should_be_stopped()) {

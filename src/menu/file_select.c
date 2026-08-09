@@ -51,7 +51,7 @@ static s16 sSoundTextX;
 static s16 sSoundTextY;
 #endif
 
-//! @Bug (UB Array Access) For PAL, more buttons were added than the array was extended.
+//! @Bug (UB Array Access) For EU, more buttons were added than the array was extended.
 //! This causes no currently known issues on console (as the other variables are not changed
 //! while this is used) but can cause issues with other compilers.
 #ifdef VERSION_EU
@@ -118,7 +118,7 @@ static s8 sSelectedFileNum = 0;
 // coin high score, 1 for high score across all files.
 static s8 sScoreFileCoinScoreMode = 0;
 
-// In PAL, if no save file exists, open the language menu so the user can find it.
+// In EU, if no save file exists, open the language menu so the user can find it.
 #ifdef VERSION_EU
 static s8 sOpenLangSettings = FALSE;
 #endif
