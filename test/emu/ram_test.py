@@ -20,13 +20,13 @@ import m64p_core
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(HERE, "..", "..")
-ROM = os.path.join(REPO, "build", "us", "sm64.us.z64")
+ROM = os.path.join(REPO, "build", "us", "sm64.us.f3dzex.z64")
 MAP = os.path.join(REPO, "build", "us", "sm64.us.map")
 HOST_TESTER = os.path.join(REPO, "test", "host", "build", "run_tests")
 
 # The committed input script always produces this seed. If you change the
 # script's menu timing, this changes too; update it from the failure message.
-EXPECTED_SEED = 435573511
+EXPECTED_SEED = 231329435
 
 # BingoObjective layout in the N64 build (32-bit, big-endian):
 # 0 initialized(u8+pad)  4 type  8 state  12 icon  16 class

@@ -16,7 +16,7 @@ import tempfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROM = os.path.join(HERE, "..", "..", "build", "us", "sm64.us.z64")
+ROM = os.path.join(HERE, "..", "..", "build", "us", "sm64.us.f3dzex.z64")
 SCRIPT = os.path.join(HERE, "scripts", "boot_and_board.txt")
 GOLDEN_BOARD_SHOT = os.path.join(HERE, "golden", "board_screen.png")
 

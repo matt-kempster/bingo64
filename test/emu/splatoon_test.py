@@ -17,7 +17,7 @@ import m64p_core
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(HERE, "..", "..")
-ROM = os.path.join(REPO, "build", "us", "sm64.us.z64")
+ROM = os.path.join(REPO, "build", "us", "sm64.us.f3dzex.z64")
 MAP = os.path.join(REPO, "build", "us", "sm64.us.map")
 
 LEVEL_BOB = 9
