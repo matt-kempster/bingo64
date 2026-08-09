@@ -11774,10 +11774,9 @@ const Gfx dl_hud_img_begin[] = {
     gsDPSetTextureFilter(G_TF_POINT),
     // gsDPSetAlphaCompare(G_AC_THRESHOLD),
     gsDPSetBlendColor(255, 255, 255, 255),
-    // ex-alo change
-    // Forces HUD Filter
-    gsDPSetRenderMode(G_RM_NOOP, G_RM_NOOP2),
-    gsDPSetTextureFilter(G_TF_POINT),
+    // Original bingo64 render mode. ex-alo's G_RM_NOOP wrote every texel
+    // (no blender), which boxed all HUD glyphs in black on real N64.
+    gsDPSetRenderMode(G_RM_AA_XLU_SURF, G_RM_AA_XLU_SURF2),
     gsSPEndDisplayList(),
 };
 

@@ -169,6 +169,7 @@ void print_generic_string(s16 x, s16 y, const u8 *str);
 void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str);
 void print_menu_generic_string(s16 x, s16 y, const u8 *str);
 void print_generic_string_but_tiny(s16 x, s16 y, const u8 *str);
+s32 strlen_tiny(const char *str);
 
 void handle_menu_scrolling(s8 scrollDirection, s8 *currentIndex, s8 minIndex, s8 maxIndex);
 #if defined(VERSION_US) || defined(VERSION_EU) || defined(VERSION_CN)

@@ -42,8 +42,11 @@ s32 bingo_get_star_count(void) {
     s32 course;
     s32 count = 0;
 
-    // Get standard course star count.
-    for (course = COURSE_MIN - 1; course < COURSE_MAX; course++) {
+    // Get standard course star count. bingo_get_course_count() takes a
+    // 1-based course number and reads gbCourseStars[course - 1]; starting
+    // below COURSE_MIN indexed the array at -1, which the N64's 32-bit
+    // pointer wraparound forgave but segfaults on 64-bit hosts.
+    for (course = COURSE_MIN; course <= COURSE_MAX; course++) {
         count += bingo_get_course_count(course);
     }
 

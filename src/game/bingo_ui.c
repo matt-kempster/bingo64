@@ -204,7 +204,7 @@ void draw_bingo_screen() {
     // Shade the screen.
     // Why was I checking this twice?
     // if (gPlayer1Controller->buttonDown & L_TRIG) {
-        shade_screen_opacity(180);
+        shade_screen_opacity(140);
     // }
 
     // Title.

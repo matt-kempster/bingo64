@@ -4,8 +4,10 @@
 #include "area.h"
 #include "bingo.h"
 
+#include "bingo_const.h"
 #include "bingo_descriptions.h"
 #include "bingo_objective_func.h"
+#include "bingo_tracking_star.h"
 #include "bingo_objective_init.h"
 #include "memory.h"
 #include "segment2.h"

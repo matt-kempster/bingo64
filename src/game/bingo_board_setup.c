@@ -5,6 +5,7 @@
 #include "bingo.h"
 
 #include "engine/behavior_script.h"
+#include "engine/math_util.h"
 #include "engine/rand.h"
 #include "bingo_descriptions.h"
 #include "bingo_const.h"

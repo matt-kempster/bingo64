@@ -621,14 +621,17 @@ static void render_vertical_line(int x, int y, int pos) {
     sp2C = sp34;
     sp28 = sp30;
 
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, 1, 0, 0, 0, ENVIRONMENT, 0, 0,
-                      0, 1);
+    // Alpha comes from ENVIRONMENT (255) rather than the constant-1 input:
+    // same picture on N64, but the PC renderer maps unknown combiner inputs
+    // to zero, which made these lines invisible there.
+    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, ENVIRONMENT, 0, 0, 0, ENVIRONMENT, 0, 0,
+                      0, ENVIRONMENT);
 
-    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 0);
+    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 255);
     gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 6) << 2, (sp28 + height) << 2,
                         0, 0, 0, 32, 32);
 
-    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 0);
+    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 255);
     gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + 6 - 1) << 2,
                         (sp28 + height - 1) << 2, 0, 0, 0, 32, 32);
 
@@ -719,14 +722,15 @@ static void render_horizontal_line(int x, int y, int pos) {
     sp28 = sp30;
     // gSPTextureRectangleFlip(gDisplayListHead++, sp2C << 2, sp28 << 2,
     //                         (sp2C + length) << 2, (sp28 + 15) << 2, 0, 0, 0, 4096, 0x10);
-    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, 1, 0, 0, 0, ENVIRONMENT, 0, 0,
-                      0, 1);
+    // Same ENVIRONMENT-alpha trick as render_vertical_line (see above).
+    gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, ENVIRONMENT, 0, 0, 0, ENVIRONMENT, 0, 0, 0, ENVIRONMENT, 0, 0,
+                      0, ENVIRONMENT);
 
-    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 0);
+    gDPSetEnvColor(gDisplayListHead++, 127, 127, 127, 255);
     gSPTextureRectangle(gDisplayListHead++, sp2C << 2, sp28 << 2, (sp2C + length) << 2, (sp28 + 6) << 2,
                         0, 0, 0, 1024, 1024);
 
-    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 0);
+    gDPSetEnvColor(gDisplayListHead++, 200, 200, 200, 255);
     gSPTextureRectangle(gDisplayListHead++, sp2C + 1 << 2, sp28 + 1 << 2, (sp2C + length - 1) << 2,
                         (sp28 + 6 - 1) << 2, 0, 0, 0, 1024, 1024);
     gDPSetCombineLERP(gDisplayListHead++, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0, TEXEL0, 0, 0, 0,

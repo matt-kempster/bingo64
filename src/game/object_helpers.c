@@ -4,6 +4,7 @@
 #include "area.h"
 #include "behavior_actions.h"
 #include "behavior_data.h"
+#include "bingo_tracking_collectables.h"
 #include "camera.h"
 #include "debug.h"
 #include "dialog_ids.h"
