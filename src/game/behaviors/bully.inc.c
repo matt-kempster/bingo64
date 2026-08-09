@@ -261,7 +261,7 @@ void bhv_bully_loop(void) {
             break;
 
         case BULLY_ACT_DEATH_PLANE_DEATH:
-            o->activeFlags = 0;
+            o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
             break;
     }
 
@@ -375,7 +375,7 @@ void bhv_big_bully_with_minions_loop(void) {
             break;
 
         case BULLY_ACT_DEATH_PLANE_DEATH:
-            o->activeFlags = 0;
+            o->activeFlags = ACTIVE_FLAG_DEACTIVATED;
             break;
     }
 }

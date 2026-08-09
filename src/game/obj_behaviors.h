@@ -1,16 +1,13 @@
-#ifndef _OBJ_BEHAVIORS_H
-#define _OBJ_BEHAVIORS_H
+#ifndef OBJ_BEHAVIORS_H
+#define OBJ_BEHAVIORS_H
 
-#include "types.h"
-#include "object_helpers.h"
+#include <PR/ultratypes.h>
+
 #include "engine/surface_collision.h"
-
-extern u8 bob_seg7_metal_ball_path0[];
-extern u8 ttm_seg7_trajectory_070170A0[];
-extern u8 bob_seg7_metal_ball_path1[];
+#include "macros.h"
+#include "types.h"
 
 void set_yoshi_as_not_dead(void);
-
 s32 coin_step(s16 *collisionFlagsPtr);
 void moving_coin_flicker(void);
 void coin_collected(void);
@@ -43,7 +40,7 @@ void bhv_bobomb_loop(void);
 void bhv_bobomb_fuse_smoke_init(void);
 void bhv_bobomb_buddy_init(void);
 void bobomb_buddy_act_idle(void);
-void bobomb_buddy_cannon_dialog(s16 arg0, s16 arg1);
+void bobomb_buddy_cannon_dialog(s16 dialogFirstText, s16 dialogSecondText);
 void bobomb_buddy_act_talk(void);
 void bobomb_buddy_act_turn_to_talk(void);
 void bobomb_buddy_actions(void);
@@ -71,11 +68,11 @@ void bhv_butterfly_loop(void);
 void bhv_hoot_init(void);
 f32 hoot_find_next_floor(struct FloorGeometry **arg0, f32 arg1);
 void hoot_floor_bounce(void);
-void hoot_free_step(s16 arg0, s32 arg1);
+void hoot_free_step(s16 fastOscY, s32 speed);
 void hoot_player_set_yaw(void);
-void hoot_carry_step(s32 arg0, UNUSED f32 arg1, UNUSED f32 arg2);
-void hoot_surface_collision(f32 arg0, UNUSED f32 arg1, f32 arg2);
-void hoot_act_ascent(f32 arg0, f32 arg1);
+void hoot_carry_step(s32 speed, UNUSED f32 xPrev, UNUSED f32 zPrev);
+void hoot_surface_collision(f32 xPrev, UNUSED f32 yPrev, f32 zPrev);
+void hoot_act_ascent(f32 xPrev, f32 zPrev);
 void hoot_action_loop(void);
 void hoot_turn_to_home(void);
 void hoot_awake_loop(void);
@@ -99,7 +96,7 @@ void bully_check_mario_collision(void);
 void bully_act_chase_mario(void);
 void bully_act_knockback(void);
 void bully_act_back_up(void);
-void bully_backup_check(s16 arg0);
+void bully_backup_check(s16 collisionFlags);
 void bully_play_stomping_sound(void);
 void bully_step(void);
 void bully_spawn_coin(void);
@@ -165,6 +162,6 @@ void bhv_free_bowling_ball_roll_loop(void); /* likely unused */
 void bhv_free_bowling_ball_loop(void); /* likely unused */
 void bhv_rr_cruiser_wing_init(void);
 void bhv_rr_cruiser_wing_loop(void);
-extern void spawn_default_star(f32, f32, f32);
+void spawn_default_star(f32 sp20, f32 sp24, f32 sp28);
 
-#endif /* _OBJ_BEHAVIORS_H */
+#endif // OBJ_BEHAVIORS_H

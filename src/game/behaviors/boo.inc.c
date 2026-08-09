@@ -493,7 +493,7 @@ void bhv_boo_loop(void) {
     boo_approach_target_opacity_and_update_scale();
 
     if (obj_has_behavior(o->parentObj, bhvMerryGoRoundBooManager)) {
-        if (o->activeFlags == 0) {
+        if (o->activeFlags == ACTIVE_FLAG_DEACTIVATED) {
             o->parentObj->oMerryGoRoundBooManagerNumBoosKilled++;
         }
     }

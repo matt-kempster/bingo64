@@ -1,6 +1,9 @@
 #ifndef HUD_H
 #define HUD_H
 
+#include <PR/ultratypes.h>
+#include <PR/gbi.h>
+
 #include "types.h"
 #include "bingo.h"
 
@@ -33,17 +36,11 @@ enum CameraHUDLut {
     GLYPH_CAM_ARROW_DOWN
 };
 
-// Segment 3
-extern u8 *power_meter_health_segments_lut[];
-extern Gfx* dl_power_meter_base;
-extern Gfx* dl_power_meter_health_segments_begin;
-extern Gfx* dl_power_meter_health_segments_end;
-
 // Functions
-extern void set_hud_camera_status(s16 status);
-extern void render_hud(void);
+void set_hud_camera_status(s16 status);
+void render_hud(void);
 extern void bingo_hud_update_message(enum BingoObjectiveIcon, char message[10], s8 horribleHackWallkick);
 extern void bingo_hud_update_number(enum BingoObjectiveIcon, s32);
 extern void bingo_hud_update_state(enum BingoObjectiveIcon, enum BingoObjectiveIcon);
 
-#endif /* HUD_H */
+#endif // HUD_H

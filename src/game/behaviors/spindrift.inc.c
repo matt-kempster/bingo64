@@ -15,7 +15,7 @@ struct ObjectHitbox sSpindriftHitbox = {
 };
 
 void bhv_spindrift_loop(void) {
-    o->activeFlags |= 0x400;
+    o->activeFlags |= ACTIVE_FLAG_UNK10;
     if (obj_set_hitbox_and_die_if_attacked_bingo(
         &sSpindriftHitbox, SOUND_OBJ_DYING_ENEMY1, 0, BINGO_UPDATE_KILLED_SPINDRIFT
     ))
