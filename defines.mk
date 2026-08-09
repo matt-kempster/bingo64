@@ -39,7 +39,11 @@ RM2C ?= 0
 # Quality of life fixes
 QOL_FIXES ?= 1
 # Quality of life features
-QOL_FEATURES ?= 1
+# Off for bingo64: these are gameplay changes, not fixes — non-vanilla wall
+# kicks (no bonk at low speed, kicks out of dives), easier long jumps/jump
+# kicks, better hanging/flying, velocity-based turning, DS-style C-up
+# movement, collision tweaks, and more (~50 defines in include/config/).
+QOL_FEATURES ?= 0
 # Quality of life redone files
 QOL_REDONE ?= 1
 
