@@ -5,6 +5,7 @@
 #include "audio/external.h"
 #include "behavior_actions.h"
 #include "behavior_data.h"
+#include "bingo_net.h"
 #include "camera.h"
 #include "dialog_ids.h"
 #include "engine/behavior_script.h"
@@ -294,6 +295,24 @@ void bhv_unlock_door_star_loop(void) {
 }
 
 /**
+ * True while the geo processor is rendering an online-bingo ghost puppet.
+ * Ghosts share Mario's geo, so every body-state read below must be routed
+ * away from the local player's state (gBodyStates[0]) for them.
+ */
+static s32 rendering_ghost_puppet(void) {
+    return gCurGraphNodeObject != NULL
+           && bingo_net_obj_is_ghost((struct Object *) gCurGraphNodeObject);
+}
+
+/**
+ * Body state to render from: ghost puppets use gBodyStates[1], which vanilla
+ * never writes (it stays neutral: no punches, no torso tilt, default cap).
+ */
+static struct MarioBodyState *body_state_for_render(s32 index) {
+    return rendering_ghost_puppet() ? &gBodyStates[1] : &gBodyStates[index];
+}
+
+/**
  * Generate a display list that sets the correct blend mode and color for mirror Mario.
  */
 static Gfx *make_gfx_mario_alpha(struct GraphNodeGenerated *node, s16 alpha) {
@@ -330,12 +349,34 @@ Gfx *geo_mirror_mario_set_alpha(s32 callContext, struct GraphNode *node, UNUSED 
     UNUSED u8 filler1[4];
     Gfx *gfx = NULL;
     struct GraphNodeGenerated *asGenerated = (struct GraphNodeGenerated *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[asGenerated->parameter];
+    struct MarioBodyState *bodyState = body_state_for_render(asGenerated->parameter);
     s16 alpha;
     UNUSED u8 filler2[4];
 
     if (callContext == GEO_CONTEXT_RENDER) {
         alpha = (bodyState->modelState & 0x100) ? (bodyState->modelState & 0xFF) : 255;
+#ifndef TARGET_N64
+        if (rendering_ghost_puppet()) {
+            // Ghost puppets render translucent. This must happen in the
+            // OPAQUE layer (within a layer the master list keeps traversal
+            // order, so these commands precede exactly this puppet's body):
+            // switch the blender to XLU so Mario's FADEA materials blend
+            // with env alpha. The vanilla alpha<255 path can't be used, as
+            // it parks its commands in the transparent layer where they
+            // never affect the opaque body, and gfx_pc ignores both the
+            // alpha combiner and alpha compare in opaque render modes.
+            // The post-body hook in geo_mirror_mario_backface_culling
+            // restores the layer's normal state.
+            Gfx *ghostGfx = alloc_display_list(4 * sizeof(*ghostGfx));
+            asGenerated->fnNode.node.flags =
+                (asGenerated->fnNode.node.flags & 0xFF) | (LAYER_OPAQUE << 8);
+            gDPPipeSync(&ghostGfx[0]);
+            gDPSetRenderMode(&ghostGfx[1], G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
+            gDPSetEnvColor(&ghostGfx[2], 255, 255, 255, 140);
+            gSPEndDisplayList(&ghostGfx[3]);
+            return ghostGfx;
+        }
+#endif
 #ifdef BETTERCAMERA
         if (gPuppyCam.enabled && alpha > gPuppyCam.opacity && !gCamera->cutscene) {
             alpha = gPuppyCam.opacity;
@@ -356,7 +397,7 @@ Gfx *geo_mirror_mario_set_alpha(s32 callContext, struct GraphNode *node, UNUSED 
  */
 Gfx *geo_switch_mario_stand_run(s32 callContext, struct GraphNode *node, UNUSED Mat4 *mtx) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[switchCase->numCases];
+    struct MarioBodyState *bodyState = body_state_for_render(switchCase->numCases);
 
     if (callContext == GEO_CONTEXT_RENDER) {
         // assign result. 0 if moving, 1 if stationary.
@@ -370,7 +411,7 @@ Gfx *geo_switch_mario_stand_run(s32 callContext, struct GraphNode *node, UNUSED 
  */
 Gfx *geo_switch_mario_eyes(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[switchCase->numCases];
+    struct MarioBodyState *bodyState = body_state_for_render(switchCase->numCases);
     s16 blinkFrame;
 
     if (callContext == GEO_CONTEXT_RENDER) {
@@ -393,7 +434,7 @@ Gfx *geo_switch_mario_eyes(s32 callContext, struct GraphNode *node, UNUSED Mat4 
  */
 Gfx *geo_mario_tilt_torso(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeGenerated *asGenerated = (struct GraphNodeGenerated *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[asGenerated->parameter];
+    struct MarioBodyState *bodyState = body_state_for_render(asGenerated->parameter);
     s32 action = bodyState->action;
 
     if (callContext == GEO_CONTEXT_RENDER) {
@@ -415,18 +456,19 @@ Gfx *geo_mario_tilt_torso(s32 callContext, struct GraphNode *node, UNUSED Mat4 *
  */
 Gfx *geo_mario_head_rotation(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeGenerated *asGenerated = (struct GraphNodeGenerated *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[asGenerated->parameter];
+    struct MarioBodyState *bodyState = body_state_for_render(asGenerated->parameter);
     s32 action = bodyState->action;
 
     if (callContext == GEO_CONTEXT_RENDER) {
         struct GraphNodeRotation *rotNode = (struct GraphNodeRotation *) node->next;
         struct Camera *camera = gCurGraphNodeCamera->config.camera;
 
-        if (camera->mode == CAMERA_MODE_C_UP
+        // C-up head rotation follows the local camera; ghosts must not.
+        if ((camera->mode == CAMERA_MODE_C_UP
 #ifdef BETTERCAMERA
         || gPuppyCam.mode3Flags & PUPPYCAM_MODE3_ENTER_FIRST_PERSON
 #endif
-        ) {
+        ) && !rendering_ghost_puppet()) {
             
             rotNode->rotation[0] = gPlayerCameraState->headRotation[1];
             rotNode->rotation[2] = gPlayerCameraState->headRotation[0];
@@ -448,7 +490,7 @@ Gfx *geo_mario_head_rotation(s32 callContext, struct GraphNode *node, UNUSED Mat
  */
 Gfx *geo_switch_mario_hand(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[0];
+    struct MarioBodyState *bodyState = body_state_for_render(0);
 
     if (callContext == GEO_CONTEXT_RENDER) {
         if (bodyState->handState == MARIO_HAND_FISTS) {
@@ -479,7 +521,7 @@ Gfx *geo_mario_hand_foot_scaler(s32 callContext, struct GraphNode *node, UNUSED 
     static s16 sMarioAttackAnimCounter = 0;
     struct GraphNodeGenerated *asGenerated = (struct GraphNodeGenerated *) node;
     struct GraphNodeScale *scaleNode = (struct GraphNodeScale *) node->next;
-    struct MarioBodyState *bodyState = &gBodyStates[0];
+    struct MarioBodyState *bodyState = body_state_for_render(0);
 
     if (callContext == GEO_CONTEXT_RENDER) {
         scaleNode->scale = 1.0f;
@@ -501,7 +543,7 @@ Gfx *geo_mario_hand_foot_scaler(s32 callContext, struct GraphNode *node, UNUSED 
  */
 Gfx *geo_switch_mario_cap_effect(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[switchCase->numCases];
+    struct MarioBodyState *bodyState = body_state_for_render(switchCase->numCases);
 
     if (callContext == GEO_CONTEXT_RENDER) {
         switchCase->selectedCase = bodyState->modelState >> 8;
@@ -516,7 +558,7 @@ Gfx *geo_switch_mario_cap_effect(s32 callContext, struct GraphNode *node, UNUSED
 Gfx *geo_switch_mario_cap_on_off(s32 callContext, struct GraphNode *node, UNUSED Mat4 *c) {
     struct GraphNode *next = node->next;
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
-    struct MarioBodyState *bodyState = &gBodyStates[switchCase->numCases];
+    struct MarioBodyState *bodyState = body_state_for_render(switchCase->numCases);
 
     if (callContext == GEO_CONTEXT_RENDER) {
         switchCase->selectedCase = bodyState->capState & 1;
@@ -545,7 +587,7 @@ Gfx *geo_mario_rotate_wing_cap_wings(s32 callContext, struct GraphNode *node, UN
     if (callContext == GEO_CONTEXT_RENDER) {
         struct GraphNodeRotation *rotNode = (struct GraphNodeRotation *) node->next;
 
-        if (!gBodyStates[asGenerated->parameter >> 1].wingFlutter) {
+        if (!body_state_for_render(asGenerated->parameter >> 1)->wingFlutter) {
             rotX = (coss((gAreaUpdateCounter & 0xF) << 12) + 1.0f) * 4096.0f;
         } else {
             rotX = (coss((gAreaUpdateCounter & 7) << 13) + 1.0f) * 6144.0f;
@@ -663,6 +705,21 @@ Gfx *geo_mirror_mario_backface_culling(s32 callContext, struct GraphNode *node, 
         }
         asGenerated->fnNode.node.flags = (asGenerated->fnNode.node.flags & 0xFF) | (LAYER_OPAQUE << 8);
     }
+#ifndef TARGET_N64
+    // Post-body instance (parameter 1) doubles as the ghost puppet's state
+    // reset: restore the opaque layer's blender and env alpha so the
+    // translucency set up in geo_mirror_mario_set_alpha cannot leak into
+    // whatever the opaque layer draws after this ghost.
+    if (callContext == GEO_CONTEXT_RENDER && asGenerated->parameter == 1
+        && rendering_ghost_puppet()) {
+        gfx = alloc_display_list(4 * sizeof(*gfx));
+        gDPPipeSync(&gfx[0]);
+        gDPSetRenderMode(&gfx[1], G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+        gDPSetEnvColor(&gfx[2], 255, 255, 255, 255);
+        gSPEndDisplayList(&gfx[3]);
+        asGenerated->fnNode.node.flags = (asGenerated->fnNode.node.flags & 0xFF) | (LAYER_OPAQUE << 8);
+    }
+#endif
 
     return gfx;
 }

@@ -17,4 +17,8 @@ void bingo_net_on_local_complete(struct BingoObjective *objective);
 // Behavior update for the ghost puppet object (bhvNetGhost).
 void bhv_net_ghost_update(void);
 
+// True if obj is a ghost puppet. Used by Mario's geo ASM functions so
+// puppets don't mirror the local player's body state (always 0 on N64).
+s32 bingo_net_obj_is_ghost(struct Object *obj);
+
 #endif // BINGO_NET_H

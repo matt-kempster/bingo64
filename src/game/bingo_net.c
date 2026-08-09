@@ -70,7 +70,13 @@ void bhv_net_ghost_update(void) {
     // Drive the Mario animation from the network state.
     list = &sGhostAnimLists[slot];
     if (!sGhostAnimInit[slot]) {
-        setup_dma_table_list(list, gMarioAnims, sGhostAnimBufs[slot]);
+        // Share Mario's boot-allocated DMA table instead of calling
+        // setup_dma_table_list: that would main_pool_alloc a copy mid-level,
+        // which main_pool_pop_state frees on the next level transition,
+        // leaving list->dmaTable dangling (crashed on castle entry).
+        list->dmaTable = gMarioAnimsBuf.dmaTable;
+        list->currentAddr = NULL;
+        list->bufTarget = sGhostAnimBufs[slot];
         sGhostAnimInit[slot] = 1;
     }
     if (g->animID >= 0) {
@@ -79,7 +85,10 @@ void bhv_net_ghost_update(void) {
             targetAnim->values = (void *) VIRTUAL_TO_PHYSICAL((u8 *) targetAnim + (uintptr_t) targetAnim->values);
             targetAnim->index = (void *) VIRTUAL_TO_PHYSICAL((u8 *) targetAnim + (uintptr_t) targetAnim->index);
         }
-        if (o->header.gfx.animInfo.animID != g->animID) {
+        // Also compare curAnim: a recycled object can inherit a stale animID
+        // that happens to match, with curAnim still NULL from geo_obj_init.
+        if (o->header.gfx.animInfo.animID != g->animID
+            || o->header.gfx.animInfo.curAnim != targetAnim) {
             o->header.gfx.animInfo.animID = g->animID;
             o->header.gfx.animInfo.curAnim = targetAnim;
             o->header.gfx.animInfo.animAccel = 0;
@@ -148,6 +157,10 @@ void bingo_net_on_local_complete(struct BingoObjective *objective) {
     network_notify_local_claim(objective - gBingoObjectives);
 }
 
+s32 bingo_net_obj_is_ghost(struct Object *obj) {
+    return obj != NULL && obj->behavior == segmented_to_virtual(bhvNetGhost);
+}
+
 #else // TARGET_N64
 
 void bhv_net_ghost_update(void) {
@@ -157,6 +170,10 @@ void bingo_net_update(void) {
 }
 
 void bingo_net_on_local_complete(UNUSED struct BingoObjective *objective) {
+}
+
+s32 bingo_net_obj_is_ghost(UNUSED struct Object *obj) {
+    return 0;
 }
 
 #endif
