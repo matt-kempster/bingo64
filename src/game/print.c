@@ -587,7 +587,6 @@ void clip_to_bounds(s32 *x, s32 *y) {
 u8 gOptionSelectIconOpacity = 255;
 void render_textrect(s32 x, s32 y, s32 pos, u8 alpha) {
     s32 rectBaseX = x + pos * 12;
-#endif
     s32 rectBaseY = 224 - y;
     s32 rectX;
     s32 rectY;

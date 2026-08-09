@@ -160,8 +160,8 @@ s32 gBingoSeedIsSet = 0;
 // We can support seeds up to 4,294,967,295, but since this is a weird number,
 // we cap it at 999,999,999, which is 9 digits long. "RANDOM" is 6 characters
 // long, so:
-u8 gBingoSeedRandomText[] = { TEXT_RANDOM, 0xFF, 0xFF, 0xFF };
-u8 gBingoSeedText[] = { TEXT_RANDOM, 0xFF, 0xFF, 0xFF };
+u8 gBingoSeedRandomText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
+u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 
 s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11

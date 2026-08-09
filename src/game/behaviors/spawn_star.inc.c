@@ -20,7 +20,7 @@ void bhv_collect_star_init(void) {
     // Bingo64 uses its own per-course star flags, not the save file's.
     u8 currentLevelStarFlags = bingo_get_course_flags(gCurrCourseNum - 1);
 
-    if (currentLevelStarFlags & (1 << starIndex)) {
+    if (currentLevelStarFlags & (1 << starId)) {
         o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_TRANSPARENT_STAR];
     } else {
         o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_STAR];

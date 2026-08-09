@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-extern struct Object *obj_nearest_object_with_behavior(const BehaviorScript *behavior);
-extern void mark_object_for_deletion(struct Object *obj);
+extern struct Object *cur_obj_nearest_object_with_behavior(const BehaviorScript *behavior);
+extern void obj_mark_for_deletion(struct Object *obj);
 
 #endif

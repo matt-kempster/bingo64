@@ -744,7 +744,7 @@ s32 act_in_cannon(struct MarioState *m) {
 
                 m->marioObj->header.gfx.node.flags |= GRAPH_RENDER_ACTIVE;
 
-                cannon = obj_nearest_object_with_behavior(bhvCannon);
+                cannon = cur_obj_nearest_object_with_behavior(bhvCannon);
                 if (cannon) {
                     bingo_update(BINGO_UPDATE_SHOT_FROM_CANNON);
                     if (is_new_kill(BINGO_UPDATE_CANNON_COLLECTABLE, cannon->oBingoId)) {

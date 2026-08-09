@@ -1073,6 +1073,12 @@ SECTIONS
 
         BUILD_DIR/libultra.a:*.o(.bss*);
 
+        . = ALIGN(0x8);
+    }
+    END_NOLOAD(main)
+
+    CREATE_LO_HI_PAIR(_mainSegmentNoloadSize, SIZEOF (.main.noload))
+
    BEGIN_SEG(engine, SEG_ENGINE)
    {
       BUILD_DIR/src/engine/math_util.o(.text);

@@ -117,7 +117,7 @@ void bhv_act_selector_star_type_reversed_loop(void) {
             break;
     }
     // Scale act selector stars depending of the type selected
-    obj_scale(gCurrentObject->oStarSelectorSize);
+    cur_obj_scale(gCurrentObject->oStarSelectorSize);
     // Unused timer, only referenced here. Probably replaced by sActSelectorMenuTimer
     gCurrentObject->oStarSelectorTimer++;
 }

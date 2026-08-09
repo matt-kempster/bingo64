@@ -557,7 +557,7 @@ void check_instant_warp(void) {
                 gMarioState->marioObj->oPosY = gMarioState->pos[1];
                 gMarioState->marioObj->oPosZ = gMarioState->pos[2];
 
-                greendemon = obj_nearest_object_with_behavior(bhv1upGreenDemon);
+                greendemon = cur_obj_nearest_object_with_behavior(bhv1upGreenDemon);
                 if (greendemon != NULL) {
                     greendemon->oPosX += warp->displacement[0];
                     greendemon->oPosY += warp->displacement[1];
@@ -1362,7 +1362,7 @@ s32 lvl_set_current_level(UNUSED s16 arg0, s32 levelNum) {
         || gCurrLevelNum == LEVEL_BOWSER_3
     ) {
         return 0;
-    } else if ((gCurrCourseNum > COURSE_STAGES_MAX || val4 != 0)) {
+    } else if ((gCurrCourseNum > COURSE_STAGES_MAX || warpCheckpointActive != 0)) {
         return 1;
     } else
 

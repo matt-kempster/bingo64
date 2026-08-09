@@ -2,7 +2,7 @@
 # Runs a ROM headless in mupen64plus, taking screenshots at chosen frames.
 #
 # usage: run_rom.sh <rom> <shot_dir> <frame_list> [input_script]
-# example: run_rom.sh ../../build/us/sm64.us.f3dex.z64 /tmp/shots 30,300 scripts/boot.txt
+# example: run_rom.sh ../../build/us/sm64.us.z64 /tmp/shots 30,300 scripts/boot.txt
 #
 # M64P points at the mupen64plus install (default: ~/opt/m64p/install).
 

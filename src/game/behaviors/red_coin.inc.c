@@ -105,7 +105,7 @@ void bhv_red_coin_loop(void) {
         coin_collected();
         // Despawn the coin.
         o->oInteractStatus = 0;
-        bingoNumber = obj_nearest_object_with_behavior(bhvBingoOrangeNumber);
+        bingoNumber = cur_obj_nearest_object_with_behavior(bhvBingoOrangeNumber);
         if (bingoNumber != NULL) {
             if (o->parentObj->oHiddenStarTriggerCounter != bingoNumber->oBhvParams2ndByte) {
                 bingo_update(BINGO_UPDATE_WRONG_RED_COIN);

@@ -14,7 +14,7 @@
 #include "menu/file_select.h"
 #include "engine/behavior_script.h"
 #include "level_update.h"
-#include "audio_defines.h"
+#include "sounds.h"
 #include "audio/external.h"
 #include "bingo_objective_func.h"
 #include "splatoon.h"
@@ -65,8 +65,8 @@ void disable_bingo_modifiers() {
         sSelectionFlags = gBingoClickGamePrevCameraSettings;
         gDialogCameraAngleIndex = gBingoClickGamePrevCameraIndex;
     }
-    if (obj_nearest_object_with_behavior(bhv1upGreenDemon) != NULL) {
-        mark_object_for_deletion(obj_nearest_object_with_behavior(bhv1upGreenDemon));
+    if (cur_obj_nearest_object_with_behavior(bhv1upGreenDemon) != NULL) {
+        obj_mark_for_deletion(cur_obj_nearest_object_with_behavior(bhv1upGreenDemon));
     }
     gBingoReverseJoystickActive = 0;
     gBingoDaredevilActive = 0;

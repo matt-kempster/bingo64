@@ -19,10 +19,10 @@ void bhv_spawned_star_init(void) {
     if (!(o->oInteractionSubtype & INT_SUBTYPE_NO_EXIT)) {
         o->oBhvParams = o->parentObj->oBhvParams;
     }
-    sp24 = (o->oBhvParams >> 24) & 0xFF;
-    // if(bit_shift_left(sp24) & save_file_get_star_flags(gCurrSaveFileNum-1,gCurrCourseNum-1))
+    starIndex = (o->oBhvParams >> 24) & 0xFF;
+    // if(bit_shift_left(starIndex) & save_file_get_star_flags(gCurrSaveFileNum-1,gCurrCourseNum-1))
     // wait lol, this might _actually_ be unused. oops.
-    if (bit_shift_left(sp24) & bingo_get_course_flags(gCurrCourseNum - 1)) {
+    if (bit_shift_left(starIndex) & bingo_get_course_flags(gCurrCourseNum - 1)) {
         cur_obj_set_model(MODEL_TRANSPARENT_STAR);
     }
 

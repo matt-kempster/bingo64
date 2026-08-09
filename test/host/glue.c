@@ -63,12 +63,12 @@ void bingo_hud_update_state(s32 icon, s32 state) {
     (void) state;
 }
 
-struct Object *obj_nearest_object_with_behavior(const BehaviorScript *behavior) {
+struct Object *cur_obj_nearest_object_with_behavior(const BehaviorScript *behavior) {
     (void) behavior;
     return NULL;
 }
 
-void mark_object_for_deletion(struct Object *obj) {
+void obj_mark_for_deletion(struct Object *obj) {
     (void) obj;
 }
 
