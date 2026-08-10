@@ -27,6 +27,7 @@ enum ConfigOptionType {
     CONFIG_TYPE_UINT,
     CONFIG_TYPE_FLOAT,
     CONFIG_TYPE_BIND,
+    CONFIG_TYPE_STRING,
 };
 
 struct ConfigOption {
@@ -36,7 +37,9 @@ struct ConfigOption {
         bool *boolValue;
         unsigned int *uintValue;
         float *floatValue;
+        char *strValue;
     };
+    unsigned int strLen;  // buffer size, CONFIG_TYPE_STRING only
 };
 
 /*
@@ -64,6 +67,12 @@ ConfigWindow configWindow       = {
 unsigned int configFiltering    = 1;          // 0=force nearest, 1=linear
 unsigned int configMasterVolume = MAX_VOLUME; // 0 - MAX_VOLUME
 unsigned int configMusicVolume = MAX_VOLUME;
+
+// Online bingo lobby defaults (edited on the file-select ONLINE screen)
+char configNetName[16] = "mario";
+char configNetServer[128] = "";
+char configNetRoom[32] = "bingo";
+unsigned int configNetColor = 0;
 unsigned int configSfxVolume = MAX_VOLUME;
 unsigned int configEnvVolume = MAX_VOLUME;
 
@@ -151,6 +160,10 @@ static const struct ConfigOption options[] = {
     {.name = "vsync",                .type = CONFIG_TYPE_BOOL, .boolValue = &configWindow.vsync},
 #endif
     {.name = "texture_filtering",    .type = CONFIG_TYPE_UINT, .uintValue = &configFiltering},
+    {.name = "net_name",             .type = CONFIG_TYPE_STRING, .strValue = configNetName, .strLen = sizeof(configNetName)},
+    {.name = "net_server",           .type = CONFIG_TYPE_STRING, .strValue = configNetServer, .strLen = sizeof(configNetServer)},
+    {.name = "net_room",             .type = CONFIG_TYPE_STRING, .strValue = configNetRoom, .strLen = sizeof(configNetRoom)},
+    {.name = "net_color",            .type = CONFIG_TYPE_UINT, .uintValue = &configNetColor},
     {.name = "master_volume",        .type = CONFIG_TYPE_UINT, .uintValue = &configMasterVolume},
     {.name = "music_volume",         .type = CONFIG_TYPE_UINT, .uintValue = &configMusicVolume},
     {.name = "sfx_volume",           .type = CONFIG_TYPE_UINT, .uintValue = &configSfxVolume},
@@ -357,6 +370,9 @@ void configfile_load(const char *filename) {
                         case CONFIG_TYPE_FLOAT:
                             sscanf(tokens[1], "%f", option->floatValue);
                             break;
+                        case CONFIG_TYPE_STRING:
+                            snprintf(option->strValue, option->strLen, "%s", tokens[1]);
+                            break;
                         default:
                             assert(0); // bad type
                     }
@@ -403,6 +419,13 @@ void configfile_save(const char *filename) {
                 for (int i = 0; i < MAX_BINDS; ++i)
                     fprintf(file, "%04x ", option->uintValue[i]);
                 fprintf(file, "\n");
+                break;
+            case CONFIG_TYPE_STRING:
+                // An empty value would parse as a missing one; just skip
+                // it and let the default apply on the next load.
+                if (option->strValue[0] != '\0') {
+                    fprintf(file, "%s %s\n", option->name, option->strValue);
+                }
                 break;
             default:
                 assert(0); // unknown type

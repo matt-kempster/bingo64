@@ -30,6 +30,7 @@
 #include "gfx_direct3d_common.h"
 #include "gfx_screen_config.h"
 #include "gfx_pc.h"
+#include "../controller/text_input.h"
 
 #define WINCLASS_NAME L"N64GAME"
 
@@ -321,6 +322,13 @@ static LRESULT CALLBACK gfx_dxgi_wnd_proc(HWND h_wnd, UINT message, WPARAM w_par
             break;
         case WM_KEYUP:
             onkeyup(w_param, l_param);
+            break;
+        case WM_CHAR:
+            // TranslateMessage turns keystrokes into these; menu text
+            // fields consume them (backspace/enter/escape included).
+            if (text_input_active() && w_param < 0x80) {
+                text_input_on_char((int) w_param);
+            }
             break;
         case WM_SYSKEYDOWN:
             if ((w_param == VK_RETURN) && ((l_param & 1 << 30) == 0)) {

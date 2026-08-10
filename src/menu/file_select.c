@@ -37,6 +37,12 @@
 #include "pc/configfile.h"
 #endif
 
+#ifndef TARGET_N64
+#include <stdio.h>
+#include "online_lobby.h"
+#include "pc/network/network.h"
+#endif
+
 #ifdef COMMAND_LINE_OPTIONS
 #include "pc/cliopts.h"
 #endif
@@ -681,6 +687,12 @@ void bhv_menu_button_manager_init(void) {
     );
     sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale = 1.0f;
 
+#ifndef TARGET_N64
+    sMainMenuButtons[MENU_BUTTON_ONLINE] = spawn_object_rel_with_rot(
+        gCurrentObject, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, -6800, 5800, 0, 0, 0, 0
+    );
+    sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonScale = 1.0f;
+#endif
 
     sTextBaseAlpha = 0;
 }
@@ -704,12 +716,32 @@ static void check_main_menu_clicked_buttons(void) {
         s16 buttonY = sMainMenuButtons[buttonID]->oPosY;
 
         if (check_clicked_button(buttonX, buttonY, 200.0f) == TRUE) {
+#ifndef TARGET_N64
+            // In an online room the race starts together: the file pick
+            // unlocks at the shared GO.
+            if (buttonID == MENU_BUTTON_PLAY_FILE_A && network_active()
+                && network_state() != NET_STATE_RACING) {
+                printf("net: file pick locked until the room's GO\n");
+                play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+                break;
+            }
+#endif
             // If menu button clicked, select it
             sMainMenuButtons[buttonID]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
             sSelectedButtonID = buttonID;
             break;
         }
     }
+
+#ifndef TARGET_N64
+    if (sSelectedButtonID == MENU_BUTTON_NONE
+        && check_clicked_button(sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosX,
+                                sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosY, 200.0f) == TRUE) {
+        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+        sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
+        sSelectedButtonID = MENU_BUTTON_ONLINE;
+    }
+#endif
 
     // Play sound of the save file clicked
     switch (sSelectedButtonID) {
@@ -739,6 +771,11 @@ void bhv_menu_button_manager_loop(void) {
         case MENU_BUTTON_SEED_OPTION:
             exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_SEED_OPTION], MENU_BUTTON_NONE);
             break;
+#ifndef TARGET_N64
+        case MENU_BUTTON_ONLINE:
+            exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_ONLINE], MENU_BUTTON_NONE);
+            break;
+#endif
     }
 
     sClickPos[0] = -10000;
@@ -758,6 +795,10 @@ static void handle_cursor_button_input(void) {
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
             sCursorClickingTimer = 1;
+#ifndef TARGET_N64
+            // If we host an online room, the options may have changed.
+            network_push_local_options();
+#endif
         } else {
             if (sBingoOptionSelectTimer > 0) {
                 sBingoOptionSelectTimer--;
@@ -805,6 +846,16 @@ static void handle_cursor_button_input(void) {
                 sToggleCurrentOption = 1;
             }
         }
+#ifndef TARGET_N64
+    } else if (sSelectedButtonID == MENU_BUTTON_ONLINE) {
+        if (online_lobby_handle_input()) {
+            // Leave the lobby screen (any connection stays up).
+            sTextBaseAlpha = 0;
+            sClickPos[0] = sCursorPos[0];
+            sClickPos[1] = sCursorPos[1];
+            sCursorClickingTimer = 1;
+        }
+#endif
     } else { // If cursor is clicked
         if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | B_BUTTON | START_BUTTON)) {
             sClickPos[0] = sCursorPos[0];
@@ -937,6 +988,12 @@ static void draw_seed_mode_menu(void) {
     print_generic_string(241, 34, textOption);
     print_generic_string(245, 104, textStart);
     print_generic_string(35, 104, textBackspace);
+#ifndef TARGET_N64
+    {
+        static unsigned char textOnline[] = { 0x18, 0x17, 0x15, 0x12, 0x17, 0x0E, 0xFF };  // "ONLINE"
+        print_generic_string(38, 177, textOnline);
+    }
+#endif
 
     // Display seed
     if (gBingoSeedIsSet) {
@@ -1552,6 +1609,11 @@ static void print_file_select_strings(void) {
         case MENU_BUTTON_SEED_OPTION:
             print_bingo_options();
             break;
+#ifndef TARGET_N64
+        case MENU_BUTTON_ONLINE:
+            online_lobby_draw(sTextBaseAlpha);
+            break;
+#endif
     }
     // Timers for menu alpha text and the main menu itself
     if (sTextBaseAlpha < 250) {
@@ -1636,10 +1698,9 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 }
 
 u32 get_seed(void) {
-#if !defined(TARGET_N64) && !defined(_WIN32)
+#ifndef TARGET_N64
     // Online play: every player in the room uses the server's shared seed.
     {
-        extern s32 network_has_seed(u32 *seed);
         u32 netSeed;
         if (network_has_seed(&netSeed)) {
             return netSeed;

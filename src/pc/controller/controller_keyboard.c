@@ -7,13 +7,70 @@
 #include "controller_emscripten_keyboard.h"
 #endif
 
+#include <stdio.h>
+#include <string.h>
+
 #include "../configfile.h"
 #include "controller_keyboard.h"
+#include "text_input.h"
 #ifdef TOUCH_CONTROLS
 #include "controller_touchscreen.h"
 #endif
 
 static int keyboard_buttons_down;
+
+// --- menu text-field editing (see text_input.h) ---
+
+static char *sTextBuf = NULL;
+static int sTextMax = 0;
+static char sTextOriginal[128];
+static int sTextFinished = 0;
+
+int text_input_active(void) {
+    return sTextBuf != NULL;
+}
+
+void text_input_start(char *buf, int maxLen) {
+    sTextBuf = buf;
+    sTextMax = maxLen;
+    snprintf(sTextOriginal, sizeof(sTextOriginal), "%s", buf);
+    sTextFinished = 0;
+    // Whatever keys were held for gameplay must not stick while typing.
+    keyboard_on_all_keys_up();
+}
+
+void text_input_stop(void) {
+    sTextBuf = NULL;
+}
+
+int text_input_take_finished(void) {
+    int f = sTextFinished;
+    sTextFinished = 0;
+    return f;
+}
+
+void text_input_on_char(int c) {
+    int len;
+    if (sTextBuf == NULL) {
+        return;
+    }
+    len = (int) strlen(sTextBuf);
+    if (c == '\b') {
+        if (len > 0) {
+            sTextBuf[len - 1] = '\0';
+        }
+    } else if (c == '\r' || c == '\n') {
+        sTextFinished = 1;
+    } else if (c == 0x1B) {
+        snprintf(sTextBuf, sTextMax, "%s", sTextOriginal);
+        sTextFinished = 1;
+    } else if (c > ' ' && c < 0x7F && len < sTextMax - 1) {
+        // Printable ASCII except space: these strings travel in the
+        // space-separated relay protocol.
+        sTextBuf[len] = (char) c;
+        sTextBuf[len + 1] = '\0';
+    }
+}
 
 #define MAX_KEYBINDS 64
 static int keyboard_mapping[MAX_KEYBINDS][2];
@@ -34,7 +91,12 @@ static int keyboard_map_scancode(int scancode) {
 #define SCANCODE_M 0x32
 
 bool keyboard_on_key_down(int scancode) {
-    int mapped = keyboard_map_scancode(scancode);
+    int mapped;
+    if (text_input_active()) {
+        // The keyboard is a text field right now, not a controller.
+        return false;
+    }
+    mapped = keyboard_map_scancode(scancode);
     // M toggles this window's audio mute, unless the user bound M to a button.
     if (scancode == SCANCODE_M && mapped == 0) {
         extern unsigned char gAudioMuted;

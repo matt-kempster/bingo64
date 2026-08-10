@@ -44,6 +44,7 @@ void Sleep(unsigned long ms);
 
 #include "src/pc/controller/controller_keyboard.h"
 #include "src/pc/controller/controller_touchscreen.h"
+#include "src/pc/controller/text_input.h"
 
 #ifdef TARGET_SWITCH
 #include <switch.h>
@@ -333,11 +334,29 @@ static void gfx_sdl_handle_events(void) {
 #ifndef TARGET_WEB
             // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
             case SDL_KEYDOWN:
+                if (text_input_active()) {
+                    // SDL_TEXTINPUT carries the characters; the edit keys
+                    // arrive only as key events.
+                    switch (event.key.keysym.scancode) {
+                        case SDL_SCANCODE_BACKSPACE: text_input_on_char('\b'); break;
+                        case SDL_SCANCODE_RETURN:
+                        case SDL_SCANCODE_KP_ENTER:  text_input_on_char('\r'); break;
+                        case SDL_SCANCODE_ESCAPE:    text_input_on_char(0x1B); break;
+                        default: break;
+                    }
+                }
                 gfx_sdl_onkeydown(event.key.keysym.scancode);
                 break;
             case SDL_KEYUP:
                 gfx_sdl_onkeyup(event.key.keysym.scancode);
                 break;
+            case SDL_TEXTINPUT: {
+                const char *t;
+                for (t = event.text.text; *t != '\0'; t++) {
+                    text_input_on_char((unsigned char) *t);
+                }
+                break;
+            }
 #endif
 #ifdef TOUCH_CONTROLS
         case SDL_FINGERDOWN:

@@ -22,7 +22,7 @@ struct PCCLIOptions  {
     char NetServer[128];
     char NetRoom[32];
     char NetName[16];
-    unsigned int NetTeam;
+    unsigned int NetColor;
 };
 
 extern struct PCCLIOptions gCLIOpts;

@@ -50,7 +50,10 @@ enum MenuButtonTypes {
     MENU_BUTTON_SEED_NUM_0,  // separated due to unique position
 
     MENU_BUTTON_SEED_OPTION,
-    MENU_BUTTON_SEED_MAX
+    MENU_BUTTON_SEED_MAX,
+
+    // The online lobby screen (PC only; the button is not spawned on N64)
+    MENU_BUTTON_ONLINE
 };
 
 enum ScoreMenuMessageID {

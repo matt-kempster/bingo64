@@ -49,7 +49,7 @@ static void print_cli_help(void) {
     printf("%-20s\tConnect to a bingo relay server (see server/relay.py).\n", "--net-server HOST[:PORT]");
     printf("%-20s\tRoom to join on the relay server (default: bingo).\n", "--net-room ROOM");
     printf("%-20s\tYour player name for online play (default: mario).\n", "--net-name NAME");
-    printf("%-20s\tTeam number for group modes (default: 0, no team).\n", "--net-team N");
+    printf("%-20s\tMario palette index 0-7 for online play (default: 0).\n", "--net-color N");
 }
 
 static void print_cli_level_list(void) {
@@ -165,8 +165,8 @@ void parse_cli_opts(int argc, char* argv[]) {
             gCLIOpts.NetName[sizeof(gCLIOpts.NetName) - 1] = '\0';
         }
 
-        else if (strcmp(argv[i], "--net-team") == 0 && (i + 1) < argc)
-            arg_uint("--net-team", argv[++i], &gCLIOpts.NetTeam);
+        else if (strcmp(argv[i], "--net-color") == 0 && (i + 1) < argc)
+            arg_uint("--net-color", argv[++i], &gCLIOpts.NetColor);
 
         // Print level list to use with args
         else if (strcmp(argv[i], "--listlevels") == 0) {
