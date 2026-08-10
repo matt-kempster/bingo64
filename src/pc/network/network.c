@@ -172,6 +172,13 @@ static void handle_line(char *line) {
         s32 lockout = 0, public_ = 0;
         s32 id = 0;
         if (sscanf(line + 1, "%d %d %d", &id, &lockout, &public_) == 3) {
+            // A v1 relay sends "W <id> <seed> <lockout>": the huge seed
+            // lands in the lockout field. Fail loudly instead of running
+            // a half-broken lobby against an outdated server.
+            if (lockout < 0 || lockout > 1 || public_ < 0 || public_ > 1) {
+                net_fail("server runs an old relay version");
+                return;
+            }
             sLocalId = id;
             sLockout = lockout;
             sState = NET_STATE_LOBBY;
