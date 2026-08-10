@@ -755,6 +755,15 @@ s32 bingo_objective_metal_cap_box_init(enum BingoObjectiveClass class) {
     }
 }
 
+s32 bingo_objective_recovery_heart_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        case BINGO_CLASS_HARD:
+            return random_range_inclusive(4, 8);
+        default:
+            return random_range_inclusive(2, 5);
+    }
+}
+
 s32 bingo_objective_signpost_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -892,6 +901,8 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_vanish_cap_box_init(class);
         case BINGO_OBJECTIVE_METAL_CAP_BOX:
             return bingo_objective_metal_cap_box_init(class);
+        case BINGO_OBJECTIVE_RECOVERY_HEART:
+            return bingo_objective_recovery_heart_init(class);
         case BINGO_OBJECTIVE_SIGNPOST:
             return bingo_objective_signpost_init(class);
         case BINGO_OBJECTIVE_POLES:

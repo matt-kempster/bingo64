@@ -191,6 +191,7 @@
 #define TEXT_POLES _("Grab Poles")
 #define TEXT_CANNONS _("Shoot Cannons")
 #define TEXT_RED_COINS _("Collect Red Coins")
+#define TEXT_RECOVERY_HEARTS _("Use Recovery Hearts")
 #define TEXT_AMPS _("Touch Amps")
 #define TEXT_KILL_GOOMBAS _("Kill Goombas")
 #define TEXT_KILL_BOBOMBS _("Kill Bob-ombs")

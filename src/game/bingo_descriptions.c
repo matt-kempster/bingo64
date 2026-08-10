@@ -478,6 +478,9 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_SIGNPOST:
             strcpy(verb, "Read");
             break;
+        case BINGO_OBJECTIVE_RECOVERY_HEART:
+            strcpy(verb, "Use");
+            break;
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
         case BINGO_OBJECTIVE_WING_CAP_BOX:
         case BINGO_OBJECTIVE_VANISH_CAP_BOX:
@@ -527,6 +530,9 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             break;
         case BINGO_OBJECTIVE_SIGNPOST:
             strcpy(collectName, "Signposts");
+            break;
+        case BINGO_OBJECTIVE_RECOVERY_HEART:
+            strcpy(collectName, "Recovery Hearts");
             break;
         case BINGO_OBJECTIVE_POLES:
             strcpy(collectName, "Poles");
@@ -697,6 +703,7 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_WING_CAP_BOX:
         case BINGO_OBJECTIVE_VANISH_CAP_BOX:
         case BINGO_OBJECTIVE_METAL_CAP_BOX:
+        case BINGO_OBJECTIVE_RECOVERY_HEART:
         case BINGO_OBJECTIVE_AMPS:
         case BINGO_OBJECTIVE_KILL_GOOMBAS:
         case BINGO_OBJECTIVE_KILL_BOBOMBS:
