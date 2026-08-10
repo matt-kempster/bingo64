@@ -357,24 +357,33 @@ Gfx *geo_mirror_mario_set_alpha(s32 callContext, struct GraphNode *node, UNUSED 
         alpha = (bodyState->modelState & 0x100) ? (bodyState->modelState & 0xFF) : 255;
 #ifndef TARGET_N64
         if (rendering_ghost_puppet()) {
-            // Ghost puppets render translucent. This must happen in the
-            // OPAQUE layer (within a layer the master list keeps traversal
-            // order, so these commands precede exactly this puppet's body):
-            // switch the blender to XLU so Mario's FADEA materials blend
-            // with env alpha. The vanilla alpha<255 path can't be used, as
-            // it parks its commands in the transparent layer where they
-            // never affect the opaque body, and gfx_pc ignores both the
-            // alpha combiner and alpha compare in opaque render modes.
-            // The post-body hook in geo_mirror_mario_backface_culling
-            // restores the layer's normal state.
-            Gfx *ghostGfx = alloc_display_list(4 * sizeof(*ghostGfx));
-            asGenerated->fnNode.node.flags =
-                (asGenerated->fnNode.node.flags & 0xFF) | (LAYER_OPAQUE << 8);
-            gDPPipeSync(&ghostGfx[0]);
-            gDPSetRenderMode(&ghostGfx[1], G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
-            gDPSetEnvColor(&ghostGfx[2], 255, 255, 255, 140);
-            gSPEndDisplayList(&ghostGfx[3]);
-            return ghostGfx;
+            // Ghost puppets render translucent as a whole. Blending each
+            // body part independently stacks opacity where parts overlap
+            // (arm over torso), so the body draws twice instead: a
+            // depth-only pre-pass (alpha 0, Z_UPD) in LAYER_ALPHA settles
+            // the nearest ghost surface per pixel, then LAYER_TRANSPARENT
+            // blends exactly that surface once (its Z compare passes only
+            // at the pre-pass depth). geo_append_display_list routes the
+            // ghost's opaque body lists into both layers; these state DLs
+            // bracket them there, and the post-body hook in
+            // geo_mirror_mario_backface_culling restores each layer's
+            // state. Mario's FADEA materials take the alpha from the env
+            // color. The vanilla alpha<255 path can't be used, as gfx_pc
+            // ignores both the alpha combiner and alpha compare in opaque
+            // render modes.
+            Gfx *pre = alloc_display_list(4 * sizeof(*pre));
+            Gfx *blend = alloc_display_list(4 * sizeof(*blend));
+            gDPPipeSync(&pre[0]);
+            gDPSetRenderMode(&pre[1], G_RM_AA_ZB_XLU_SURF | Z_UPD, G_RM_AA_ZB_XLU_SURF2 | Z_UPD);
+            gDPSetEnvColor(&pre[2], 255, 255, 255, 0);
+            gSPEndDisplayList(&pre[3]);
+            gDPPipeSync(&blend[0]);
+            gDPSetRenderMode(&blend[1], G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
+            gDPSetEnvColor(&blend[2], 255, 255, 255, 140);
+            gSPEndDisplayList(&blend[3]);
+            geo_append_display_list_ext(pre, LAYER_ALPHA);
+            geo_append_display_list_ext(blend, LAYER_TRANSPARENT);
+            return NULL;
         }
 #endif
 #ifdef BETTERCAMERA
@@ -707,17 +716,23 @@ Gfx *geo_mirror_mario_backface_culling(s32 callContext, struct GraphNode *node, 
     }
 #ifndef TARGET_N64
     // Post-body instance (parameter 1) doubles as the ghost puppet's state
-    // reset: restore the opaque layer's blender and env alpha so the
-    // translucency set up in geo_mirror_mario_set_alpha cannot leak into
-    // whatever the opaque layer draws after this ghost.
+    // reset: restore each pass layer's normal render mode and env color so
+    // the state set up in geo_mirror_mario_set_alpha cannot leak into
+    // whatever those layers draw after this ghost.
     if (callContext == GEO_CONTEXT_RENDER && asGenerated->parameter == 1
         && rendering_ghost_puppet()) {
-        gfx = alloc_display_list(4 * sizeof(*gfx));
-        gDPPipeSync(&gfx[0]);
-        gDPSetRenderMode(&gfx[1], G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
-        gDPSetEnvColor(&gfx[2], 255, 255, 255, 255);
-        gSPEndDisplayList(&gfx[3]);
-        asGenerated->fnNode.node.flags = (asGenerated->fnNode.node.flags & 0xFF) | (LAYER_OPAQUE << 8);
+        Gfx *fixAlpha = alloc_display_list(4 * sizeof(*fixAlpha));
+        Gfx *fixBlend = alloc_display_list(4 * sizeof(*fixBlend));
+        gDPPipeSync(&fixAlpha[0]);
+        gDPSetRenderMode(&fixAlpha[1], G_RM_AA_ZB_TEX_EDGE, G_RM_AA_ZB_TEX_EDGE2);
+        gDPSetEnvColor(&fixAlpha[2], 255, 255, 255, 255);
+        gSPEndDisplayList(&fixAlpha[3]);
+        gDPPipeSync(&fixBlend[0]);
+        gDPSetRenderMode(&fixBlend[1], G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
+        gDPSetEnvColor(&fixBlend[2], 255, 255, 255, 255);
+        gSPEndDisplayList(&fixBlend[3]);
+        geo_append_display_list_ext(fixAlpha, LAYER_ALPHA);
+        geo_append_display_list_ext(fixBlend, LAYER_TRANSPARENT);
     }
 #endif
 

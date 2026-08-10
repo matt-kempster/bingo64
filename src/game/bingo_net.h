@@ -21,4 +21,15 @@ void bhv_net_ghost_update(void);
 // puppets don't mirror the local player's body state (always 0 on N64).
 s32 bingo_net_obj_is_ghost(struct Object *obj);
 
+#ifndef TARGET_N64
+// The palette index of the peer driving this ghost puppet (0 = red).
+s32 bingo_net_ghost_color(struct Object *obj);
+
+// A copy of `dl` with Mario's red-material lights swapped for the given
+// palette color, so each ghost wears its owner's hat color. Clones are
+// built lazily and cached; returns `dl` itself for color 0 (red) or when
+// the display list touches no red material.
+void *bingo_net_tinted_dl(void *dl, s32 color);
+#endif
+
 #endif // BINGO_NET_H

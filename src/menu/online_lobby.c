@@ -42,10 +42,7 @@ static s32 sPublic = 0;
 static const char *sColorNames[NET_COLOR_COUNT] = {
     "RED", "GREEN", "BLUE", "YELLOW", "PURPLE", "PINK", "CYAN", "WHITE",
 };
-static const u8 sColorRGB[NET_COLOR_COUNT][3] = {
-    { 255, 70, 70 },  { 70, 220, 70 },   { 100, 140, 255 }, { 255, 220, 60 },
-    { 200, 100, 255 }, { 255, 150, 210 }, { 90, 230, 255 },  { 240, 240, 240 },
-};
+#define sColorRGB gNetColorRGB
 
 // From file_select.c: the locally entered seed, offered to the server when
 // our join creates the room.

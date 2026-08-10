@@ -10,6 +10,7 @@
 #include "print.h"
 #include "rendering_graph_node.h"
 #include "shadow.h"
+#include "bingo_net.h"
 
 #include "config.h"
 #include "config/config_world.h"
@@ -261,6 +262,12 @@ void geo_append_display_list(void *displayList, s16 layer)
     }
 }
 
+// Callable form for code outside this file (the macro above replaces
+// geo_append_display_list under HIGH_FPS_PC).
+void geo_append_display_list_ext(void *displayList, s16 layer) {
+    geo_append_display_list(displayList, layer);
+}
+
 // ex-alo change
 // simplify matrix and dl usage into functions (From HackerSM64)
 void inc_mat_stack(void) {
@@ -278,8 +285,27 @@ void inc_mat_stack(void) {
 }
 
 void append_dl_and_return(struct GraphNodeDisplayList *node) {
+    s16 layer = node->node.flags >> 8;
     if (node->displayList != NULL) {
-        geo_append_display_list(node->displayList, node->node.flags >> 8);
+#ifndef TARGET_N64
+        // Ghost Mario puppets: the opaque body draws twice for whole-body
+        // translucency. A depth-only pre-pass in LAYER_ALPHA resolves the
+        // nearest surface per pixel, then LAYER_TRANSPARENT blends exactly
+        // that surface once, so overlapping parts (arm over torso) do not
+        // stack opacity. State DLs bracketing both passes come from
+        // geo_mirror_mario_set_alpha; the body lists are also swapped for
+        // hat-colored clones (bingo_net_tinted_dl). Only static model
+        // lists flow through here, so the clone cache stays valid.
+        if (layer == LAYER_OPAQUE && gCurGraphNodeObject != NULL
+            && bingo_net_obj_is_ghost((struct Object *) gCurGraphNodeObject)) {
+            void *tinted = bingo_net_tinted_dl(
+                node->displayList,
+                bingo_net_ghost_color((struct Object *) gCurGraphNodeObject));
+            geo_append_display_list(tinted, LAYER_ALPHA);
+            geo_append_display_list(tinted, LAYER_TRANSPARENT);
+        } else
+#endif
+        geo_append_display_list(node->displayList, layer);
     }
     if (node->node.children != NULL) {
         geo_process_node_and_siblings(node->node.children);

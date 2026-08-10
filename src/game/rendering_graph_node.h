@@ -39,6 +39,10 @@ struct RenderModeContainer {
 void geo_process_node_and_siblings(struct GraphNode *firstNode);
 void geo_process_root(struct GraphNodeRoot *node, Vp *b, Vp *c, s32 clearColor);
 
+// Append a display list to the current master list from outside
+// rendering_graph_node.c (used by the ghost puppet's two-pass rendering).
+void geo_append_display_list_ext(void *displayList, s16 layer);
+
 #ifdef HIGH_FPS_PC
 void interpolate_vectors(Vec3f res, Vec3f a, Vec3f b);
 void interpolate_vectors_s16(Vec3s res, Vec3s a, Vec3s b);

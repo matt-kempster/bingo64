@@ -7,7 +7,9 @@ static const Lights1 mario_blue_lights_group = gdSPDefLights1(
 );
 
 // 0x04000018 # solid color red - left & right arm, torso (tshirt part), caps - all poly types
-static const Lights1 mario_red_lights_group = gdSPDefLights1(
+// Non-static: the PC online code clones the display lists that bind these
+// lights to recolor ghost Marios (src/game/bingo_net.c).
+const Lights1 mario_red_lights_group = gdSPDefLights1(
     0x7f, 0x00, 0x00,
     0xff, 0x00, 0x00, 0x28, 0x28, 0x28
 );

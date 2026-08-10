@@ -56,6 +56,9 @@ struct NetGhost {
 extern struct NetGhost gNetGhosts[NET_MAX_GHOSTS];
 extern struct NetPlayer gNetPlayers[NET_MAX_PLAYERS];
 
+// The player palette: lobby roster text, ghost hat tint, etc.
+extern const u8 gNetColorRGB[NET_COLOR_COUNT][3];
+
 // Reads --net-server/--net-room/--net-name/--net-color from gCLIOpts,
 // connects, and auto-readies (CLI sessions skip the lobby wait).
 // Quietly does nothing when no server was requested.

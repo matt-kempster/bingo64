@@ -69,6 +69,12 @@ static const char *net_strerror(void) {
 struct NetGhost gNetGhosts[NET_MAX_GHOSTS];
 struct NetPlayer gNetPlayers[NET_MAX_PLAYERS];
 
+// Index 0 must stay Mario red: it maps to the unmodified model.
+const u8 gNetColorRGB[NET_COLOR_COUNT][3] = {
+    { 255, 70, 70 },   { 70, 220, 70 },   { 100, 140, 255 }, { 255, 220, 60 },
+    { 200, 100, 255 }, { 255, 150, 210 }, { 90, 230, 255 },  { 240, 240, 240 },
+};
+
 static enum NetState sState = NET_STATE_OFF;
 static net_sock_t sSocket = NET_BAD_SOCK;
 static s32 sLocalId = 0;
