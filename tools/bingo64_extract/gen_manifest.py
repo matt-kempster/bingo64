@@ -195,15 +195,27 @@ def main():
         print(f"located extra {path}: mio0={loc[0]:#x} pos={loc[1]:#x}")
 
     # --- sound maps -------------------------------------------------------
-    # sound_data.ctl and bank_sets ship with the game (structural data from
-    # committed sources); the extractor rebuilds sequences.bin and
-    # sound_data.tbl from the user's ROM via these maps.
+    # sound_data.ctl ships with the game (structural data from committed
+    # sources); the extractor rebuilds sequences.bin, sound_data.tbl and
+    # bank_sets from the user's ROM via these maps.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from gen_sound_map import build_sound_maps, verify_tbl_content
     snd = build_sound_maps(rom, builddir)
     print(verify_tbl_content(rom, builddir, snd["tbl_map"], snd["tbl_len"]))
     built_tbl = open(f"{builddir}/sound/sound_data.tbl", "rb").read()
     tbl_header = built_tbl[:snd["tbl_map"][0][0]]
+
+    # bank_sets is the ROM's sequence->bank table with its u16 offset table
+    # byteswapped to native order; locate the ROM copy and emit the recipe.
+    built_bs = open(f"{builddir}/sound/bank_sets", "rb").read()
+    bs_swap = struct.unpack("<H", built_bs[:2])[0]  # first offset = table size
+    assert bs_swap % 2 == 0 and 0 < bs_swap < len(built_bs), bs_swap
+    rom_order = bytearray(built_bs)
+    rom_order[0:bs_swap:2], rom_order[1:bs_swap:2] = \
+        built_bs[1:bs_swap:2], built_bs[0:bs_swap:2]
+    bs_off = rom.find(bytes(rom_order))
+    assert bs_off >= 0, "bank_sets not found in ROM"
+    print(f"bank_sets: rom@{bs_off:#x} len={len(built_bs)} swap={bs_swap}")
 
     # --- emit ------------------------------------------------------------
     with open(outpath, "w") as f:
@@ -235,6 +247,9 @@ def main():
         emit_bytes("sTblHeader", tbl_header)
         emit_map("sTblMap", snd["tbl_map"])
         f.write(f"static const unsigned int sTblLen = {snd['tbl_len']};\n")
+        f.write(f"static const unsigned int sBankSetsOff = {bs_off};\n")
+        f.write(f"static const unsigned int sBankSetsLen = {len(built_bs)};\n")
+        f.write(f"static const unsigned int sBankSetsSwap = {bs_swap};\n")
     print(f"wrote {outpath}: {len(tex)} textures, {len(sky)} sky/cake, "
           f"{len(snd['seq_map'])} sequences, {len(snd['tbl_map'])} samples")
 

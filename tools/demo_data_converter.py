@@ -31,6 +31,12 @@ def main():
     with open(prog_args[0], "r") as file:
         descr = json.loads(re.sub(r"/\*[\w\W]*?\*/", "", file.read()))
 
+    # Release builds ship no ROM bytes: emit an empty table so the demo
+    # recordings never enter the binary (title_screen.c guards playback).
+    if "NO_ROM_DEMOS" in defines:
+        descr["table"] = []
+        descr["demofiles"] = []
+
     table = []
     for item in descr["table"]:
         if not "ifdef" in item or any(d in defines for d in item["ifdef"]):

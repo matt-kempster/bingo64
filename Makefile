@@ -1595,7 +1595,7 @@ $(BUILD_DIR)/assets/mario_anim_data.c: $(wildcard assets/anims/*.inc.c)
 # Generate demo input data
 $(BUILD_DIR)/assets/demo_data.c: assets/demo_data.json $(wildcard assets/demos/*.bin)
 	@$(PRINT) "$(GREEN)Generating demo data $(NO_COL)\n"
-	$(V)$(PYTHON) tools/demo_data_converter.py assets/demo_data.json $(DEF_INC_CFLAGS) > $@
+	$(V)$(PYTHON) tools/demo_data_converter.py assets/demo_data.json $(DEF_INC_CFLAGS) $(CUSTOM_C_DEFINES) > $@
 
 # Encode in-game text strings
 $(BUILD_DIR)/$(CHARMAP): $(CHARMAP)

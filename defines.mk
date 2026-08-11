@@ -62,6 +62,10 @@ HIGH_FPS_PC ?= 0
 TEXTSAVES ?= 0
 # Load resources from external files
 EXTERNAL_DATA ?= 0
+# Compile out the title-screen attract demos. The demo input recordings
+# (assets/demos/*.bin) are literal ROM bytes baked into the exe; release
+# builds must set this so the shipped binary contains no baserom data.
+NO_ROM_DEMOS ?= 0
 # Enable Discord Rich Presence
 DISCORDRPC ?= 0
 # Enable Command Line Options
@@ -101,6 +105,11 @@ ifeq ($(EXTERNAL_DATA),1)
   ifeq ($(TARGET_N64),1)
     $(error External data is not usable on N64)
   endif
+endif
+
+# Check for demo-less builds
+ifeq ($(NO_ROM_DEMOS),1)
+  CUSTOM_C_DEFINES += -DNO_ROM_DEMOS
 endif
 
 ifeq ($(WINDOW_API),SDL2)

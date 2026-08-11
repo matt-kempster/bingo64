@@ -50,6 +50,11 @@ s32 run_level_id_or_demo(s32 level) {
 
     if (level == LEVEL_NONE) {
         if (!gPlayer1Controller->buttonDown && !gPlayer1Controller->stickMag) {
+#ifdef NO_ROM_DEMOS
+            // Demo recordings are ROM bytes; release builds compile them out
+            // and just sit on the PRESS START screen.
+            ++sDemoCountdown;
+#else
             // start the demo. 800 frames has passed while
             // player is idle on PRESS START screen.
             if ((++sDemoCountdown) == PRESS_START_DEMO_TIMER) {
@@ -71,6 +76,7 @@ s32 run_level_id_or_demo(s32 level) {
                 gCurrSaveFileNum = 1;
                 gCurrActNum = 1;
             }
+#endif
         } else { // activity was detected, so reset the demo countdown.
             sDemoCountdown = 0;
         }

@@ -3,7 +3,7 @@
  * Usage: bingo64-extract <baserom.us.z64> [outdir]
  *
  * Writes res/gfx/<...>.png (textures, skybox and cake tiles) and
- * res/sound/* (rebuilt via the recipe baked into manifest.inc). The result
+ * the res/sound files (rebuilt via the recipe baked into manifest.inc); the result
  * is equivalent to the EXTERNAL_DATA basepack, so the game runs with
  * loose files under res/ next to the executable.
  *
@@ -354,8 +354,8 @@ static void cake_split_write(const char *outdir, const rgba_t *image) {
 
 /* Rebuild a sound file: zeroed buffer + structural header shipped in the
  * manifest + waveform/music bytes copied straight from the ROM. The
- * companion files (sound_data.ctl, bank_sets) ship with the game since
- * they are generated from the repo's committed sources. */
+ * companion file sound_data.ctl ships with the game since it is
+ * generated from the repo's committed sources. */
 static void write_mapped_file(const char *outdir, const char *name,
                               uint32_t total, const unsigned char *header,
                               uint32_t header_len,
@@ -490,6 +490,27 @@ int main(int argc, char **argv) {
     write_mapped_file(outdir, "sound_data.tbl", sTblLen,
                       sTblHeader, sizeof(sTblHeader),
                       sTblMap, (int) (sizeof(sTblMap) / sizeof(sTblMap[0])));
+
+    /* bank_sets: the ROM's sequence->bank table; its leading u16 offset
+     * table is stored big-endian in ROM and native-endian in the file. */
+    {
+        char path[1024];
+        uint8_t *buf = malloc(sBankSetsLen);
+        if (!buf) { fprintf(stderr, "out of memory\n"); exit(1); }
+        memcpy(buf, sRom + sBankSetsOff, sBankSetsLen);
+        for (uint32_t i = 0; i + 1 < sBankSetsSwap; i += 2) {
+            uint8_t t = buf[i]; buf[i] = buf[i + 1]; buf[i + 1] = t;
+        }
+        snprintf(path, sizeof(path), "%s/sound/bank_sets", outdir);
+        FILE *out = fopen(path, "wb");
+        if (!out || fwrite(buf, 1, sBankSetsLen, out) != sBankSetsLen) {
+            fprintf(stderr, "cannot write %s\n", path);
+            exit(1);
+        }
+        fclose(out);
+        free(buf);
+        printf("  sound/bank_sets\n");
+    }
 
     printf("Done. Put the res/ folder next to the game executable.\n");
     return 0;
