@@ -3714,7 +3714,10 @@ s16 render_course_complete_screen(void) {
         // gCourseCompleteCoinsEqual = 0;
         gHudFlash = 0;
         gForceDrawBingoScreen = 0;
-        return 3;
+        // Auto-dismiss the (never rendered) save menu. This must be the
+        // named option, not literal 3: the PC port inserts SAVE_AND_EXIT
+        // as option 3, which made every star exit quit the game.
+        return MENU_OPT_CONTINUE_DONT_SAVE;
     }
 
     gCourseCompleteScreenTimer++;
