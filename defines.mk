@@ -37,7 +37,10 @@ RM2C ?= 0
 # --------------------------------------
 
 # Quality of life fixes
-QOL_FIXES ?= 1
+# Off for bingo64: many of these change speedrun-relevant behavior (sticky
+# wallkicks, landing input eating, ground-pound/wall bonk rules, camera
+# movement) — gameplay must stay vanilla US.
+QOL_FIXES ?= 0
 # Quality of life features
 # Off for bingo64: these are gameplay changes, not fixes — non-vanilla wall
 # kicks (no bonk at low speed, kicks out of dives), easier long jumps/jump
@@ -45,7 +48,9 @@ QOL_FIXES ?= 1
 # movement, collision tweaks, and more (~50 defines in include/config/).
 QOL_FEATURES ?= 0
 # Quality of life redone files
-QOL_REDONE ?= 1
+# Off for bingo64: includes PLATFORM_DISPLACEMENT_2 (non-vanilla momentum
+# inheritance from moving platforms) and rewritten shadows.
+QOL_REDONE ?= 0
 
 # --------------------------------------
 # Port Only Defines
