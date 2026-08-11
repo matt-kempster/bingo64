@@ -11,7 +11,9 @@
 #define FIX_SHORT_HITBOX_SLIDE_ACTS (0 || QOL_FIXES)
 
 /// Fixes undefined anim return in the hit wall code, more info in the fix itself.
-#define FIX_HIT_WALL_ACTION (0 || QOL_FIXES)
+/// Off for bingo64: makes Mario stick to the wall for 2 real frames and widens
+/// the firsties window — speedrun-relevant, so keep vanilla behavior.
+#define FIX_HIT_WALL_ACTION 0
 
 /// Fixes bonks when ground pounding next to a wall.
 #define FIX_GROUND_POUND_WALL (0 || QOL_FIXES)
