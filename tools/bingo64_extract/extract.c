@@ -46,6 +46,11 @@ struct SkyEntry {
     uint32_t pos;
     int cake;       /* 0 = skybox (8x8 of 32x32), 1 = US cake ending */
 };
+struct CopyEntry {
+    uint32_t dst;   /* offset in the output file */
+    uint32_t src;   /* offset in the ROM */
+    uint32_t len;
+};
 
 #include "manifest.inc"
 
@@ -347,34 +352,36 @@ static void cake_split_write(const char *outdir, const rgba_t *image) {
 
 /* ------------------------------------------------------------------ */
 
-static void replay_sound_recipe(const char *outdir) {
-    static const char *names[] = {"bank_sets", "sequences.bin",
-                                  "sound_data.ctl", "sound_data.tbl"};
-    const unsigned char *p = sSoundRecipe;
-    const unsigned char *end = sSoundRecipe + sizeof(sSoundRecipe);
-    for (int f = 0; f < 4; f++) {
-        char path[1024];
-        snprintf(path, sizeof(path), "%s/sound/%s", outdir, names[f]);
-        mkdirs_for(path);
-        FILE *out = fopen(path, "wb");
-        if (!out) { fprintf(stderr, "cannot write %s\n", path); exit(1); }
-        while (p < end && *p != 0x00) {
-            unsigned op = *p++;
-            uint32_t a = (uint32_t) p[0] | p[1] << 8 | p[2] << 16 | (uint32_t) p[3] << 24;
-            p += 4;
-            if (op == 0x01) {
-                uint32_t len = (uint32_t) p[0] | p[1] << 8 | p[2] << 16 | (uint32_t) p[3] << 24;
-                p += 4;
-                fwrite(sRom + a, 1, len, out);
-            } else { /* 0x02 literal */
-                fwrite(p, 1, a, out);
-                p += a;
-            }
+/* Rebuild a sound file: zeroed buffer + structural header shipped in the
+ * manifest + waveform/music bytes copied straight from the ROM. The
+ * companion files (sound_data.ctl, bank_sets) ship with the game since
+ * they are generated from the repo's committed sources. */
+static void write_mapped_file(const char *outdir, const char *name,
+                              uint32_t total, const unsigned char *header,
+                              uint32_t header_len,
+                              const struct CopyEntry *map, int nmap) {
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/sound/%s", outdir, name);
+    mkdirs_for(path);
+    uint8_t *buf = calloc(1, total);
+    if (!buf) { fprintf(stderr, "out of memory\n"); exit(1); }
+    memcpy(buf, header, header_len);
+    for (int i = 0; i < nmap; i++) {
+        if ((uint64_t) map[i].src + map[i].len > ROM_SIZE
+            || (uint64_t) map[i].dst + map[i].len > total) {
+            fprintf(stderr, "bad copy entry in %s\n", name);
+            exit(1);
         }
-        p++; /* skip 0x00 terminator */
-        fclose(out);
-        printf("  sound/%s\n", names[f]);
+        memcpy(buf + map[i].dst, sRom + map[i].src, map[i].len);
     }
+    FILE *out = fopen(path, "wb");
+    if (!out || fwrite(buf, 1, total, out) != total) {
+        fprintf(stderr, "cannot write %s\n", path);
+        exit(1);
+    }
+    fclose(out);
+    free(buf);
+    printf("  sound/%s\n", name);
 }
 
 /* ------------------------------------------------------------------ */
@@ -477,7 +484,12 @@ int main(int argc, char **argv) {
     }
 
     printf("  sound:\n");
-    replay_sound_recipe(outdir);
+    write_mapped_file(outdir, "sequences.bin", sSeqLen,
+                      sSeqHeader, sizeof(sSeqHeader),
+                      sSeqMap, (int) (sizeof(sSeqMap) / sizeof(sSeqMap[0])));
+    write_mapped_file(outdir, "sound_data.tbl", sTblLen,
+                      sTblHeader, sizeof(sTblHeader),
+                      sTblMap, (int) (sizeof(sTblMap) / sizeof(sTblMap[0])));
 
     printf("Done. Put the res/ folder next to the game executable.\n");
     return 0;

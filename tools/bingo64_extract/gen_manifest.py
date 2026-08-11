@@ -194,15 +194,16 @@ def main():
         tex.append((path, fmt, depth, w, h, len(raw), loc[0], loc[1]))
         print(f"located extra {path}: mio0={loc[0]:#x} pos={loc[1]:#x}")
 
-    # --- sound recipe ----------------------------------------------------
-    if os.environ.get("BINGO64_NO_SOUND"):
-        recipe = b"\x00\x00\x00\x00"  # four empty files
-        print("sound recipe: skipped (BINGO64_NO_SOUND)")
-    else:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from gen_sound_recipe import build_recipe
-        recipe, stats = build_recipe(rom, builddir)
-        print("sound recipe:", stats)
+    # --- sound maps -------------------------------------------------------
+    # sound_data.ctl and bank_sets ship with the game (structural data from
+    # committed sources); the extractor rebuilds sequences.bin and
+    # sound_data.tbl from the user's ROM via these maps.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from gen_sound_map import build_sound_maps, verify_tbl_content
+    snd = build_sound_maps(rom, builddir)
+    print(verify_tbl_content(rom, builddir, snd["tbl_map"], snd["tbl_len"]))
+    built_tbl = open(f"{builddir}/sound/sound_data.tbl", "rb").read()
+    tbl_header = built_tbl[:snd["tbl_map"][0][0]]
 
     # --- emit ------------------------------------------------------------
     with open(outpath, "w") as f:
@@ -216,12 +217,26 @@ def main():
         for (name, size, mio0, inner, cake) in sorted(sky):
             f.write(f'{{"{name}",{size},{mio0}LL,{inner},{cake}}},\n')
         f.write("};\n")
-        f.write("static const unsigned char sSoundRecipe[] = {\n")
-        for i in range(0, len(recipe), 20):
-            f.write(",".join(str(b) for b in recipe[i:i+20]) + ",\n")
-        f.write("};\n")
+        def emit_bytes(name, data):
+            f.write(f"static const unsigned char {name}[] = {{\n")
+            for i in range(0, len(data), 20):
+                f.write(",".join(str(b) for b in data[i:i+20]) + ",\n")
+            f.write("};\n")
+
+        def emit_map(name, entries):
+            f.write(f"static const struct CopyEntry {name}[] = {{\n")
+            for (dst, src, ln) in entries:
+                f.write(f"{{{dst},{src},{ln}}},\n")
+            f.write("};\n")
+
+        emit_bytes("sSeqHeader", snd["seq_header"])
+        emit_map("sSeqMap", snd["seq_map"])
+        f.write(f"static const unsigned int sSeqLen = {snd['seq_len']};\n")
+        emit_bytes("sTblHeader", tbl_header)
+        emit_map("sTblMap", snd["tbl_map"])
+        f.write(f"static const unsigned int sTblLen = {snd['tbl_len']};\n")
     print(f"wrote {outpath}: {len(tex)} textures, {len(sky)} sky/cake, "
-          f"{len(recipe)} recipe bytes")
+          f"{len(snd['seq_map'])} sequences, {len(snd['tbl_map'])} samples")
 
 if __name__ == "__main__":
     main()
