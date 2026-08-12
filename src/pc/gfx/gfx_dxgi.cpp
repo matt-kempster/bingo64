@@ -1,6 +1,7 @@
 #ifdef WAPI_DXGI
 
 #include <stdint.h>
+#include <stdio.h>
 #include <math.h>
 
 #include <map>
@@ -485,6 +486,27 @@ static bool gfx_dxgi_start_frame(void) {
     }
 
     dxgi.frame_timestamp += FRAME_INTERVAL_US_NUMERATOR;
+
+    // Recovery guard: DWM sometimes stops updating GetFrameStatistics for
+    // an occluded/composed window. The pacing math below then compares a
+    // frozen last-present time against an ever-advancing frame_timestamp,
+    // saturates at Present(4) (15 fps) and can never catch up -- until a
+    // swapchain reset (window resize) restarted the statistics. Detect the
+    // drift against the wall clock and re-anchor instead.
+    {
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+        uint64_t now_us = qpc_to_us(now.QuadPart - dxgi.qpc_init);
+        int64_t drift_us = (int64_t) (dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR)
+                           - (int64_t) now_us;
+        if (drift_us > 250000 || drift_us < -250000) {
+            fprintf(stderr, "gfx: frame pacing drifted %lld us, re-anchoring\n",
+                    (long long) drift_us);
+            dxgi.frame_timestamp = now_us * FRAME_INTERVAL_US_DENOMINATOR;
+            dxgi.frame_stats.clear();
+            dxgi.pending_frame_stats.clear();
+        }
+    }
 
     if (dxgi.frame_stats.size() >= 2) {
         DXGI_FRAME_STATISTICS *first = &dxgi.frame_stats.begin()->second;
