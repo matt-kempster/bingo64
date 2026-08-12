@@ -732,7 +732,17 @@ static void import_texture(int tile) {
         return;
     }
 
+#ifdef EXTERNAL_DATA
+    // addr is a path string, not texture data: checksum only the string.
+    // size_bytes is the N64 texture's data size and would read far past
+    // the string's end -- into globals whose changes then leaked a new
+    // cache entry per frame until the pool overflowed and every texture
+    // re-imported (PNG decode) every frame.
+    checksum = calculate_checksum(rdp.loaded_texture[tile].addr,
+                                  strlen((const char *) rdp.loaded_texture[tile].addr));
+#else
     checksum = calculate_checksum(rdp.loaded_texture[tile].addr, rdp.loaded_texture[tile].size_bytes);
+#endif
 
     if (gfx_texture_cache_lookup(tile, &rendering_state.textures[tile], rdp.loaded_texture[tile].addr, fmt, siz, rdp.palette, checksum)) {
         return;
