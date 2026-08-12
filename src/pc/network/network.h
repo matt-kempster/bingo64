@@ -89,6 +89,17 @@ s32 network_connect(const char *server, const char *room, const char *name,
 
 // Are we the room's host (the server decides; the role can pass on)?
 s32 network_is_host(void);
+// The server-assigned id of the room's host (0 = unknown/none).
+s32 network_host_id(void);
+
+// Room settings are frozen: the start broadcast went out (countdown,
+// racing, or reconnecting mid-race). The relay enforces this too.
+s32 network_room_locked(void);
+
+// Returns 1 exactly once when we enter RACING (GO, or a late-join /
+// reconnect into a running race): the file select consumes this to
+// auto-launch the game.
+s32 network_take_go_flag(void);
 
 // Host only: start the race now (ready marks are advisory; the host may
 // force-start). The server answers with the S start broadcast.

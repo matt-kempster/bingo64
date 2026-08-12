@@ -168,8 +168,10 @@ static unsigned char textSeeds[] = { TEXT_SEEDS };
 static unsigned char textReset[] = { TEXT_RESET };
 #endif
 static unsigned char textRandom[] = { TEXT_RANDOM };
+#ifdef TARGET_N64
 static unsigned char textOption[] = { TEXT_OPTION };
 static unsigned char textStart[] = { TEXT_START };
+#endif
 #ifdef TARGET_N64
 static unsigned char textBackspace[] = { TEXT_BACKSPACE };
 #endif
@@ -200,9 +202,17 @@ s32 sBingoOptionCurrentPage = 0;
 #define BINGO_MAX_PAGE_INDEX 3
 
 // Where leaving the options screen lands: the main screen normally, or
-// the online lobby when it was opened from there (vanilla-style
-// submenu-to-submenu navigation).
+// the 1P setup screen / online lobby when it was opened from there
+// (vanilla-style submenu-to-submenu navigation).
 static s8 sOptionsReturnTarget = MENU_BUTTON_NONE;
+
+#ifndef TARGET_N64
+// Room settings (mode/objectives/seed) belong to the host and freeze for
+// everyone once the race starts.
+static s32 bingo_options_locked(void) {
+    return network_active() && (!network_is_host() || network_room_locked());
+}
+#endif
 
 
 /**
@@ -507,6 +517,57 @@ void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButto
     }
 }
 
+#ifndef TARGET_N64
+// --- PC submenu screens: 1P setup and the online lobby --------------------
+// Each is a fullscreen-grown main button carrying small 3D action buttons
+// (vanilla score-menu style). Exits are explicit flags: a click on a
+// sub-button must not double as "leave the screen".
+
+static s8 s1PExitRequest = 0;
+static s8 sLobbyExitRequest = 0;
+
+static void spawn_submenu_button(s32 id, s32 model, struct Object *parent,
+                                 s16 x, s16 y) {
+    sMainMenuButtons[id] = spawn_object_rel_with_rot(
+        parent, model, bhvMenuButton, x, y, -100, 0, -0x8000, 0);
+    sMainMenuButtons[id]->oMenuButtonScale = 0.11111111f;
+}
+
+static void delete_submenu_button(s32 id) {
+    if (sMainMenuButtons[id] != NULL) {
+        obj_mark_for_deletion(sMainMenuButtons[id]);
+        sMainMenuButtons[id] = NULL;
+    }
+}
+
+// Shrink out of a fullscreen submenu screen once its exit flag is raised,
+// then hand control back to targetID.
+static void exit_submenu_screen(struct Object *button, s8 targetID, s8 *exitFlag) {
+    if (!*exitFlag) {
+        return;
+    }
+    if (button->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
+        play_sound(SOUND_MENU_CAMERA_ZOOM_OUT, gGlobalSoundSource);
+        button->oMenuButtonState = MENU_BUTTON_STATE_SHRINKING;
+    } else if (button->oMenuButtonState == MENU_BUTTON_STATE_DEFAULT) {
+        sSelectedButtonID = targetID;
+        *exitFlag = 0;
+    }
+}
+
+// Open the OPTIONS screen over the current fullscreen screen; B on the
+// options screen returns to returnTarget.
+static void open_options_screen(s8 returnTarget) {
+    play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+    gOptionSelectIconOpacity = 0;
+    sTextBaseAlpha = 0;
+    sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState =
+        MENU_BUTTON_STATE_GROWING;
+    sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
+    sOptionsReturnTarget = returnTarget;
+}
+#endif
+
 static void seed_push_key(s32 key) {
     s32 i;
     if (!gBingoSeedIsSet) {
@@ -614,23 +675,114 @@ static void seed_typing_finish(void) {
     gSeedTypingActive = 0;
     bingo_seed_set_from_ascii(gSeedTypedBuf);
 }
+
+void load_main_menu_save_file(struct Object *fileButton, s32 fileNum);
+
+// The 1P setup screen: the green door grown fullscreen, with the seed
+// display (click to type) and small START / OPTIONS buttons.
+static void onep_screen_loop(void) {
+    struct Object *door = sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A];
+
+    if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
+        && sMainMenuButtons[MENU_BUTTON_1P_START] == NULL && !s1PExitRequest) {
+        // The fullscreen parent is yaw-rotated 180, so child X mirrors:
+        // spawn at -330 to render on the right.
+        spawn_submenu_button(MENU_BUTTON_1P_START,
+                             MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, door, -330, -320);
+        spawn_submenu_button(MENU_BUTTON_1P_OPTIONS,
+                             MODEL_MAIN_MENU_BLUE_COPY_BUTTON, door, 330, -320);
+    }
+
+    if (sMainMenuButtons[MENU_BUTTON_1P_START] != NULL
+        && door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
+        && !gSeedTypingActive) {
+        if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_1P_START]->oPosX,
+                                 sMainMenuButtons[MENU_BUTTON_1P_START]->oPosY,
+                                 22.0f) == TRUE) {
+            play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
+            load_main_menu_save_file(door, 1);
+        } else if (check_clicked_button(
+                       sMainMenuButtons[MENU_BUTTON_1P_OPTIONS]->oPosX,
+                       sMainMenuButtons[MENU_BUTTON_1P_OPTIONS]->oPosY,
+                       22.0f) == TRUE) {
+            // Hide our buttons while the options screen covers us; they
+            // respawn when it hands control back.
+            delete_submenu_button(MENU_BUTTON_1P_START);
+            delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+            open_options_screen(MENU_BUTTON_PLAY_FILE_A);
+        } else if (sClickPos[0] > -65 && sClickPos[0] < 65
+                   && sClickPos[1] > 5 && sClickPos[1] < 60) {
+            seed_typing_begin();
+        }
+    }
+
+    if (s1PExitRequest) {
+        delete_submenu_button(MENU_BUTTON_1P_START);
+        delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+    }
+    exit_submenu_screen(door, MENU_BUTTON_NONE, &s1PExitRequest);
+}
+
+// The online lobby: the yellow door grown fullscreen; field rows are
+// handled by online_lobby.c, the four action buttons live here.
+static void lobby_screen_loop(void) {
+    struct Object *door = sMainMenuButtons[MENU_BUTTON_ONLINE];
+    s32 b;
+
+    if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
+        && sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] == NULL
+        && !sLobbyExitRequest) {
+        static const s32 models[LOBBY_BTN_COUNT] = {
+            MODEL_MAIN_MENU_RED_ERASE_BUTTON,    // CONNECT / LEAVE
+            MODEL_MAIN_MENU_PURPLE_SOUND_BUTTON, // READY
+            MODEL_MAIN_MENU_BLUE_COPY_BUTTON,    // OPTIONS
+            MODEL_MAIN_MENU_GREEN_SCORE_BUTTON,  // START RACE
+        };
+        for (b = 0; b < LOBBY_BTN_COUNT; b++) {
+            s16 x, y;
+            online_lobby_button_world_pos(b, &x, &y);
+            spawn_submenu_button(MENU_BUTTON_LOBBY_MIN + b, models[b], door, x, y);
+        }
+    }
+
+    if (sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] != NULL
+        && door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
+        for (b = 0; b < LOBBY_BTN_COUNT; b++) {
+            struct Object *btn = sMainMenuButtons[MENU_BUTTON_LOBBY_MIN + b];
+            // Inactive buttons render recessed; clicking them just buzzes.
+            btn->oMenuButtonScale =
+                online_lobby_button_active(b) ? 0.11111111f : 0.088f;
+            if (check_clicked_button(btn->oPosX, btn->oPosY, 22.0f) == TRUE) {
+                if (!online_lobby_button_active(b)) {
+                    play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+                } else {
+                    play_sound(SOUND_MENU_CLICK_FILE_SELECT, gGlobalSoundSource);
+                    if (online_lobby_button_pressed(b) == 2) {
+                        // Hide the lobby buttons while the options screen
+                        // covers us; they respawn on return.
+                        s32 d;
+                        for (d = 0; d < LOBBY_BTN_COUNT; d++) {
+                            delete_submenu_button(MENU_BUTTON_LOBBY_MIN + d);
+                        }
+                        open_options_screen(MENU_BUTTON_ONLINE);
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    if (sLobbyExitRequest) {
+        for (b = 0; b < LOBBY_BTN_COUNT; b++) {
+            delete_submenu_button(MENU_BUTTON_LOBBY_MIN + b);
+        }
+    }
+    exit_submenu_screen(door, MENU_BUTTON_NONE, &sLobbyExitRequest);
+}
 #endif
 
+#ifdef TARGET_N64
 static void seed_menu_check_clicked_buttons() {
-#ifndef TARGET_N64
-    // Only the OPTION button remains of the seed-button group; clicking
-    // the seed display starts keyboard entry.
-    if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oPosX,
-                             sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oPosY,
-                             200.0f) == TRUE) {
-        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
-        gOptionSelectIconOpacity = 0;
-        sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
-        sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
-    } else if (!gSeedTypingActive && check_clicked_button(0, 3000, 200.0f) == TRUE) {
-        seed_typing_begin();
-    }
-#else
     int buttonId;
 
     for (buttonId = MENU_BUTTON_SEED_MIN; buttonId < MENU_BUTTON_SEED_MAX; buttonId++) {
@@ -673,8 +825,8 @@ static void seed_menu_check_clicked_buttons() {
             break;
         }
     }
-#endif
 }
+#endif
 
 /**
  * Loads a save file selected after it goes into a full screen state
@@ -770,6 +922,7 @@ void bhv_menu_button_manager_init(void) {
     sMainMenuButtons[buttonID]->oMenuButtonScale = 0.75f;
 #endif
 
+#ifdef TARGET_N64
     sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A] = spawn_object_rel_with_rot(
         gCurrentObject, MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, bhvMenuButton, 6800, 1000, 0, 0, 0, 0
     );
@@ -779,12 +932,33 @@ void bhv_menu_button_manager_init(void) {
         gCurrentObject, MODEL_MAIN_MENU_BLUE_COPY_BUTTON, bhvMenuButton, 6800, -3800, 0, 0, 0, 0
     );
     sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale = 1.0f;
+#else
+    // The PC main screen is just two doors: 1P (green, the play/seed setup
+    // screen) and NET (yellow, the online lobby), centered side by side.
+    sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A] = spawn_object_rel_with_rot(
+        gCurrentObject, MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, bhvMenuButton, -2800, 800, 0, 0, 0, 0
+    );
+    sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oMenuButtonScale = 1.0f;
 
-#ifndef TARGET_N64
     sMainMenuButtons[MENU_BUTTON_ONLINE] = spawn_object_rel_with_rot(
-        gCurrentObject, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, -6800, 5800, 0, 0, 0, 0
+        gCurrentObject, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 2800, 800, 0, 0, 0, 0
     );
     sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonScale = 1.0f;
+
+    // The options screen's backdrop button. It is not a main-screen door
+    // (options belong to the 1P setup screen and to the lobby's host), so
+    // it parks offscreen and flies in when it grows fullscreen.
+    sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = spawn_object_rel_with_rot(
+        gCurrentObject, MODEL_MAIN_MENU_BLUE_COPY_BUTTON, bhvMenuButton, 0, -20000, 0, 0, 0, 0
+    );
+    sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale = 1.0f;
+
+    sMainMenuButtons[MENU_BUTTON_1P_START] = NULL;
+    sMainMenuButtons[MENU_BUTTON_1P_OPTIONS] = NULL;
+    sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] = NULL;
+    sMainMenuButtons[MENU_BUTTON_LOBBY_READY] = NULL;
+    sMainMenuButtons[MENU_BUTTON_LOBBY_OPTIONS] = NULL;
+    sMainMenuButtons[MENU_BUTTON_LOBBY_START] = NULL;
 #endif
 
     sTextBaseAlpha = 0;
@@ -801,6 +975,7 @@ void bhv_menu_button_manager_init(void) {
  * Also play a sound and/or render buttons depending of the button ID selected.
  */
 static void check_main_menu_clicked_buttons(void) {
+#ifdef TARGET_N64
     // Main Menu buttons
     s8 buttonID;
     // Configure Main Menu button group
@@ -809,16 +984,6 @@ static void check_main_menu_clicked_buttons(void) {
         s16 buttonY = sMainMenuButtons[buttonID]->oPosY;
 
         if (check_clicked_button(buttonX, buttonY, 200.0f) == TRUE) {
-#ifndef TARGET_N64
-            // In an online room the race starts together: the file pick
-            // unlocks at the shared GO.
-            if (buttonID == MENU_BUTTON_PLAY_FILE_A && network_active()
-                && network_state() != NET_STATE_RACING) {
-                printf("net: file pick locked until the room's GO\n");
-                play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
-                break;
-            }
-#endif
             // If menu button clicked, select it
             sMainMenuButtons[buttonID]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
             sSelectedButtonID = buttonID;
@@ -826,22 +991,36 @@ static void check_main_menu_clicked_buttons(void) {
         }
     }
 
-#ifndef TARGET_N64
-    if (sSelectedButtonID == MENU_BUTTON_NONE
-        && check_clicked_button(sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosX,
-                                sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosY, 200.0f) == TRUE) {
-        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
-        sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
-        sSelectedButtonID = MENU_BUTTON_ONLINE;
-    }
-#endif
-
     // Play sound of the save file clicked
     switch (sSelectedButtonID) {
         case MENU_BUTTON_PLAY_FILE_A:
             play_sound(SAVE_FILE_SOUND, gGlobalSoundSource);
             break;
     }
+#else
+    // The PC main screen: the 1P door (setup screen) and the NET door
+    // (online lobby). Options live inside those screens, not up here.
+    if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oPosX,
+                             sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oPosY,
+                             200.0f) == TRUE) {
+        if (network_active()) {
+            // No solo game while in a room; the room's GO starts you.
+            play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+        } else {
+            play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+            sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oMenuButtonState =
+                MENU_BUTTON_STATE_GROWING;
+            sSelectedButtonID = MENU_BUTTON_PLAY_FILE_A;
+        }
+    } else if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosX,
+                                    sMainMenuButtons[MENU_BUTTON_ONLINE]->oPosY,
+                                    200.0f) == TRUE) {
+        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+        sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonState =
+            MENU_BUTTON_STATE_GROWING;
+        sSelectedButtonID = MENU_BUTTON_ONLINE;
+    }
+#endif
 }
 
 #undef SAVE_FILE_SOUND
@@ -853,13 +1032,31 @@ static void check_main_menu_clicked_buttons(void) {
  * is loaded, and that checks what buttonID is clicked in the main menu.
  */
 void bhv_menu_button_manager_loop(void) {
+#ifndef TARGET_N64
+    // The room's GO: every player's game launches itself, no clicking.
+    if (network_take_go_flag() && sSelectedFileNum == 0) {
+        if (text_input_active()) {
+            text_input_stop();
+        }
+        gSeedTypingActive = 0;
+        play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
+        sSelectedFileNum = 1;
+    }
+#endif
+
     switch (sSelectedButtonID) {
         case MENU_BUTTON_NONE:
             check_main_menu_clicked_buttons();
+#ifdef TARGET_N64
             seed_menu_check_clicked_buttons();
+#endif
             break;
         case MENU_BUTTON_PLAY_FILE_A:
+#ifdef TARGET_N64
             load_main_menu_save_file(sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A], 1);
+#else
+            onep_screen_loop();
+#endif
             break;
         case MENU_BUTTON_SEED_OPTION:
             exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_SEED_OPTION],
@@ -870,7 +1067,7 @@ void bhv_menu_button_manager_loop(void) {
             break;
 #ifndef TARGET_N64
         case MENU_BUTTON_ONLINE:
-            exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_ONLINE], MENU_BUTTON_NONE);
+            lobby_screen_loop();
             break;
 #endif
     }
@@ -894,7 +1091,9 @@ static void handle_cursor_button_input(void) {
             sCursorClickingTimer = 1;
 #ifndef TARGET_N64
             // If we host an online room, the options may have changed.
-            network_push_local_options();
+            if (!bingo_options_locked()) {
+                network_push_local_options();
+            }
 #endif
         } else {
             if (sBingoOptionSelectTimer > 0) {
@@ -940,40 +1139,51 @@ static void handle_cursor_button_input(void) {
                 }
             }
             if (gPlayer3Controller->buttonPressed & A_BUTTON) {
+#ifndef TARGET_N64
+                if (bingo_options_locked()) {
+                    play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+                } else {
+                    sToggleCurrentOption = 1;
+                }
+#else
                 sToggleCurrentOption = 1;
+#endif
             }
         }
 #ifndef TARGET_N64
     } else if (sSelectedButtonID == MENU_BUTTON_ONLINE) {
-        s32 request = online_lobby_handle_input();
+        s32 request = online_lobby_handle_input(sCursorPos[0] + 160.0f,
+                                                sCursorPos[1] + 120.0f);
         if (request == 1) {
             // Leave the lobby screen (any connection stays up).
             sTextBaseAlpha = 0;
+            sLobbyExitRequest = 1;
+        } else if (request == -1) {
+            // A click away from the field rows: maybe one of the lobby's
+            // 3D buttons (lobby_screen_loop checks).
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
             sCursorClickingTimer = 1;
-        } else if (request == 2) {
-            // Jump to the options screen; the lobby stays fullscreen
-            // behind it and B returns there.
-            play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
-            gOptionSelectIconOpacity = 0;
-            sTextBaseAlpha = 0;
-            sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState =
-                MENU_BUTTON_STATE_GROWING;
-            sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
-            sOptionsReturnTarget = MENU_BUTTON_ONLINE;
         }
-#endif
-    } else { // If cursor is clicked
-#ifndef TARGET_N64
-        if (sSelectedButtonID == MENU_BUTTON_NONE && gSeedTypingActive) {
+    } else if (sSelectedButtonID == MENU_BUTTON_PLAY_FILE_A) {
+        // The 1P setup screen.
+        if (gSeedTypingActive) {
             // The keyboard owns input while the seed is being typed.
             if (text_input_take_finished()) {
                 seed_typing_finish();
             }
             return;
         }
+        if (gPlayer3Controller->buttonPressed & (B_BUTTON | START_BUTTON)) {
+            sTextBaseAlpha = 0;
+            s1PExitRequest = 1;
+        } else if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON)) {
+            sClickPos[0] = sCursorPos[0];
+            sClickPos[1] = sCursorPos[1];
+            sCursorClickingTimer = 1;
+        }
 #endif
+    } else { // If cursor is clicked
         if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | B_BUTTON | START_BUTTON)) {
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
@@ -1090,38 +1300,70 @@ void print_generic_string_fade(s16 x, s16 y, const u8 *text) {
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
+#ifdef TARGET_N64
 static void draw_seed_mode_menu(void) {
     s32 xSeedPos;
     unsigned char textEnterSeed[] = { TEXT_ENTER_SEED };
     // Display "ENTER SEED" text
     print_hud_lut_string_fade(2, 100, 35, textEnterSeed);
 
-    gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);  // TODO: needed?
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
 
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-#ifdef TARGET_N64
     print_generic_string(47, 34, textReset);
     print_generic_string(35, 104, textBackspace);
-#else
-    {
-        static unsigned char textOnline[] = { 0x18, 0x17, 0x15, 0x12, 0x17, 0x0E, 0xFF };  // "ONLINE"
-        static unsigned char textSeedClickHint[] = { TEXT_SEED_CLICK_HINT };
-        static unsigned char textSeedTypingHint[] = { TEXT_SEED_TYPING_HINT };
-        print_generic_string(38, 177, textOnline);
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 160));
-        print_generic_string(88, 130,
-                             gSeedTypingActive ? textSeedTypingHint : textSeedClickHint);
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-    }
-#endif
     print_generic_string(241, 34, textOption);
     print_generic_string(245, 104, textStart);
 
     // Display seed
-#ifndef TARGET_N64
+    if (gBingoSeedIsSet) {
+        xSeedPos = 105;
+    } else {
+        xSeedPos = 125;
+    }
+    print_hud_lut_string_fade(2, xSeedPos, 100 + (30 * -1), gBingoSeedText);
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+}
+#else
+// The PC main screen: just the two doors (1P and NET) under the title.
+static void draw_main_menu_pc(void) {
+    static const u8 textBingo64Hud[] =
+        { 0x0B, 0x12, 0x17, 0x10, 0x18, GLOBAL_CHAR_SPACE, 0x06, 0x04, 0xFF };  // "BINGO 64"
+    print_hud_lut_string_fade(2, 104, 35, textBingo64Hud);
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+    net_print_ascii(89, 101, "1 PLAYER");
+    net_print_ascii(182, 101, "ONLINE");
+    if (network_active()) {
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
+        net_print_ascii(100, 62, "IN AN ONLINE ROOM");
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+}
+
+// The 1P setup screen: seed (click to type) plus START / OPTIONS buttons.
+static void draw_1p_setup(void) {
+    s32 xSeedPos;
+    unsigned char textEnterSeed[] = { TEXT_ENTER_SEED };
+    static unsigned char textSeedClickHint[] = { TEXT_SEED_CLICK_HINT };
+    static unsigned char textSeedTypingHint[] = { TEXT_SEED_TYPING_HINT };
+
+    print_hud_lut_string_fade(2, 100, 35, textEnterSeed);
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 160));
+    print_generic_string(88, 130,
+                         gSeedTypingActive ? textSeedTypingHint : textSeedClickHint);
+
+    // Labels under the two sub-buttons.
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+    net_print_ascii(90, 46, "OPTIONS");
+    net_print_ascii(189, 46, "START");
+
     if (gSeedTypingActive) {
-        // The digits being typed (blinking while empty), in the HUD font.
+        // The digits being typed, in the HUD font.
         u8 typed[12];
         s32 i, n = 0;
         for (i = 0; gSeedTypedBuf[i] != '\0' && n < 9; i++) {
@@ -1136,23 +1378,27 @@ static void draw_seed_mode_menu(void) {
         gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
         return;
     }
-#endif
     if (gBingoSeedIsSet) {
         xSeedPos = 105;
     } else {
         xSeedPos = 125;
     }
-    print_hud_lut_string_fade(2, xSeedPos, 100 + (30 * -1), gBingoSeedText);
+    print_hud_lut_string_fade(2, xSeedPos, 70, gBingoSeedText);
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
+#endif
 
 /**
  * Prints main menu strings that shows on the yellow background menu screen.
  * Does not print the strings of text for EU, only the symbols.
  */
 static void print_main_menu_strings(void) {
+#ifdef TARGET_N64
     draw_seed_mode_menu();
+#else
+    draw_main_menu_pc();
+#endif
 }
 
 static unsigned char textGameMode[] = { TEXT_GAME_MODE };
@@ -1581,6 +1827,17 @@ static void print_bingo_options(void) {
     if (gOptionSelectIconOpacity <= 10) {
         return;
     }
+#ifndef TARGET_N64
+    // Room settings are the host's, and freeze once the race starts.
+    if (bingo_options_locked()) {
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+        gDPSetEnvColor(gDisplayListHead++, 255, 120, 120, MIN(sTextBaseAlpha, 220));
+        net_print_ascii(24, 212,
+                        network_room_locked() ? "LOCKED. THE RACE HAS STARTED"
+                                              : "THE HOST CONTROLS THESE SETTINGS");
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+    }
+#endif
     switch (sBingoOptionCurrentPage) {
         case 0:
             print_bingo_page_0();
@@ -1743,8 +2000,12 @@ static void print_file_select_strings(void) {
             print_bingo_options();
             break;
 #ifndef TARGET_N64
+        case MENU_BUTTON_PLAY_FILE_A:
+            draw_1p_setup();
+            break;
         case MENU_BUTTON_ONLINE:
-            online_lobby_draw(sTextBaseAlpha);
+            online_lobby_draw(sTextBaseAlpha, sCursorPos[0] + 160.0f,
+                              sCursorPos[1] + 120.0f);
             break;
 #endif
     }
@@ -1804,6 +2065,11 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
     sSelectedButtonID = MENU_BUTTON_NONE;
     sCurrentMenuLevel = MENU_LAYER_MAIN;
     sTextBaseAlpha = 0;
+#ifndef TARGET_N64
+    s1PExitRequest = 0;
+    sLobbyExitRequest = 0;
+    gSeedTypingActive = 0;
+#endif
     sCursorPos[0] = 94.0f;
     sCursorPos[1] = 20.0f;
     sClickPos[0] = -10000;

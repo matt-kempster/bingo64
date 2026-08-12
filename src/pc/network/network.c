@@ -107,6 +107,8 @@ static s32 sResultCount = 0;
 static s32 sWinnerId = 0;      // lockout: the decided winner
 static s32 sFinishSent = 0;
 static s32 sHostId = 0;        // who may edit settings and start the race
+static s32 sGoFlag = 0;        // set once when we enter RACING; file select
+                               // consumes it to auto-launch the game at GO
 static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
                                    // us whether we are the host
 
@@ -296,6 +298,9 @@ static void handle_line(char *line) {
             // reconnect); unsigned wrap keeps the shared clock correct.
             sGoFrame = gGlobalTimer + (u32) delta;
             sState = (delta > 0) ? NET_STATE_COUNTDOWN : NET_STATE_RACING;
+            if (delta <= 0) {
+                sGoFlag = 1;
+            }
             printf("net: race starts in %d frames, seed %u\n", delta, seed);
             fflush(stdout);
         }
@@ -489,6 +494,7 @@ static void reset_session_state(void) {
     sFinishSent = 0;
     sHostId = 0;
     sPendingRoomMode = -1;
+    sGoFlag = 0;
 }
 
 // Resolve the saved server, start the nonblocking connect and arm the
@@ -711,6 +717,7 @@ void network_update(void) {
 
     if (sState == NET_STATE_COUNTDOWN && gGlobalTimer >= sGoFrame) {
         sState = NET_STATE_RACING;
+        sGoFlag = 1;
     }
 
     // Ghost state at 15Hz (every other 30Hz game frame): plenty smooth with
@@ -799,6 +806,21 @@ void network_push_local_options(void) {
 
 s32 network_is_host(void) {
     return network_active() && sHostId != 0 && sLocalId == sHostId;
+}
+
+s32 network_host_id(void) {
+    return sHostId;
+}
+
+s32 network_room_locked(void) {
+    return sState == NET_STATE_COUNTDOWN || sState == NET_STATE_RACING
+           || sState == NET_STATE_RECONNECTING;
+}
+
+s32 network_take_go_flag(void) {
+    s32 flag = sGoFlag;
+    sGoFlag = 0;
+    return flag;
 }
 
 void network_start_race(void) {

@@ -53,7 +53,18 @@ enum MenuButtonTypes {
     MENU_BUTTON_SEED_MAX,
 
     // The online lobby screen (PC only; the button is not spawned on N64)
-    MENU_BUTTON_ONLINE
+    MENU_BUTTON_ONLINE,
+
+    // PC-only submenu buttons, spawned while their screen is fullscreen
+    // (vanilla score-file-button style) and deleted on exit.
+    MENU_BUTTON_1P_START,      // 1P setup: start the game
+    MENU_BUTTON_1P_OPTIONS,    // 1P setup: open the options screen
+    MENU_BUTTON_LOBBY_CONNECT,
+    MENU_BUTTON_LOBBY_READY,
+    MENU_BUTTON_LOBBY_OPTIONS,
+    MENU_BUTTON_LOBBY_START,
+    MENU_BUTTON_LOBBY_MIN = MENU_BUTTON_LOBBY_CONNECT,
+    MENU_BUTTON_LOBBY_MAX = MENU_BUTTON_LOBBY_START
 };
 
 enum ScoreMenuMessageID {
