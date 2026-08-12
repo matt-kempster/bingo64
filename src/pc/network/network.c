@@ -97,7 +97,6 @@ static char sSavedRoom[NET_ROOM_LEN];
 static char sSavedName[NET_NAME_LEN];
 static s32 sSavedColor = 0;
 static s32 sSavedFlags = 0;
-static u32 sSavedSeed = 0;
 static s32 sRetryFrames = 0;
 static s32 sWasReconnect = 0;  // this connection resumed a session
 static s32 sResyncFlag = 0;
@@ -107,6 +106,13 @@ static struct NetResult sResults[NET_MAX_PLAYERS];
 static s32 sResultCount = 0;
 static s32 sWinnerId = 0;      // lockout: the decided winner
 static s32 sFinishSent = 0;
+static s32 sHostId = 0;        // who may edit settings and start the race
+static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
+                                   // us whether we are the host
+
+// The seed proposal from the seed-entry UI (0 = random); implemented in
+// src/menu/file_select.c, linked into every PC build.
+extern u32 bingo_seed_proposal(void);
 
 // The join line, sent once the nonblocking connect completes.
 static char sJoinLine[224];
@@ -247,19 +253,27 @@ static void handle_line(char *line) {
             fflush(stdout);
             sLocalId = id;
             sToken = token;
-            if (sLocalId != 1) {
-                // The room's current mode; the creator's own push wins below.
-                gbBingoMode = (enum BingoGameMode) mode;
-            }
+            // The room's current mode; applied in the H handler once we
+            // know whether we are the host (whose own push wins).
+            sPendingRoomMode = mode;
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
             sState = NET_STATE_LOBBY;
-            // If we created the room, our local bingo options become the
-            // room's options (re-pushed if changed while in the lobby).
-            network_push_local_options();
             if (sAutoReady) {
                 network_set_ready(1);
             }
+        }
+    } else if (cmd == 'H') {
+        s32 id;
+        if (sscanf(line + 1, "%d", &id) == 1) {
+            sHostId = id;
+            if (sHostId == sLocalId) {
+                // Our local settings become (or stay) the room's.
+                network_push_local_options();
+            } else if (sPendingRoomMode >= 0) {
+                gbBingoMode = (enum BingoGameMode) sPendingRoomMode;
+            }
+            sPendingRoomMode = -1;
         }
     } else if (cmd == 'S') {
         u32 seed = 0;
@@ -375,10 +389,10 @@ static void handle_line(char *line) {
             }
         }
     } else if (cmd == 'O') {
-        // The creator changed the room options while we sat in the lobby.
+        // The host changed the room options while we sat in the lobby.
         s32 mode;
         if (sscanf(line + 1, "%d", &mode) == 1
-            && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != 1) {
+            && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
         }
     } else if (cmd == 'F') {
@@ -473,6 +487,8 @@ static void reset_session_state(void) {
     sResultCount = 0;
     sWinnerId = 0;
     sFinishSent = 0;
+    sHostId = 0;
+    sPendingRoomMode = -1;
 }
 
 // Resolve the saved server, start the nonblocking connect and arm the
@@ -556,15 +572,15 @@ static s32 net_dial(const char **err) {
     }
     freeaddrinfo(res);
 
-    snprintf(sJoinLine, sizeof(sJoinLine), "J %d %s %s %d %d %u %u\n",
+    snprintf(sJoinLine, sizeof(sJoinLine), "J %d %s %s %d %d %u\n",
              NET_PROTOCOL_VERSION, sSavedRoom, sSavedName,
-             sSavedColor, sSavedFlags, sSavedSeed, sToken);
+             sSavedColor, sSavedFlags, sToken);
     sWasReconnect = sToken != 0;
     return 1;
 }
 
 s32 network_connect(const char *server, const char *room, const char *name,
-                    s32 color, s32 flagsPublic, u32 seedProposal) {
+                    s32 color, s32 flagsPublic) {
     const char *err = "cannot connect";
 
     network_disconnect();
@@ -580,7 +596,6 @@ s32 network_connect(const char *server, const char *room, const char *name,
              (name != NULL && name[0]) ? name : "mario");
     sSavedColor = color % NET_COLOR_COUNT;
     sSavedFlags = flagsPublic ? 1 : 0;
-    sSavedSeed = seedProposal;
 
     if (!net_dial(&err)) {
         net_fail(err);
@@ -610,7 +625,7 @@ void network_init_from_cli(void) {
     network_connect(gCLIOpts.NetServer,
                     gCLIOpts.NetRoom[0] ? gCLIOpts.NetRoom : "bingo",
                     gCLIOpts.NetName[0] ? gCLIOpts.NetName : "mario",
-                    (s32) gCLIOpts.NetColor, 0, 0);
+                    (s32) gCLIOpts.NetColor, 0);
     // CLI sessions ready up automatically: whoever launches from the
     // command line doesn't want to hang around in the lobby. (Set after
     // network_connect: its internal disconnect clears the flag.)
@@ -756,21 +771,21 @@ s32 network_countdown_frames(void) {
     return 0;
 }
 
-void network_send_options(s32 mode, s32 unlock, u64 mask) {
-    char line[64];
+void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed) {
+    char line[80];
     if (!network_active()) {
         return;
     }
-    snprintf(line, sizeof(line), "O %d %d %llx\n",
-             mode, unlock, (unsigned long long) mask);
+    snprintf(line, sizeof(line), "O %d %d %llx %u\n",
+             mode, unlock, (unsigned long long) mask, seed);
     net_send_line(line);
 }
 
 void network_push_local_options(void) {
     s32 i;
     u64 mask = 0;
-    // Only the room creator's options count; the server drops the rest.
-    if (!network_active() || sLocalId != 1) {
+    // Only the host's settings count; the server drops the rest.
+    if (!network_is_host()) {
         return;
     }
     for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
@@ -778,7 +793,18 @@ void network_push_local_options(void) {
             mask |= (u64) 1 << i;
         }
     }
-    network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask);
+    network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask,
+                         bingo_seed_proposal());
+}
+
+s32 network_is_host(void) {
+    return network_active() && sHostId != 0 && sLocalId == sHostId;
+}
+
+void network_start_race(void) {
+    if (network_is_host() && sState == NET_STATE_LOBBY) {
+        net_send_line("X\n");
+    }
 }
 
 s32 network_has_seed(u32 *seed) {

@@ -13,7 +13,7 @@
 // replays the room state (claims, finishes).
 // Everything here is PC-only; the N64 build never sees this header.
 
-#define NET_PROTOCOL_VERSION 3
+#define NET_PROTOCOL_VERSION 4
 
 #define NET_MAX_GHOSTS  15
 #define NET_MAX_PLAYERS 16
@@ -81,11 +81,18 @@ void network_shutdown(void);
 
 // Start connecting to "host[:port]" and join a room. Non-blocking: poll
 // network_state() for progress. flagsPublic only matters when this join
-// creates the room; the game mode comes from gbBingoMode via
+// creates the room; game mode and seed proposal ride along via
 // network_push_local_options. Returns 0 if the connection could not even
 // be started (bad host).
 s32 network_connect(const char *server, const char *room, const char *name,
-                    s32 color, s32 flagsPublic, u32 seedProposal);
+                    s32 color, s32 flagsPublic);
+
+// Are we the room's host (the server decides; the role can pass on)?
+s32 network_is_host(void);
+
+// Host only: start the race now (ready marks are advisory; the host may
+// force-start). The server answers with the S start broadcast.
+void network_start_race(void);
 // Leave the room / abort the connection. Also clears NET_STATE_ERROR.
 void network_disconnect(void);
 
@@ -107,10 +114,11 @@ s32 network_local_ready(void);
 // Frames (30/s) until GO. Positive during the countdown, 0 once racing.
 s32 network_countdown_frames(void);
 
-// Send the room's bingo options (server only accepts them from the room
-// creator). mask bit i set = objective type i disabled. The options that
-// arrive with the start message are applied to the bingo globals directly.
-void network_send_options(s32 mode, s32 unlock, u64 mask);
+// Send the room's settings (server only accepts them from the host).
+// mask bit i set = objective type i disabled; seed 0 = random at start.
+// The options that arrive with the start message are applied to the
+// bingo globals directly.
+void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed);
 // Push the current bingo globals as room options (no-op unless we are
 // the room creator). Called after the welcome and whenever the options
 // screen may have changed them.

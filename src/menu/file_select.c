@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include "online_lobby.h"
 #include "pc/network/network.h"
+#include "pc/controller/text_input.h"
 #endif
 
 #ifdef COMMAND_LINE_OPTIONS
@@ -163,11 +164,15 @@ static u8 xIcon[] = { GLYPH_MULTIPLY, GLYPH_SPACE };
 
 static unsigned char textSelectFile[] = { TEXT_SELECT_FILE };
 static unsigned char textSeeds[] = { TEXT_SEEDS };
+#ifdef TARGET_N64
 static unsigned char textReset[] = { TEXT_RESET };
+#endif
 static unsigned char textRandom[] = { TEXT_RANDOM };
 static unsigned char textOption[] = { TEXT_OPTION };
 static unsigned char textStart[] = { TEXT_START };
+#ifdef TARGET_N64
 static unsigned char textBackspace[] = { TEXT_BACKSPACE };
+#endif
 static unsigned char textOff[] = { TEXT_OFF };
 static unsigned char textOn[] = { TEXT_ON };
 
@@ -193,6 +198,11 @@ s32 sBingoOptionSelectTimer = 0;
 s32 sToggleCurrentOption = 0;
 s32 sBingoOptionCurrentPage = 0;
 #define BINGO_MAX_PAGE_INDEX 3
+
+// Where leaving the options screen lands: the main screen normally, or
+// the online lobby when it was opened from there (vanilla-style
+// submenu-to-submenu navigation).
+static s8 sOptionsReturnTarget = MENU_BUTTON_NONE;
 
 
 /**
@@ -533,6 +543,52 @@ static void seed_backspace(void) {
     }
 }
 
+// The seed value shared by every entry UI (numpad on N64; keyboard on
+// the PC main screen and the online lobby) and pushed to the room as the
+// host's proposal. 0 = random.
+u32 bingo_seed_proposal(void) {
+    if (!gBingoSeedIsSet) {
+        return 0;
+    }
+    return (
+        gBingoSeedText[0] * 100000000
+        + gBingoSeedText[1] * 10000000
+        + gBingoSeedText[2] * 1000000
+        + gBingoSeedText[3] * 100000
+        + gBingoSeedText[4] * 10000
+        + gBingoSeedText[5] * 1000
+        + gBingoSeedText[6] * 100
+        + gBingoSeedText[7] * 10
+        + gBingoSeedText[8] * 1
+    );
+}
+
+void bingo_seed_set_from_ascii(const char *str) {
+    s32 i;
+    seed_reset();
+    for (i = 0; str[i] != '\0'; i++) {
+        if (str[i] >= '0' && str[i] <= '9') {
+            seed_push_key(str[i] - '0');
+        }
+    }
+}
+
+// "" when random; digits without leading zeros otherwise.
+void bingo_seed_to_ascii(char *out, s32 size) {
+    s32 i, o = 0, seen = 0;
+    if (gBingoSeedIsSet) {
+        for (i = 0; i < 9 && o < size - 1; i++) {
+            if (gBingoSeedText[i] != 0) {
+                seen = 1;
+            }
+            if (seen || i == 8) {
+                out[o++] = '0' + gBingoSeedText[i];
+            }
+        }
+    }
+    out[o] = '\0';
+}
+
 #undef ACTION_TIMER
 #undef MAIN_RETURN_TIMER
 
@@ -542,7 +598,39 @@ static void seed_backspace(void) {
     #define SOUND_BUTTON_Y 0
 #endif
 
+#ifndef TARGET_N64
+// The keyboard seed entry on the PC main screen (replaces the numpad).
+char gSeedTypedBuf[16];
+s32 gSeedTypingActive = 0;
+
+static void seed_typing_begin(void) {
+    bingo_seed_to_ascii(gSeedTypedBuf, sizeof(gSeedTypedBuf));
+    text_input_start(gSeedTypedBuf, 10);  // 9 digits + terminator
+    gSeedTypingActive = 1;
+}
+
+static void seed_typing_finish(void) {
+    text_input_stop();
+    gSeedTypingActive = 0;
+    bingo_seed_set_from_ascii(gSeedTypedBuf);
+}
+#endif
+
 static void seed_menu_check_clicked_buttons() {
+#ifndef TARGET_N64
+    // Only the OPTION button remains of the seed-button group; clicking
+    // the seed display starts keyboard entry.
+    if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oPosX,
+                             sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oPosY,
+                             200.0f) == TRUE) {
+        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+        gOptionSelectIconOpacity = 0;
+        sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
+        sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
+    } else if (!gSeedTypingActive && check_clicked_button(0, 3000, 200.0f) == TRUE) {
+        seed_typing_begin();
+    }
+#else
     int buttonId;
 
     for (buttonId = MENU_BUTTON_SEED_MIN; buttonId < MENU_BUTTON_SEED_MAX; buttonId++) {
@@ -585,6 +673,7 @@ static void seed_menu_check_clicked_buttons() {
             break;
         }
     }
+#endif
 }
 
 /**
@@ -625,11 +714,14 @@ static void return_to_main_menu(s16 prevMenuButtonID, struct Object *sourceButto
  * Unlike buttons on submenus, these are never hidden or recreated.
  */
 void bhv_menu_button_manager_init(void) {
+#ifdef TARGET_N64
     enum MenuButtonTypes buttonID;
     u8 buttonNum;
     s16 buttonX;
     s16 buttonY;
 
+    // The numpad only exists on N64, where it is the sole way to type a
+    // seed. The PC build enters seeds with the keyboard.
     sMainMenuButtons[MENU_BUTTON_SEED_RESET] = spawn_object_rel_with_rot(
         gCurrentObject, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, -6800, -3800, 0, 0, 0, 0
     );
@@ -676,6 +768,7 @@ void bhv_menu_button_manager_init(void) {
         gCurrentObject, MODEL_MAIN_MENU_NUMPAD_0, bhvMenuButton, 0, -1300 - 4200, 0, 0, 0, 0
     );
     sMainMenuButtons[buttonID]->oMenuButtonScale = 0.75f;
+#endif
 
     sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A] = spawn_object_rel_with_rot(
         gCurrentObject, MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, bhvMenuButton, 6800, 1000, 0, 0, 0, 0
@@ -769,7 +862,11 @@ void bhv_menu_button_manager_loop(void) {
             load_main_menu_save_file(sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A], 1);
             break;
         case MENU_BUTTON_SEED_OPTION:
-            exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_SEED_OPTION], MENU_BUTTON_NONE);
+            exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_SEED_OPTION],
+                                          sOptionsReturnTarget);
+            if (sSelectedButtonID != MENU_BUTTON_SEED_OPTION) {
+                sOptionsReturnTarget = MENU_BUTTON_NONE;
+            }
             break;
 #ifndef TARGET_N64
         case MENU_BUTTON_ONLINE:
@@ -848,15 +945,35 @@ static void handle_cursor_button_input(void) {
         }
 #ifndef TARGET_N64
     } else if (sSelectedButtonID == MENU_BUTTON_ONLINE) {
-        if (online_lobby_handle_input()) {
+        s32 request = online_lobby_handle_input();
+        if (request == 1) {
             // Leave the lobby screen (any connection stays up).
             sTextBaseAlpha = 0;
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
             sCursorClickingTimer = 1;
+        } else if (request == 2) {
+            // Jump to the options screen; the lobby stays fullscreen
+            // behind it and B returns there.
+            play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+            gOptionSelectIconOpacity = 0;
+            sTextBaseAlpha = 0;
+            sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState =
+                MENU_BUTTON_STATE_GROWING;
+            sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
+            sOptionsReturnTarget = MENU_BUTTON_ONLINE;
         }
 #endif
     } else { // If cursor is clicked
+#ifndef TARGET_N64
+        if (sSelectedButtonID == MENU_BUTTON_NONE && gSeedTypingActive) {
+            // The keyboard owns input while the seed is being typed.
+            if (text_input_take_finished()) {
+                seed_typing_finish();
+            }
+            return;
+        }
+#endif
         if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON | B_BUTTON | START_BUTTON)) {
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
@@ -982,20 +1099,44 @@ static void draw_seed_mode_menu(void) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);  // TODO: needed?
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
 
-    // Display return, reset
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+#ifdef TARGET_N64
     print_generic_string(47, 34, textReset);
-    print_generic_string(241, 34, textOption);
-    print_generic_string(245, 104, textStart);
     print_generic_string(35, 104, textBackspace);
-#ifndef TARGET_N64
+#else
     {
         static unsigned char textOnline[] = { 0x18, 0x17, 0x15, 0x12, 0x17, 0x0E, 0xFF };  // "ONLINE"
+        static unsigned char textSeedClickHint[] = { TEXT_SEED_CLICK_HINT };
+        static unsigned char textSeedTypingHint[] = { TEXT_SEED_TYPING_HINT };
         print_generic_string(38, 177, textOnline);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 160));
+        print_generic_string(88, 130,
+                             gSeedTypingActive ? textSeedTypingHint : textSeedClickHint);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
     }
 #endif
+    print_generic_string(241, 34, textOption);
+    print_generic_string(245, 104, textStart);
 
     // Display seed
+#ifndef TARGET_N64
+    if (gSeedTypingActive) {
+        // The digits being typed (blinking while empty), in the HUD font.
+        u8 typed[12];
+        s32 i, n = 0;
+        for (i = 0; gSeedTypedBuf[i] != '\0' && n < 9; i++) {
+            if (gSeedTypedBuf[i] >= '0' && gSeedTypedBuf[i] <= '9') {
+                typed[n++] = gSeedTypedBuf[i] - '0';
+            }
+        }
+        typed[n] = 0xFF;
+        if (n > 0) {
+            print_hud_lut_string_fade(2, 105, 70, typed);
+        }
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+        return;
+    }
+#endif
     if (gBingoSeedIsSet) {
         xSeedPos = 105;
     } else {
@@ -1703,17 +1844,7 @@ u32 get_seed(void) {
         init_genrand(gGlobalTimer);
         return random_u32() % 999999999;
     }
-    return (
-        gBingoSeedText[0] * 100000000
-        + gBingoSeedText[1] * 10000000
-        + gBingoSeedText[2] * 1000000
-        + gBingoSeedText[3] * 100000
-        + gBingoSeedText[4] * 10000
-        + gBingoSeedText[5] * 1000
-        + gBingoSeedText[6] * 100
-        + gBingoSeedText[7] * 10
-        + gBingoSeedText[8] * 1
-    );
+    return bingo_seed_proposal();
 }
 
 /**

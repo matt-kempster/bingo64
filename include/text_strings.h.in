@@ -195,6 +195,9 @@
 #define TEXT_TARGET_BLACKOUT _("Blackout")
 #define TEXT_TARGET_LOCKOUT _("Lockout")
 
+#define TEXT_SEED_CLICK_HINT _("Click the seed to type one")
+#define TEXT_SEED_TYPING_HINT _("Type digits. Enter when done")
+
 #define TEXT_UNLOCK_GAME _("Unlock Full Game")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 

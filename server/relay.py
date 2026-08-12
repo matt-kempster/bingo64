@@ -21,25 +21,27 @@ Game modes (shared enum with the client, see src/game/bingo.h):
 Protocol v3 (one message per line, space-separated fields):
 
   client -> server
-    J 3 <room> <name> <color> <flags> [seed] [token]
-                             join a room. The protocol version (3) comes
+    J 4 <room> <name> <color> <flags> [token]
+                             join a room. The protocol version (4) comes
                              first; older clients are refused with
                              "E version". color is a palette index 0..7.
                              flags apply only when this join creates the
-                             room: bit 0 = public. The optional seed
-                             proposal (or a random one) becomes the room
-                             seed. A nonzero token resumes the session it
-                             was issued for: same player id, and the
-                             server replays roster, claims, start and
-                             results.
+                             room: bit 0 = public. A nonzero token
+                             resumes the session it was issued for: same
+                             player id, and the server replays roster,
+                             claims, start and results.
     G <level> <area> <x> <y> <z> <yaw> <animID> <animFrame>
                              ghost state, sent ~15 times per second
     C <cell>                 claim board cell 0..24
-    R <0|1>                  ready toggle (ignored once the room started)
-    O <mode> <unlock> <maskhex>
-                             room bingo options (creator only, before the
-                             start): game mode 0..4, full-game unlock,
-                             disabled-objective bitmask as hex
+    R <0|1>                  ready toggle (a roster signal only; the race
+                             starts when the host sends X)
+    O <mode> <unlock> <maskhex> <seed>
+                             room settings (host only, before the start):
+                             game mode 0..4, full-game unlock,
+                             disabled-objective bitmask as hex, and the
+                             seed proposal (0 = random at start).
+    X                        the host starts the race (allowed even if
+                             not everyone is ready)
     F                        local win condition met (line modes; the
                              server ignores it in lockout)
     L                        list public rooms
@@ -53,7 +55,9 @@ Protocol v3 (one message per line, space-separated fields):
                              roster entry (sent for yourself too, and
                              re-sent when someone's state changes)
     R <id> <0|1>             ready change
-    O <mode>                 the creator changed the room's game mode
+    O <mode>                 the host changed the room's game mode
+    H <id>                   who the host is (on join, and when the host
+                             role passes to someone else)
     S <seed> <delta> <mode> <unlock> <maskhex>
                              the race starts: shared seed, room options,
                              and delta = frames (30/s) until GO. Negative
@@ -79,7 +83,7 @@ import asyncio
 import random
 import time
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
@@ -113,9 +117,10 @@ class Client:
 
 
 class Room:
-    def __init__(self, name, seed, public):
+    def __init__(self, name, public):
         self.name = name
-        self.seed = seed
+        self.seed = 0           # decided at start (host proposal or random)
+        self.seed_proposal = 0  # 0 = random
         self.public = public
         self.members = {}       # id -> Client (connected)
         self.disconnected = {}  # id -> (name, color): mid-race dropouts
@@ -172,27 +177,29 @@ class Relay:
     def __init__(self):
         self.rooms = {}
 
-    def room_for(self, name, proposed_seed, public):
+    def room_for(self, name, public):
         room = self.rooms.get(name)
         if room is None:
-            seed = proposed_seed if proposed_seed else random.randrange(1, 999999999)
-            room = Room(name, seed, public)
+            room = Room(name, public)
             self.rooms[name] = room
-            print("[%s] room '%s' created, seed %d%s"
-                  % (ts(), name, seed, " [public]" if public else ""))
+            print("[%s] room '%s' created%s"
+                  % (ts(), name, " [public]" if public else ""))
         return room
 
-    def maybe_start(self, room):
+    def start_race(self, room):
+        """The host pressed START RACE (ready marks are advisory only)."""
         if room.started or not room.members:
             return
-        if all(c.ready for c in room.members.values()):
-            room.started_at = time.monotonic() + COUNTDOWN_FRAMES / FPS
-            room.broadcast(room.start_line())
-            print("[%s] room '%s' starting: %d players, seed %d, mode %d"
-                  % (ts(), room.name, len(room.members), room.seed, room.mode))
+        room.seed = (room.seed_proposal
+                     if room.seed_proposal else random.randrange(1, 999999999))
+        room.started_at = time.monotonic() + COUNTDOWN_FRAMES / FPS
+        room.broadcast(room.start_line())
+        print("[%s] room '%s' starting: %d players, seed %d, mode %d"
+              % (ts(), room.name, len(room.members), room.seed, room.mode))
 
     def send_room_snapshot(self, room, client):
         """Roster, claims and race status, for a joiner or reconnector."""
+        client.send("H %d" % room.creator_id)
         for other in room.members.values():
             client.send(room.roster_line(other.id, other.name, other.color,
                                          other.ready, True))
@@ -272,13 +279,10 @@ class Relay:
                         break
                     color = clamped_int(parts[4], 0, 7)
                     flags = clamped_int(parts[5], 0, 3)
-                    seed = 0
                     token = 0
                     if len(parts) >= 7:
-                        seed = clamped_int(parts[6], 0, 999999998)
-                    if len(parts) >= 8:
-                        token = clamped_int(parts[7], 0, 2 ** 32 - 1)
-                    room = self.room_for(parts[2][:31], seed, bool(flags & 1))
+                        token = clamped_int(parts[6], 0, 2 ** 32 - 1)
+                    room = self.room_for(parts[2][:31], bool(flags & 1))
                     name = sanitize_name(parts[3])
                     resumed = self.resume_session(room, client, token, name, color)
                     if resumed < 0:
@@ -345,8 +349,7 @@ class Relay:
                     client.ready = parts[1] == "1"
                     room.broadcast("R %d %d" % (client.id,
                                                 1 if client.ready else 0))
-                    self.maybe_start(room)
-                elif cmd == "O" and client.room and len(parts) == 4:
+                elif cmd == "O" and client.room and len(parts) >= 4:
                     room = client.room
                     if client.id != room.creator_id or room.started:
                         continue
@@ -356,7 +359,14 @@ class Relay:
                         room.mask = int(parts[3], 16) & (2 ** 64 - 1)
                     except ValueError:
                         room.mask = 0
+                    if len(parts) >= 5:
+                        room.seed_proposal = clamped_int(parts[4], 0, 999999998)
                     room.broadcast("O %d" % room.mode, skip=client.id)
+                elif cmd == "X" and client.room:
+                    room = client.room
+                    if client.id != room.creator_id:
+                        continue
+                    self.start_race(room)
                 elif cmd == "L":
                     for room in self.rooms.values():
                         if room.public:
@@ -388,11 +398,10 @@ class Relay:
                     del self.rooms[room.name]
                     print("[%s] room '%s' closed" % (ts(), room.name))
                 elif not room.started:
-                    # The creator role passes on; a departure may leave
-                    # everyone else ready.
+                    # The host role passes on.
                     if client.id == room.creator_id:
                         room.creator_id = min(room.members)
-                    self.maybe_start(room)
+                        room.broadcast("H %d" % room.creator_id)
             writer.close()
 
 

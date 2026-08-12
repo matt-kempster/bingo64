@@ -30,13 +30,22 @@ enum LobbyField {
     FIELD_ROOM,
     FIELD_COLOR,
     FIELD_TYPE,
+    FIELD_SEED,     // the shared seed value (host's proposal online)
+    FIELD_MODE,     // opens the OPTIONS screen (A)
     FIELD_CONNECT,
     FIELD_READY,
+    FIELD_START,    // host only: start the race (force allowed)
     FIELD_COUNT
 };
 
 static s32 sSel = FIELD_CONNECT;
 static s32 sPublic = 0;
+static s32 sEditingField = -1;
+static char sSeedBuf[16];
+
+// Seed helpers from file_select.c (the same value the N64 numpad edits).
+extern void bingo_seed_set_from_ascii(const char *str);
+extern void bingo_seed_to_ascii(char *out, s32 size);
 
 static const char *sColorNames[NET_COLOR_COUNT] = {
     "RED", "GREEN", "BLUE", "YELLOW", "PURPLE", "PINK", "CYAN", "WHITE",
@@ -86,20 +95,29 @@ static s32 settings_editable(void) {
     return st == NET_STATE_OFF || st == NET_STATE_ERROR;
 }
 
+// The seed is editable offline, and by the host until the race starts.
+static s32 seed_editable(void) {
+    return settings_editable()
+           || (network_is_host() && network_state() == NET_STATE_LOBBY);
+}
+
 static void activate_field(s32 field) {
     switch (field) {
         case FIELD_NAME:
             if (settings_editable()) {
+                sEditingField = field;
                 text_input_start(configNetName, sizeof(configNetName));
             }
             break;
         case FIELD_SERVER:
             if (settings_editable()) {
+                sEditingField = field;
                 text_input_start(configNetServer, sizeof(configNetServer));
             }
             break;
         case FIELD_ROOM:
             if (settings_editable()) {
+                sEditingField = field;
                 text_input_start(configNetRoom, sizeof(configNetRoom));
             }
             break;
@@ -113,17 +131,26 @@ static void activate_field(s32 field) {
                 sPublic ^= 1;
             }
             break;
+        case FIELD_SEED:
+            if (seed_editable()) {
+                sEditingField = field;
+                bingo_seed_to_ascii(sSeedBuf, sizeof(sSeedBuf));
+                text_input_start(sSeedBuf, 10);  // 9 digits + terminator
+            }
+            break;
         case FIELD_CONNECT:
             if (settings_editable()) {
                 network_connect(configNetServer, configNetRoom, configNetName,
-                                (s32) configNetColor, sPublic,
-                                gBingoSeedIsSet ? get_seed() : 0);
+                                (s32) configNetColor, sPublic);
             } else {
                 network_disconnect();
             }
             break;
         case FIELD_READY:
             network_set_ready(!network_local_ready());
+            break;
+        case FIELD_START:
+            network_start_race();
             break;
     }
 }
@@ -134,6 +161,11 @@ s32 online_lobby_handle_input(void) {
     if (text_input_active()) {
         if (text_input_take_finished()) {
             text_input_stop();
+            if (sEditingField == FIELD_SEED) {
+                bingo_seed_set_from_ascii(sSeedBuf);
+                network_push_local_options();
+            }
+            sEditingField = -1;
         }
         return 0;
     }
@@ -149,26 +181,26 @@ s32 online_lobby_handle_input(void) {
         sSel = (sSel + 1) % FIELD_COUNT;
         play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
     } else if (pressed & A_BUTTON) {
+        if (sSel == FIELD_MODE) {
+            return 2;  // open the OPTIONS screen; B returns here
+        }
         activate_field(sSel);
     }
     return 0;
 }
 
-#define LOBBY_LEFT_X   20
+// LEFT_X sits on the background art's vertical fold line.
+#define LOBBY_LEFT_X   16
 #define LOBBY_VALUE_X  78
 #define LOBBY_RIGHT_X  190
 #define LOBBY_TOP_Y    172
 #define LOBBY_ROW_H    15
 
 static s32 field_row_y(s32 field) {
-    // The read-only MODE line sits between TYPE and CONNECT.
-    s32 row = field + (field >= FIELD_CONNECT ? 1 : 0);
-    return LOBBY_TOP_Y - row * LOBBY_ROW_H;
+    return LOBBY_TOP_Y - field * LOBBY_ROW_H;
 }
 
-#define LOBBY_MODE_ROW_Y (LOBBY_TOP_Y - (FIELD_TYPE + 1) * LOBBY_ROW_H)
-
-// The room's game mode: the creator sets it on the OPTION screen and the
+// The room's game mode: the host sets it on the OPTIONS screen and the
 // server tells everyone else.
 static const char *mode_name(void) {
     switch (gbBingoMode) {
@@ -259,6 +291,11 @@ void online_lobby_draw(u8 alpha) {
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_ROOM), "ROOM");
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_COLOR), "COLOR");
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_TYPE), "TYPE");
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140,
+                   seed_editable() ? MIN(alpha, 200) : dim);
+    print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_SEED), "SEED");
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(alpha, 200));
+    print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_MODE), "MODE");
 
     // Values.
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
@@ -278,12 +315,26 @@ void online_lobby_draw(u8 alpha) {
     }
     print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_TYPE), sPublic ? "PUBLIC" : "PRIVATE");
 
-    // Read-only: the mode comes from the (room creator's) OPTION screen.
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, dim);
-    print_ascii(LOBBY_LEFT_X, LOBBY_MODE_ROW_Y, "MODE");
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, dim);
-    snprintf(tmp, sizeof(tmp), "%s - SET IN OPTION", mode_name());
-    print_ascii(LOBBY_VALUE_X, LOBBY_MODE_ROW_Y, tmp);
+    // The seed: the shared value the host proposes; hidden from peers so
+    // nobody can preview the board.
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
+                   seed_editable() ? MIN(alpha, 220) : dim);
+    if (network_active() && !network_is_host()) {
+        print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_SEED), "SET BY HOST");
+    } else if (text_input_active() && sEditingField == FIELD_SEED) {
+        const char *cursor = ((gGlobalTimer >> 3) & 1) ? "-" : "";
+        snprintf(tmp, sizeof(tmp), "%s%s", sSeedBuf, cursor);
+        print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_SEED), tmp);
+    } else {
+        bingo_seed_to_ascii(tmp, sizeof(tmp));
+        print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_SEED),
+                    tmp[0] != '\0' ? tmp : "RANDOM");
+    }
+
+    // The mode row doubles as the door to the OPTIONS screen.
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(alpha, 220));
+    snprintf(tmp, sizeof(tmp), "%s - A: OPTIONS", mode_name());
+    print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_MODE), tmp);
 
     gDPSetEnvColor(gDisplayListHead++, sColorRGB[configNetColor][0],
                    sColorRGB[configNetColor][1], sColorRGB[configNetColor][2],
@@ -299,6 +350,33 @@ void online_lobby_draw(u8 alpha) {
     } else {
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, dim);
         print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_READY), "READY UP");
+    }
+    // The host starts the race (green once everyone is ready, but a
+    // force-start is allowed); everyone else just sees who decides.
+    if (network_is_host() && network_state() == NET_STATE_LOBBY) {
+        s32 i, allReady = 1;
+        for (i = 0; i < NET_MAX_PLAYERS; i++) {
+            if (gNetPlayers[i].active && gNetPlayers[i].connected
+                && !gNetPlayers[i].ready) {
+                allReady = 0;
+            }
+        }
+        if (allReady) {
+            gDPSetEnvColor(gDisplayListHead++, 110, 255, 110, MIN(alpha, 220));
+        } else {
+            gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(alpha, 220));
+        }
+        print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_START), "START RACE");
+    } else {
+        const char *label = "START RACE";
+        if (network_state() == NET_STATE_COUNTDOWN
+            || network_state() == NET_STATE_RACING) {
+            label = "STARTED";
+        } else if (network_active()) {
+            label = "HOST STARTS";
+        }
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, dim);
+        print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_START), label);
     }
 
     // Roster.
