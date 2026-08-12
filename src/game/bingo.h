@@ -4,12 +4,27 @@
 #include "course_table.h"
 #include "level_table.h"
 
+// The game mode, shared by both platforms and (online) by the whole room.
+// Line modes race to N completed rows/columns/diagonals; BLACKOUT needs the
+// whole board (online: co-op, claims are shared); LOCKOUT races to 13
+// squares (online: claims are exclusive, first claimant owns the square).
+enum BingoGameMode {
+    BINGO_MODE_LINE_1,
+    BINGO_MODE_LINE_2,
+    BINGO_MODE_LINE_3,
+    BINGO_MODE_BLACKOUT,
+    BINGO_MODE_LOCKOUT,
+    BINGO_MODE_COUNT
+};
+
+#define BINGO_LOCKOUT_TARGET 13
+
 // Global bingo state information
 extern s32 gBingoInitialized;
 extern u32 gBingoInitialSeed;
 extern s64 gbGlobalBingoTimer;
 extern s32 gbBingoTimerDisabled;
-extern s32 gbBingoTarget;
+extern enum BingoGameMode gbBingoMode;
 extern s32 gbBingosCompleted;
 extern s32 gbBingoShowCongratsCounter;
 extern s32 gbBingoShowCongratsLimit;
@@ -332,6 +347,21 @@ struct BingoObjective
 
 extern struct BingoObjective gBingoObjectives[25];
 extern u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+
+// Online: bit i set = the room's player with id i claimed this cell (line
+// modes allow several claimants per cell). Always all-zero on N64/offline.
+extern u32 gBingoCellClaimers[25];
+
+// Lines needed to win in a line mode; 0 for LOCKOUT (not line-based).
+s32 bingo_mode_line_target(void);
+// Cells the local player has completed.
+s32 bingo_complete_cell_count(void);
+// The local player met the mode's win condition.
+s32 bingo_race_won(void);
+// The race is over from the local player's perspective (they won, or an
+// online lockout/co-op race was decided for someone else). Stops the timer
+// and brings up the end screen.
+s32 bingo_race_over(void);
 
 void disable_bingo_modifiers();
 void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveState state);

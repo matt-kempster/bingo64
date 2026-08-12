@@ -1019,6 +1019,7 @@ static unsigned char text1Bingo[] = { TEXT_TARGET_1 };
 static unsigned char text2Bingos[] = { TEXT_TARGET_2 };
 static unsigned char text3Bingos[] = { TEXT_TARGET_3 };
 static unsigned char textBlackout[] = { TEXT_TARGET_BLACKOUT };
+static unsigned char textLockout[] = { TEXT_TARGET_LOCKOUT };
 
 static unsigned char textUnlockGame[] = { TEXT_UNLOCK_GAME };
 static unsigned char textToggleAll[] = { TEXT_TOGGLE_ALL };
@@ -1199,34 +1200,25 @@ static s32 bingo_config_target(s32 i, u8 **target) {
     // Returns offsetX
     if (sToggleCurrentOption && sBingoOptionSelection == i) {
         sToggleCurrentOption = 0;
-        switch (gbBingoTarget) {
-            case 1:
-                gbBingoTarget = 2;
-                break;
-            case 2:
-                gbBingoTarget = 3;
-                break;
-            case 3:
-                gbBingoTarget = 12;
-                break;
-            case 12:
-                gbBingoTarget = 1;
-                break;
-        }
+        gbBingoMode = (gbBingoMode + 1) % BINGO_MODE_COUNT;
     }
-    switch (gbBingoTarget) {
-        case 1:
+    switch (gbBingoMode) {
+        default:
+        case BINGO_MODE_LINE_1:
             *target = text1Bingo;
             return 94;
-        case 2:
+        case BINGO_MODE_LINE_2:
             *target = text2Bingos;
             return 89;
-        case 3:
+        case BINGO_MODE_LINE_3:
             *target = text3Bingos;
             return 89;
-        case 12:
+        case BINGO_MODE_BLACKOUT:
             *target = textBlackout;
             return 92;
+        case BINGO_MODE_LOCKOUT:
+            *target = textLockout;
+            return 93;
     }
 }
 

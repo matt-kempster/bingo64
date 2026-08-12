@@ -127,10 +127,25 @@ static void spawn_missing_ghosts(void) {
     }
 }
 
+// How server-confirmed claims land on the local board depends on the mode:
+//   BLACKOUT  co-op: any member's claim completes the shared board.
+//   LOCKOUT   exclusive: the claim records the owner; completion state is
+//             only set so the board shows the square as taken (tinted with
+//             the owner's color). Counting is owner-based.
+//   line modes  race: a peer's claim is recorded for display only; each
+//             player completes their own board.
 static void apply_remote_claims(void) {
     s32 cell, claimer;
     while (network_poll_claim(&cell, &claimer)) {
-        if (cell >= 0 && cell < 25) {
+        if (cell < 0 || cell >= 25) {
+            continue;
+        }
+        if (claimer >= 0 && claimer < 32) {
+            gBingoCellClaimers[cell] |= (u32) 1 << claimer;
+        }
+        if (gbBingoMode == BINGO_MODE_BLACKOUT
+            || gbBingoMode == BINGO_MODE_LOCKOUT
+            || claimer == network_local_id()) {
             gBingoNetApplyingRemoteClaim = 1;
             set_objective_state(&gBingoObjectives[cell], BINGO_STATE_COMPLETE);
             gBingoNetApplyingRemoteClaim = 0;
@@ -138,14 +153,57 @@ static void apply_remote_claims(void) {
     }
 }
 
+// After a reconnect the server replayed every claim it knows; send it the
+// completions it missed while we were gone (it drops duplicates).
+static void resend_missed_claims(void) {
+    s32 i;
+    u32 myBit = (u32) 1 << network_local_id();
+    for (i = 0; i < 25; i++) {
+        if (gBingoObjectives[i].state == BINGO_STATE_COMPLETE
+            && !(gBingoCellClaimers[i] & myBit)) {
+            network_notify_local_claim(i);
+        }
+    }
+}
+
 // Called once per gameplay frame from play_mode_normal.
 void bingo_net_update(void) {
+    static s32 sFinishAnnounced = 0;
     if (!network_active()) {
+        sFinishAnnounced = 0;
         return;
     }
     spawn_missing_ghosts();
     if (gBingoInitialized) {
         apply_remote_claims();
+        if (network_take_resync_flag()) {
+            resend_missed_claims();
+        }
+        if (network_state() == NET_STATE_RACING
+            || network_state() == NET_STATE_RECONNECTING) {
+            // The room's shared clock, so every racer times from GO even
+            // if they picked their file a little later. Once we have an
+            // official result, freeze on the server's authoritative time.
+            s32 i;
+            const struct NetResult *mine = NULL;
+            for (i = 0; i < network_result_count(); i++) {
+                if (network_result(i)->id == network_local_id()) {
+                    mine = network_result(i);
+                }
+            }
+            if (mine != NULL) {
+                gbGlobalBingoTimer = mine->frames;
+            } else if (!bingo_race_over()) {
+                gbGlobalBingoTimer = network_race_frames();
+            }
+            // Announce meeting the win condition (line modes; the server
+            // itself decides lockout from the claims).
+            if (gbBingoMode != BINGO_MODE_LOCKOUT && !sFinishAnnounced
+                && bingo_race_won()) {
+                sFinishAnnounced = 1;
+                network_notify_local_finish();
+            }
+        }
     }
 }
 
@@ -155,6 +213,30 @@ void bingo_net_on_local_complete(struct BingoObjective *objective) {
         return;
     }
     network_notify_local_claim(objective - gBingoObjectives);
+}
+
+s32 bingo_net_racing(void) {
+    return network_active() && network_has_seed(NULL);
+}
+
+s32 bingo_net_local_cell_count(void) {
+    s32 i, count = 0;
+    u32 myBit = (u32) 1 << network_local_id();
+    for (i = 0; i < 25; i++) {
+        if (gBingoCellClaimers[i] & myBit) {
+            count++;
+        }
+    }
+    return count;
+}
+
+s32 bingo_net_race_decided(void) {
+    return network_active() && network_race_winner_id() != 0;
+}
+
+s32 bingo_net_local_won(void) {
+    return network_active()
+           && network_race_winner_id() == network_local_id();
 }
 
 s32 bingo_net_obj_is_ghost(struct Object *obj) {
@@ -340,6 +422,22 @@ void bingo_net_on_local_complete(UNUSED struct BingoObjective *objective) {
 }
 
 s32 bingo_net_obj_is_ghost(UNUSED struct Object *obj) {
+    return 0;
+}
+
+s32 bingo_net_racing(void) {
+    return 0;
+}
+
+s32 bingo_net_local_cell_count(void) {
+    return 0;
+}
+
+s32 bingo_net_race_decided(void) {
+    return 0;
+}
+
+s32 bingo_net_local_won(void) {
     return 0;
 }
 

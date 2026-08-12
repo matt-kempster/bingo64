@@ -27,8 +27,9 @@ s32 gBingoInitialized = 0;
 u32 gBingoInitialSeed = 0;
 
 s64 gbGlobalBingoTimer = 0;
-s32 gbBingoTarget = 1;
+enum BingoGameMode gbBingoMode = BINGO_MODE_LINE_1;
 s32 gbBingosCompleted = 0;
+u32 gBingoCellClaimers[25] = { 0 };
 s32 gbBingoShowCongratsCounter = 0;
 s32 gbBingoShowCongratsLimit = 2;
 s32 gbBingoTimerDisabled = 0;
@@ -95,6 +96,47 @@ void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveSt
             break;
     }
     objective->state = state;
+}
+
+s32 bingo_mode_line_target(void) {
+    switch (gbBingoMode) {
+        case BINGO_MODE_LINE_1:   return 1;
+        case BINGO_MODE_LINE_2:   return 2;
+        case BINGO_MODE_LINE_3:   return 3;
+        case BINGO_MODE_BLACKOUT: return 12;
+        default:                  return 0;  // LOCKOUT: not line-based
+    }
+}
+
+s32 bingo_complete_cell_count(void) {
+    s32 i, count = 0;
+    for (i = 0; i < 25; i++) {
+        if (gBingoObjectives[i].state == BINGO_STATE_COMPLETE) {
+            count++;
+        }
+    }
+    return count;
+}
+
+s32 bingo_race_won(void) {
+    if (gbBingoMode == BINGO_MODE_LOCKOUT) {
+        if (bingo_net_racing()) {
+            // Online lockout: claims are exclusive and the server decides
+            // the winner (first to 13 in 1v1, uncatchable lead otherwise).
+            return bingo_net_local_won();
+        }
+        // Solo lockout: race to any 13 squares.
+        return bingo_complete_cell_count() >= BINGO_LOCKOUT_TARGET;
+    }
+    return gbBingosCompleted >= bingo_mode_line_target();
+}
+
+s32 bingo_race_over(void) {
+    if (bingo_race_won()) {
+        return 1;
+    }
+    // An online lockout decided for someone else ends the race for us too.
+    return gbBingoMode == BINGO_MODE_LOCKOUT && bingo_net_race_decided();
 }
 
 /**
@@ -192,7 +234,7 @@ void bingo_update(enum BingoObjectiveUpdate update) {
         update_objective(&gBingoObjectives[i], update);
     }
 
-    if (update == BINGO_UPDATE_TIMER_FRAME_GLOBAL && gbBingosCompleted < gbBingoTarget) {
+    if (update == BINGO_UPDATE_TIMER_FRAME_GLOBAL && !bingo_race_over()) {
         // Should we not increment if game is paused?
         // We probably should. Just a thought.
         gbGlobalBingoTimer++;

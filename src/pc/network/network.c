@@ -1,6 +1,8 @@
-// Online bingo client: TCP line protocol to server/relay.py, protocol v2.
+// Online bingo client: TCP line protocol to server/relay.py, protocol v3.
 // POSIX sockets on Linux/macOS, winsock2 on Windows. Connects without
-// blocking so the file-select lobby stays responsive.
+// blocking so the file-select lobby stays responsive. A dropped
+// connection mid-session auto-reconnects with the server's token; the
+// server restores our id and replays the room state.
 
 #include "network.h"
 
@@ -80,7 +82,6 @@ static net_sock_t sSocket = NET_BAD_SOCK;
 static s32 sLocalId = 0;
 static u32 sSharedSeed = 0;
 static s32 sSeedValid = 0;
-static s32 sLockout = 0;
 static s32 sAutoReady = 0;
 static s32 sLocalReady = 0;
 static char sErrorMsg[64] = "";
@@ -88,6 +89,24 @@ static char sErrorMsg[64] = "";
 // GO happens when gGlobalTimer reaches this (valid in COUNTDOWN/RACING).
 static u32 sGoFrame = 0;
 
+// Reconnect state: the server's token from the welcome, the join
+// parameters to redial with, and the retry timer.
+static u32 sToken = 0;
+static char sSavedServer[NET_SERVER_LEN];
+static char sSavedRoom[NET_ROOM_LEN];
+static char sSavedName[NET_NAME_LEN];
+static s32 sSavedColor = 0;
+static s32 sSavedFlags = 0;
+static u32 sSavedSeed = 0;
+static s32 sRetryFrames = 0;
+static s32 sWasReconnect = 0;  // this connection resumed a session
+static s32 sResyncFlag = 0;
+
+// Race results as broadcast by the server (placement order).
+static struct NetResult sResults[NET_MAX_PLAYERS];
+static s32 sResultCount = 0;
+static s32 sWinnerId = 0;      // lockout: the decided winner
+static s32 sFinishSent = 0;
 
 // The join line, sent once the nonblocking connect completes.
 static char sJoinLine[224];
@@ -112,6 +131,20 @@ static void net_fail(const char *msg) {
     if (sSocket != NET_BAD_SOCK) {
         net_close(sSocket);
         sSocket = NET_BAD_SOCK;
+    }
+    // A live session with a token redials instead of giving up; the
+    // server holds our seat and replays the room state when we return.
+    if (sToken != 0
+        && (sState == NET_STATE_LOBBY || sState == NET_STATE_COUNTDOWN
+            || sState == NET_STATE_RACING || sState == NET_STATE_RECONNECTING)) {
+        if (sState != NET_STATE_RECONNECTING) {
+            printf("net: connection lost (%s), reconnecting\n", msg);
+            fflush(stdout);
+        }
+        sState = NET_STATE_RECONNECTING;
+        sJoinLine[0] = '\0';
+        sRetryFrames = 30;
+        return;
     }
     snprintf(sErrorMsg, sizeof(sErrorMsg), "%s", msg);
     sState = NET_STATE_ERROR;
@@ -171,25 +204,56 @@ static s32 slot_for_id(s32 id) {
     return -1;
 }
 
+// Forget every room member and ghost (a reconnect that came back with a
+// fresh id: the server no longer knew us, so the old session is void).
+static void reset_room_state(void) {
+    s32 i;
+    for (i = 0; i < MAX_ID; i++) {
+        sIdToSlot[i] = -1;
+    }
+    memset(gNetGhosts, 0, sizeof(gNetGhosts));
+    memset(gNetPlayers, 0, sizeof(gNetPlayers));
+    sClaimHead = sClaimTail = 0;
+    sResultCount = 0;
+    sWinnerId = 0;
+}
+
 static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
     if (cmd == 'W') {
-        s32 lockout = 0, public_ = 0;
+        s32 public_ = 0, mode = 0;
         s32 id = 0;
-        if (sscanf(line + 1, "%d %d %d", &id, &lockout, &public_) == 3) {
-            // A v1 relay sends "W <id> <seed> <lockout>": the huge seed
-            // lands in the lockout field. Fail loudly instead of running
-            // a half-broken lobby against an outdated server.
-            if (lockout < 0 || lockout > 1 || public_ < 0 || public_ > 1) {
+        u32 token = 0;
+        if (sscanf(line + 1, "%d %d %d %u", &id, &public_, &mode, &token) == 4) {
+            // A v1/v2 relay packs other fields here; fail loudly instead
+            // of running a half-broken lobby against an outdated server.
+            if (public_ < 0 || public_ > 1 || mode < 0 || mode >= BINGO_MODE_COUNT) {
+                sToken = 0;
                 net_fail("server runs an old relay version");
                 return;
             }
-            sLocalId = id;
-            sLockout = lockout;
-            sState = NET_STATE_LOBBY;
-            printf("net: joined as #%d (%s room)\n", id, lockout ? "lockout" : "co-op");
+            if (sWasReconnect && id == sLocalId) {
+                printf("net: reconnected as #%d\n", id);
+                sResyncFlag = 1;
+            } else {
+                if (sWasReconnect) {
+                    // The server dropped our seat; start over as a new member.
+                    reset_room_state();
+                    sResyncFlag = 1;
+                }
+                printf("net: joined as #%d\n", id);
+            }
             fflush(stdout);
+            sLocalId = id;
+            sToken = token;
+            if (sLocalId != 1) {
+                // The room's current mode; the creator's own push wins below.
+                gbBingoMode = (enum BingoGameMode) mode;
+            }
+            // A started room's S replay follows immediately and advances
+            // us back to COUNTDOWN/RACING.
+            sState = NET_STATE_LOBBY;
             // If we created the room, our local bingo options become the
             // room's options (re-pushed if changed while in the lobby).
             network_push_local_options();
@@ -199,20 +263,24 @@ static void handle_line(char *line) {
         }
     } else if (cmd == 'S') {
         u32 seed = 0;
-        s32 delta = 0, target = 1, unlock = 0;
+        s32 delta = 0, mode = 0, unlock = 0;
         unsigned long long mask = 0;
-        if (sscanf(line + 1, "%u %d %d %d %llx", &seed, &delta, &target, &unlock, &mask) == 5) {
+        if (sscanf(line + 1, "%u %d %d %d %llx", &seed, &delta, &mode, &unlock, &mask) == 5) {
             s32 i;
             sSharedSeed = seed;
             sSeedValid = 1;
             // The room creator's bingo options apply to the whole room;
             // the board seeds identically for everyone.
-            gbBingoTarget = target;
+            if (mode >= 0 && mode < BINGO_MODE_COUNT) {
+                gbBingoMode = (enum BingoGameMode) mode;
+            }
             gBingoFullGameUnlocked = (u8) (unlock != 0);
             for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
                 gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
             }
-            sGoFrame = (delta > 0) ? gGlobalTimer + (u32) delta : gGlobalTimer;
+            // delta is negative when the race already started (late join /
+            // reconnect); unsigned wrap keeps the shared clock correct.
+            sGoFrame = gGlobalTimer + (u32) delta;
             sState = (delta > 0) ? NET_STATE_COUNTDOWN : NET_STATE_RACING;
             printf("net: race starts in %d frames, seed %u\n", delta, seed);
             fflush(stdout);
@@ -250,14 +318,15 @@ static void handle_line(char *line) {
             }
         }
     } else if (cmd == 'N') {
-        s32 id, color = 0, ready = 0;
+        s32 id, color = 0, ready = 0, connected = 1;
         char name[NET_NAME_LEN] = "";
-        if (sscanf(line + 1, "%d %15s %d %d", &id, name, &color, &ready) >= 3) {
+        if (sscanf(line + 1, "%d %15s %d %d %d", &id, name, &color, &ready, &connected) >= 3) {
             struct NetPlayer *p = player_for_id(id, 1);
             if (p != NULL) {
                 strncpy(p->name, name, NET_NAME_LEN - 1);
                 p->color = (u8) (color % NET_COLOR_COUNT);
                 p->ready = (u8) (ready != 0);
+                p->connected = (u8) (connected != 0);
                 if (id != sLocalId) {
                     printf("net: %s is here (#%d, color %d)\n", name, id, color);
                     fflush(stdout);
@@ -285,23 +354,66 @@ static void handle_line(char *line) {
                 sClaimTail = next;
             }
         }
-    } else if (cmd == 'B') {
+    } else if (cmd == 'B' || cmd == 'D') {
         s32 id;
         if (sscanf(line + 1, "%d", &id) == 1 && id >= 0 && id < MAX_ID) {
             struct NetPlayer *p = player_for_id(id, 0);
             if (p != NULL) {
-                printf("net: %s left\n", p->name);
+                printf("net: %s %s\n", p->name,
+                       cmd == 'B' ? "left" : "disconnected (may return)");
                 fflush(stdout);
-                p->active = 0;
+                if (cmd == 'B') {
+                    p->active = 0;
+                } else {
+                    p->connected = 0;
+                    p->ready = 0;
+                }
             }
             if (sIdToSlot[id] >= 0) {
                 gNetGhosts[(int) sIdToSlot[id]].active = 0;
                 sIdToSlot[id] = -1;
             }
         }
+    } else if (cmd == 'O') {
+        // The creator changed the room options while we sat in the lobby.
+        s32 mode;
+        if (sscanf(line + 1, "%d", &mode) == 1
+            && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != 1) {
+            gbBingoMode = (enum BingoGameMode) mode;
+        }
+    } else if (cmd == 'F') {
+        s32 id, place, frames;
+        if (sscanf(line + 1, "%d %d %d", &id, &place, &frames) == 3) {
+            s32 i, known = 0;
+            for (i = 0; i < sResultCount; i++) {
+                known |= sResults[i].id == id;
+            }
+            if (!known && sResultCount < NET_MAX_PLAYERS) {
+                sResults[sResultCount].id = id;
+                sResults[sResultCount].place = place;
+                sResults[sResultCount].frames = frames;
+                sResultCount++;
+                printf("net: #%d finished in place %d (%d frames)\n", id, place, frames);
+                fflush(stdout);
+            }
+        }
+    } else if (cmd == 'V') {
+        s32 id, frames;
+        if (sscanf(line + 1, "%d %d", &id, &frames) == 2) {
+            sWinnerId = id;
+            if (sResultCount == 0) {
+                sResults[0].id = id;
+                sResults[0].place = 1;
+                sResults[0].frames = frames;
+                sResultCount = 1;
+            }
+            printf("net: race decided, #%d wins (%d frames)\n", id, frames);
+            fflush(stdout);
+        }
     } else if (cmd == 'E') {
         char msg[48];
         snprintf(msg, sizeof(msg), "server refused: %s", line + 2);
+        sToken = 0;  // a refusal is final: no auto-reconnect loop
         net_fail(msg);
     }
 }
@@ -350,29 +462,34 @@ static void reset_session_state(void) {
     sLocalId = 0;
     sSeedValid = 0;
     sSharedSeed = 0;
-    sLockout = 0;
     sLocalReady = 0;
     sClaimHead = sClaimTail = 0;
     sInLen = 0;
     sErrorMsg[0] = '\0';
+    sToken = 0;
+    sRetryFrames = 0;
+    sWasReconnect = 0;
+    sResyncFlag = 0;
+    sResultCount = 0;
+    sWinnerId = 0;
+    sFinishSent = 0;
 }
 
-s32 network_connect(const char *server, const char *room, const char *name,
-                    s32 color, s32 flagsLockout, s32 flagsPublic,
-                    u32 seedProposal) {
+// Resolve the saved server, start the nonblocking connect and arm the
+// join line (with the reconnect token if we have one). Returns 0 with
+// *err set on immediate failure; no state change happens here.
+static s32 net_dial(const char **err) {
     char host[NET_SERVER_LEN];
     const char *colon;
     const char *port = "64064";
     char portbuf[16];
     struct addrinfo hints, *res = NULL, *ai;
-    s32 flags = (flagsLockout ? 1 : 0) | (flagsPublic ? 2 : 0);
 
-    network_disconnect();
-    reset_session_state();
-
-    if (server == NULL || server[0] == '\0') {
-        return 0;
+    if (sSocket != NET_BAD_SOCK) {
+        net_close(sSocket);
+        sSocket = NET_BAD_SOCK;
     }
+    sInLen = 0;
 
 #ifdef _WIN32
     {
@@ -380,7 +497,7 @@ s32 network_connect(const char *server, const char *room, const char *name,
         if (!sWsaReady) {
             WSADATA wsa;
             if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-                net_fail("WSAStartup failed");
+                *err = "WSAStartup failed";
                 return 0;
             }
             sWsaReady = 1;
@@ -388,19 +505,19 @@ s32 network_connect(const char *server, const char *room, const char *name,
     }
 #endif
 
-    colon = strrchr(server, ':');
+    colon = strrchr(sSavedServer, ':');
     if (colon != NULL) {
-        size_t hlen = colon - server;
+        size_t hlen = colon - sSavedServer;
         if (hlen >= sizeof(host)) {
             hlen = sizeof(host) - 1;
         }
-        memcpy(host, server, hlen);
+        memcpy(host, sSavedServer, hlen);
         host[hlen] = '\0';
         strncpy(portbuf, colon + 1, sizeof(portbuf) - 1);
         portbuf[sizeof(portbuf) - 1] = '\0';
         port = portbuf;
     } else {
-        strncpy(host, server, sizeof(host) - 1);
+        strncpy(host, sSavedServer, sizeof(host) - 1);
         host[sizeof(host) - 1] = '\0';
     }
 
@@ -408,14 +525,14 @@ s32 network_connect(const char *server, const char *room, const char *name,
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     if (getaddrinfo(host, port, &hints, &res) != 0 || res == NULL) {
-        net_fail("cannot resolve server");
+        *err = "cannot resolve server";
         return 0;
     }
     ai = res;
     sSocket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
     if (sSocket == NET_BAD_SOCK) {
         freeaddrinfo(res);
-        net_fail("cannot create socket");
+        *err = "cannot create socket";
         return 0;
     }
 #ifdef _WIN32
@@ -432,16 +549,43 @@ s32 network_connect(const char *server, const char *room, const char *name,
     }
     if (connect(sSocket, ai->ai_addr, (int) ai->ai_addrlen) != 0 && !net_connect_in_progress()) {
         freeaddrinfo(res);
-        net_fail("cannot connect");
+        net_close(sSocket);
+        sSocket = NET_BAD_SOCK;
+        *err = "cannot connect";
         return 0;
     }
     freeaddrinfo(res);
 
-    snprintf(sJoinLine, sizeof(sJoinLine), "J %d %s %s %d %d %u\n",
-             NET_PROTOCOL_VERSION,
-             (room != NULL && room[0]) ? room : "bingo",
-             (name != NULL && name[0]) ? name : "mario",
-             color % NET_COLOR_COUNT, flags, seedProposal);
+    snprintf(sJoinLine, sizeof(sJoinLine), "J %d %s %s %d %d %u %u\n",
+             NET_PROTOCOL_VERSION, sSavedRoom, sSavedName,
+             sSavedColor, sSavedFlags, sSavedSeed, sToken);
+    sWasReconnect = sToken != 0;
+    return 1;
+}
+
+s32 network_connect(const char *server, const char *room, const char *name,
+                    s32 color, s32 flagsPublic, u32 seedProposal) {
+    const char *err = "cannot connect";
+
+    network_disconnect();
+    reset_session_state();
+
+    if (server == NULL || server[0] == '\0') {
+        return 0;
+    }
+    snprintf(sSavedServer, sizeof(sSavedServer), "%s", server);
+    snprintf(sSavedRoom, sizeof(sSavedRoom), "%s",
+             (room != NULL && room[0]) ? room : "bingo");
+    snprintf(sSavedName, sizeof(sSavedName), "%s",
+             (name != NULL && name[0]) ? name : "mario");
+    sSavedColor = color % NET_COLOR_COUNT;
+    sSavedFlags = flagsPublic ? 1 : 0;
+    sSavedSeed = seedProposal;
+
+    if (!net_dial(&err)) {
+        net_fail(err);
+        return 0;
+    }
     sState = NET_STATE_CONNECTING;
     printf("net: connecting to %s\n", server);
     fflush(stdout);
@@ -466,7 +610,7 @@ void network_init_from_cli(void) {
     network_connect(gCLIOpts.NetServer,
                     gCLIOpts.NetRoom[0] ? gCLIOpts.NetRoom : "bingo",
                     gCLIOpts.NetName[0] ? gCLIOpts.NetName : "mario",
-                    (s32) gCLIOpts.NetColor, 0, 0, 0);
+                    (s32) gCLIOpts.NetColor, 0, 0);
     // CLI sessions ready up automatically: whoever launches from the
     // command line doesn't want to hang around in the lobby. (Set after
     // network_connect: its internal disconnect clears the flag.)
@@ -510,10 +654,32 @@ void network_update(void) {
         return;
     }
 
-    if (sState == NET_STATE_CONNECTING && sJoinLine[0] != '\0') {
+    // Between reconnect attempts: no socket, just a retry countdown.
+    if (sState == NET_STATE_RECONNECTING && sSocket == NET_BAD_SOCK) {
+        if (--sRetryFrames <= 0) {
+            const char *err;
+            if (net_dial(&err)) {
+                printf("net: redialing %s\n", sSavedServer);
+                fflush(stdout);
+            } else {
+                sRetryFrames = 150;  // resolve failed; try again in 5s
+            }
+        }
+        return;
+    }
+
+    if (sJoinLine[0] != '\0'
+        && (sState == NET_STATE_CONNECTING || sState == NET_STATE_RECONNECTING)) {
         s32 done = poll_connect_done();
         if (done < 0) {
-            net_fail("cannot connect");
+            if (sState == NET_STATE_RECONNECTING) {
+                net_close(sSocket);
+                sSocket = NET_BAD_SOCK;
+                sJoinLine[0] = '\0';
+                sRetryFrames = 90;
+            } else {
+                net_fail("cannot connect");
+            }
             return;
         }
         if (done > 0) {
@@ -558,15 +724,16 @@ const char *network_error_message(void) {
 
 s32 network_active(void) {
     return sState == NET_STATE_LOBBY || sState == NET_STATE_COUNTDOWN
-           || sState == NET_STATE_RACING;
+           || sState == NET_STATE_RACING || sState == NET_STATE_RECONNECTING;
 }
 
 s32 network_local_id(void) {
     return sLocalId;
 }
 
-s32 network_lockout(void) {
-    return sLockout;
+s32 network_color_of_id(s32 id) {
+    struct NetPlayer *p = player_for_id(id, 0);
+    return p != NULL ? p->color : 0;
 }
 
 void network_set_ready(s32 ready) {
@@ -589,13 +756,13 @@ s32 network_countdown_frames(void) {
     return 0;
 }
 
-void network_send_options(s32 target, s32 unlock, u64 mask) {
+void network_send_options(s32 mode, s32 unlock, u64 mask) {
     char line[64];
     if (!network_active()) {
         return;
     }
     snprintf(line, sizeof(line), "O %d %d %llx\n",
-             target, unlock, (unsigned long long) mask);
+             mode, unlock, (unsigned long long) mask);
     net_send_line(line);
 }
 
@@ -611,7 +778,7 @@ void network_push_local_options(void) {
             mask |= (u64) 1 << i;
         }
     }
-    network_send_options(gbBingoTarget, gBingoFullGameUnlocked, mask);
+    network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask);
 }
 
 s32 network_has_seed(u32 *seed) {
@@ -638,6 +805,53 @@ s32 network_poll_claim(s32 *cell, s32 *claimerId) {
     *claimerId = sClaimIds[sClaimHead];
     sClaimHead = (sClaimHead + 1) % CLAIM_QUEUE_LEN;
     return 1;
+}
+
+void network_notify_local_finish(void) {
+    if (!network_active() || sFinishSent) {
+        return;
+    }
+    sFinishSent = 1;
+    net_send_line("F\n");
+}
+
+s32 network_race_frames(void) {
+    if (sSeedValid && (sState == NET_STATE_RACING
+                       || sState == NET_STATE_RECONNECTING)) {
+        return (s32) (gGlobalTimer - sGoFrame);
+    }
+    return 0;
+}
+
+s32 network_result_count(void) {
+    return sResultCount;
+}
+
+const struct NetResult *network_result(s32 i) {
+    if (i < 0 || i >= sResultCount) {
+        return NULL;
+    }
+    return &sResults[i];
+}
+
+s32 network_local_place(void) {
+    s32 i;
+    for (i = 0; i < sResultCount; i++) {
+        if (sResults[i].id == sLocalId) {
+            return sResults[i].place;
+        }
+    }
+    return 0;
+}
+
+s32 network_race_winner_id(void) {
+    return sWinnerId;
+}
+
+s32 network_take_resync_flag(void) {
+    s32 f = sResyncFlag;
+    sResyncFlag = 0;
+    return f;
 }
 
 #endif // NET_SOCKETS_AVAILABLE

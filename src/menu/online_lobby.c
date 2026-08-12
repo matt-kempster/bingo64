@@ -13,6 +13,7 @@
 #include <PR/gbi.h>
 
 #include "audio/external.h"
+#include "game/bingo.h"
 #include "game/game_init.h"
 #include "game/ingame_menu.h"
 #include "game/segment2.h"
@@ -28,7 +29,6 @@ enum LobbyField {
     FIELD_SERVER,
     FIELD_ROOM,
     FIELD_COLOR,
-    FIELD_MODE,
     FIELD_TYPE,
     FIELD_CONNECT,
     FIELD_READY,
@@ -36,7 +36,6 @@ enum LobbyField {
 };
 
 static s32 sSel = FIELD_CONNECT;
-static s32 sLockout = 0;
 static s32 sPublic = 0;
 
 static const char *sColorNames[NET_COLOR_COUNT] = {
@@ -109,11 +108,6 @@ static void activate_field(s32 field) {
                 configNetColor = (configNetColor + 1) % NET_COLOR_COUNT;
             }
             break;
-        case FIELD_MODE:
-            if (settings_editable()) {
-                sLockout ^= 1;
-            }
-            break;
         case FIELD_TYPE:
             if (settings_editable()) {
                 sPublic ^= 1;
@@ -122,7 +116,7 @@ static void activate_field(s32 field) {
         case FIELD_CONNECT:
             if (settings_editable()) {
                 network_connect(configNetServer, configNetRoom, configNetName,
-                                (s32) configNetColor, sLockout, sPublic,
+                                (s32) configNetColor, sPublic,
                                 gBingoSeedIsSet ? get_seed() : 0);
             } else {
                 network_disconnect();
@@ -167,7 +161,23 @@ s32 online_lobby_handle_input(void) {
 #define LOBBY_ROW_H    15
 
 static s32 field_row_y(s32 field) {
-    return LOBBY_TOP_Y - field * LOBBY_ROW_H;
+    // The read-only MODE line sits between TYPE and CONNECT.
+    s32 row = field + (field >= FIELD_CONNECT ? 1 : 0);
+    return LOBBY_TOP_Y - row * LOBBY_ROW_H;
+}
+
+#define LOBBY_MODE_ROW_Y (LOBBY_TOP_Y - (FIELD_TYPE + 1) * LOBBY_ROW_H)
+
+// The room's game mode: the creator sets it on the OPTION screen and the
+// server tells everyone else.
+static const char *mode_name(void) {
+    switch (gbBingoMode) {
+        case BINGO_MODE_LINE_2:   return "2 BINGOS";
+        case BINGO_MODE_LINE_3:   return "3 BINGOS";
+        case BINGO_MODE_BLACKOUT: return "BLACKOUT";
+        case BINGO_MODE_LOCKOUT:  return "LOCKOUT";
+        default:                  return "1 BINGO";
+    }
 }
 
 static void draw_selection_highlight(u8 alpha) {
@@ -216,6 +226,9 @@ static void status_text(char *buf, s32 size) {
         case NET_STATE_RACING:
             snprintf(buf, size, "GO. PICK A FILE");
             break;
+        case NET_STATE_RECONNECTING:
+            snprintf(buf, size, "CONNECTION LOST. RECONNECTING...");
+            break;
         case NET_STATE_ERROR:
             snprintf(buf, size, "%s", network_error_message());
             break;
@@ -245,7 +258,6 @@ void online_lobby_draw(u8 alpha) {
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_SERVER), "SERVER");
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_ROOM), "ROOM");
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_COLOR), "COLOR");
-    print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_MODE), "MODE");
     print_ascii(LOBBY_LEFT_X, field_row_y(FIELD_TYPE), "TYPE");
 
     // Values.
@@ -264,8 +276,14 @@ void online_lobby_draw(u8 alpha) {
                  (text_input_active() && sSel == FIELD_ROOM) ? cursor : "");
         print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_ROOM), tmp);
     }
-    print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_MODE), sLockout ? "LOCKOUT" : "COOP");
     print_ascii(LOBBY_VALUE_X, field_row_y(FIELD_TYPE), sPublic ? "PUBLIC" : "PRIVATE");
+
+    // Read-only: the mode comes from the (room creator's) OPTION screen.
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, dim);
+    print_ascii(LOBBY_LEFT_X, LOBBY_MODE_ROW_Y, "MODE");
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, dim);
+    snprintf(tmp, sizeof(tmp), "%s - SET IN OPTION", mode_name());
+    print_ascii(LOBBY_VALUE_X, LOBBY_MODE_ROW_Y, tmp);
 
     gDPSetEnvColor(gDisplayListHead++, sColorRGB[configNetColor][0],
                    sColorRGB[configNetColor][1], sColorRGB[configNetColor][2],
@@ -294,9 +312,12 @@ void online_lobby_draw(u8 alpha) {
         }
         gDPSetEnvColor(gDisplayListHead++, sColorRGB[p->color][0],
                        sColorRGB[p->color][1], sColorRGB[p->color][2],
-                       MIN(alpha, 220));
+                       p->connected ? MIN(alpha, 220) : dim);
         print_ascii(LOBBY_RIGHT_X, LOBBY_TOP_Y - row * LOBBY_ROW_H, p->name);
-        if (p->ready || network_state() == NET_STATE_COUNTDOWN
+        if (!p->connected) {
+            gDPSetEnvColor(gDisplayListHead++, 255, 120, 120, MIN(alpha, 220));
+            print_ascii(LOBBY_RIGHT_X + 90, LOBBY_TOP_Y - row * LOBBY_ROW_H, "-");
+        } else if (p->ready || network_state() == NET_STATE_COUNTDOWN
             || network_state() == NET_STATE_RACING) {
             gDPSetEnvColor(gDisplayListHead++, 110, 255, 110, MIN(alpha, 220));
             print_ascii(LOBBY_RIGHT_X + 90, LOBBY_TOP_Y - row * LOBBY_ROW_H, "OK");

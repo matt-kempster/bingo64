@@ -17,6 +17,9 @@
 #include "area.h"
 #include "bingo_ui.h"
 #include "bingo.h"
+#ifndef TARGET_N64
+#include "pc/network/network.h"
+#endif
 #include "save_file.h"
 #include "print.h"
 #include "bingo_ui.h"
@@ -641,7 +644,7 @@ void render_hud(void) {
 #endif
 
         if (gPlayer1Controller->buttonPressed & L_TRIG
-            && gbBingosCompleted >= gbBingoTarget
+            && bingo_race_over()
             && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit
         ) {
             // If you press L twice, the congrats message goes away.
@@ -650,7 +653,7 @@ void render_hud(void) {
         if (gPlayer1Controller->buttonDown & L_TRIG || gForceDrawBingoScreen == 1) {
             draw_bingo_screen();
         } else {
-            if ((gbBingosCompleted >= gbBingoTarget) && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit) {
+            if (bingo_race_over() && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit) {
                 draw_bingo_win_screen();
             } else {
                 bingo_hud_render();
@@ -659,6 +662,13 @@ void render_hud(void) {
             if (gbBingoShowTimer) {
                 draw_bingo_hud_timer();
             }
+
+#ifndef TARGET_N64
+            if (network_state() == NET_STATE_RECONNECTING
+                && (gGlobalTimer & 0x10)) {
+                print_text(20, 20, "RECONNECTING");
+            }
+#endif
 
             if (gCurrentArea != NULL && gCurrentArea->camera->mode == CAMERA_MODE_INSIDE_CANNON) {
                 render_hud_cannon_reticle();

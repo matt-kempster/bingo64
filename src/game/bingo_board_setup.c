@@ -438,7 +438,7 @@ s32 deduplicate_pass_multi_bingo() {
 void deduplicate() {
     s32 attempts = 10;
     while (attempts > 0) {
-        if (gbBingoTarget == 1) {
+        if (bingo_mode_line_target() == 1) {
             if (!deduplicate_pass_single_bingo()) {
                 break;
             }
@@ -476,6 +476,9 @@ void setup_bingo_objectives(u32 seed) {
 
     gBingoInitialized = 1;
     gBingoInitialSeed = seed;
+    for (i = 0; i < 25; i++) {
+        gBingoCellClaimers[i] = 0;
+    }
 
     harderClass = (random_u16() % 2) + 1; // either 1 or 2
     easierClass = (2 - harderClass) + 1; // either 2 or 1, opposite harderClass

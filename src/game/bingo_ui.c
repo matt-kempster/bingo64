@@ -23,6 +23,9 @@
 #include "ingame_menu.h"
 #include "bingo_objective_info.h"
 #include "segment2.h"
+#ifndef TARGET_N64
+#include "pc/network/network.h"
+#endif
 
 s8 gBingoAllowBoardToShow;
 s8 gForceDrawBingoScreen = 0;
@@ -53,9 +56,79 @@ int bingostrlen(char *str) {
     return len;
 }
 
+#ifndef TARGET_N64
+// "matt" -> "MATT" in a static buffer, for the all-caps HUD font.
+static const char *hud_upper(const char *name) {
+    static char buf[NET_NAME_LEN];
+    s32 i;
+    for (i = 0; name[i] != '\0' && i < NET_NAME_LEN - 1; i++) {
+        buf[i] = (name[i] >= 'a' && name[i] <= 'z') ? name[i] - 0x20 : name[i];
+    }
+    buf[i] = '\0';
+    return buf;
+}
+
+static const char *net_name_of_id(s32 id) {
+    s32 i;
+    for (i = 0; i < NET_MAX_PLAYERS; i++) {
+        if (gNetPlayers[i].active && gNetPlayers[i].id == id) {
+            return hud_upper(gNetPlayers[i].name);
+        }
+    }
+    return "?";
+}
+
+// Cells each room member owns (their bit is set in gBingoCellClaimers).
+static s32 net_cell_count_of_id(s32 id) {
+    s32 i, count = 0;
+    if (id < 0 || id >= 32) {
+        return 0;
+    }
+    for (i = 0; i < 25; i++) {
+        if (gBingoCellClaimers[i] & ((u32) 1 << id)) {
+            count++;
+        }
+    }
+    return count;
+}
+#endif
+
 void draw_bingo_win_screen() {
     char timestamp[16];
     char msg[40];
+
+#ifndef TARGET_N64
+    if (network_active() && gbBingoMode == BINGO_MODE_LOCKOUT
+        && network_race_winner_id() != 0) {
+        // Lockout ends for the whole room at once: show the verdict.
+        s32 winner = network_race_winner_id();
+        if (winner == network_local_id()) {
+            sprintf(msg, "YOU WIN %d SQUARES", net_cell_count_of_id(winner));
+        } else {
+            sprintf(msg, "%s WINS %d SQUARES", net_name_of_id(winner),
+                    net_cell_count_of_id(winner));
+        }
+        print_text(30, 60, msg);
+        if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
+            print_text(60, 40, "PRESS L AGAIN TO");
+            print_text(110, 20, "DISMISS");
+        }
+        return;
+    }
+    if (network_active() && network_local_place() > 0) {
+        // A race finish: our official place and server-timed result.
+        getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
+        sprintf(msg, "FINISHED NUMBER %d IN %s", network_local_place(), timestamp);
+        print_text(16, 60, msg);
+        if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
+            print_text(60, 40, "PRESS L AGAIN TO");
+            print_text(110, 20, "DISMISS");
+        } else {
+            print_text(30, 40, "YOU ARE A SUPER PLAYER");
+        }
+        return;
+    }
+#endif
 
     getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
     sprintf(msg, "YOUR TIME IS %s", timestamp);
@@ -223,6 +296,36 @@ void draw_bingo_screen() {
     sprintf(time_print, "TIME %s", timestamp);
     print_text_tiny(240, 196, time_print);
 
+#ifndef TARGET_N64
+    // Online: live standings (lockout) or the finishers so far (races),
+    // stacked under the timer in the right column.
+    if (network_active()) {
+        char row_print[40];
+        s32 rowY = 184;
+        if (gbBingoMode == BINGO_MODE_LOCKOUT) {
+            for (i = 0; i < NET_MAX_PLAYERS && rowY > 100; i++) {
+                struct NetPlayer *p = &gNetPlayers[i];
+                if (!p->active) {
+                    continue;
+                }
+                sprintf(row_print, "%s%s %d", hud_upper(p->name),
+                        p->connected ? "" : "*", net_cell_count_of_id(p->id));
+                print_text_tiny(240, rowY, row_print);
+                rowY -= 9;
+            }
+        } else {
+            for (i = 0; i < network_result_count() && rowY > 100; i++) {
+                const struct NetResult *r = network_result(i);
+                getTimeFmtPreciseTiny(timestamp, r->frames);
+                sprintf(row_print, "%d %s %s", r->place,
+                        net_name_of_id(r->id), timestamp);
+                print_text_tiny(240, rowY, row_print);
+                rowY -= 9;
+            }
+        }
+    }
+#endif
+
     // Lines.
     for (i = 0; i < 4; i++) {
         // print_vertical_line(25 + spacing * i, HUD_TOP_Y - 36);
@@ -232,6 +335,40 @@ void draw_bingo_screen() {
         // print_horizontal_line(37 + spacing * i);
         print_horizontal_line(38 + spacing * i);
     }
+
+#ifndef TARGET_N64
+    // Who claimed what: a small color chip per claiming peer next to each
+    // cell's icon (several can stack in the race modes).
+    if (network_active()) {
+        s32 chip;
+        gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+        gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+        for (i = 0; i < 5; i++) {
+            for (j = 0; j < 5; j++) {
+                u32 mask = gBingoCellClaimers[5 * i + j];
+                s32 id;
+                chip = 0;
+                for (id = 0; id < 32 && chip < 4; id++) {
+                    s32 color;
+                    if (!(mask & ((u32) 1 << id))) {
+                        continue;
+                    }
+                    color = network_color_of_id(id);
+                    gDPSetPrimColor(gDisplayListHead++, 0, 0,
+                                    gNetColorRGB[color][0],
+                                    gNetColorRGB[color][1],
+                                    gNetColorRGB[color][2], 230);
+                    {
+                        s32 rx = BINGO_MIN_X + spacing * j + 18;
+                        s32 ry = (224 - (27 + spacing * i)) + chip * 6;
+                        gDPFillRectangle(gDisplayListHead++, rx, ry, rx + 5, ry + 5);
+                    }
+                    chip++;
+                }
+            }
+        }
+    }
+#endif
 
     // Icons.
     // This has to be a separate for-loop from the below in order

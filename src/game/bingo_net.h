@@ -21,6 +21,13 @@ void bhv_net_ghost_update(void);
 // puppets don't mirror the local player's body state (always 0 on N64).
 s32 bingo_net_obj_is_ghost(struct Object *obj);
 
+// Online race status for the shared win logic in bingo.c. On N64 (and
+// offline) these report "not online": 0 / 0 / 0.
+s32 bingo_net_racing(void);           // in an online race right now
+s32 bingo_net_local_cell_count(void); // cells the local player owns online
+s32 bingo_net_race_decided(void);     // an online winner exists (lockout)
+s32 bingo_net_local_won(void);        // ...and it is the local player
+
 #ifndef TARGET_N64
 // The palette index of the peer driving this ghost puppet (0 = red).
 s32 bingo_net_ghost_color(struct Object *obj);
