@@ -340,6 +340,10 @@ static void bhv_menu_button_growing_from_submenu(struct Object *button) {
         button->oParentRelativePosX = 0.0f;
         button->oParentRelativePosY = 0.0f;
         button->oMenuButtonState = MENU_BUTTON_STATE_FULLSCREEN;
+#ifdef WIDESCREEN
+        // Backdrop duty: stretch to the window edges like the main doors.
+        button->oAnimState = 1;
+#endif
         button->oMenuButtonTimer = 0;
     }
 }
@@ -348,6 +352,9 @@ static void bhv_menu_button_growing_from_submenu(struct Object *button) {
  * Shrink back to submenu, used to return back while inside a score save menu.
  */
 static void bhv_menu_button_shrinking_to_submenu(struct Object *button) {
+#ifdef WIDESCREEN
+    button->oAnimState = 0;
+#endif
     if (button->oMenuButtonTimer < 16) {
         button->oFaceAngleYaw -= 0x800;
     }
@@ -527,10 +534,21 @@ static s8 s1PExitRequest = 0;
 static s8 sLobbyExitRequest = 0;
 
 static void spawn_submenu_button(s32 id, s32 model, struct Object *parent,
-                                 s16 x, s16 y) {
+                                 s16 x, s16 y, f32 scale) {
     sMainMenuButtons[id] = spawn_object_rel_with_rot(
         parent, model, bhvMenuButton, x, y, -100, 0, -0x8000, 0);
-    sMainMenuButtons[id]->oMenuButtonScale = 0.11111111f;
+    sMainMenuButtons[id]->oMenuButtonScale = scale;
+}
+
+// A symmetric, generous hitbox for the PC submenu 3D buttons, covering the
+// rendered button plus the label under it. check_clicked_button's box is
+// skewed 30-left/20-right for the N64 hand sprite, which left the right
+// half of a button (and its whole label) unclickable.
+static s32 check_clicked_submenu_button(struct Object *btn) {
+    f32 x = btn->oPosX / 7.208f;
+    f32 y = btn->oPosY / 7.208f;
+    return sClickPos[0] > x - 30.0f && sClickPos[0] < x + 30.0f
+        && sClickPos[1] > y - 34.0f && sClickPos[1] < y + 26.0f;
 }
 
 static void delete_submenu_button(s32 id) {
@@ -555,14 +573,20 @@ static void exit_submenu_screen(struct Object *button, s8 targetID, s8 *exitFlag
     }
 }
 
-// Open the OPTIONS screen over the current fullscreen screen; B on the
-// options screen returns to returnTarget.
-static void open_options_screen(s8 returnTarget) {
+// Open the OPTIONS screen: the clicked OPTIONS sub-button itself grows
+// fullscreen from its spot (the vanilla score-file zoom) and doubles as
+// the screen's backdrop; the SEED_OPTION slot aliases it until the screen
+// closes and it shrinks back into place. B or BACK returns to returnTarget.
+static void open_options_screen(s8 returnTarget, struct Object *sourceBtn) {
     play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
     gOptionSelectIconOpacity = 0;
     sTextBaseAlpha = 0;
-    sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonState =
-        MENU_BUTTON_STATE_GROWING;
+    sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = sourceBtn;
+    // Backdrop coverage matches the vanilla score-file zoom's 1/9 scale;
+    // restored to the screen's button size when the exit completes.
+    sourceBtn->oMenuButtonScale = 0.11111111f;
+    sourceBtn->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
+    sCurrentMenuLevel = MENU_LAYER_SUBMENU;
     sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
     sOptionsReturnTarget = returnTarget;
 }
@@ -684,32 +708,34 @@ static void onep_screen_loop(void) {
     struct Object *door = sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A];
 
     if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
-        && sMainMenuButtons[MENU_BUTTON_1P_START] == NULL && !s1PExitRequest) {
+        && sMainMenuButtons[MENU_BUTTON_1P_START] == NULL && !s1PExitRequest
+        && sSelectedFileNum == 0) {
         // The fullscreen parent is yaw-rotated 180, so child X mirrors:
         // spawn at -330 to render on the right.
         spawn_submenu_button(MENU_BUTTON_1P_START,
-                             MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, door, -330, -320);
+                             MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, door, -330, -320,
+                             0.11111111f);
         spawn_submenu_button(MENU_BUTTON_1P_OPTIONS,
-                             MODEL_MAIN_MENU_BLUE_COPY_BUTTON, door, 330, -320);
+                             MODEL_MAIN_MENU_BLUE_COPY_BUTTON, door, 330, -320,
+                             0.11111111f);
     }
 
     if (sMainMenuButtons[MENU_BUTTON_1P_START] != NULL
         && door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
         && !gSeedTypingActive) {
-        if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_1P_START]->oPosX,
-                                 sMainMenuButtons[MENU_BUTTON_1P_START]->oPosY,
-                                 22.0f) == TRUE) {
+        if (check_clicked_submenu_button(sMainMenuButtons[MENU_BUTTON_1P_START])) {
             play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
-            load_main_menu_save_file(door, 1);
-        } else if (check_clicked_button(
-                       sMainMenuButtons[MENU_BUTTON_1P_OPTIONS]->oPosX,
-                       sMainMenuButtons[MENU_BUTTON_1P_OPTIONS]->oPosY,
-                       22.0f) == TRUE) {
-            // Hide our buttons while the options screen covers us; they
-            // respawn when it hands control back.
+            // Buttons vanish for the fade-out; updates freeze once the
+            // level script sees the file number, so leave a clean frame.
             delete_submenu_button(MENU_BUTTON_1P_START);
             delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
-            open_options_screen(MENU_BUTTON_PLAY_FILE_A);
+            load_main_menu_save_file(door, 1);
+        } else if (check_clicked_submenu_button(
+                       sMainMenuButtons[MENU_BUTTON_1P_OPTIONS])) {
+            // START stays alive behind the grown options screen and is
+            // revealed again when it shrinks back.
+            open_options_screen(MENU_BUTTON_PLAY_FILE_A,
+                                sMainMenuButtons[MENU_BUTTON_1P_OPTIONS]);
         } else if (sClickPos[0] > -65 && sClickPos[0] < 65
                    && sClickPos[1] > 5 && sClickPos[1] < 60) {
             seed_typing_begin();
@@ -731,7 +757,7 @@ static void lobby_screen_loop(void) {
 
     if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
         && sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] == NULL
-        && !sLobbyExitRequest) {
+        && !sLobbyExitRequest && sSelectedFileNum == 0) {
         static const s32 models[LOBBY_BTN_COUNT] = {
             MODEL_MAIN_MENU_RED_ERASE_BUTTON,    // CONNECT / LEAVE
             MODEL_MAIN_MENU_PURPLE_SOUND_BUTTON, // READY
@@ -741,30 +767,29 @@ static void lobby_screen_loop(void) {
         for (b = 0; b < LOBBY_BTN_COUNT; b++) {
             s16 x, y;
             online_lobby_button_world_pos(b, &x, &y);
-            spawn_submenu_button(MENU_BUTTON_LOBBY_MIN + b, models[b], door, x, y);
+            // Uniform size for all four; varying it to mark inactive buttons
+            // just read as broken layout. Inactive = dim label + buzz.
+            spawn_submenu_button(MENU_BUTTON_LOBBY_MIN + b, models[b], door, x, y,
+                                 0.10f);
         }
+        // An ENTER pressed on some earlier screen must not pop a field
+        // editor open the moment the lobby appears.
+        text_input_take_enter_key();
     }
 
     if (sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] != NULL
         && door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN) {
         for (b = 0; b < LOBBY_BTN_COUNT; b++) {
             struct Object *btn = sMainMenuButtons[MENU_BUTTON_LOBBY_MIN + b];
-            // Inactive buttons render recessed; clicking them just buzzes.
-            btn->oMenuButtonScale =
-                online_lobby_button_active(b) ? 0.11111111f : 0.088f;
-            if (check_clicked_button(btn->oPosX, btn->oPosY, 22.0f) == TRUE) {
+            if (check_clicked_submenu_button(btn)) {
                 if (!online_lobby_button_active(b)) {
                     play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
                 } else {
                     play_sound(SOUND_MENU_CLICK_FILE_SELECT, gGlobalSoundSource);
                     if (online_lobby_button_pressed(b) == 2) {
-                        // Hide the lobby buttons while the options screen
-                        // covers us; they respawn on return.
-                        s32 d;
-                        for (d = 0; d < LOBBY_BTN_COUNT; d++) {
-                            delete_submenu_button(MENU_BUTTON_LOBBY_MIN + d);
-                        }
-                        open_options_screen(MENU_BUTTON_ONLINE);
+                        // The other buttons stay alive behind the grown
+                        // options screen until it shrinks back.
+                        open_options_screen(MENU_BUTTON_ONLINE, btn);
                     }
                 }
                 break;
@@ -945,13 +970,10 @@ void bhv_menu_button_manager_init(void) {
     );
     sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonScale = 1.0f;
 
-    // The options screen's backdrop button. It is not a main-screen door
-    // (options belong to the 1P setup screen and to the lobby's host), so
-    // it parks offscreen and flies in when it grows fullscreen.
-    sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = spawn_object_rel_with_rot(
-        gCurrentObject, MODEL_MAIN_MENU_BLUE_COPY_BUTTON, bhvMenuButton, 0, -20000, 0, 0, 0, 0
-    );
-    sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale = 1.0f;
+    // The options screen has no backdrop object of its own on PC: the
+    // clicked OPTIONS sub-button itself grows fullscreen (vanilla
+    // score-file style), and this slot aliases it while the screen is up.
+    sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = NULL;
 
     sMainMenuButtons[MENU_BUTTON_1P_START] = NULL;
     sMainMenuButtons[MENU_BUTTON_1P_OPTIONS] = NULL;
@@ -1035,12 +1057,25 @@ void bhv_menu_button_manager_loop(void) {
 #ifndef TARGET_N64
     // The room's GO: every player's game launches itself, no clicking.
     if (network_take_go_flag() && sSelectedFileNum == 0) {
+        s32 d;
         if (text_input_active()) {
             text_input_stop();
         }
         gSeedTypingActive = 0;
         play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
         sSelectedFileNum = 1;
+        // Clear the screen's action buttons: object updates freeze during
+        // the fade-out, and a frozen mid-state button row reads as a glitch.
+        delete_submenu_button(MENU_BUTTON_1P_START);
+        delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+        for (d = 0; d < LOBBY_BTN_COUNT; d++) {
+            delete_submenu_button(MENU_BUTTON_LOBBY_MIN + d);
+        }
+        // If the options screen was up, its backdrop was one of those
+        // buttons; drop the alias so nothing touches the deleted object.
+        if (sSelectedButtonID == MENU_BUTTON_SEED_OPTION) {
+            sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = NULL;
+        }
     }
 #endif
 
@@ -1059,9 +1094,25 @@ void bhv_menu_button_manager_loop(void) {
 #endif
             break;
         case MENU_BUTTON_SEED_OPTION:
+#ifndef TARGET_N64
+            if (sMainMenuButtons[MENU_BUTTON_SEED_OPTION] == NULL) {
+                break;  // its lobby button was deleted at GO mid-options
+            }
+#endif
             exit_score_file_to_score_menu(sMainMenuButtons[MENU_BUTTON_SEED_OPTION],
                                           sOptionsReturnTarget);
             if (sSelectedButtonID != MENU_BUTTON_SEED_OPTION) {
+#ifndef TARGET_N64
+                // The backdrop was the clicked OPTIONS sub-button; it has
+                // shrunk back into its spot, so it resumes life as that
+                // button at its screen's size.
+                sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale =
+                    (sOptionsReturnTarget == MENU_BUTTON_ONLINE) ? 0.10f
+                                                                 : 0.11111111f;
+                sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = NULL;
+                // ENTERs pressed on the options screen stay there.
+                text_input_take_enter_key();
+#endif
                 sOptionsReturnTarget = MENU_BUTTON_NONE;
             }
             break;
@@ -1076,6 +1127,29 @@ void bhv_menu_button_manager_loop(void) {
     sClickPos[1] = -10000;
 }
 
+// Leave the options screen: fakes the click-timer pulse that
+// exit_score_file_to_score_menu waits for to start the shrink-out.
+static void options_screen_exit(void) {
+    sTextBaseAlpha = 0;
+    gOptionSelectIconOpacity = 0;
+    sClickPos[0] = sCursorPos[0];
+    sClickPos[1] = sCursorPos[1];
+    sCursorClickingTimer = 1;
+#ifndef TARGET_N64
+    // If we host an online room, the options may have changed.
+    if (!bingo_options_locked()) {
+        network_push_local_options();
+    }
+#endif
+}
+
+#ifndef TARGET_N64
+// The clickable BACK tag in the options screen's top-right corner.
+static s32 options_back_tag_hovered(void) {
+    return sCursorPos[0] > 96.0f && sCursorPos[1] > 84.0f;
+}
+#endif
+
 /**
  * Cursor function that handles button inputs.
  * If the cursor is clicked, sClickPos uses the same value as sCursorPos.
@@ -1083,18 +1157,7 @@ void bhv_menu_button_manager_loop(void) {
 static void handle_cursor_button_input(void) {
     if (sSelectedButtonID == MENU_BUTTON_SEED_OPTION) {
         if (gPlayer3Controller->buttonPressed & (B_BUTTON | START_BUTTON)) {
-            sTextBaseAlpha = 0;
-            gOptionSelectIconOpacity = 0;
-
-            sClickPos[0] = sCursorPos[0];
-            sClickPos[1] = sCursorPos[1];
-            sCursorClickingTimer = 1;
-#ifndef TARGET_N64
-            // If we host an online room, the options may have changed.
-            if (!bingo_options_locked()) {
-                network_push_local_options();
-            }
-#endif
+            options_screen_exit();
         } else {
             if (sBingoOptionSelectTimer > 0) {
                 sBingoOptionSelectTimer--;
@@ -1140,7 +1203,10 @@ static void handle_cursor_button_input(void) {
             }
             if (gPlayer3Controller->buttonPressed & A_BUTTON) {
 #ifndef TARGET_N64
-                if (bingo_options_locked()) {
+                if (options_back_tag_hovered()) {
+                    // Clicked the BACK tag: same as pressing B.
+                    options_screen_exit();
+                } else if (bingo_options_locked()) {
                     play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
                 } else {
                     sToggleCurrentOption = 1;
@@ -1174,9 +1240,20 @@ static void handle_cursor_button_input(void) {
             }
             return;
         }
-        if (gPlayer3Controller->buttonPressed & (B_BUTTON | START_BUTTON)) {
+        if (gPlayer3Controller->buttonPressed & B_BUTTON) {
             sTextBaseAlpha = 0;
             s1PExitRequest = 1;
+        } else if (gPlayer3Controller->buttonPressed & START_BUTTON) {
+            // ENTER/START means "go", same as clicking the START button.
+            // (It used to back out of the screen, which read as broken.)
+            struct Object *door = sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A];
+            if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
+                && !s1PExitRequest) {
+                play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
+                delete_submenu_button(MENU_BUTTON_1P_START);
+                delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+                load_main_menu_save_file(door, 1);
+            }
         } else if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON)) {
             sClickPos[0] = sCursorPos[0];
             sClickPos[1] = sCursorPos[1];
@@ -1334,8 +1411,9 @@ static void draw_main_menu_pc(void) {
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-    net_print_ascii(89, 101, "1 PLAYER");
-    net_print_ascii(182, 101, "ONLINE");
+    // Centered under the doors (world x -2800/+2800 -> screen 117/203).
+    net_print_ascii_centered(117, 101, "1 PLAYER");
+    net_print_ascii_centered(203, 101, "ONLINE");
     if (network_active()) {
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
         net_print_ascii(100, 62, "IN AN ONLINE ROOM");
@@ -1357,10 +1435,11 @@ static void draw_1p_setup(void) {
     print_generic_string(88, 130,
                          gSeedTypingActive ? textSeedTypingHint : textSeedClickHint);
 
-    // Labels under the two sub-buttons.
+    // Labels under the two sub-buttons (buttons bottom out at y~60; keep a
+    // visible gap so the text doesn't ride up onto the button faces).
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-    net_print_ascii(90, 46, "OPTIONS");
-    net_print_ascii(189, 46, "START");
+    net_print_ascii_centered(114, 40, "OPTIONS");
+    net_print_ascii_centered(206, 40, "START");
 
     if (gSeedTypingActive) {
         // The digits being typed, in the HUD font.
@@ -1739,6 +1818,7 @@ static void print_bingo_page_2(void) {
     for (i = 0; i < 11; i++) {
         offsetY = ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2;
         creditString = NULL;
+        creditString2 = NULL;  // only rows 4+ have a right column
         switch (i) {
             case 0:
                 creditString = textBingo64;
@@ -1852,6 +1932,16 @@ static void print_bingo_options(void) {
             print_bingo_page_2();
             break;
     }
+#ifndef TARGET_N64
+    // Clickable BACK tag, top right; mouse users had no visible way out
+    // (the screen only exited on B/ESC).
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140,
+                   options_back_tag_hovered() ? sTextBaseAlpha
+                                              : MIN(sTextBaseAlpha, 170));
+    net_print_ascii(262, 212, "BACK");
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+#endif
     if (sToggleCurrentOption) {
         sToggleCurrentOption = 0;
     }

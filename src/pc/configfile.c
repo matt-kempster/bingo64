@@ -70,7 +70,7 @@ unsigned int configMusicVolume = MAX_VOLUME;
 
 // Online bingo lobby defaults (edited on the file-select ONLINE screen)
 char configNetName[16] = "mario";
-char configNetServer[128] = "";
+char configNetServer[128] = "127.0.0.1";
 char configNetRoom[32] = "bingo";
 unsigned int configNetColor = 0;
 unsigned int configSfxVolume = MAX_VOLUME;

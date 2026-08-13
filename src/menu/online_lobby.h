@@ -42,5 +42,7 @@ s32 online_lobby_button_pressed(s32 which);
 
 // ASCII -> menu-font printing, shared with file_select's PC-only screens.
 void net_print_ascii(s16 x, s16 y, const char *str);
+// Center on x using the generic font's kerning table.
+void net_print_ascii_centered(s16 centerX, s16 y, const char *str);
 
 #endif // ONLINE_LOBBY_H

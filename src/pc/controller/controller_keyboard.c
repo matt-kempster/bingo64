@@ -25,6 +25,9 @@ static char *sTextBuf = NULL;
 static int sTextMax = 0;
 static char sTextOriginal[128];
 static int sTextFinished = 0;
+// ENTER pressed while NOT typing: menus use it as the "activate/edit" key
+// (it is not an N64 button, so it never collides with gameplay binds).
+static int sMenuEnterPressed = 0;
 
 int text_input_active(void) {
     return sTextBuf != NULL;
@@ -47,6 +50,12 @@ int text_input_take_finished(void) {
     int f = sTextFinished;
     sTextFinished = 0;
     return f;
+}
+
+int text_input_take_enter_key(void) {
+    int p = sMenuEnterPressed;
+    sMenuEnterPressed = 0;
+    return p;
 }
 
 void text_input_on_char(int c) {
@@ -95,6 +104,9 @@ bool keyboard_on_key_down(int scancode) {
     if (text_input_active()) {
         // The keyboard is a text field right now, not a controller.
         return false;
+    }
+    if (scancode == 0x1C || scancode == 0x11C) {  // ENTER / numpad ENTER
+        sMenuEnterPressed = 1;
     }
     mapped = keyboard_map_scancode(scancode);
     // M toggles this window's audio mute, unless the user bound M to a button.

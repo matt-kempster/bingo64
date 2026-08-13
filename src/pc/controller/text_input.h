@@ -22,6 +22,10 @@ int text_input_active(void);
 // also restores the original text) since the last call?
 int text_input_take_finished(void);
 
+// One-shot: was ENTER pressed while NOT typing? Menus use this as the
+// "activate/edit the selected thing" key; it is not a bindable N64 button.
+int text_input_take_enter_key(void);
+
 // Backends push characters here. Printable ASCII is appended; 0x08 is
 // backspace, 0x0D/0x0A finishes, 0x1B cancels. Spaces are dropped: every
 // text field feeds the space-separated relay protocol.

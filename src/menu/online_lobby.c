@@ -42,6 +42,7 @@ enum LobbyField {
 
 static s32 sPublic = 0;
 static s32 sEditingField = -1;
+static s32 sSelectedField = FIELD_NAME;  // keyboard-nav selection
 static char sSeedBuf[16];
 
 // Seed helpers from file_select.c (the same value the N64 numpad edits).
@@ -90,6 +91,20 @@ void net_print_ascii(s16 x, s16 y, const char *str) {
     print_generic_string(x, y, buf);
 }
 
+// Centered via the font's real kerning table: estimating width from
+// strlen sits visibly off-center (the average advance is ~5-6, not 7.5).
+extern u8 gDialogCharWidths[256];
+
+void net_print_ascii_centered(s16 centerX, s16 y, const char *str) {
+    u8 buf[64];
+    s32 i, w = 0;
+    ascii_to_menu(buf, str, sizeof(buf));
+    for (i = 0; buf[i] != 0xFF; i++) {
+        w += gDialogCharWidths[buf[i]];
+    }
+    print_generic_string(centerX - w / 2, y, buf);
+}
+
 #define print_ascii net_print_ascii
 
 // ---------------------------------------------------------------------------
@@ -99,13 +114,13 @@ void net_print_ascii(s16 x, s16 y, const char *str) {
 // things (title, buttons, status) anchor to x=160, which every aspect
 // ratio agrees on.
 
-#define LOBBY_EDGE_PAD_L 16   // tracks the backdrop frame's left bevel
+#define LOBBY_EDGE_PAD_L 30   // the backdrop frame's inner panel starts ~26 units in
 #define LOBBY_EDGE_PAD_R 130  // roster column, from the right edge
 #define LOBBY_TOP_Y      168
 #define LOBBY_ROW_H      14
 #define LOBBY_HEADER_Y   96   // "ROOM SETTINGS" section header
 #define LOBBY_STATUS_Y   182  // status line, up top under the title
-#define LOBBY_LABEL_Y    26   // labels under the action buttons
+#define LOBBY_LABEL_Y    22   // labels under the action buttons, atop the bottom bevel
 
 static s16 lobby_left_x(void) {
     return (s16) GFX_DIMENSIONS_RECT_FROM_LEFT_EDGE(LOBBY_EDGE_PAD_L);
@@ -126,7 +141,9 @@ static s32 field_row_y(s32 field) {
 // The four action buttons, in world units relative to the fullscreen
 // backdrop (click depth 22; world/7.208 = screen units from center).
 static const s16 sBtnWorldX[LOBBY_BTN_COUNT] = { -675, -225, 225, 675 };
-#define LOBBY_BTN_WORLD_Y (-548)
+// Row sits between the MODE row above and the labels below: center y=51.5
+// screen units, so a 0.10-scale button (half-height ~14) clears both.
+#define LOBBY_BTN_WORLD_Y (-494)
 
 void online_lobby_button_world_pos(s32 which, s16 *x, s16 *y) {
     // The fullscreen parent is yaw-rotated 180, so child X mirrors at
@@ -171,11 +188,42 @@ static s32 field_at(f32 x, f32 y) {
     }
     for (f = 0; f < FIELD_COUNT; f++) {
         s32 ry = field_row_y(f);
-        if (y >= ry - 6 && y <= ry + 12) {
+        if (y >= ry - 2 && y <= ry + 16) {
             return field_editable(f) ? f : -1;
         }
     }
     return -1;
+}
+
+// Which 3D action button is under the cursor (screen units)? Mirrors
+// file_select's check_clicked_submenu_button box so A-presses over a
+// button are left for it to handle.
+static s32 button_at(f32 x, f32 y) {
+    s32 b;
+    f32 by = 120.0f + LOBBY_BTN_WORLD_Y / 7.208f;
+    if (y < by - 34.0f || y > by + 26.0f) {
+        return -1;
+    }
+    for (b = 0; b < LOBBY_BTN_COUNT; b++) {
+        f32 bx = 160.0f + sBtnWorldX[b] / 7.208f;
+        if (x > bx - 30.0f && x < bx + 30.0f) {
+            return b;
+        }
+    }
+    return -1;
+}
+
+// Arrow keys move the selection over the currently editable rows.
+static void move_selection(s32 dir) {
+    s32 i, f = sSelectedField;
+    for (i = 0; i < FIELD_COUNT; i++) {
+        f = (f + dir + FIELD_COUNT) % FIELD_COUNT;
+        if (field_editable(f)) {
+            sSelectedField = f;
+            play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
+            return;
+        }
+    }
 }
 
 s32 online_lobby_button_active(s32 which) {
@@ -266,16 +314,32 @@ s32 online_lobby_handle_input(f32 curX, f32 curY) {
     }
 
     pressed = gPlayer3Controller->buttonPressed;
-    if (pressed & (B_BUTTON | START_BUTTON)) {
+    // B backs out. START/ENTER deliberately does NOT: on the keyboard it
+    // reads as "go", and yanking the screen away instead is disorienting.
+    if (pressed & B_BUTTON) {
         return 1;
+    }
+    // Arrow keys move the row selection, options-screen style; the mouse
+    // cursor and the 3D buttons keep working alongside.
+    if (pressed & (U_JPAD | U_CBUTTONS)) {
+        move_selection(-1);
+    } else if (pressed & (D_JPAD | D_CBUTTONS)) {
+        move_selection(1);
     }
     if (pressed & A_BUTTON) {
         s32 f = field_at(curX, curY);
         if (f >= 0) {
+            // A/click is strictly cursor-driven; it pulls the selection along.
+            sSelectedField = f;
             activate_field(f);
-        } else {
-            return -1;  // maybe one of the 3D buttons; file_select checks
+        } else if (button_at(curX, curY) >= 0) {
+            return -1;  // one of the 3D buttons; file_select checks
         }
+    }
+    // ENTER (not an N64 button, so SPACE-as-START stays out of this)
+    // activates the keyboard-selected row.
+    if (text_input_take_enter_key() && field_editable(sSelectedField)) {
+        activate_field(sSelectedField);
     }
     return 0;
 }
@@ -295,19 +359,28 @@ static const char *mode_name(void) {
     }
 }
 
-static void draw_hover_highlight(u8 alpha, f32 curX, f32 curY) {
-    s32 f = field_at(curX, curY);
-    s32 y;
-    if (f < 0) {
-        return;
-    }
-    y = field_row_y(f);
+static void draw_row_highlight(s32 f, u8 alpha) {
+    s32 y = field_row_y(f);
     // Fill rects use top-down screen coords; text y counts from the bottom.
+    // Glyphs occupy roughly [y+4, y+13] (measured), so the band [y+1, y+16]
+    // gives them even breathing room above and below.
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, alpha);
+    gDPFillRectangle(gDisplayListHead++, lobby_left_x() - 3, 240 - y - 16,
+                     lobby_left_x() + 148, 240 - y - 1);
+}
+
+// The keyboard selection is always marked; the cursor's hover row (if it
+// is a different one) gets a lighter wash.
+static void draw_highlights(u8 alpha, f32 curX, f32 curY) {
+    s32 hover = field_at(curX, curY);
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, MIN(alpha, 150));
-    gDPFillRectangle(gDisplayListHead++, lobby_left_x() - 3, 240 - y - 13,
-                     lobby_left_x() + 148, 240 - y + 2);
+    if (field_editable(sSelectedField)) {
+        draw_row_highlight(sSelectedField, MIN(alpha, 150));
+    }
+    if (hover >= 0 && hover != sSelectedField) {
+        draw_row_highlight(hover, MIN(alpha, 80));
+    }
 }
 
 static const char *button_label(s32 which) {
@@ -332,7 +405,7 @@ static const char *button_label(s32 which) {
                 return "STARTED";
             }
             if (network_active() && !network_is_host()) {
-                return "HOST STARTS";
+                return "HOST ONLY";  // short: must not collide with OPTIONS' label
             }
             return "START RACE";
     }
@@ -399,7 +472,7 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
     print_hud_lut_string(2, 116, 20, textOnlineHud);
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
 
-    draw_hover_highlight(alpha, curX, curY);
+    draw_highlights(alpha, curX, curY);
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
 
@@ -476,8 +549,7 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
             gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
                            active ? MIN(alpha, 220) : dim);
         }
-        print_ascii(button_unit_x(b) - (s32) strlen(label) * 15 / 4,
-                    LOBBY_LABEL_Y, label);
+        net_print_ascii_centered(button_unit_x(b), LOBBY_LABEL_Y, label);
     }
 
     // Roster: name in the player's color, a marker column on the right.
