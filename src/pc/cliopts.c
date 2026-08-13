@@ -40,6 +40,7 @@ static void print_cli_help(void) {
     printf("%-20s\tEnables the cheat menu.\n", "--cheats");
 #endif
     printf("%-20s\tSkips the Peach and Castle intro when starting a new game.\n", "--skip-intro");
+    printf("%-20s\tSkips the title screen and boots into file select.\n", "--skip-title");
     printf("%-20s\tStarts the game in full screen mode.\n", "--fullscreen");
     printf("%-20s\tStarts the game in windowed mode.\n", "--windowed");
     printf("%-20s\tOffers the user a level select menu.\n", "--levelselect");
@@ -89,6 +90,7 @@ void set_cli_opts(void) {
     extern bool gShowProfiler;
     extern bool gShowDebugText;
     if (gCLIOpts.SkipIntro) gGlobalGameSkips |= GAME_SKIP_INTRO_SCENE;
+    if (gCLIOpts.SkipTitle) gGlobalGameSkips |= GAME_SKIP_TITLE_SCREEN | GAME_SKIP_GODDARD;
     if (gCLIOpts.LevelSelect) gDebugLevelSelect = TRUE;
     if (gCLIOpts.Profiler) gShowProfiler = TRUE;
     if (gCLIOpts.Debug) gShowDebugText = TRUE;
@@ -101,6 +103,9 @@ void parse_cli_opts(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--skip-intro") == 0) // Skip Peach Intro
             gCLIOpts.SkipIntro = true;
+
+        else if (strcmp(argv[i], "--skip-title") == 0) // Boot straight into file select
+            gCLIOpts.SkipTitle = true;
 
         else if (strcmp(argv[i], "--fullscreen") == 0) // Open game in fullscreen
             gCLIOpts.FullScreen = 1;

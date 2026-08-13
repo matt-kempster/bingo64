@@ -7,6 +7,7 @@
 
 struct PCCLIOptions  {
     unsigned int SkipIntro;
+    unsigned int SkipTitle;
     unsigned int FullScreen;
     unsigned int LevelSelect;
     unsigned int LevelNumOverride;
