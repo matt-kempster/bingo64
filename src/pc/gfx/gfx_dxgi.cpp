@@ -81,11 +81,12 @@ static struct {
     ComPtr<IDXGISwapChain1> swap_chain;
     HANDLE waitable_object;
     uint64_t qpc_init, qpc_freq;
-    uint64_t frame_timestamp; // in units of 1/FRAME_INTERVAL_US_DENOMINATOR microseconds
-    std::map<UINT, DXGI_FRAME_STATISTICS> frame_stats;
-    std::set<std::pair<UINT, UINT>> pending_frame_stats;
+    // Frame pacing state: cadence measured with QPC, no DWM statistics.
+    uint64_t last_present_us;    // when the previous start_frame ran
+    double estimated_vsync_us;   // EMA of the display's vsync interval
+    double vsync_accum;          // fractional-interval carry (Bresenham)
+    UINT applied_sync_interval;  // interval used by the previous Present
     bool dropped_frame;
-    bool sync_interval_means_frames_to_wait;
     UINT length_in_vsync_frames;
 
     void (*run_one_game_iter)(void);
@@ -460,140 +461,69 @@ static uint64_t qpc_to_us(uint64_t qpc) {
 }
 
 static bool gfx_dxgi_start_frame(void) {
-    DXGI_FRAME_STATISTICS stats;
-    if (dxgi.swap_chain->GetFrameStatistics(&stats) == S_OK && (stats.SyncRefreshCount != 0 || stats.SyncQPCTime.QuadPart != 0ULL)) {
-        {
-            LARGE_INTEGER t0;
-            QueryPerformanceCounter(&t0);
-            //printf("Get frame stats: %llu\n", (unsigned long long)(t0.QuadPart - dxgi.qpc_init));
+    // Frame pacing, rewritten. The original (n64-fast3d-engine) paced with
+    // IDXGISwapChain::GetFrameStatistics, but DWM stops updating or lags
+    // those stats for occluded/composed windows, which wedged the pacer at
+    // Present(4) - a pegged 15 fps that only a swapchain reset (window
+    // resize) cured. sm64coopdx solved this by deleting that logic; we do
+    // the same, but keep refresh-rate independence: measure the present
+    // cadence ourselves with QPC and pick the sync interval from it.
+    LARGE_INTEGER qpc_now;
+    QueryPerformanceCounter(&qpc_now);
+    uint64_t now_us = qpc_to_us(qpc_now.QuadPart - dxgi.qpc_init);
+    const double frame_us = (double) FRAME_INTERVAL_US_NUMERATOR / FRAME_INTERVAL_US_DENOMINATOR;
+
+    if (dxgi.last_present_us != 0) {
+        int64_t gap_us = (int64_t) (now_us - dxgi.last_present_us);
+
+        // Present() can stop blocking (occluded/minimized window); don't
+        // let the game fast-forward. Sleep is coarse, but this floor only
+        // matters while vsync isn't pacing us.
+        int64_t min_gap_us = (int64_t) frame_us - 3000;
+        if (gap_us >= 0 && gap_us < min_gap_us) {
+            Sleep((DWORD) ((min_gap_us - gap_us) / 1000));
+            QueryPerformanceCounter(&qpc_now);
+            now_us = qpc_to_us(qpc_now.QuadPart - dxgi.qpc_init);
+            gap_us = (int64_t) (now_us - dxgi.last_present_us);
         }
-        //printf("stats: %u %u %u %u %u %.6f\n", dxgi.pending_frame_stats.rbegin()->first, dxgi.pending_frame_stats.rbegin()->second, stats.PresentCount, stats.PresentRefreshCount, stats.SyncRefreshCount, (double)(stats.SyncQPCTime.QuadPart - dxgi.qpc_init) / dxgi.qpc_freq);
-        if (dxgi.frame_stats.empty() || dxgi.frame_stats.rbegin()->second.PresentCount != stats.PresentCount) {
-            dxgi.frame_stats.insert(std::make_pair(stats.PresentCount, stats));
-        }
-        if (dxgi.frame_stats.size() > 3) {
-            dxgi.frame_stats.erase(dxgi.frame_stats.begin());
+
+        // Learn the display's vsync interval from the cadence the previous
+        // Present imposed. Hitches and stalls fall outside the window and
+        // leave the estimate untouched.
+        if (dxgi.applied_sync_interval > 0 && gap_us > 1000 && gap_us < 200000) {
+            double vsync_us = (double) gap_us / dxgi.applied_sync_interval;
+            if (vsync_us >= 3000.0 && vsync_us <= 60000.0) { // ~17..333 Hz
+                dxgi.estimated_vsync_us = dxgi.estimated_vsync_us == 0.0
+                    ? vsync_us
+                    : dxgi.estimated_vsync_us * 0.9 + vsync_us * 0.1;
+            }
         }
     }
-    if (!dxgi.frame_stats.empty()) {
-        while (!dxgi.pending_frame_stats.empty() && dxgi.pending_frame_stats.begin()->first < dxgi.frame_stats.rbegin()->first) {
-            dxgi.pending_frame_stats.erase(dxgi.pending_frame_stats.begin());
-        }
-    }
-    while (dxgi.pending_frame_stats.size() > 15) {
-        // Just make sure the list doesn't grow too large if GetFrameStatistics fails.
-        dxgi.pending_frame_stats.erase(dxgi.pending_frame_stats.begin());
-    }
+    dxgi.last_present_us = now_us;
 
-    dxgi.frame_timestamp += FRAME_INTERVAL_US_NUMERATOR;
-
-    // Recovery guard: DWM sometimes stops updating GetFrameStatistics for
-    // an occluded/composed window. The pacing math below then compares a
-    // frozen last-present time against an ever-advancing frame_timestamp,
-    // saturates at Present(4) (15 fps) and can never catch up -- until a
-    // swapchain reset (window resize) restarted the statistics. Detect the
-    // drift against the wall clock and re-anchor instead.
-    {
-        LARGE_INTEGER now;
-        QueryPerformanceCounter(&now);
-        uint64_t now_us = qpc_to_us(now.QuadPart - dxgi.qpc_init);
-        int64_t drift_us = (int64_t) (dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR)
-                           - (int64_t) now_us;
-        if (drift_us > 250000 || drift_us < -250000) {
-            fprintf(stderr, "gfx: frame pacing drifted %lld us, re-anchoring\n",
-                    (long long) drift_us);
-            dxgi.frame_timestamp = now_us * FRAME_INTERVAL_US_DENOMINATOR;
-            dxgi.frame_stats.clear();
-            dxgi.pending_frame_stats.clear();
-        }
+    double vsync_us = dxgi.estimated_vsync_us != 0.0 ? dxgi.estimated_vsync_us : 16666.7;
+    double ideal = frame_us / vsync_us; // 2.0 at 60 Hz, 4.8 at 144 Hz, ...
+    // Carry the fractional part so the average cadence hits the game rate
+    // even when the refresh rate isn't a multiple of it.
+    double want = ideal + dxgi.vsync_accum;
+    int interval = (int) floor(want + 0.5);
+    if (interval < 1) {
+        interval = 1;
+    }
+    if (interval > 4) {
+        interval = 4; // DXGI's Present sync interval maxes out at 4;
+                      // beyond-240Hz displays are held back by the floor above
+    }
+    dxgi.vsync_accum = want - interval;
+    if (dxgi.vsync_accum > 1.5) {
+        dxgi.vsync_accum = 1.5;
+    }
+    if (dxgi.vsync_accum < -1.5) {
+        dxgi.vsync_accum = -1.5;
     }
 
-    if (dxgi.frame_stats.size() >= 2) {
-        DXGI_FRAME_STATISTICS *first = &dxgi.frame_stats.begin()->second;
-        DXGI_FRAME_STATISTICS *last = &dxgi.frame_stats.rbegin()->second;
-        uint64_t sync_qpc_diff = last->SyncQPCTime.QuadPart - first->SyncQPCTime.QuadPart;
-        UINT sync_vsync_diff = last->SyncRefreshCount - first->SyncRefreshCount;
-        UINT present_vsync_diff = last->PresentRefreshCount - first->PresentRefreshCount;
-        UINT present_diff = last->PresentCount - first->PresentCount;
-
-        if (sync_vsync_diff == 0) {
-            sync_vsync_diff = 1;
-        }
-
-        double estimated_vsync_interval = (double)sync_qpc_diff / (double)sync_vsync_diff;
-        uint64_t estimated_vsync_interval_us = qpc_to_us(estimated_vsync_interval);
-        //printf("Estimated vsync_interval: %d\n", (int)estimated_vsync_interval_us);
-        if (estimated_vsync_interval_us < 2 || estimated_vsync_interval_us > 1000000) {
-            // Unreasonable, maybe a monitor change
-            estimated_vsync_interval_us = 16666;
-            estimated_vsync_interval = estimated_vsync_interval_us * dxgi.qpc_freq / 1000000;
-        }
-
-        UINT queued_vsyncs = 0;
-        bool is_first = true;
-        for (const std::pair<UINT, UINT>& p : dxgi.pending_frame_stats) {
-            if (is_first && dxgi.sync_interval_means_frames_to_wait) {
-                is_first = false;
-                continue;
-            }
-            queued_vsyncs += p.second;
-        }
-
-        uint64_t last_frame_present_end_qpc = (last->SyncQPCTime.QuadPart - dxgi.qpc_init) + estimated_vsync_interval * queued_vsyncs;
-        uint64_t last_end_us = qpc_to_us(last_frame_present_end_qpc);
-
-        double vsyncs_to_wait = (double)(int64_t)(dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR - last_end_us) / estimated_vsync_interval_us;
-        //printf("ts: %llu, last_end_us: %llu, Init v: %f\n", dxgi.frame_timestamp / 3, last_end_us, vsyncs_to_wait);
-
-        if (vsyncs_to_wait <= 0) {
-            // Too late
-
-            if ((int64_t)(dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR - last_end_us) < -66666) {
-                // The application must have been paused or similar
-                vsyncs_to_wait = round(((double)FRAME_INTERVAL_US_NUMERATOR / FRAME_INTERVAL_US_DENOMINATOR) / estimated_vsync_interval_us);
-                if (vsyncs_to_wait < 1) {
-                    vsyncs_to_wait = 1;
-                }
-                dxgi.frame_timestamp = FRAME_INTERVAL_US_DENOMINATOR * (last_end_us + vsyncs_to_wait * estimated_vsync_interval_us);
-            } else {
-                // Drop frame
-                //printf("Dropping frame\n");
-                dxgi.dropped_frame = true;
-                return false;
-            }
-        }
-        if (floor(vsyncs_to_wait) != vsyncs_to_wait) {
-            uint64_t left = last_end_us + floor(vsyncs_to_wait) * estimated_vsync_interval_us;
-            uint64_t right = last_end_us + ceil(vsyncs_to_wait) * estimated_vsync_interval_us;
-            uint64_t adjusted_desired_time = dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR + (last_end_us + (FRAME_INTERVAL_US_NUMERATOR / FRAME_INTERVAL_US_DENOMINATOR) > dxgi.frame_timestamp / FRAME_INTERVAL_US_DENOMINATOR ? 2000 : -2000);
-            int64_t diff_left = adjusted_desired_time - left;
-            int64_t diff_right = right - adjusted_desired_time;
-            if (diff_left < 0) {
-                diff_left = -diff_left;
-            }
-            if (diff_right < 0) {
-                diff_right = -diff_right;
-            }
-            if (diff_left < diff_right) {
-                vsyncs_to_wait = floor(vsyncs_to_wait);
-            } else {
-                vsyncs_to_wait = ceil(vsyncs_to_wait);
-            }
-            if (vsyncs_to_wait == 0) {
-                //printf("vsyncs_to_wait became 0 so dropping frame\n");
-                dxgi.dropped_frame = true;
-                return false;
-            }
-        }
-        //printf("v: %d\n", (int)vsyncs_to_wait);
-        if (vsyncs_to_wait > 4) {
-            // Invalid, so change to 4
-            vsyncs_to_wait = 4;
-        }
-        dxgi.length_in_vsync_frames = vsyncs_to_wait;
-    } else {
-        dxgi.length_in_vsync_frames = 2;
-    }
+    dxgi.length_in_vsync_frames = interval;
+    dxgi.applied_sync_interval = interval;
 
     return true;
 }
