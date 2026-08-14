@@ -1,14 +1,25 @@
-// Online bingo client: TCP line protocol to server/relay.py, protocol v3.
+// Online bingo client: line protocol to server/relay.py, protocol v4.
 // POSIX sockets on Linux/macOS, winsock2 on Windows. Connects without
 // blocking so the file-select lobby stays responsive. A dropped
 // connection mid-session auto-reconnects with the server's token; the
 // server restores our id and replays the room state.
+//
+// Two transports, chosen by the server address ("udp:" prefix = UDP,
+// otherwise TCP). TCP is the newline-framed stream it has always been.
+// UDP exists for tunnels that only carry UDP (playit.gg free tier):
+// each datagram is a 10-byte header + one line, control messages ride a
+// small reliable in-order channel and ghost state rides an unreliable-
+// sequenced channel where a lost packet is simply superseded by the
+// next one. The reference implementation of this transport is
+// RefClient in server/test_relay.py; keep the two in sync.
 
 #include "network.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <stdint.h>
 
 #include "macros.h"
 
@@ -119,9 +130,50 @@ extern u32 bingo_seed_proposal(void);
 // The join line, sent once the nonblocking connect completes.
 static char sJoinLine[224];
 
-// Inbound line assembly.
+// Inbound line assembly (TCP framing).
 static char sInBuf[4096];
 static u32 sInLen = 0;
+
+// --- UDP transport (server address prefixed "udp:") -------------------
+// Header (big-endian): u8 magic, u8 type, u32 conn_id, u32 seq.
+// conn_id is a random nonzero id we pick per dial; it identifies the
+// session in both directions so NAT/proxy address changes don't matter.
+#define UDP_MAGIC       0xB6
+#define UDP_T_GHOST     0  // seq = ghost counter, stale packets dropped
+#define UDP_T_RELIABLE  1  // seq = 1-based message sequence
+#define UDP_T_ACK       2  // seq = highest reliable seq received in order
+#define UDP_T_KEEPALIVE 3
+#define UDP_HEADER_LEN  10
+#define UDP_MSG_MAX     224
+#define UDP_OUT_RING    32   // unacked reliable messages (a reconnect
+                             // resync can burst ~25 claim lines)
+#define UDP_RESEND_FRAMES    8    // ~266 ms between retransmit bursts
+#define UDP_KEEPALIVE_FRAMES 90   // 3 s; keeps NAT mappings open and
+                                  // makes the server ack (liveness)
+#define UDP_TIMEOUT_FRAMES   450  // 15 s of server silence = dead link
+
+static s32 sUdpMode = 0;
+static u32 sConnId = 0;
+static char sOutMsg[UDP_OUT_RING][UDP_MSG_MAX];
+static u16  sOutMsgLen[UDP_OUT_RING];
+static u32  sOutMsgSeq[UDP_OUT_RING];
+static s32  sOutHead = 0, sOutCount = 0;
+static u32  sOutNext = 1;       // next reliable seq to assign
+static u32  sInExpected = 0;    // highest reliable seq processed in order
+static u32  sGhostIn = 0, sGhostOut = 0;
+static u32  sLastInboundFrame = 0;
+static u32  sLastResendFrame = 0, sLastKeepaliveFrame = 0;
+
+static void udp_store_u32(u8 *p, u32 v) {
+    p[0] = (u8) (v >> 24);
+    p[1] = (u8) (v >> 16);
+    p[2] = (u8) (v >> 8);
+    p[3] = (u8) v;
+}
+
+static u32 udp_load_u32(const u8 *p) {
+    return ((u32) p[0] << 24) | ((u32) p[1] << 16) | ((u32) p[2] << 8) | p[3];
+}
 
 // Server-confirmed claims waiting for the game loop to apply them.
 #define CLAIM_QUEUE_LEN 32
@@ -160,8 +212,55 @@ static void net_fail(const char *msg) {
     fflush(stdout);
 }
 
+// Send one datagram. Send errors are deliberately ignored: UDP sends
+// fail transiently (ICMP unreachable after a server restart, full
+// buffers); the silence timeout in udp_tick is the real detector.
+static void udp_send_dgram(u8 type, u32 seq, const char *payload, u32 len) {
+    u8 buf[UDP_HEADER_LEN + UDP_MSG_MAX];
+    if (sSocket == NET_BAD_SOCK || len > UDP_MSG_MAX) {
+        return;
+    }
+    buf[0] = UDP_MAGIC;
+    buf[1] = type;
+    udp_store_u32(buf + 2, sConnId);
+    udp_store_u32(buf + 6, seq);
+    memcpy(buf + UDP_HEADER_LEN, payload, len);
+    send(sSocket, (const char *) buf, (int) (UDP_HEADER_LEN + len), 0);
+}
+
+static void udp_send_line(const char *line) {
+    u32 len = (u32) strlen(line);
+    s32 slot;
+    while (len > 0 && line[len - 1] == '\n') {
+        len--;  // datagram boundaries frame messages; no newline needed
+    }
+    if (line[0] == 'G' && line[1] == ' ') {
+        udp_send_dgram(UDP_T_GHOST, ++sGhostOut, line, len);
+        return;
+    }
+    if (sOutCount >= UDP_OUT_RING) {
+        // The server stopped acking long enough to back us up; redial
+        // (the token + resync flow replays anything that mattered).
+        net_fail("network backlog");
+        return;
+    }
+    if (len >= UDP_MSG_MAX) {
+        len = UDP_MSG_MAX - 1;
+    }
+    slot = (sOutHead + sOutCount) % UDP_OUT_RING;
+    memcpy(sOutMsg[slot], line, len);
+    sOutMsgLen[slot] = (u16) len;
+    sOutMsgSeq[slot] = sOutNext++;
+    sOutCount++;
+    udp_send_dgram(UDP_T_RELIABLE, sOutMsgSeq[slot], sOutMsg[slot], len);
+}
+
 static void net_send_line(const char *line) {
     if (sSocket == NET_BAD_SOCK) {
+        return;
+    }
+    if (sUdpMode) {
+        udp_send_line(line);
         return;
     }
     if (send(sSocket, line, (int) strlen(line), 0) < 0 && !net_would_block()) {
@@ -437,8 +536,90 @@ static void handle_line(char *line) {
     }
 }
 
+static void pump_inbound_udp(void) {
+    u8 buf[UDP_HEADER_LEN + 600 + 1];
+    for (;;) {
+        u8 type;
+        u32 seq;
+        char *payload;
+        int n = (int) recv(sSocket, (char *) buf, (int) sizeof(buf) - 1, 0);
+        if (n < 0) {
+            if (!net_would_block()) {
+                // Connected UDP sockets surface ICMP unreachable here
+                // (ECONNREFUSED / WSAECONNRESET): the server is gone.
+                net_fail("connection lost");
+            }
+            return;
+        }
+        if (n < UDP_HEADER_LEN || buf[0] != UDP_MAGIC
+            || udp_load_u32(buf + 2) != sConnId) {
+            continue;
+        }
+        sLastInboundFrame = gGlobalTimer;
+        type = buf[1];
+        seq = udp_load_u32(buf + 6);
+        buf[n] = '\0';
+        payload = (char *) buf + UDP_HEADER_LEN;
+        if (type == UDP_T_ACK) {
+            while (sOutCount > 0 && (s32) (seq - sOutMsgSeq[sOutHead]) >= 0) {
+                sOutHead = (sOutHead + 1) % UDP_OUT_RING;
+                sOutCount--;
+            }
+        } else if (type == UDP_T_KEEPALIVE) {
+            udp_send_dgram(UDP_T_ACK, sInExpected, "", 0);
+        } else if (type == UDP_T_GHOST) {
+            if ((s32) (seq - sGhostIn) > 0) {
+                sGhostIn = seq;
+                handle_line(payload);
+            }
+        } else if (type == UDP_T_RELIABLE) {
+            if (seq == sInExpected + 1) {
+                sInExpected = seq;
+                udp_send_dgram(UDP_T_ACK, sInExpected, "", 0);
+                handle_line(payload);
+            } else {
+                // Duplicate or gap-jumper: drop it, re-state what we
+                // have; the server resends the missing seq shortly.
+                udp_send_dgram(UDP_T_ACK, sInExpected, "", 0);
+            }
+        }
+        if (sSocket == NET_BAD_SOCK) {
+            return;  // a handler failed the connection
+        }
+    }
+}
+
+// Retransmit unacked reliable messages, keep the NAT mapping warm, and
+// notice a dead server. Called once per frame while the socket is up.
+static void udp_tick(void) {
+    s32 i, burst;
+    if (sSocket == NET_BAD_SOCK) {
+        return;
+    }
+    if (gGlobalTimer - sLastResendFrame >= UDP_RESEND_FRAMES) {
+        sLastResendFrame = gGlobalTimer;
+        burst = sOutCount < 8 ? sOutCount : 8;
+        for (i = 0; i < burst; i++) {
+            s32 slot = (sOutHead + i) % UDP_OUT_RING;
+            udp_send_dgram(UDP_T_RELIABLE, sOutMsgSeq[slot], sOutMsg[slot],
+                           sOutMsgLen[slot]);
+        }
+    }
+    if (gGlobalTimer - sLastKeepaliveFrame >= UDP_KEEPALIVE_FRAMES) {
+        sLastKeepaliveFrame = gGlobalTimer;
+        udp_send_dgram(UDP_T_KEEPALIVE, 0, "", 0);
+    }
+    if (gGlobalTimer - sLastInboundFrame > UDP_TIMEOUT_FRAMES) {
+        net_fail("server not responding");
+    }
+}
+
 static void pump_inbound(void) {
     if (sSocket == NET_BAD_SOCK) {
+        return;
+    }
+    if (sUdpMode) {
+        pump_inbound_udp();
         return;
     }
     for (;;) {
@@ -502,6 +683,7 @@ static void reset_session_state(void) {
 // *err set on immediate failure; no state change happens here.
 static s32 net_dial(const char **err) {
     char host[NET_SERVER_LEN];
+    const char *addr = sSavedServer;
     const char *colon;
     const char *port = "64064";
     char portbuf[16];
@@ -512,6 +694,26 @@ static s32 net_dial(const char **err) {
         sSocket = NET_BAD_SOCK;
     }
     sInLen = 0;
+
+    sUdpMode = 0;
+    if (strncmp(addr, "udp:", 4) == 0) {
+        sUdpMode = 1;
+        addr += 4;
+    }
+    // Fresh transport state per dial: a new session id (a reconnect is a
+    // new UDP session; continuity comes from the token in the join line)
+    // and zeroed sequence/ack/ring state.
+    sConnId = (u32) time(NULL) ^ ((u32) (uintptr_t) &hints << 8)
+              ^ (gGlobalTimer * 2654435761u);
+    if (sConnId == 0) {
+        sConnId = 1;
+    }
+    sOutHead = sOutCount = 0;
+    sOutNext = 1;
+    sInExpected = 0;
+    sGhostIn = sGhostOut = 0;
+    sLastInboundFrame = gGlobalTimer;
+    sLastResendFrame = sLastKeepaliveFrame = gGlobalTimer;
 
 #ifdef _WIN32
     {
@@ -527,25 +729,25 @@ static s32 net_dial(const char **err) {
     }
 #endif
 
-    colon = strrchr(sSavedServer, ':');
+    colon = strrchr(addr, ':');
     if (colon != NULL) {
-        size_t hlen = colon - sSavedServer;
+        size_t hlen = colon - addr;
         if (hlen >= sizeof(host)) {
             hlen = sizeof(host) - 1;
         }
-        memcpy(host, sSavedServer, hlen);
+        memcpy(host, addr, hlen);
         host[hlen] = '\0';
         strncpy(portbuf, colon + 1, sizeof(portbuf) - 1);
         portbuf[sizeof(portbuf) - 1] = '\0';
         port = portbuf;
     } else {
-        strncpy(host, sSavedServer, sizeof(host) - 1);
+        strncpy(host, addr, sizeof(host) - 1);
         host[sizeof(host) - 1] = '\0';
     }
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = sUdpMode ? SOCK_DGRAM : SOCK_STREAM;
     if (getaddrinfo(host, port, &hints, &res) != 0 || res == NULL) {
         *err = "cannot resolve server";
         return 0;
@@ -565,7 +767,7 @@ static s32 net_dial(const char **err) {
 #else
     fcntl(sSocket, F_SETFL, O_NONBLOCK);
 #endif
-    {
+    if (!sUdpMode) {
         int one = 1;
         setsockopt(sSocket, IPPROTO_TCP, TCP_NODELAY, (const char *) &one, sizeof(one));
     }
@@ -614,6 +816,16 @@ s32 network_connect(const char *server, const char *room, const char *name,
 }
 
 void network_disconnect(void) {
+    if (sUdpMode && sSocket != NET_BAD_SOCK && network_active()) {
+        // Courtesy quit so the room hears B/D now instead of after the
+        // server's silence timeout. Fire-and-forget: we are closing, so
+        // send a few copies and let the timeout cover the loss case.
+        s32 i;
+        u32 seq = sOutNext++;
+        for (i = 0; i < 3; i++) {
+            udp_send_dgram(UDP_T_RELIABLE, seq, "Q", 1);
+        }
+    }
     if (sSocket != NET_BAD_SOCK) {
         net_close(sSocket);
         sSocket = NET_BAD_SOCK;
@@ -643,7 +855,12 @@ void network_shutdown(void) {
 }
 
 // Has the nonblocking connect finished? 1 = yes, 0 = still going, -1 = failed.
+// UDP "connects" instantly (it only fixes the peer address).
 static s32 poll_connect_done(void) {
+    if (sUdpMode) {
+        return 1;
+    }
+    {
     fd_set wfds, efds;
     struct timeval tv;
     int err = 0;
@@ -665,6 +882,7 @@ static s32 poll_connect_done(void) {
         return -1;
     }
     return FD_ISSET(sSocket, &wfds) ? 1 : 0;
+    }
 }
 
 void network_update(void) {
@@ -711,6 +929,9 @@ void network_update(void) {
     }
 
     pump_inbound();
+    if (sUdpMode) {
+        udp_tick();
+    }
     if (sState == NET_STATE_OFF || sState == NET_STATE_ERROR) {
         return;
     }

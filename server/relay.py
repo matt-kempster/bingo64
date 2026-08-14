@@ -1,13 +1,45 @@
 #!/usr/bin/env python3
-"""Bingo64 relay server, protocol v3.
+"""Bingo64 relay server, protocol v4.
 
 A small room server for online bingo (plans/online-bingo.md Part D).
-Clients speak a line-based text protocol over TCP; the server groups them
-into rooms, relays ghost-Mario state, arbitrates cell claims, runs the
+Clients speak a line-based text protocol; the server groups them into
+rooms, relays ghost-Mario state, arbitrates cell claims, runs the
 ready-up flow (the board seed is withheld until every member is ready,
 then broadcast with a synchronized countdown), assigns finish placements
 with authoritative times, decides lockout races, and lets a dropped
 client reconnect mid-race with a token.
+
+The same line protocol rides one of two transports, both on one port:
+
+  TCP   one message per newline-terminated line, as always. Right for
+        LAN, direct IPs and localhost testing.
+  UDP   for tunnels that only carry UDP (playit.gg free tier). Each
+        datagram is a 10-byte header + one line (no newline). Control
+        messages ride a reliable in-order channel; ghost state rides an
+        unreliable-sequenced channel where stale packets are dropped
+        instead of retransmitted (better than TCP for position data:
+        one lost packet cannot stall the ones behind it).
+
+UDP header (big-endian):
+    u8  magic 0xB6
+    u8  type        0 ghost / 1 reliable / 2 ack / 3 keepalive
+    u32 conn_id     random nonzero id chosen by the client; identifies
+                    the session in both directions (never the address:
+                    NATs and proxies remap addresses mid-session, and a
+                    datagram with a known conn_id from a new address
+                    simply updates the session's address)
+    u32 seq         ghost: sender's ghost counter, receiver drops stale
+                    reliable: 1-based message sequence
+                    ack: highest reliable seq received in order
+                    keepalive: 0
+
+Reliability: the sender keeps unacked reliable messages queued and
+resends them every 250 ms until the peer's cumulative ack covers them;
+the receiver processes seq == expected+1 only (dups and gap-jumpers are
+dropped) and answers every reliable/keepalive datagram with an ack.
+Clients send a keepalive every few seconds so NAT mappings stay open;
+a session silent for 30 s is treated as a disconnect (mid-race that
+holds the seat for a token reconnect, exactly like a TCP drop).
 
 Game modes (shared enum with the client, see src/game/bingo.h):
   0/1/2  line race   first to 1/2/3 bingos; claims are per-player, the
@@ -18,7 +50,7 @@ Game modes (shared enum with the client, see src/game/bingo.h):
   4      lockout     exclusive claims; the server decides the winner
                      (uncatchable lead, or board exhausted)
 
-Protocol v3 (one message per line, space-separated fields):
+Line protocol (space-separated fields):
 
   client -> server
     J 4 <room> <name> <color> <flags> [token]
@@ -45,6 +77,9 @@ Protocol v3 (one message per line, space-separated fields):
     F                        local win condition met (line modes; the
                              server ignores it in lockout)
     L                        list public rooms
+    Q                        leaving on purpose (UDP: a courtesy so the
+                             room hears B/D now instead of after the
+                             silence timeout; TCP just closes)
 
   server -> client
     W <id> <public> <mode> <token>
@@ -81,6 +116,7 @@ No dependencies beyond the Python standard library.
 import argparse
 import asyncio
 import random
+import struct
 import time
 
 PROTOCOL_VERSION = 4
@@ -91,14 +127,27 @@ FPS = 30
 MODE_BLACKOUT = 3
 MODE_LOCKOUT = 4
 
+# UDP transport constants (mirrored in src/pc/network/network.c).
+UDP_MAGIC = 0xB6
+UDP_GHOST = 0
+UDP_RELIABLE = 1
+UDP_ACK = 2
+UDP_KEEPALIVE = 3
+UDP_HEADER = struct.Struct("!BBII")
+UDP_MAX_PAYLOAD = 512
+UDP_RESEND_S = 0.25         # retransmit cadence for unacked messages
+UDP_RESEND_WINDOW = 8       # head-of-queue messages per retransmit tick
+UDP_TIMEOUT_S = 30.0        # silence after which a session is dropped
+UDP_CLOSE_LINGER_S = 5.0    # refused sessions stick around to ack the E
+UDP_MAX_CONNS = 512         # new-session cap (random-conn-id flood guard)
+
 
 class Client:
-    __slots__ = ("reader", "writer", "id", "name", "color", "room", "ready",
-                 "alive", "ghost_updates")
+    """A room member; subclasses supply the transport."""
+    __slots__ = ("id", "name", "color", "room", "ready", "alive",
+                 "ghost_updates")
 
-    def __init__(self, reader, writer):
-        self.reader = reader
-        self.writer = writer
+    def __init__(self):
         self.id = None
         self.name = "?"
         self.color = 0
@@ -107,13 +156,175 @@ class Client:
         self.alive = True
         self.ghost_updates = 0
 
-    def send(self, line):
+    def send(self, line, lossy=False):
+        raise NotImplementedError
+
+    def kick(self):
+        """Sever the transport (the seat was taken over by a reconnect)."""
+        raise NotImplementedError
+
+
+class TcpClient(Client):
+    __slots__ = ("writer",)
+
+    def __init__(self, writer):
+        super().__init__()
+        self.writer = writer
+
+    def send(self, line, lossy=False):
         if not self.alive:
             return
         try:
             self.writer.write((line + "\n").encode())
         except Exception:
             self.alive = False
+
+    def kick(self):
+        self.alive = False
+        try:
+            self.writer.close()
+        except Exception:
+            pass
+
+
+class UdpConn:
+    """One UDP session: reliability state plus the room-member Client."""
+    __slots__ = ("cid", "addr", "endpoint", "client", "out", "next_seq",
+                 "in_expected", "ghost_in", "ghost_out", "last_recv",
+                 "close_at")
+
+    def __init__(self, cid, addr, endpoint):
+        self.cid = cid
+        self.addr = addr
+        self.endpoint = endpoint
+        self.client = UdpClient(self)
+        self.out = []           # [(seq, datagram bytes)] awaiting ack
+        self.next_seq = 1
+        self.in_expected = 0    # highest reliable seq processed in order
+        self.ghost_in = 0
+        self.ghost_out = 0
+        self.last_recv = time.monotonic()
+        self.close_at = None    # linger deadline once we decided to close
+
+    def _dgram(self, type_, seq, payload=b""):
+        return UDP_HEADER.pack(UDP_MAGIC, type_, self.cid, seq) + payload
+
+    def send_line(self, line, lossy):
+        if lossy:
+            self.ghost_out += 1
+            self.endpoint.transmit(self._dgram(UDP_GHOST, self.ghost_out,
+                                               line.encode()), self.addr)
+            return
+        seq = self.next_seq
+        self.next_seq += 1
+        dgram = self._dgram(UDP_RELIABLE, seq, line.encode())
+        self.out.append((seq, dgram))
+        self.endpoint.transmit(dgram, self.addr)
+
+    def send_ack(self):
+        self.endpoint.transmit(self._dgram(UDP_ACK, self.in_expected),
+                               self.addr)
+
+    def on_ack(self, seq):
+        while self.out and self.out[0][0] <= seq:
+            self.out.pop(0)
+
+    def begin_close(self):
+        """Stop the session, lingering briefly so a queued E gets acked."""
+        if self.close_at is None:
+            self.close_at = time.monotonic() + UDP_CLOSE_LINGER_S
+
+
+class UdpClient(Client):
+    __slots__ = ("conn",)
+
+    def __init__(self, conn):
+        super().__init__()
+        self.conn = conn
+
+    def send(self, line, lossy=False):
+        if self.alive:
+            self.conn.send_line(line, lossy)
+
+    def kick(self):
+        self.alive = False
+        self.conn.endpoint.forget(self.conn)
+
+
+class UdpEndpoint(asyncio.DatagramProtocol):
+    def __init__(self, relay):
+        self.relay = relay
+        self.transport = None
+        self.conns = {}  # conn_id -> UdpConn
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def transmit(self, dgram, addr):
+        if self.transport is not None:
+            self.transport.sendto(dgram, addr)
+
+    def forget(self, conn):
+        self.conns.pop(conn.cid, None)
+
+    def datagram_received(self, data, addr):
+        if len(data) < UDP_HEADER.size or len(data) > UDP_HEADER.size + UDP_MAX_PAYLOAD:
+            return
+        magic, type_, cid, seq = UDP_HEADER.unpack_from(data)
+        if magic != UDP_MAGIC or cid == 0:
+            return
+        conn = self.conns.get(cid)
+        if conn is None:
+            if len(self.conns) >= UDP_MAX_CONNS:
+                return
+            conn = UdpConn(cid, addr, self)
+            self.conns[cid] = conn
+        conn.addr = addr  # NAT rebind / proxy flow change: follow the sender
+        conn.last_recv = time.monotonic()
+        if conn.close_at is not None:
+            if type_ == UDP_ACK:
+                conn.on_ack(seq)
+            return  # closing: accept acks for the pending E, nothing else
+        payload = data[UDP_HEADER.size:]
+        if type_ == UDP_ACK:
+            conn.on_ack(seq)
+        elif type_ == UDP_KEEPALIVE:
+            conn.send_ack()
+        elif type_ == UDP_GHOST:
+            if seq > conn.ghost_in:
+                conn.ghost_in = seq
+                self._process(conn, payload)
+        elif type_ == UDP_RELIABLE:
+            if seq == conn.in_expected + 1:
+                conn.in_expected = seq
+                conn.send_ack()
+                self._process(conn, payload)
+            else:
+                conn.send_ack()  # dup or gap: re-state what we have
+
+    def _process(self, conn, payload):
+        parts = payload.decode(errors="replace").split()
+        if not parts:
+            return
+        if not self.relay.process_line(conn.client, parts):
+            conn.begin_close()
+
+    async def tick_loop(self):
+        while True:
+            await asyncio.sleep(UDP_RESEND_S)
+            now = time.monotonic()
+            for conn in list(self.conns.values()):
+                if conn.close_at is not None and (now >= conn.close_at
+                                                  or not conn.out):
+                    self.forget(conn)
+                    continue
+                if now - conn.last_recv > UDP_TIMEOUT_S:
+                    conn.client.alive = False
+                    self.forget(conn)
+                    self.relay.drop(conn.client, "timed out")
+                    continue
+                for _, dgram in conn.out[:UDP_RESEND_WINDOW]:
+                    self.transmit(dgram, conn.addr)
 
 
 class Room:
@@ -141,10 +352,10 @@ class Room:
     def started(self):
         return self.started_at is not None
 
-    def broadcast(self, line, skip=None):
+    def broadcast(self, line, skip=None, lossy=False):
         for c in self.members.values():
             if c.id != skip:
-                c.send(line)
+                c.send(line, lossy)
 
     def start_delta_frames(self):
         """Frames until GO (positive: still counting down)."""
@@ -243,12 +454,8 @@ class Relay:
             if tok == token:
                 old = room.members.pop(id_, None)
                 if old is not None:
-                    # A half-dead socket still holds the seat; replace it.
-                    old.alive = False
-                    try:
-                        old.writer.close()
-                    except Exception:
-                        pass
+                    # A half-dead transport still holds the seat; replace it.
+                    old.kick()
                 room.disconnected.pop(id_, None)
                 client.id = id_
                 client.name = name
@@ -257,8 +464,149 @@ class Relay:
                 return id_
         return -1
 
-    async def handle(self, reader, writer):
-        client = Client(reader, writer)
+    def process_line(self, client, parts):
+        """Handle one message. Returns False when the connection is done
+        (refused): the caller severs the transport, without drop()."""
+        cmd = parts[0]
+        if cmd == "J" and client.room is None and len(parts) >= 3:
+            if parts[1] != str(PROTOCOL_VERSION):
+                client.send("E version %d" % PROTOCOL_VERSION)
+                return False
+            if len(parts) < 6:
+                client.send("E bad_join")
+                return False
+            color = clamped_int(parts[4], 0, 7)
+            flags = clamped_int(parts[5], 0, 3)
+            token = 0
+            if len(parts) >= 7:
+                token = clamped_int(parts[6], 0, 2 ** 32 - 1)
+            room = self.room_for(parts[2][:31], bool(flags & 1))
+            name = sanitize_name(parts[3])
+            resumed = self.resume_session(room, client, token, name, color)
+            if resumed < 0:
+                if len(room.members) >= MAX_ROOM:
+                    client.send("E room_full")
+                    return False
+                client.name = name
+                client.color = color
+                client.id = room.next_id
+                room.next_id += 1
+                room.members[client.id] = client
+                room.tokens[client.id] = random.randrange(1, 2 ** 32)
+            client.room = room
+            client.send("W %d %d %d %d"
+                        % (client.id, 1 if room.public else 0,
+                           room.mode, room.tokens[client.id]))
+            self.send_room_snapshot(room, client)
+            # Announce the (re)arrival to everyone else.
+            room.broadcast(room.roster_line(client.id, client.name,
+                                            client.color, client.ready,
+                                            True), skip=client.id)
+            print("[%s] %s %s room '%s' as #%d (%d members)"
+                  % (ts(), client.name,
+                     "rejoined" if resumed >= 0 else "joined",
+                     room.name, client.id, len(room.members)))
+        elif cmd == "G" and client.room and len(parts) == 9:
+            client.ghost_updates += 1
+            client.room.broadcast(
+                "G %d %s" % (client.id, " ".join(parts[1:])),
+                skip=client.id, lossy=True)
+        elif cmd == "C" and client.room and len(parts) == 2:
+            cell = clamped_int(parts[1], -1, 24)
+            if cell < 0:
+                return True
+            room = client.room
+            ids = room.claims.setdefault(cell, [])
+            if room.mode in (MODE_BLACKOUT, MODE_LOCKOUT):
+                if ids:
+                    return True  # exclusive/co-op: first claim only
+            elif client.id in ids:
+                return True  # race: once per player
+            ids.append(client.id)
+            room.broadcast("C %d %d" % (cell, client.id))
+            print("[%s] room '%s': cell %d claimed by #%d %s"
+                  % (ts(), room.name, cell, client.id, client.name))
+            if room.mode == MODE_LOCKOUT:
+                self.adjudicate_lockout(room)
+        elif cmd == "F" and client.room:
+            room = client.room
+            if (not room.started or room.mode == MODE_LOCKOUT
+                    or any(f[0] == client.id for f in room.finishers)):
+                return True
+            place = len(room.finishers) + 1
+            frames = room.elapsed_frames()
+            room.finishers.append((client.id, place, frames))
+            room.broadcast("F %d %d %d" % (client.id, place, frames))
+            print("[%s] room '%s': #%d %s finished, place %d (%d frames)"
+                  % (ts(), room.name, client.id, client.name,
+                     place, frames))
+        elif cmd == "R" and client.room and len(parts) == 2:
+            room = client.room
+            if room.started:
+                return True
+            client.ready = parts[1] == "1"
+            room.broadcast("R %d %d" % (client.id,
+                                        1 if client.ready else 0))
+        elif cmd == "O" and client.room and len(parts) >= 4:
+            room = client.room
+            if client.id != room.creator_id or room.started:
+                return True
+            room.mode = clamped_int(parts[1], 0, 4)
+            room.unlock = clamped_int(parts[2], 0, 1)
+            try:
+                room.mask = int(parts[3], 16) & (2 ** 64 - 1)
+            except ValueError:
+                room.mask = 0
+            if len(parts) >= 5:
+                room.seed_proposal = clamped_int(parts[4], 0, 999999998)
+            room.broadcast("O %d" % room.mode, skip=client.id)
+        elif cmd == "X" and client.room:
+            room = client.room
+            if client.id != room.creator_id:
+                return True
+            self.start_race(room)
+        elif cmd == "Q":
+            self.drop(client, "left")
+            return False
+        elif cmd == "L":
+            for room in self.rooms.values():
+                if room.public:
+                    client.send("P %s %d %d"
+                                % (room.name, len(room.members),
+                                   1 if room.started else 0))
+            client.send("P .")
+        return True
+
+    def drop(self, client, why="left"):
+        """The transport died: free the seat (or hold it mid-race)."""
+        client.alive = False
+        room = client.room
+        if not room or room.members.get(client.id) is not client:
+            return
+        del room.members[client.id]
+        if room.started and room.members:
+            # Mid-race drop: hold the seat for a reconnect.
+            room.disconnected[client.id] = (client.name, client.color)
+            room.broadcast("D %d" % client.id)
+            print("[%s] %s %s room '%s' (%d members, may return)"
+                  % (ts(), client.name, why, room.name, len(room.members)))
+        else:
+            room.broadcast("B %d" % client.id)
+            room.tokens.pop(client.id, None)
+            print("[%s] %s left room '%s' (%d members, %d ghost updates relayed)"
+                  % (ts(), client.name, room.name, len(room.members),
+                     client.ghost_updates))
+        if not room.members:
+            del self.rooms[room.name]
+            print("[%s] room '%s' closed" % (ts(), room.name))
+        elif not room.started:
+            # The host role passes on.
+            if client.id == room.creator_id:
+                room.creator_id = min(room.members)
+                room.broadcast("H %d" % room.creator_id)
+
+    async def handle_tcp(self, reader, writer):
+        client = TcpClient(writer)
         try:
             while True:
                 line = await reader.readline()
@@ -269,139 +617,12 @@ class Relay:
                 parts = line.decode(errors="replace").split()
                 if not parts:
                     continue
-                cmd = parts[0]
-                if cmd == "J" and client.room is None and len(parts) >= 3:
-                    if parts[1] != str(PROTOCOL_VERSION):
-                        client.send("E version %d" % PROTOCOL_VERSION)
-                        break
-                    if len(parts) < 6:
-                        client.send("E bad_join")
-                        break
-                    color = clamped_int(parts[4], 0, 7)
-                    flags = clamped_int(parts[5], 0, 3)
-                    token = 0
-                    if len(parts) >= 7:
-                        token = clamped_int(parts[6], 0, 2 ** 32 - 1)
-                    room = self.room_for(parts[2][:31], bool(flags & 1))
-                    name = sanitize_name(parts[3])
-                    resumed = self.resume_session(room, client, token, name, color)
-                    if resumed < 0:
-                        if len(room.members) >= MAX_ROOM:
-                            client.send("E room_full")
-                            break
-                        client.name = name
-                        client.color = color
-                        client.id = room.next_id
-                        room.next_id += 1
-                        room.members[client.id] = client
-                        room.tokens[client.id] = random.randrange(1, 2 ** 32)
-                    client.room = room
-                    client.send("W %d %d %d %d"
-                                % (client.id, 1 if room.public else 0,
-                                   room.mode, room.tokens[client.id]))
-                    self.send_room_snapshot(room, client)
-                    # Announce the (re)arrival to everyone else.
-                    room.broadcast(room.roster_line(client.id, client.name,
-                                                    client.color, client.ready,
-                                                    True), skip=client.id)
-                    print("[%s] %s %s room '%s' as #%d (%d members)"
-                          % (ts(), client.name,
-                             "rejoined" if resumed >= 0 else "joined",
-                             room.name, client.id, len(room.members)))
-                elif cmd == "G" and client.room and len(parts) == 9:
-                    client.ghost_updates += 1
-                    client.room.broadcast(
-                        "G %d %s" % (client.id, " ".join(parts[1:])),
-                        skip=client.id)
-                elif cmd == "C" and client.room and len(parts) == 2:
-                    cell = clamped_int(parts[1], -1, 24)
-                    if cell < 0:
-                        continue
-                    room = client.room
-                    ids = room.claims.setdefault(cell, [])
-                    if room.mode in (MODE_BLACKOUT, MODE_LOCKOUT):
-                        if ids:
-                            continue  # exclusive/co-op: first claim only
-                    elif client.id in ids:
-                        continue  # race: once per player
-                    ids.append(client.id)
-                    room.broadcast("C %d %d" % (cell, client.id))
-                    print("[%s] room '%s': cell %d claimed by #%d %s"
-                          % (ts(), room.name, cell, client.id, client.name))
-                    if room.mode == MODE_LOCKOUT:
-                        self.adjudicate_lockout(room)
-                elif cmd == "F" and client.room:
-                    room = client.room
-                    if (not room.started or room.mode == MODE_LOCKOUT
-                            or any(f[0] == client.id for f in room.finishers)):
-                        continue
-                    place = len(room.finishers) + 1
-                    frames = room.elapsed_frames()
-                    room.finishers.append((client.id, place, frames))
-                    room.broadcast("F %d %d %d" % (client.id, place, frames))
-                    print("[%s] room '%s': #%d %s finished, place %d (%d frames)"
-                          % (ts(), room.name, client.id, client.name,
-                             place, frames))
-                elif cmd == "R" and client.room and len(parts) == 2:
-                    room = client.room
-                    if room.started:
-                        continue
-                    client.ready = parts[1] == "1"
-                    room.broadcast("R %d %d" % (client.id,
-                                                1 if client.ready else 0))
-                elif cmd == "O" and client.room and len(parts) >= 4:
-                    room = client.room
-                    if client.id != room.creator_id or room.started:
-                        continue
-                    room.mode = clamped_int(parts[1], 0, 4)
-                    room.unlock = clamped_int(parts[2], 0, 1)
-                    try:
-                        room.mask = int(parts[3], 16) & (2 ** 64 - 1)
-                    except ValueError:
-                        room.mask = 0
-                    if len(parts) >= 5:
-                        room.seed_proposal = clamped_int(parts[4], 0, 999999998)
-                    room.broadcast("O %d" % room.mode, skip=client.id)
-                elif cmd == "X" and client.room:
-                    room = client.room
-                    if client.id != room.creator_id:
-                        continue
-                    self.start_race(room)
-                elif cmd == "L":
-                    for room in self.rooms.values():
-                        if room.public:
-                            client.send("P %s %d %d"
-                                        % (room.name, len(room.members),
-                                           1 if room.started else 0))
-                    client.send("P .")
+                if not self.process_line(client, parts):
+                    break
         except (ConnectionResetError, asyncio.IncompleteReadError):
             pass
         finally:
-            client.alive = False
-            room = client.room
-            if room and room.members.get(client.id) is client:
-                del room.members[client.id]
-                if room.started and room.members:
-                    # Mid-race drop: hold the seat for a reconnect.
-                    room.disconnected[client.id] = (client.name, client.color)
-                    room.broadcast("D %d" % client.id)
-                    print("[%s] %s disconnected from room '%s' "
-                          "(%d members, may return)"
-                          % (ts(), client.name, room.name, len(room.members)))
-                else:
-                    room.broadcast("B %d" % client.id)
-                    room.tokens.pop(client.id, None)
-                    print("[%s] %s left room '%s' (%d members, %d ghost updates relayed)"
-                          % (ts(), client.name, room.name, len(room.members),
-                             client.ghost_updates))
-                if not room.members:
-                    del self.rooms[room.name]
-                    print("[%s] room '%s' closed" % (ts(), room.name))
-                elif not room.started:
-                    # The host role passes on.
-                    if client.id == room.creator_id:
-                        room.creator_id = min(room.members)
-                        room.broadcast("H %d" % room.creator_id)
+            self.drop(client, "disconnected from")
             writer.close()
 
 
@@ -427,8 +648,12 @@ async def main():
     args = ap.parse_args()
 
     relay = Relay()
-    server = await asyncio.start_server(relay.handle, args.host, args.port)
-    print("[%s] bingo64 relay listening on %s:%d (protocol v%d)"
+    server = await asyncio.start_server(relay.handle_tcp, args.host, args.port)
+    loop = asyncio.get_running_loop()
+    _, endpoint = await loop.create_datagram_endpoint(
+        lambda: UdpEndpoint(relay), local_addr=(args.host, args.port))
+    asyncio.ensure_future(endpoint.tick_loop())
+    print("[%s] bingo64 relay listening on %s:%d tcp+udp (protocol v%d)"
           % (ts(), args.host, args.port, PROTOCOL_VERSION))
     async with server:
         await server.serve_forever()

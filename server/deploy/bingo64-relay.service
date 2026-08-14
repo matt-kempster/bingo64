@@ -1,0 +1,20 @@
+[Unit]
+Description=Bingo64 relay server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bingo
+ExecStart=/usr/bin/python3 -u /opt/bingo64/relay.py --port 64064
+Restart=always
+RestartSec=3
+# Hardening: the relay needs nothing but a socket.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target
