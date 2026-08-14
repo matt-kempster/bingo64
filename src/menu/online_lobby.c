@@ -508,8 +508,19 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
         snprintf(tmp, sizeof(tmp), "%s%s", configNetName,
                  (text_input_active() && sEditingField == FIELD_NAME) ? cursor : "");
         print_ascii(valueX, field_row_y(FIELD_NAME), tmp);
-        snprintf(tmp, sizeof(tmp), "%.28s%s", configNetServer,
-                 (text_input_active() && sEditingField == FIELD_SERVER) ? cursor : "");
+        // Long addresses (udp:host.tun.ply.gg:port) overflow the row:
+        // show the tail, since both typing and the port live at the end.
+        {
+            const char *srv = configNetServer;
+            size_t slen = strlen(srv);
+            const char *cur = (text_input_active()
+                               && sEditingField == FIELD_SERVER) ? cursor : "";
+            if (slen > 28) {
+                snprintf(tmp, sizeof(tmp), "..%s%s", srv + slen - 26, cur);
+            } else {
+                snprintf(tmp, sizeof(tmp), "%s%s", srv, cur);
+            }
+        }
         print_ascii(valueX, field_row_y(FIELD_SERVER), tmp);
         snprintf(tmp, sizeof(tmp), "%s%s", configNetRoom,
                  (text_input_active() && sEditingField == FIELD_ROOM) ? cursor : "");
