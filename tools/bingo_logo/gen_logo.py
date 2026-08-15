@@ -21,16 +21,21 @@ WOOD_PATH = "/home/matt/b64-logo/logo_wood.png"  # copy of levels/intro/0.rgba16
 OUT_DIR = "/home/matt/b64-logo/export"
 DL_NAME = "bingo_logo"
 
-# Classic SM64 logo letter palette (sRGB), cycled across BINGO + 64
+# Face/bevel color pairs lifted straight from the vanilla logo's vertex
+# data (face = bright front, ring = saturated bevel outline), per hue:
+RED    = ((1.000, 0.184, 0.184), (0.843, 0.000, 0.000))
+BLUE   = ((0.396, 0.498, 1.000), (0.125, 0.224, 0.898))
+YELLOW = ((1.000, 1.000, 0.224), (0.730, 0.730, 0.000))
+GREEN  = ((0.000, 0.945, 0.000), (0.000, 0.627, 0.000))
 LETTERS = [
-    # (char, row, color)
-    ("B", 0, (0.95, 0.08, 0.05)),   # red
-    ("I", 0, (0.20, 0.35, 0.98)),   # blue
-    ("N", 0, (1.00, 0.85, 0.00)),   # yellow
-    ("G", 0, (0.15, 0.85, 0.10)),   # green
-    ("O", 0, (0.95, 0.08, 0.05)),   # red
-    ("6", 1, (0.20, 0.35, 0.98)),   # blue
-    ("4", 1, (0.15, 0.85, 0.10)),   # green
+    # (char, row, (face, ring))
+    ("B", 0, RED),
+    ("I", 0, BLUE),
+    ("N", 0, YELLOW),
+    ("G", 0, GREEN),
+    ("O", 0, RED),
+    ("6", 1, BLUE),
+    ("4", 1, GREEN),
 ]
 SIZE_ROW0 = 10.0        # BINGO letter size (blender units; x100 = sm64 units)
 SIZE_ROW1 = 16.0        # 64 size
@@ -46,13 +51,19 @@ EXTRUDE_FRAC = 0.16     # extrusion depth as fraction of size
 SHEAR_Y = 0.5           # how far the extrusion slides down per unit depth
 
 # layer stack: (kind, glyph fatten as size-frac, z depth as size-frac)
+# THIN insets the bright face inward from the raw glyph (skinnier letters);
+# ring/wood step outward from it by the same rims as before.
+# override per run: LOGO_THIN=0.035 blender -b --python gen_logo.py
+THIN = float(os.environ.get("LOGO_THIN", "0.028"))
+# the same-hue bevel is a real sloped skirt built from the front face's
+# inset rim (see bmesh step) — not a separate flat layer
+RING_DEPTH_FRAC = 0.014
 LAYER_DEFS = [
     ("front", 0.000,  0.000),
-    ("ring",  0.025, -0.030),
-    ("step",  0.050, -0.060),
-    ("ext",   0.050, -0.060),
+    ("step",  0.050 - THIN, -0.060),
+    ("ext",   0.050 - THIN, -0.060),
 ]
-LAYER_ID = {"ext": 0, "step": 1, "ring": 2, "front": 3}
+LAYER_ID = {"ext": 0, "step": 1, "front": 2}
 
 # Vanilla logo footprint (measured from the US DLs): x -1190..1414,
 # y -381..864 — i.e. ~2600x1245 units centered near (+110, +240).
@@ -152,8 +163,29 @@ bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 for o, row, color, kind in made:
     mesh = o.data
+    size = SIZE_ROW1 if row == 1 else SIZE_ROW0
     bm = bmesh.new()
     bm.from_mesh(mesh)
+    if kind == "front" and THIN > 0:
+        # drop back side first, then mesh-inset the glyph fill inward; the
+        # rim becomes the same-hue bevel: slant its outer edge backward so
+        # it reads as a slope, not a vertical cliff
+        backs = [f for f in bm.faces if f.normal.z < -0.85]
+        bmesh.ops.delete(bm, geom=backs, context="FACES")
+        rim = bmesh.ops.inset_region(bm, faces=list(bm.faces),
+                                     thickness=THIN * size * s,
+                                     use_even_offset=True)["faces"]
+        bev_lay = bm.faces.layers.int.new("is_bevel")
+        rim_set = set(rim)
+        inner_verts = set()
+        for f in bm.faces:
+            if f not in rim_set:
+                inner_verts.update(f.verts)
+        for f in rim:
+            f[bev_lay] = 1
+            for v in f.verts:
+                if v not in inner_verts:
+                    v.co.z -= RING_DEPTH_FRAC * size * s
     bmesh.ops.triangulate(bm, faces=bm.faces)
     # no z-buffer on the splash path: painter's order back-to-front. Flat
     # layers keep only their front side; the extrusion keeps only its walls.
@@ -178,10 +210,12 @@ for o, row, color, kind in made:
     uv = mesh.uv_layers["UVMap"]
     lay_attr = mesh.attributes["layer_id"]
 
-    light = lerp3(color, (1.0, 1.0, 1.0), 0.12)   # slight top highlight
+    face_col, ring_col = color
 
+    bev_attr = mesh.attributes.get("is_bevel")
     for poly in mesh.polygons:
         lay_attr.data[poly.index].value = LAYER_ID[kind]
+        is_bevel = bev_attr is not None and bev_attr.data[poly.index].value
         # extrusion walls: wood lit from above (vanilla uses gray shading)
         if kind == "ext":
             ny = poly.normal.y
@@ -190,11 +224,10 @@ for o, row, color, kind in made:
             vtx = mesh.vertices[mesh.loops[li].vertex_index]
             t = (vtx.co.y - lo_.y) / hgt
             if kind == "front":
-                c = lerp3(color, light, t)
-                u, v = vtx.co.x * 0.12, vtx.co.y * 0.12
-            elif kind == "ring":
-                # same hue, shaded: darker at the bottom, lighter up top
-                c = tuple(ch_ * (0.42 + 0.30 * t) for ch_ in color)
+                if is_bevel:
+                    c = tuple(ch_ * (0.88 + 0.12 * t) for ch_ in ring_col)
+                else:
+                    c = tuple(ch_ * (0.94 + 0.06 * t) for ch_ in face_col)
                 u, v = vtx.co.x * 0.12, vtx.co.y * 0.12
             elif kind == "step":
                 g = 0.55 + 0.40 * t
@@ -314,13 +347,13 @@ def group_stats(n):
     return max(zs) - min(zs), sum(zs) / len(zs)
 
 ngroups = len(set(_re.findall(r"Gfx bingo_logo_bingo_logo_mesh_tri_(\d+)\[", src)))
-assert ngroups == 4, f"expected 4 tri groups, got {ngroups}"
-stats = {n: group_stats(n) for n in range(4)}
+assert ngroups == 3, f"expected 3 tri groups, got {ngroups}"
+stats = {n: group_stats(n) for n in range(3)}
 ext_n = max(stats, key=lambda n: stats[n][0])
 assert stats[ext_n][0] > 40, "extrusion group not found by z-span"
 flat = sorted((n for n in stats if n != ext_n), key=lambda n: stats[n][1])
-step_n, ring_n, front_n = flat
-print(f"DEBUG wrapper order: ext={ext_n} step={step_n} ring={ring_n} front={front_n}")
+step_n, front_n = flat
+print(f"DEBUG wrapper order: ext={ext_n} step={step_n} front={front_n}")
 
 WRAPPER = f"""Gfx bingo_logo_bingo_logo_mesh[] = {{
 \tgsDPPipeSync(),
@@ -340,7 +373,6 @@ WRAPPER = f"""Gfx bingo_logo_bingo_logo_mesh[] = {{
 \tgsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, intro_seg7_texture_1),
 \tgsDPLoadSync(),
 \tgsDPLoadBlock(G_TX_LOADTILE, 0, 0, 32 * 32 - 1, CALC_DXT(32, G_IM_SIZ_16b_BYTES)),
-\tgsSPDisplayList(bingo_logo_bingo_logo_mesh_tri_{ring_n}),
 \tgsSPDisplayList(bingo_logo_bingo_logo_mesh_tri_{front_n}),
 \tgsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF),
 \tgsDPPipeSync(),
