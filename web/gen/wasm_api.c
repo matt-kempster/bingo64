@@ -56,6 +56,18 @@ static void save_or_restore_weights(void) {
     }
 }
 
+// The public API still speaks "target" (1, 2, 3, or 12 for blackout), the
+// options the site offers; the game replaced gbBingoTarget with the
+// BingoGameMode enum. Board bytes are mode-independent either way.
+static enum BingoGameMode mode_from_target(s32 target) {
+    switch (target) {
+        case 2:  return BINGO_MODE_LINE_2;
+        case 3:  return BINGO_MODE_LINE_3;
+        case 12: return BINGO_MODE_BLACKOUT;
+        default: return BINGO_MODE_LINE_1;
+    }
+}
+
 static void generate(u32 seed, s32 target, const u8 *disabled) {
     int i;
     save_or_restore_weights();
@@ -63,7 +75,7 @@ static void generate(u32 seed, s32 target, const u8 *disabled) {
     for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
         gBingoObjectivesDisabled[i] = disabled != NULL ? disabled[i] : 0;
     }
-    gbBingoTarget = target;
+    gbBingoMode = mode_from_target(target);
     gbBingosCompleted = 0;
     setup_bingo_objectives(seed);
 }
