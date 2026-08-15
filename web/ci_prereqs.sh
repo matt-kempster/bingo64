@@ -36,4 +36,8 @@ for tex in $(grep -o '"textures/[^"]*"' src/game/bingo_objective_info.c | tr -d 
     targets="$targets build/us/$tex"
 done
 
-make QEMU_IRIX=true NOEXTRACT=1 GRUCODE=f3dex $targets
+# TARGET_N64=1 keeps the generated files under build/us, where the web and
+# test/host builds expect them (the alo-based Makefile defaults to the PC
+# target, build/us_pc). Only host tools run for these targets, so the mips
+# toolchain is not needed.
+make TARGET_N64=1 NOEXTRACT=1 GRUCODE=f3dex $targets

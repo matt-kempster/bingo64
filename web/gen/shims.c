@@ -4,6 +4,7 @@
 // the website show the real level and star names.
 
 #include <ultra64.h>
+#include "macros.h" // for GLUE2, used by the generated text data below
 #include "types.h"
 
 s16 gCurrCourseNum = 0;
@@ -11,7 +12,7 @@ s16 gCurrLevelNum = 0;
 s16 gTTCSpeedSetting = 0;
 s16 sSelectionFlags = 0;
 s8 gDialogCameraAngleIndex = 0;
-f32 gDefaultSoundArgs[3] = { 0 };
+f32 gGlobalSoundSource[3] = { 0 };
 
 const BehaviorScript bhv1upGreenDemon[] = { 0 };
 
@@ -40,13 +41,30 @@ void bingo_hud_update_state(s32 icon, s32 state) {
     (void) state;
 }
 
-struct Object *obj_nearest_object_with_behavior(const BehaviorScript *behavior) {
+struct Object *cur_obj_nearest_object_with_behavior(const BehaviorScript *behavior) {
     (void) behavior;
     return NULL;
 }
 
-void mark_object_for_deletion(struct Object *obj) {
+void obj_mark_for_deletion(struct Object *obj) {
     (void) obj;
+}
+
+// Netplay hooks in bingo.c: the web generator is always offline.
+struct BingoObjective;
+
+void bingo_net_on_local_complete(struct BingoObjective *objective) {
+    (void) objective;
+}
+
+s32 bingo_net_racing(void) {
+    return 0;
+}
+s32 bingo_net_race_decided(void) {
+    return 0;
+}
+s32 bingo_net_local_won(void) {
+    return 0;
 }
 
 s32 gSplatoonEnabled = 0;
@@ -58,16 +76,16 @@ void splatoon_clear(void) {
     gSplatoonTotalFloors = 0;
 }
 
-// Same as the game's RandomU16 in behavior_script.c: low 16 bits of the
+// Same as the game's random_u16 in behavior_script.c: low 16 bits of the
 // Mersenne Twister output.
 unsigned long genrand_int32(void);
 
-u32 RandomU32(void) {
+u32 random_u32(void) {
     return genrand_int32();
 }
 
-u16 RandomU16(void) {
-    return (u16) RandomU32();
+u16 random_u16(void) {
+    return (u16) random_u32();
 }
 
 // The real course/act name tables. The main ROM build generates this file

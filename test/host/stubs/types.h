@@ -3,11 +3,20 @@
 
 #include <ultra64.h>
 
+typedef u8  Bool8;
+typedef u16 Bool16;
+typedef u32 Bool32;
+typedef s16 Angle;
+typedef u16 UAngle;
+typedef s32 Angle32;
+typedef s16 Vec2s[2];
+typedef f32 Vec2f[2];
 typedef f32 Vec3f[3];
 typedef s16 Vec3s[3];
 typedef s32 Vec3i[3];
 typedef f32 Vec4f[4];
 typedef s16 Vec4s[4];
+typedef Angle Vec3a[3];
 typedef f32 Mat4[4][4];
 typedef uintptr_t BehaviorScript;
 typedef s16 Collision;
@@ -34,6 +43,12 @@ struct Object;
 #endif
 #ifndef ALIGNED8
 #define ALIGNED8
+#endif
+#ifndef ALWAYS_INLINE
+#define ALWAYS_INLINE static inline
+#endif
+#ifndef NO_INLINE
+#define NO_INLINE
 #endif
 
 #endif

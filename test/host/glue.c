@@ -58,6 +58,8 @@ void bingo_hud_update_number(s32 icon, s32 number) {
     gGlueHudNumberLast = number;
 }
 
+struct BingoObjective;
+
 void bingo_net_on_local_complete(struct BingoObjective *objective) {
     (void) objective;
 }
@@ -74,6 +76,17 @@ struct Object *cur_obj_nearest_object_with_behavior(const BehaviorScript *behavi
 
 void obj_mark_for_deletion(struct Object *obj) {
     (void) obj;
+}
+
+// Netplay hooks in bingo.c: the host build is always offline.
+s32 bingo_net_racing(void) {
+    return 0;
+}
+s32 bingo_net_race_decided(void) {
+    return 0;
+}
+s32 bingo_net_local_won(void) {
+    return 0;
 }
 
 // Splatoon lives in game/rendering code the tests don't build; the bingo

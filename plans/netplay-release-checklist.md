@@ -9,6 +9,33 @@ Legend: items marked **(missing)** need code, **(untested)** exist but
 have never been exercised, **(verify)** are probably fine but should be
 confirmed once. Unmarked items are design decisions to make.
 
+## 0. Opinionated priority order
+
+Everything below is the full list; this is the order I would do it in.
+
+1. **Rematch / return to lobby**, and pass the host role after a race
+   ends (§1). One server change fixes both; without it a room is
+   single-use, which every play session will hit within 10 minutes.
+2. **In-game leave**: a pause-menu LEAVE RACE, and defined
+   save-and-quit behavior (§1). The other flow every session hits.
+3. **The live 3+ player test evening** (§7). Do it right after 1–2;
+   it will reorder the rest of this list better than any reasoning.
+4. **In-game UDP reconnect** (§3). The feature exists and is the one
+   most likely to have a real bug nobody has seen.
+5. **Whereabouts + privacy toggle** (§2). The headline visible feature
+   of the release.
+6. **Error-message and version-mismatch UX pass** (§5, §3). Cheap, and
+   it is the difference between "it's broken" and "oh, I need to
+   update" messages from friends.
+7. **Window-drag starvation check on Windows** (§3). Five minutes to
+   test; a disconnect-by-title-bar would be embarrassing.
+8. **Server ops drills**: VM reboot, playit-as-systemd, billing alert
+   (§4). One ssh session.
+9. **Release mechanics** (§6): goldens, full sweep, zip, friend-facing
+   setup doc, tag.
+10. **Ghost polish** (§2): despawn on leave, fade stale ghosts,
+    visibility toggle. Nice-to-have; nothing breaks without it.
+
 ## 1. Room lifecycle — the bread-and-butter host-server flows
 
 These are the flows every "game server with a host" has. Most gaps in

@@ -54,10 +54,22 @@ static void save_or_restore_weights(void) {
     }
 }
 
+// BOARD_TARGET still speaks the old numbers (1, 2, 3, or 12 for blackout);
+// the game replaced gbBingoTarget with the BingoGameMode enum. Board bytes
+// are mode-independent either way.
+static enum BingoGameMode mode_from_target(s32 target) {
+    switch (target) {
+        case 2:  return BINGO_MODE_LINE_2;
+        case 3:  return BINGO_MODE_LINE_3;
+        case 12: return BINGO_MODE_BLACKOUT;
+        default: return BINGO_MODE_LINE_1;
+    }
+}
+
 static void generate_board(u32 seed) {
     save_or_restore_weights();
     memset(gBingoObjectives, 0, sizeof(gBingoObjectives));
-    gbBingoTarget = 1;
+    gbBingoMode = BINGO_MODE_LINE_1;
     gbBingosCompleted = 0;
     setup_bingo_objectives(seed);
 }
@@ -352,7 +364,7 @@ static void reset_sim(void) {
     memset(gBingoObjectives, 0, sizeof(gBingoObjectives));
     gBingoInitialized = 1;
     gbBingosCompleted = 0;
-    gbBingoTarget = 1;
+    gbBingoMode = BINGO_MODE_LINE_1;
     gbBingoTimerDisabled = 0;
     gCurrCourseNum = 0;
     gbStarIndex = 0;
@@ -662,11 +674,11 @@ int main(void) {
         }
         generate_board((u32) strtoul(seedArg, NULL, 10));
         if (targetArg != NULL) {
-            // generate_board pins the target to 1; redo setup with the
+            // generate_board pins the mode to LINE_1; redo setup with the
             // requested target, exactly like a fresh boot with that option.
             save_or_restore_weights();
             memset(gBingoObjectives, 0, sizeof(gBingoObjectives));
-            gbBingoTarget = (s32) strtol(targetArg, NULL, 10);
+            gbBingoMode = mode_from_target((s32) strtol(targetArg, NULL, 10));
             gbBingosCompleted = 0;
             setup_bingo_objectives((u32) strtoul(seedArg, NULL, 10));
         }
