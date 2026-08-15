@@ -53,7 +53,8 @@ const GeoLayout intro_geo_0002D0[] = {
         GEO_OPEN_NODE(),
             GEO_CAMERA_FRUSTUM(45, 128, 16384),
             GEO_OPEN_NODE(),
-                GEO_CAMERA(0, 0, 0, 3200, 0, 0, 0, 0x00000000),
+                // closer + below the logo, gazing up (vanilla vibe)
+                GEO_CAMERA(0, 0, -550, 2650, 0, 150, 0, 0x00000000),
                 GEO_OPEN_NODE(),
                     GEO_ASM(0, geo_intro_super_mario_64_logo),
                 GEO_CLOSE_NODE(),
