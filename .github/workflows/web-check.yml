@@ -20,8 +20,10 @@ jobs:
 
       - name: Install packages
         run: |
+          # mips binutils only satisfy the Makefile's TARGET_N64 toolchain
+          # detection; the generated-file targets never run the compiler.
           sudo apt-get update
-          sudo apt-get install -y libaudiofile-dev
+          sudo apt-get install -y libaudiofile-dev binutils-mips-linux-gnu
 
       - name: Install Emscripten
         run: |
