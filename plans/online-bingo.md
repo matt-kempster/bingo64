@@ -1,9 +1,10 @@
 # Plan: Online Bingo64
 
-Status: agreed 2026-08-08. Parts A and B step 1 are done (the `web/`
-directory). Part D is in progress on the `alo-port` branch: the move to the
-alo code base is done (2026-08-09), and the first version of the relay
-server, the shared board, and ghost Mario is done. See section 9.
+Status: agreed 2026-08-08. Part A is done (see `web/`), with the Bingosync
+goal export from part B. Part D is done in its first full version: the move
+to the alo code base (2026-08-09), the relay server (TCP + reliable-UDP,
+protocol v4), the lobby in file select, the shared board, ghost Mario, and
+the live deployment (GCP e2-micro + playit.gg UDP tunnel). See section 9.
 
 Note: this document uses ASD-STE100 (Simplified Technical English) style.
 
