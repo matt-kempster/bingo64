@@ -42,7 +42,9 @@ checked off in one place.
 
 ### In the far future
 
-- [ ] Online capabilities (netplay)
+- [x] Online capabilities (netplay) — first live race completed
+      2026-08-13; release polish tracked in
+      `plans/netplay-release-checklist.md`
 
 ## Planned objectives
 
