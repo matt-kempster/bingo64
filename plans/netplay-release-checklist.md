@@ -260,6 +260,31 @@ this section are confirmed by reading `server/relay.py`.
       `--net-server udp:... --net-room ...`. Include the "config is
       rewritten on exit" gotcha.
 - [ ] **Tag a GitHub release** once the sweep is green.
+- [ ] **Versioning at 1.0 (design agreed 2026-08-16, not yet needed).**
+      Until the first public release, the clobber-freely rule stands:
+      bump both PROTOCOL_VERSIONs, redeploy, old exes get "update
+      needed". At 1.0 the then-current protocol number becomes the
+      floor and the relay switches to supporting old versions forever,
+      cheaply, via three rules:
+      1. **Version-namespaced rooms**, not translation: the room key
+         becomes (name, version) — same-version clients find each
+         other; a v16 exe and a v18 exe joining "peachcastle" land in
+         two separate rooms. Cross-version play is a NON-goal (old and
+         new exes are different games — different boards/objectives —
+         so a mixed race would be unfair even if connected). Nobody is
+         ever refused; no message translation exists anywhere.
+      2. **Frozen per-version policy objects** for the few messages
+         the relay actually interprets (start, lockout claims,
+         finishes, K): POLICIES[16], POLICIES[17], ... Old policy code
+         and its tests are frozen — never edited — and stay in CI
+         forever, which is what actually guarantees no clobbering.
+         The 10-byte UDP framing versions independently (all versions
+         must share enough framing for the server to read J).
+      3. **Nudge, don't refuse**: the welcome carries a "newer version
+         exists" hint that old clients show as a toast.
+      Ops: still one process/port/tunnel/VM (free tier unchanged);
+      make room GC + the daily stats line report per-version so a dead
+      version's retirement is a data-driven call.
 
 ## 7. Live test matrix (humans required)
 
