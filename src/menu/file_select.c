@@ -759,7 +759,8 @@ static void lobby_screen_loop(void) {
         && sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] == NULL
         && !sLobbyExitRequest && sSelectedFileNum == 0) {
         static const s32 models[LOBBY_BTN_COUNT] = {
-            MODEL_MAIN_MENU_RED_ERASE_BUTTON,    // CONNECT / LEAVE
+            MODEL_MAIN_MENU_YELLOW_FILE_BUTTON,  // CONNECT / LEAVE (red would
+                                                 // vanish into the red room)
             MODEL_MAIN_MENU_PURPLE_SOUND_BUTTON, // READY
             MODEL_MAIN_MENU_BLUE_COPY_BUTTON,    // OPTIONS
             MODEL_MAIN_MENU_GREEN_SCORE_BUTTON,  // START RACE
@@ -966,7 +967,7 @@ void bhv_menu_button_manager_init(void) {
     sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oMenuButtonScale = 1.0f;
 
     sMainMenuButtons[MENU_BUTTON_ONLINE] = spawn_object_rel_with_rot(
-        gCurrentObject, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 2800, 800, 0, 0, 0, 0
+        gCurrentObject, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, 2800, 800, 0, 0, 0, 0
     );
     sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonScale = 1.0f;
 
@@ -1420,6 +1421,14 @@ static void draw_main_menu_pc(void) {
     if (network_active()) {
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
         net_print_ascii(100, 62, "IN AN ONLINE ROOM");
+    }
+    // Version stamp: with no-back-compat netplay, "which build am I on"
+    // must be answerable from a screenshot.
+    {
+        char ver[12];
+        snprintf(ver, sizeof(ver), "V%d", NET_PROTOCOL_VERSION);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 120));
+        net_print_ascii((s16) GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(30), 10, ver);
     }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }

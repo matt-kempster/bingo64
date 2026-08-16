@@ -424,22 +424,32 @@ static s32 all_connected_ready(void) {
     return 1;
 }
 
-static void status_text(char *buf, s32 size) {
+// The status line is the lobby's one live signal, so it carries color as
+// well as text: gray = idle, yellow = in progress (with walking dots),
+// green = good news, red = trouble.
+static void status_text(char *buf, s32 size, u8 rgb[3]) {
     s32 i, ready = 0, total = 0;
+    // Walking dots for the in-progress states.
+    static const char *dots[] = { ".", "..", "..." };
+    const char *dot = dots[(gGlobalTimer >> 4) % 3];
     // A fresh notice (host ended the race, someone left...) outranks the
     // regular state line: it is how a player warped back here learns why.
     u32 noticeAge;
     const char *notice = bingo_notice_latest(&noticeAge);
+    rgb[0] = rgb[1] = rgb[2] = 255;
     if (notice != NULL && noticeAge < 150 && network_active()) {
         snprintf(buf, size, "%s", notice);
+        rgb[2] = 140;  // notice yellow, matching the toast register
         return;
     }
     switch (network_state()) {
         case NET_STATE_OFF:
             snprintf(buf, size, "NOT CONNECTED");
+            rgb[0] = rgb[1] = rgb[2] = 160;
             break;
         case NET_STATE_CONNECTING:
-            snprintf(buf, size, "CONNECTING...");
+            snprintf(buf, size, "CONNECTING%s", dot);
+            rgb[0] = 255; rgb[1] = 220; rgb[2] = 100;
             break;
         case NET_STATE_LOBBY:
             for (i = 0; i < NET_MAX_PLAYERS; i++) {
@@ -449,19 +459,24 @@ static void status_text(char *buf, s32 size) {
                 }
             }
             snprintf(buf, size, "%d OF %d READY", ready, total);
+            if (ready == total) { rgb[0] = 110; rgb[1] = 255; rgb[2] = 110; }
             break;
         case NET_STATE_COUNTDOWN:
             snprintf(buf, size, "STARTING IN %d",
                      (network_countdown_frames() + 29) / 30);
+            rgb[0] = 255; rgb[1] = 220; rgb[2] = 100;
             break;
         case NET_STATE_RACING:
             snprintf(buf, size, "GO");
+            rgb[0] = 110; rgb[1] = 255; rgb[2] = 110;
             break;
         case NET_STATE_RECONNECTING:
-            snprintf(buf, size, "CONNECTION LOST. RECONNECTING...");
+            snprintf(buf, size, "CONNECTION LOST. RECONNECTING%s", dot);
+            rgb[0] = 255; rgb[1] = 120; rgb[2] = 120;
             break;
         case NET_STATE_ERROR:
             snprintf(buf, size, "%s", network_error_message());
+            rgb[0] = 255; rgb[1] = 120; rgb[2] = 120;
             break;
     }
 }
@@ -479,6 +494,17 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, alpha);
     print_hud_lut_string(2, 116, 20, textOnlineHud);
+    // The countdown perches right above the START RACE button: that's
+    // where the eye already is after clicking it, not the status corner.
+    if (network_state() == NET_STATE_COUNTDOWN) {
+        s32 secs = (network_countdown_frames() + 29) / 30;
+        u8 digit[2] = { 0x00, 0xFF };
+        if (secs < 0) secs = 0;
+        if (secs > 9) secs = 9;
+        digit[0] = (u8) secs;
+        gDPSetEnvColor(gDisplayListHead++, 255, 220, 100, alpha);
+        print_hud_lut_string(2, button_unit_x(LOBBY_BTN_START) - 6, 140, digit);
+    }
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
 
     draw_highlights(alpha, curX, curY);
@@ -512,30 +538,34 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
                    settings_editable() ? MIN(alpha, 220) : dim);
     {
-        // A blinking dash marks the field being typed into.
+        // A blinking dash marks the field being typed into. Long values
+        // (udp:host.tun.ply.gg:port addresses, imported names) get a
+        // "..tail" cutoff sized to the column that actually exists at this
+        // aspect ratio -- the tail is where both typing and the port live.
         const char *cursor = ((gGlobalTimer >> 3) & 1) ? "-" : "";
-        snprintf(tmp, sizeof(tmp), "%s%s", configNetName,
-                 (text_input_active() && sEditingField == FIELD_NAME) ? cursor : "");
-        print_ascii(valueX, field_row_y(FIELD_NAME), tmp);
-        // Long addresses (udp:host.tun.ply.gg:port) overflow the row:
-        // show the tail, since both typing and the port live at the end.
-        {
-            const char *srv = configNetServer;
-            size_t slen = strlen(srv);
+        // ~6 units per generic-font glyph, worst-case-ish; the column runs
+        // from the value x to the roster column.
+        s32 maxChars = (rosterX - valueX - 6) / 6;
+        struct { s32 field; const char *val; } rows[] = {
+            { FIELD_NAME,   configNetName },
+            { FIELD_SERVER, configNetServer },
+            { FIELD_ROOM,   configNetRoom },
+        };
+        for (i = 0; i < 3; i++) {
+            const char *val = rows[i].val;
             const char *cur = (text_input_active()
-                               && sEditingField == FIELD_SERVER) ? cursor : "";
-            if (slen > 28) {
-                snprintf(tmp, sizeof(tmp), "..%s%s", srv + slen - 26, cur);
+                               && sEditingField == rows[i].field) ? cursor : "";
+            s32 len = (s32) strlen(val);
+            s32 keep = maxChars - 2 - (s32) strlen(cur);
+            if (len + (s32) strlen(cur) <= maxChars) {
+                snprintf(tmp, sizeof(tmp), "%.60s%s", val, cur);
             } else {
-                // %.60s: provably fits tmp (slen <= 28 here, but the
-                // compiler can't see that and warns without the bound).
-                snprintf(tmp, sizeof(tmp), "%.60s%s", srv, cur);
+                if (keep < 1) keep = 1;
+                if (keep > len) keep = len;
+                snprintf(tmp, sizeof(tmp), "..%.60s%s", val + len - keep, cur);
             }
+            print_ascii(valueX, field_row_y(rows[i].field), tmp);
         }
-        print_ascii(valueX, field_row_y(FIELD_SERVER), tmp);
-        snprintf(tmp, sizeof(tmp), "%s%s", configNetRoom,
-                 (text_input_active() && sEditingField == FIELD_ROOM) ? cursor : "");
-        print_ascii(valueX, field_row_y(FIELD_ROOM), tmp);
     }
     print_ascii(valueX, field_row_y(FIELD_TYPE), sPublic ? "PUBLIC" : "PRIVATE");
 
@@ -575,7 +605,11 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
     }
 
     // Roster: name in the player's color, a marker column on the right.
-    // The host wears the gold HOST tag.
+    // The host wears the gold HOST tag. Off the network there is no room,
+    // so the whole column stays blank rather than showing an empty header.
+    if (!network_active()) {
+        goto roster_done;
+    }
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(alpha, 200));
     print_ascii(rosterX, LOBBY_TOP_Y, "PLAYERS");
     row = 1;
@@ -603,14 +637,17 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
         }
         row++;
     }
+roster_done:
 
     // Status line under the title, plus a typing hint while a field has
     // the keyboard.
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(alpha, 200));
     if (text_input_active()) {
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(alpha, 200));
         print_ascii(leftX, LOBBY_STATUS_Y, "TYPE ON KEYBOARD. ENTER WHEN DONE");
     } else {
-        status_text(tmp, sizeof(tmp));
+        u8 rgb[3];
+        status_text(tmp, sizeof(tmp), rgb);
+        gDPSetEnvColor(gDisplayListHead++, rgb[0], rgb[1], rgb[2], MIN(alpha, 200));
         print_ascii(leftX, LOBBY_STATUS_Y, tmp);
     }
 
