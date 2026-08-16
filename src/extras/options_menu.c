@@ -121,6 +121,9 @@ static const u8 optsOnlineStr[][SIZEOPTC(32)] = {
     { TEXT_OPT_ONLINE },
     { TEXT_OPT_NET_LEAVE },
     { TEXT_OPT_NET_LOBBY },
+    { TEXT_OPT_NET_SURE },
+    { TEXT_OPT_NET_KEEP },
+    { TEXT_OPT_NET_ENDALL },
 };
 #endif
 
@@ -191,10 +194,30 @@ static void optvideo_apply(UNUSED struct Option *self, s32 arg) {
 
 /* online race actions (the ONLINE submenu only shows while connected) */
 
+static struct SubMenu *currentMenu;      // defined below, after menuMain
+static struct SubMenu menuOnlineConfirm; // ditto
+
 static void optnet_act_leave(UNUSED struct Option *self, s32 arg) {
     if (!arg && network_active()) {
         network_disconnect(); // courtesy quit; keep playing offline
         optmenu_toggle();     // close the menu (also saves the config)
+    }
+}
+
+static void optnet_act_lobby_confirm(UNUSED struct Option *self, s32 arg) {
+    if (!arg) {
+        // BACK TO LOBBY ends the race for everyone: interpose an ARE YOU
+        // SURE submenu, cursor parked on the harmless answer.
+        menuOnlineConfirm.select = 0;
+        menuOnlineConfirm.scroll = 0;
+        menuOnlineConfirm.prev = currentMenu;
+        currentMenu = &menuOnlineConfirm;
+    }
+}
+
+static void optnet_act_keep_racing(UNUSED struct Option *self, s32 arg) {
+    if (!arg && currentMenu->prev != NULL) {
+        currentMenu = currentMenu->prev; // same as pressing B
     }
 }
 
@@ -361,9 +384,16 @@ static struct SubMenu menuMain = DEF_SUBMENU( optMainStr[0], optsMain );
 #ifndef TARGET_N64
 /* the ONLINE submenu (race actions), shown only while connected */
 
+static struct Option optsOnlineConfirm[] = {
+    DEF_OPT_BUTTON( optsOnlineStr[4], optnet_act_keep_racing ),
+    DEF_OPT_BUTTON( optsOnlineStr[5], optnet_act_lobby ),
+};
+
+static struct SubMenu menuOnlineConfirm = DEF_SUBMENU( optsOnlineStr[3], optsOnlineConfirm );
+
 static struct Option optsOnline[] = {
     DEF_OPT_BUTTON( optsOnlineStr[1], optnet_act_leave ),
-    DEF_OPT_BUTTON( optsOnlineStr[2], optnet_act_lobby ), // host only
+    DEF_OPT_BUTTON( optsOnlineStr[2], optnet_act_lobby_confirm ), // host only
 };
 
 static struct SubMenu menuOnline = DEF_SUBMENU( optsOnlineStr[0], optsOnline );

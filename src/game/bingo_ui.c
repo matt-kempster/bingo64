@@ -93,6 +93,66 @@ static s32 net_cell_count_of_id(s32 id) {
 }
 #endif
 
+// --- In-game notices --------------------------------------------------
+// Small toast queue for online events (someone joined/left/finished, the
+// host changed, the race was ended). Pushed by the PC network client;
+// drawn top-left under the HUD counters in the all-caps HUD font, newest
+// at the bottom. On N64 nothing pushes, so it all compiles to a no-op.
+
+#define BINGO_NOTICE_MAX 3
+#define BINGO_NOTICE_LEN 48
+#define BINGO_NOTICE_LIFE 150 // frames a notice stays up (5 seconds)
+
+static char sNoticeText[BINGO_NOTICE_MAX][BINGO_NOTICE_LEN];
+static u32 sNoticeFrame[BINGO_NOTICE_MAX];
+static s32 sNoticeCount = 0;
+
+static void bingo_notice_drop_oldest(void) {
+    s32 i, j;
+    for (i = 1; i < sNoticeCount; i++) {
+        for (j = 0; j < BINGO_NOTICE_LEN; j++) {
+            sNoticeText[i - 1][j] = sNoticeText[i][j];
+        }
+        sNoticeFrame[i - 1] = sNoticeFrame[i];
+    }
+    sNoticeCount--;
+}
+
+void bingo_notice(const char *text) {
+    s32 i;
+    char *dst;
+    if (sNoticeCount == BINGO_NOTICE_MAX) {
+        bingo_notice_drop_oldest();
+    }
+    dst = sNoticeText[sNoticeCount];
+    for (i = 0; text[i] != '\0' && i < BINGO_NOTICE_LEN - 1; i++) {
+        // The HUD font is caps-only.
+        dst[i] = (text[i] >= 'a' && text[i] <= 'z') ? text[i] - 0x20 : text[i];
+    }
+    dst[i] = '\0';
+    sNoticeFrame[sNoticeCount] = gGlobalTimer;
+    sNoticeCount++;
+}
+
+const char *bingo_notice_latest(u32 *ageFrames) {
+    if (sNoticeCount == 0) {
+        return NULL;
+    }
+    *ageFrames = gGlobalTimer - sNoticeFrame[sNoticeCount - 1];
+    return sNoticeText[sNoticeCount - 1];
+}
+
+void draw_bingo_notices(void) {
+    s32 i;
+    while (sNoticeCount > 0
+           && gGlobalTimer - sNoticeFrame[0] > BINGO_NOTICE_LIFE) {
+        bingo_notice_drop_oldest();
+    }
+    for (i = 0; i < sNoticeCount; i++) {
+        print_text(20, 168 - 18 * i, sNoticeText[i]);
+    }
+}
+
 void draw_bingo_win_screen() {
     char timestamp[16];
     char msg[40];

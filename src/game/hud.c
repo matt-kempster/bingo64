@@ -663,6 +663,8 @@ void render_hud(void) {
                 draw_bingo_hud_timer();
             }
 
+            draw_bingo_notices();
+
 #ifndef TARGET_N64
             if (network_state() == NET_STATE_RECONNECTING
                 && (gGlobalTimer & 0x10)) {

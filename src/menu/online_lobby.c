@@ -16,6 +16,7 @@
 
 #include "audio/external.h"
 #include "game/bingo.h"
+#include "game/bingo_ui.h"
 #include "game/game_init.h"
 #include "game/ingame_menu.h"
 #include "game/segment2.h"
@@ -425,6 +426,14 @@ static s32 all_connected_ready(void) {
 
 static void status_text(char *buf, s32 size) {
     s32 i, ready = 0, total = 0;
+    // A fresh notice (host ended the race, someone left...) outranks the
+    // regular state line: it is how a player warped back here learns why.
+    u32 noticeAge;
+    const char *notice = bingo_notice_latest(&noticeAge);
+    if (notice != NULL && noticeAge < 150 && network_active()) {
+        snprintf(buf, size, "%s", notice);
+        return;
+    }
     switch (network_state()) {
         case NET_STATE_OFF:
             snprintf(buf, size, "NOT CONNECTED");

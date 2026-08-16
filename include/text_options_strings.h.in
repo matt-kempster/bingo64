@@ -103,6 +103,9 @@
 
 #define TEXT_OPT_NET_LEAVE _("LEAVE RACE")
 #define TEXT_OPT_NET_LOBBY _("BACK TO LOBBY")
+#define TEXT_OPT_NET_SURE   _("ARE YOU SURE")
+#define TEXT_OPT_NET_KEEP   _("KEEP RACING")
+#define TEXT_OPT_NET_ENDALL _("END THE RACE FOR ALL")
 
 #else // VERSION
 
@@ -183,6 +186,9 @@
 
 #define TEXT_OPT_NET_LEAVE _("Leave Race")
 #define TEXT_OPT_NET_LOBBY _("Back To Lobby")
+#define TEXT_OPT_NET_SURE   _("ARE YOU SURE")
+#define TEXT_OPT_NET_KEEP   _("Keep Racing")
+#define TEXT_OPT_NET_ENDALL _("End The Race For All")
 
 #endif // VERSION
 

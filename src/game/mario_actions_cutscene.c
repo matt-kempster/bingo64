@@ -257,17 +257,18 @@ void handle_save_menu(struct MarioState *m) {
     s32 dialogID;
     // wait for the menu to show up
     if (is_anim_past_end(m) && gSaveOptSelectIndex != MENU_OPT_NONE) {
-        // save and continue / save and quit
+        // bingo64: SAVE & QUIT does not exist. The save menu is never
+        // rendered (render_course_complete_screen auto-dismisses with
+        // CONTINUE_DONT_SAVE) and quitting mid-race is the online
+        // back-to-lobby flow's job, so the vanilla -2 warp to the Mario
+        // head is gone for good.
         if (gSaveOptSelectIndex == MENU_OPT_SAVE_AND_CONTINUE
 #if !defined(TARGET_N64) && !defined(TARGET_PORT_CONSOLE)
         || gSaveOptSelectIndex == MENU_OPT_SAVE_AND_EXIT
 #endif
-        || gSaveOptSelectIndex == MENU_OPT_SAVE_AND_QUIT) {
+        ) {
             save_file_do_save(gCurrSaveFileNum - 1);
 
-            if (gSaveOptSelectIndex == MENU_OPT_SAVE_AND_QUIT) {
-                fade_into_special_warp(-2, 0); // reset game
-            }
 #if !defined(TARGET_N64) && !defined(TARGET_PORT_CONSOLE)
             if (gSaveOptSelectIndex == MENU_OPT_SAVE_AND_EXIT) {
                 fade_into_special_warp(0, 0);
@@ -276,19 +277,16 @@ void handle_save_menu(struct MarioState *m) {
 #endif
         }
 
-        // not quitting (MENU_OPT_CONTINUE_DONT_SAVE)
-        if (gSaveOptSelectIndex != MENU_OPT_SAVE_AND_QUIT) { 
-            disable_time_stop();
-            m->faceAngle[1] += 0x8000;
-            // figure out what dialog to show, if we should
-            dialogID = get_star_collection_dialog(m);
-            if (dialogID) {
-                play_peachs_jingle();
-                // look up for dialog
-                set_mario_action(m, ACT_READING_AUTOMATIC_DIALOG, dialogID);
-            } else {
-                set_mario_action(m, ACT_IDLE, 0);
-            }
+        disable_time_stop();
+        m->faceAngle[1] += 0x8000;
+        // figure out what dialog to show, if we should
+        dialogID = get_star_collection_dialog(m);
+        if (dialogID) {
+            play_peachs_jingle();
+            // look up for dialog
+            set_mario_action(m, ACT_READING_AUTOMATIC_DIALOG, dialogID);
+        } else {
+            set_mario_action(m, ACT_IDLE, 0);
         }
     }
 }

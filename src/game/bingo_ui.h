@@ -10,4 +10,12 @@ void draw_bingo_hud_timer(void);
 void draw_bingo_screen(void);
 void draw_bingo_win_screen(void);
 
+// Toast queue for online events ("MATT LEFT", "HOST ENDED THE RACE").
+// bingo_notice uppercases and truncates; notices expire after 5s.
+void bingo_notice(const char *text);
+void draw_bingo_notices(void);  // HUD hook (top-left stack)
+// Newest notice and its age in frames, or NULL: the lobby status line
+// shows fresh notices for players who are back at the file select.
+const char *bingo_notice_latest(u32 *ageFrames);
+
 #endif /* _BINGO_UI_H */

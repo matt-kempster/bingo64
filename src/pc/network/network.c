@@ -28,6 +28,7 @@
 #include "game/area.h"
 #include "game/bingo.h"
 #include "game/bingo_net.h"
+#include "game/bingo_ui.h"
 #include "game/level_update.h"
 #include "game/object_list_processor.h"
 #include "engine/math_util.h"
@@ -352,6 +353,21 @@ static void reset_room_state(void) {
     sWinnerId = 0;
 }
 
+// "<name> <did something>" as an in-game toast (bingo_notice uppercases).
+static void notice_about(s32 id, const char *what) {
+    struct NetPlayer *p = player_for_id(id, 0);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s %s", p != NULL ? p->name : "someone", what);
+    bingo_notice(buf);
+}
+
+static const char *place_suffix(s32 place) {
+    if (place == 1) return "ST";
+    if (place == 2) return "ND";
+    if (place == 3) return "RD";
+    return "TH";
+}
+
 static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
@@ -398,6 +414,7 @@ static void handle_line(char *line) {
     } else if (cmd == 'H') {
         s32 id;
         if (sscanf(line + 1, "%d", &id) == 1) {
+            s32 prevHost = sHostId;
             sHostId = id;
             if (sHostId == sLocalId) {
                 // Our local settings become (or stay) the room's.
@@ -406,6 +423,14 @@ static void handle_line(char *line) {
                 gbBingoMode = (enum BingoGameMode) sPendingRoomMode;
             }
             sPendingRoomMode = -1;
+            // The role passed on (0 = the initial announcement).
+            if (prevHost != 0 && id != prevHost) {
+                if (id == sLocalId) {
+                    bingo_notice("you are now the host");
+                } else {
+                    notice_about(id, "is now the host");
+                }
+            }
         }
     } else if (cmd == 'S') {
         u32 seed = 0;
@@ -470,6 +495,8 @@ static void handle_line(char *line) {
         s32 id, color = 0, ready = 0, connected = 1;
         char name[NET_NAME_LEN] = "";
         if (sscanf(line + 1, "%d %15s %d %d %d", &id, name, &color, &ready, &connected) >= 3) {
+            struct NetPlayer *existing = player_for_id(id, 0);
+            s32 wasConnected = (existing != NULL) ? existing->connected : -1;
             struct NetPlayer *p = player_for_id(id, 1);
             if (p != NULL) {
                 strncpy(p->name, name, NET_NAME_LEN - 1);
@@ -479,6 +506,13 @@ static void handle_line(char *line) {
                 if (id != sLocalId) {
                     printf("net: %s is here (#%d, color %d)\n", name, id, color);
                     fflush(stdout);
+                    if (wasConnected == 0 && connected != 0) {
+                        notice_about(id, "reconnected");
+                    } else if (wasConnected < 0
+                               && (sState == NET_STATE_COUNTDOWN
+                                   || sState == NET_STATE_RACING)) {
+                        notice_about(id, "joined the race");
+                    }
                 }
             }
         }
@@ -512,8 +546,10 @@ static void handle_line(char *line) {
                        cmd == 'B' ? "left" : "disconnected (may return)");
                 fflush(stdout);
                 if (cmd == 'B') {
+                    notice_about(id, "left");
                     p->active = 0;
                 } else {
+                    notice_about(id, "disconnected");
                     p->connected = 0;
                     p->ready = 0;
                 }
@@ -544,6 +580,13 @@ static void handle_line(char *line) {
                 sResultCount++;
                 printf("net: #%d finished in place %d (%d frames)\n", id, place, frames);
                 fflush(stdout);
+                if (id != sLocalId) {
+                    // (our own finish gets the big win overlay instead)
+                    char what[32];
+                    snprintf(what, sizeof(what), "finished %d%s",
+                             place, place_suffix(place));
+                    notice_about(id, what);
+                }
             }
         }
     } else if (cmd == 'V') {
@@ -564,6 +607,9 @@ static void handle_line(char *line) {
         // The server re-sends the roster (everyone unready) right after.
         printf("net: back to the lobby\n");
         fflush(stdout);
+        // Fresh enough to still be showing on the lobby's status line
+        // once the warp lands everyone back at the file select.
+        bingo_notice("the host ended the race");
         reset_race_state();
         if (network_active()) {
             sState = NET_STATE_LOBBY;

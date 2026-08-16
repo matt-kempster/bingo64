@@ -15,10 +15,10 @@ Everything below is the full list; this is the order I would do it in.
 
 1. ~~**Rematch / return to lobby**, and pass the host role after a race
    ends (§1).~~ DONE 2026-08-16 (game-end-flow branch): protocol K.
-2. **In-game leave**: ~~a pause-menu LEAVE RACE~~ (DONE: pause + R →
-   ONLINE submenu), and defined save-and-quit behavior (§1). K also
-   repairs a save-and-quit stranded at the lobby: the next room reset
-   re-syncs them.
+2. ~~**In-game leave**: a pause-menu LEAVE RACE, and defined
+   save-and-quit behavior (§1).~~ DONE 2026-08-16: pause + R → ONLINE
+   submenu; save-and-quit turned out to be already unreachable and is
+   now deleted (§1).
 3. **The live 3+ player test evening** (§7). Do it right after 1–2;
    it will reorder the rest of this list better than any reasoning.
 4. **In-game UDP reconnect** (§3). The feature exists and is the one
@@ -62,16 +62,14 @@ this section are confirmed by reading `server/relay.py`.
       keep playing offline). The ONLINE submenu only appears while
       connected. Not yet play-tested with a real second player watching
       the departure.
-- [ ] **Exit to title / save-and-quit mid-race (untested).** What
-      actually happens today when a racer save-and-quits to file
-      select? Presumably still NET_STATE_RACING with no Mario. Does the
-      lobby screen behave? Does the ghost freeze in place for everyone
-      else? Test it, then decide the intended behavior (probably: back
-      to file select = still in the race, board replayed via S, AUTO-GO
-      puts them back in — i.e. it should look like a reconnect).
-      Note 2026-08-16: a save-and-quit player stranded at the lobby is
-      now repaired by the next K (room reset re-syncs everyone), but
-      the mid-race behavior itself is still untested/undecided.
+- [x] **Exit to title / save-and-quit mid-race.** RESOLVED 2026-08-16:
+      it turns out save-and-quit was already unreachable in bingo64 —
+      the post-star save menu is never rendered (the replaced
+      `render_course_complete_screen` auto-returns CONTINUE_DONT_SAVE),
+      so nothing could feed SAVE & QUIT to `handle_save_menu`. The dead
+      branch (and its -2 Mario-head warp) is now deleted outright, per
+      Matt: mid-race quitting is the back-to-lobby flow's job. EXIT
+      COURSE (castle) and SAVE & EXIT (closes the game) still exist.
 - [ ] **Joining a room whose race already started (untested in-game).**
       The protocol supports it (S with negative delta, replayed claims)
       and the relay-level test covers it, but nobody has done it from
@@ -87,7 +85,12 @@ this section are confirmed by reading `server/relay.py`.
       frozen-timer, watching standings. Can you keep playing casually?
       Can you leave without killing your place? Say what places others
       got in an obvious way (board screen shows standings — is it
-      enough?).
+      enough?). Partly covered 2026-08-16: in-game toast notices
+      (bingo_notice, top-left HUD stack, 5s) announce peers' finishes
+      with places, joins/leaves/disconnects/reconnects, host changes,
+      and "the host ended the race" (which also takes over the lobby
+      status line for 5s so the reason for the warp-out is visible).
+      Still open: whether the standings themselves need more.
 - [ ] **Ties (verify).** Two `F` messages in the same server tick —
       places are assigned by arrival order on the server clock. Decide
       whether frame-identical times should share a place; at minimum
