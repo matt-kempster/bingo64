@@ -228,6 +228,17 @@ this section are confirmed by reading `server/relay.py`.
       only type a name and room? Or keep it blank to avoid strangers
       landing on Matt's relay? (Room names are effectively passwords —
       probably fine to default it.)
+- [ ] **Settings bundles (Matt's ask, 2026-08-16).** Friends should not
+      have to use the in-game text fields at all: ship a preset next to
+      the exe that carries server/room/name so the lobby is just
+      CONNECT → READY. Candidate shapes: (a) a `race.bat` / `race.sh`
+      per room passing --net-server/--net-room/--net-name (zero code,
+      packaging only); (b) a `race.cfg` profile file auto-loaded from
+      beside the exe when present, overriding the config's net_*
+      fields (small client change, friendlier than .bat); (c) the
+      packaging script emits it with the tunnel address baked in.
+      (b)+(c) is probably the right combo — decide with the friend
+      setup doc in §6.
 
 ## 6. Release mechanics
 
