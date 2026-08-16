@@ -615,8 +615,18 @@ static void handle_line(char *line) {
             sState = NET_STATE_LOBBY;
         }
     } else if (cmd == 'E') {
-        char msg[48];
-        snprintf(msg, sizeof(msg), "server refused: %s", line + 2);
+        // Refusals get a human message: the raw reason strings read as
+        // "it's broken" instead of saying what to do about it.
+        char msg[64];
+        s32 sv;
+        if (sscanf(line + 1, " version %d", &sv) == 1) {
+            snprintf(msg, sizeof(msg), "update needed: game is v%d, server v%d",
+                     NET_PROTOCOL_VERSION, sv);
+        } else if (strncmp(line + 2, "room_full", 9) == 0) {
+            snprintf(msg, sizeof(msg), "that room is full");
+        } else {
+            snprintf(msg, sizeof(msg), "server refused: %s", line + 2);
+        }
         sToken = 0;  // a refusal is final: no auto-reconnect loop
         net_fail(msg);
     }

@@ -527,7 +527,9 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
             if (slen > 28) {
                 snprintf(tmp, sizeof(tmp), "..%s%s", srv + slen - 26, cur);
             } else {
-                snprintf(tmp, sizeof(tmp), "%s%s", srv, cur);
+                // %.60s: provably fits tmp (slen <= 28 here, but the
+                // compiler can't see that and warns without the bound).
+                snprintf(tmp, sizeof(tmp), "%.60s%s", srv, cur);
             }
         }
         print_ascii(valueX, field_row_y(FIELD_SERVER), tmp);
