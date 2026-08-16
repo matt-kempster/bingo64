@@ -103,6 +103,12 @@ s32 check_wall_z_projection(struct Surface *surf, f32 y, f32 x) {
 static s32 find_wall_collisions_from_list(struct SurfaceNode *surfaceNode, struct WallCollisionData *data) {
     struct Surface *surf = NULL;
     f32 radius = data->radius;
+#ifndef ALO
+    // Vanilla caps the wall-collision radius; alo dropped the clamp.
+    if (radius > 200.0f) {
+        radius = 200.0f;
+    }
+#endif
 #if ROUNDED_WALL_CORNERS
     const f32 corner_threshold = -0.9f;
     f32 margin_radius = radius - 1.0f;
@@ -391,6 +397,8 @@ void resolve_and_return_wall_collisions_data(Vec3f pos, f32 offset, f32 radius, 
 
 // Upward raycast along Y axis.
 static s32 check_within_ceil_triangle_bounds(s32 x, s32 z, struct Surface *surf) {
+#ifdef ALO
+    // ex-alo change: f32 cross products (see floor variant)
     f32 x1 = surf->vertex1[0];
     f32 z1 = surf->vertex1[2];
 
@@ -406,6 +414,22 @@ static s32 check_within_ceil_triangle_bounds(s32 x, s32 z, struct Surface *surf)
 
     if ((z2 - z) * (x3 - x2) - (x2 - x) * (z3 - z2) > 0) return FALSE;
     if ((z3 - z) * (x1 - x3) - (x3 - x) * (z1 - z3) > 0) return FALSE;
+#else
+    // Vanilla integer cross products (TerrainData) — exact seam decisions.
+    s32 x1 = surf->vertex1[0];
+    s32 z1 = surf->vertex1[2];
+
+    s32 z2 = surf->vertex2[2];
+    s32 x2 = surf->vertex2[0];
+
+    if ((z1 - z) * (x2 - x1) - (x1 - x) * (z2 - z1) > 0) return FALSE;
+
+    s32 x3 = surf->vertex3[0];
+    s32 z3 = surf->vertex3[2];
+
+    if ((z2 - z) * (x3 - x2) - (x2 - x) * (z3 - z2) > 0) return FALSE;
+    if ((z3 - z) * (x1 - x3) - (x3 - x) * (z1 - z3) > 0) return FALSE;
+#endif
 
     return TRUE;
 }
@@ -520,6 +544,9 @@ f32 find_ceil(f32 posX, f32 posY, f32 posZ, struct Surface **pceil) {
  *                     FLOORS                     *
  **************************************************/
 static s32 check_within_floor_triangle_bounds(s32 x, s32 z, struct Surface *surf) {
+#ifdef ALO
+    // ex-alo change: f32 cross products (rounds above 2^24 — seam behavior
+    // can differ from vanilla for large triangles)
     f32 x1 = surf->vertex1[0];
     f32 z1 = surf->vertex1[2];
     f32 x2 = surf->vertex2[0];
@@ -534,6 +561,22 @@ static s32 check_within_floor_triangle_bounds(s32 x, s32 z, struct Surface *surf
 
     if ((z2 - z) * (x3 - x2) - (x2 - x) * (z3 - z2) < 0.0f) return FALSE; // 23
     if ((z3 - z) * (x1 - x3) - (x3 - x) * (z1 - z3) < 0.0f) return FALSE; // 31
+#else
+    // Vanilla does these cross products in exact integer arithmetic
+    // (TerrainData) — seam decisions must match the N64 bit-for-bit.
+    s32 x1 = surf->vertex1[0];
+    s32 z1 = surf->vertex1[2];
+    s32 x2 = surf->vertex2[0];
+    s32 z2 = surf->vertex2[2];
+
+    if ((z1 - z) * (x2 - x1) - (x1 - x) * (z2 - z1) < 0) return FALSE; // 12
+
+    s32 x3 = surf->vertex3[0];
+    s32 z3 = surf->vertex3[2];
+
+    if ((z2 - z) * (x3 - x2) - (x2 - x) * (z3 - z2) < 0) return FALSE; // 23
+    if ((z3 - z) * (x1 - x3) - (x3 - x) * (z1 - z3) < 0) return FALSE; // 31
+#endif
 
     return TRUE;
 }

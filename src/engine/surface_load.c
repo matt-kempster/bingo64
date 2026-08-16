@@ -856,6 +856,7 @@ void load_object_collision_model(void) {
 #endif
     f32 drawDist = obj->oDrawingDistance;
 
+#ifdef ALO
     // ex-alo change
     // Ensure the object is allocated to set default collision and drawing distance.
     // Distance check behave different when it comes to dynamic collision.
@@ -863,6 +864,9 @@ void load_object_collision_model(void) {
         if (colDist  == 0.0f) colDist = 1000.0f;
         if (drawDist == 0.0f) drawDist = 4000.0f;
     }
+#endif
+    // (vanilla: an object that never sets these distances keeps 0 and never
+    // loads its collision)
 
     // If the object collision is supposed to be loaded more than the
     // drawing distance, extend the drawing range.

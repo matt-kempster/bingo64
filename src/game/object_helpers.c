@@ -412,9 +412,13 @@ struct Object *spawn_object_rel_with_rot(struct Object *parent, ModelID32 model,
     struct Object *newObj = spawn_object_at_origin(parent, 0, model, behavior);
     newObj->oFlags |= OBJ_FLAG_TRANSFORM_RELATIVE_TO_PARENT;
     obj_set_parent_relative_pos(newObj, xOff, yOff, zOff);
+#ifdef ALO
     // ex-alo change
     // last arg originally had a typo (zOff instead of roll)
     obj_set_angle(newObj, pitch, yaw, roll);
+#else
+    obj_set_angle(newObj, pitch, yaw, zOff); // Nice typo you got there Nintendo.
+#endif
 
     return newObj;
 }
