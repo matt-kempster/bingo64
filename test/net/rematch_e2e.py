@@ -25,6 +25,10 @@ import time
 REPO = sys.argv[1]
 EXE = sys.argv[2]
 PORT = 64222
+# Where the GAME dials the relay. Defaults to loopback; a Windows exe
+# run from WSL interop needs the WSL adapter IP instead (the relay
+# binds 0.0.0.0, but Windows' 127.0.0.1 is not WSL's).
+GAME_SERVER = os.environ.get("E2E_GAME_SERVER", "127.0.0.1:%d" % PORT)
 SCRATCH = tempfile.mkdtemp(prefix="rematch_e2e_")
 print("logs: %s" % SCRATCH)
 
@@ -82,7 +86,7 @@ def main():
     game_log = os.path.join(SCRATCH, "e2e_game.log")
     game = subprocess.Popen(
         [EXE, "--skip-title",
-         "--net-server", "127.0.0.1:%d" % PORT,
+         "--net-server", GAME_SERVER,
          "--net-room", "e2e", "--net-name", "racer"],
         stdout=open(game_log, "w"), stderr=subprocess.STDOUT,
         cwd=os.path.dirname(EXE))
