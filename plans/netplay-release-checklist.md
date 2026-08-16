@@ -13,11 +13,12 @@ confirmed once. Unmarked items are design decisions to make.
 
 Everything below is the full list; this is the order I would do it in.
 
-1. **Rematch / return to lobby**, and pass the host role after a race
-   ends (§1). One server change fixes both; without it a room is
-   single-use, which every play session will hit within 10 minutes.
-2. **In-game leave**: a pause-menu LEAVE RACE, and defined
-   save-and-quit behavior (§1). The other flow every session hits.
+1. ~~**Rematch / return to lobby**, and pass the host role after a race
+   ends (§1).~~ DONE 2026-08-16 (game-end-flow branch): protocol K.
+2. **In-game leave**: ~~a pause-menu LEAVE RACE~~ (DONE: pause + R →
+   ONLINE submenu), and defined save-and-quit behavior (§1). K also
+   repairs a save-and-quit stranded at the lobby: the next room reset
+   re-syncs them.
 3. **The live 3+ player test evening** (§7). Do it right after 1–2;
    it will reorder the rest of this list better than any reasoning.
 4. **In-game UDP reconnect** (§3). The feature exists and is the one
@@ -41,24 +42,26 @@ Everything below is the full list; this is the order I would do it in.
 These are the flows every "game server with a host" has. Most gaps in
 this section are confirmed by reading `server/relay.py`.
 
-- [ ] **Rematch / return to lobby (missing — biggest gap).** A room
-      never leaves the started state: `Room.started_at` is set at START
-      RACE and never cleared. After a race ends, the only way to play
-      again is for everyone to quit and rejoin, retyping nothing but
-      re-doing the whole join dance. Design: host gets a "BACK TO
-      LOBBY" (or auto after all finishers + N seconds) that resets
-      seed/results/claims, keeps roster/ready state, broadcasts a
-      room-reset message. New protocol message required.
-- [ ] **Host leaves mid-race or post-race (missing).** Host passing
-      exists only in the lobby phase (`elif not room.started` in
-      `Relay.drop`). Once started, a host who quits leaves the room
-      permanently hostless — combined with the missing rematch flow,
-      the room is dead. Fix alongside rematch.
-- [ ] **Leave the room from in-game (missing).** `network_disconnect()`
-      is only reachable from the lobby screen. Mid-race there is no
-      "leave race" action — the player's options are alt-F4 or
-      finishing. Decide: pause-menu "LEAVE RACE" item, or treat
-      save-and-quit as leaving?
+- [x] **Rematch / return to lobby.** DONE 2026-08-16: protocol message
+      `K` (host only, started rooms). The server clears seed/claims/
+      results/ready, releases held mid-race seats (those players hear
+      B), and broadcasts K + a fresh all-unready roster. The client
+      resets its race state, warps to the file select via a new -10
+      special warp (straight to `level_main_menu_entry_1`, no Mario
+      head), and the lobby is live again; rematch = K then X. The host
+      triggers it from pause + R → ONLINE → BACK TO LOBBY. Covered by
+      `server/test_relay.py` (test_back_to_lobby_and_rematch) and the
+      in-game `test/net/rematch_e2e.py`.
+- [x] **Host leaves mid-race or post-race.** DONE 2026-08-16: the host
+      role passes to the lowest-id *connected* member in every phase
+      (`Relay.pass_host`, called from `drop`). A mid-race host dropout
+      still gets their seat held, but returns as a regular member.
+      Covered by test_host_passes_mid_race.
+- [x] **Leave the room from in-game.** DONE 2026-08-16: pause + R →
+      ONLINE → LEAVE RACE (everyone; courtesy quit + disconnect, then
+      keep playing offline). The ONLINE submenu only appears while
+      connected. Not yet play-tested with a real second player watching
+      the departure.
 - [ ] **Exit to title / save-and-quit mid-race (untested).** What
       actually happens today when a racer save-and-quits to file
       select? Presumably still NET_STATE_RACING with no Mario. Does the
@@ -66,6 +69,9 @@ this section are confirmed by reading `server/relay.py`.
       else? Test it, then decide the intended behavior (probably: back
       to file select = still in the race, board replayed via S, AUTO-GO
       puts them back in — i.e. it should look like a reconnect).
+      Note 2026-08-16: a save-and-quit player stranded at the lobby is
+      now repaired by the next K (room reset re-syncs everyone), but
+      the mid-race behavior itself is still untested/undecided.
 - [ ] **Joining a room whose race already started (untested in-game).**
       The protocol supports it (S with negative delta, replayed claims)
       and the relay-level test covers it, but nobody has done it from
