@@ -481,6 +481,59 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         b.send("X")
         await b.wait_line("S ", skip=1)    # and start a fresh one
 
+    async def test_tied_finishes_get_distinct_places(self):
+        # Two F's in the same server tick: places follow arrival order,
+        # even when the authoritative frame counts are identical.
+        a, b = await self.two_joined()
+        a.send("X")
+        await a.wait_line("S ")
+        await b.wait_line("S ")
+        a.send("F")
+        b.send("F")
+        fa = (await a.wait_line("F 1 ")).split()
+        fb = (await a.wait_line("F 2 ")).split()
+        self.assertEqual(fa[2], "1")
+        self.assertEqual(fb[2], "2")   # no shared place
+        # B sees the identical standings.
+        self.assertEqual(await b.wait_line("F 1 "), " ".join(fa))
+        self.assertEqual(await b.wait_line("F 2 "), " ".join(fb))
+
+    async def test_abandoned_race_room_is_collected(self):
+        # Everyone silently vanishes mid-race: the held seats must not
+        # keep the room object alive once the last transport times out.
+        relaymod.UDP_TIMEOUT_S = 0.6
+        a, b = await self.two_joined(keepalive=0.2)
+        a.send("X")
+        await b.wait_line("S ")
+        a.close()
+        b.close()
+        self._cleanup.remove(a)
+        self._cleanup.remove(b)
+        await asyncio.sleep(2.0)       # both silence timeouts elapse
+        c = self.track(RefClient(self.udp_port, keepalive=0.2))
+        await c.start()
+        c.join("testroom", "carol")
+        w = (await c.wait_line("W ")).split()
+        self.assertEqual(w[1], "1")    # fresh room, not seat #3
+        self.assertEqual(c.count("S "), 0)  # and no stale race replayed
+
+    async def test_join_during_countdown(self):
+        # The relay lets a joiner in mid-countdown; the snapshot's S
+        # carries the frames still to go so their clock lines up.
+        a = self.track(RefClient(self.udp_port))
+        await a.start()
+        a.join("testroom", "alice")
+        await a.wait_line("W ")
+        a.send("X")
+        await a.wait_line("S ")
+        b = self.track(RefClient(self.udp_port))
+        await b.start()
+        b.join("testroom", "bob")
+        await b.wait_line("W ")
+        delta = int((await b.wait_line("S ")).split()[2])
+        self.assertGreater(delta, 0)
+        self.assertLessEqual(delta, relaymod.COUNTDOWN_FRAMES)
+
     async def test_room_full_refusal(self):
         clients = []
         for i in range(relaymod.MAX_ROOM):

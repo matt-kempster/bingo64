@@ -398,9 +398,25 @@ class Room:
         return counts
 
 
+STATS_INTERVAL_S = 24 * 3600  # one journal line a day proves liveness
+
+
 class Relay:
     def __init__(self):
         self.rooms = {}
+        self.stat_joins = 0    # joins since the last daily summary
+        self.stat_races = 0    # races started since the last summary
+
+    async def stats_loop(self):
+        """A daily heartbeat in the journal, so "is it alive?" never
+        needs an ssh session: journalctl -u bingo64-relay | tail."""
+        while True:
+            await asyncio.sleep(STATS_INTERVAL_S)
+            print("[%s] daily: %d rooms open, %d joins, %d races started"
+                  % (ts(), len(self.rooms), self.stat_joins,
+                     self.stat_races))
+            self.stat_joins = 0
+            self.stat_races = 0
 
     def room_for(self, name, public):
         room = self.rooms.get(name)
@@ -418,6 +434,7 @@ class Relay:
         room.seed = (room.seed_proposal
                      if room.seed_proposal else random.randrange(1, 999999999))
         room.started_at = time.monotonic() + COUNTDOWN_FRAMES / FPS
+        self.stat_races += 1
         room.broadcast(room.start_line())
         print("[%s] room '%s' starting: %d players, seed %d, mode %d"
               % (ts(), room.name, len(room.members), room.seed, room.mode))
@@ -537,6 +554,7 @@ class Relay:
                 room.members[client.id] = client
                 room.tokens[client.id] = random.randrange(1, 2 ** 32)
             client.room = room
+            self.stat_joins += 1
             client.send("W %d %d %d %d"
                         % (client.id, 1 if room.public else 0,
                            room.mode, room.tokens[client.id]))
@@ -701,6 +719,7 @@ async def main():
     _, endpoint = await loop.create_datagram_endpoint(
         lambda: UdpEndpoint(relay), local_addr=(args.host, args.port))
     asyncio.ensure_future(endpoint.tick_loop())
+    asyncio.ensure_future(relay.stats_loop())
     print("[%s] bingo64 relay listening on %s:%d tcp+udp (protocol v%d)"
           % (ts(), args.host, args.port, PROTOCOL_VERSION))
     async with server:

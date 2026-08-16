@@ -75,12 +75,12 @@ this section are confirmed by reading `server/relay.py`.
       and the relay-level test covers it, but nobody has done it from
       the real game against the live server. Also decide the UX: does a
       late joiner race (their timer already behind) or spectate?
-- [ ] **DNF / abandoned race (missing).** If nobody finishes and
-      everyone drifts away, mid-race drops hold seats ("may return")
-      and the room object lingers until every connection times out.
-      Verify rooms are actually garbage-collected in that case
-      (30s UDP silence → drop → `del self.rooms[...]` when empty), and
-      add a hard room-age cap as a backstop.
+- [x] **DNF / abandoned race.** VERIFIED 2026-08-16
+      (test_abandoned_race_room_is_collected): when the last transport
+      times out, the room is deleted even with seats held for
+      reconnects, and the room name is fresh for the next join. A hard
+      room-age cap as a belt-and-braces backstop remains a post-MVP
+      nicety.
 - [ ] **Finisher experience (design).** After you finish: you're
       frozen-timer, watching standings. Can you keep playing casually?
       Can you leave without killing your place? Say what places others
@@ -91,17 +91,21 @@ this section are confirmed by reading `server/relay.py`.
       and "the host ended the race" (which also takes over the lobby
       status line for 5s so the reason for the warp-out is visible).
       Still open: whether the standings themselves need more.
-- [ ] **Ties (verify).** Two `F` messages in the same server tick —
-      places are assigned by arrival order on the server clock. Decide
-      whether frame-identical times should share a place; at minimum
-      confirm nothing breaks.
-- [ ] **Ready-state edge cases (verify).** Un-ready during countdown;
-      host force-start with 0 ready; joiner arriving during the 3s
-      countdown (relay refuses `J` on started rooms only — countdown
-      rooms are started; confirm the refusal message is friendly).
-- [ ] **Room capacity UX (verify).** MAX_ROOM=15 relay-side; the
-      "E full" refusal is tested at transport level — check the lobby
-      shows a readable message, not a generic error.
+- [x] **Ties.** DECIDED + VERIFIED 2026-08-16
+      (test_tied_finishes_get_distinct_places): frame-identical times
+      keep distinct places in arrival order — simple, stable, and every
+      client sees identical standings. No shared places.
+- [ ] **Ready-state edge cases (partly verified 2026-08-16).** A joiner
+      during the countdown is accepted (not refused) and their S
+      carries the remaining delta (test_join_during_countdown) —
+      correction to the note below: `J` is never refused for started
+      rooms, late join is by design. Still to check by hand: un-ready
+      during countdown (relay ignores R once started), host force-start
+      with 0 ready.
+- [x] **Room capacity UX.** DONE 2026-08-16: the client rewrites
+      "E room_full" to "that room is full" on the lobby status line
+      (version mismatches likewise say "update needed: game is v5,
+      server v4").
 - [ ] **Name/color collisions (verify).** Two players named "mario"
       with the same color: everything keys off ids, but can you tell
       the ghosts/standings apart? Consider a join-time dedup suffix.
@@ -188,9 +192,10 @@ this section are confirmed by reading `server/relay.py`.
       journald caps disk usage (default is fine, but MemoryMax=256M on
       the service + unbounded logs on a 30GB disk — check
       SystemMaxUse).
-- [ ] **Uptime visibility (design, cheap).** A once-a-day "N rooms, N
-      conns served" summary line in the log, or an HTTP /status on a
-      second port, so Matt can tell it's alive without ssh.
+- [x] **Uptime visibility.** DONE 2026-08-16: Relay.stats_loop prints a
+      daily "N rooms open, N joins, N races started" journal line
+      (counters reset each day). `journalctl -u bingo64-relay | tail`
+      answers "is it alive" without an interactive session.
 - [ ] **Free-tier guardrails (verify).** e2-micro free tier: confirm
       the VM is in a free region with pd-standard disk and no static
       IP reserved; set a billing alert at $1 so surprises are loud.
