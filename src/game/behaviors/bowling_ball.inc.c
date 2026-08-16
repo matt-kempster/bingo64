@@ -255,9 +255,17 @@ void bhv_free_bowling_ball_roll_loop(void) {
         cur_obj_play_sound_1(SOUND_ENV_BOWLING_BALL_ROLL);
     }
 
+#ifdef ALO
     if ((collisionFlags & OBJ_COL_FLAG_GROUNDED) && !(collisionFlags & OBJ_COL_FLAG_NO_Y_VEL)) {
         cur_obj_play_sound_2(SOUND_GENERAL_QUIET_POUND1_LOWPRIO);
     }
+#else
+    //! Never true (GROUNDED implies the LANDED mask) — vanilla never plays
+    // this landing thud.
+    if ((collisionFlags & OBJ_COL_FLAG_GROUNDED) && !(collisionFlags & OBJ_COL_FLAGS_LANDED)) {
+        cur_obj_play_sound_2(SOUND_GENERAL_QUIET_POUND1_LOWPRIO);
+    }
+#endif
 
     if (!is_point_within_radius_of_mario(o->oPosX, o->oPosY, o->oPosZ, 6000)) {
         o->header.gfx.node.flags |= GRAPH_RENDER_INVISIBLE;
