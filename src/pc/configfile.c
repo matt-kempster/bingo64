@@ -70,7 +70,9 @@ unsigned int configMusicVolume = MAX_VOLUME;
 
 // Online bingo lobby defaults (edited on the file-select ONLINE screen)
 char configNetName[16] = "mario";
-char configNetServer[128] = "127.0.0.1";
+// "auto" = discover the server via the DNS TXT record (see network.c);
+// fresh installs need zero address typing. Any host:port still works.
+char configNetServer[128] = "auto";
 char configNetRoom[32] = "bingo";
 unsigned int configNetColor = 0;
 unsigned int configSfxVolume = MAX_VOLUME;

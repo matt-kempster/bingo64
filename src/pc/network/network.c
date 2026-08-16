@@ -775,16 +775,159 @@ static void reset_session_state(void) {
     sLobbyReturnFlag = 0;
 }
 
+// --- "auto" server discovery over DNS TXT ------------------------------
+// A server address of "auto" means: look up the TXT record at
+// NET_AUTO_TXT_HOST and dial whatever it says (e.g. "udp:host:port").
+// The record lives on Matt's own domain, so shipped exes and settings
+// bundles never carry a tunnel address that might change — updating one
+// registrar record repoints every build ever released.
+//
+// The lookup is a single raw DNS query to a public resolver (no TLS, no
+// HTTP, one UDP round trip). We ask public resolvers instead of the
+// system one because discovering the system resolver portably is more
+// code than the query itself.
+#define NET_AUTO_TXT_HOST "_bingo64.kempster.com"
+
+static s32 dns_txt_query_once(const char *resolverIp, const char *name,
+                              char *out, size_t outsz) {
+    u8 pkt[512], rsp[512];
+    size_t plen = 0, i;
+    s32 rlen, ancount, sock;
+    struct sockaddr_in dst;
+    fd_set rfds;
+    struct timeval tv;
+    u16 qid = (u16) ((gGlobalTimer * 2654435761u) >> 16);
+
+    // Header: id, RD=1, one question.
+    pkt[plen++] = (u8) (qid >> 8); pkt[plen++] = (u8) qid;
+    pkt[plen++] = 0x01; pkt[plen++] = 0x00;  // RD
+    pkt[plen++] = 0x00; pkt[plen++] = 0x01;  // QDCOUNT
+    memset(pkt + plen, 0, 6); plen += 6;     // AN/NS/AR
+    // QNAME: dotted name to length-prefixed labels.
+    while (*name != '\0') {
+        const char *dot = strchr(name, '.');
+        size_t lab = (dot != NULL) ? (size_t) (dot - name) : strlen(name);
+        if (lab == 0 || lab > 63 || plen + lab + 6 > sizeof(pkt)) {
+            return 0;
+        }
+        pkt[plen++] = (u8) lab;
+        memcpy(pkt + plen, name, lab);
+        plen += lab;
+        name += lab + (dot != NULL ? 1 : 0);
+    }
+    pkt[plen++] = 0x00;
+    pkt[plen++] = 0x00; pkt[plen++] = 16;    // QTYPE TXT
+    pkt[plen++] = 0x00; pkt[plen++] = 1;     // QCLASS IN
+
+    sock = (s32) socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock == NET_BAD_SOCK) {
+        return 0;
+    }
+    memset(&dst, 0, sizeof(dst));
+    dst.sin_family = AF_INET;
+    dst.sin_port = htons(53);
+    dst.sin_addr.s_addr = inet_addr(resolverIp);
+    if (sendto(sock, (const char *) pkt, (int) plen, 0,
+               (struct sockaddr *) &dst, sizeof(dst)) != (int) plen) {
+        net_close(sock);
+        return 0;
+    }
+    FD_ZERO(&rfds);
+    FD_SET((unsigned) sock, &rfds);
+    tv.tv_sec = 1; tv.tv_usec = 200000;
+    if (select(sock + 1, &rfds, NULL, NULL, &tv) <= 0) {
+        net_close(sock);
+        return 0;
+    }
+    rlen = recv(sock, (char *) rsp, sizeof(rsp), 0);
+    net_close(sock);
+    if (rlen < 12 || rsp[0] != pkt[0] || rsp[1] != pkt[1]) {
+        return 0;
+    }
+    ancount = (rsp[6] << 8) | rsp[7];
+    // Skip the question section.
+    i = 12;
+    while (i < (size_t) rlen && rsp[i] != 0) {
+        i += rsp[i] + 1;
+    }
+    i += 5;  // the 0 byte + qtype/qclass
+    // Walk answers; take the first TXT record's strings.
+    while (ancount-- > 0 && i + 12 <= (size_t) rlen) {
+        s32 type, rdlen;
+        // Name: compressed pointer or labels.
+        if ((rsp[i] & 0xC0) == 0xC0) {
+            i += 2;
+        } else {
+            while (i < (size_t) rlen && rsp[i] != 0) {
+                i += rsp[i] + 1;
+            }
+            i += 1;
+        }
+        if (i + 10 > (size_t) rlen) {
+            return 0;
+        }
+        type = (rsp[i] << 8) | rsp[i + 1];
+        rdlen = (rsp[i + 8] << 8) | rsp[i + 9];
+        i += 10;
+        if (i + rdlen > (size_t) rlen) {
+            return 0;
+        }
+        if (type == 16) {
+            // rdata = length-prefixed character-strings; concatenate.
+            size_t end = i + rdlen, o = 0;
+            while (i < end && o + 1 < outsz) {
+                size_t sl = rsp[i++];
+                if (sl > end - i) {
+                    sl = end - i;
+                }
+                if (sl > outsz - 1 - o) {
+                    sl = outsz - 1 - o;
+                }
+                memcpy(out + o, rsp + i, sl);
+                o += sl;
+                i += sl;
+            }
+            out[o] = '\0';
+            return o > 0;
+        }
+        i += rdlen;
+    }
+    return 0;
+}
+
+static s32 net_resolve_auto(char *out, size_t outsz, const char **err) {
+    static const char *resolvers[] = { "1.1.1.1", "8.8.8.8" };
+    size_t r;
+    for (r = 0; r < sizeof(resolvers) / sizeof(resolvers[0]); r++) {
+        if (dns_txt_query_once(resolvers[r], NET_AUTO_TXT_HOST, out, outsz)) {
+            printf("net: auto server -> %s\n", out);
+            return 1;
+        }
+    }
+    *err = "auto server lookup failed";
+    return 0;
+}
+
 // Resolve the saved server, start the nonblocking connect and arm the
 // join line (with the reconnect token if we have one). Returns 0 with
 // *err set on immediate failure; no state change happens here.
 static s32 net_dial(const char **err) {
     char host[NET_SERVER_LEN];
+    static char autoAddr[NET_SERVER_LEN];
     const char *addr = sSavedServer;
     const char *colon;
     const char *port = "64064";
     char portbuf[16];
     struct addrinfo hints, *res = NULL, *ai;
+
+    // "auto": ask the TXT record where the server lives today. Looked up
+    // fresh on every dial so a reconnect loop follows a moved tunnel.
+    if (strcmp(addr, "auto") == 0 || strcmp(addr, "AUTO") == 0) {
+        if (!net_resolve_auto(autoAddr, sizeof(autoAddr), err)) {
+            return 0;
+        }
+        addr = autoAddr;
+    }
 
     if (sSocket != NET_BAD_SOCK) {
         net_close(sSocket);
