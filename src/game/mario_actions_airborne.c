@@ -226,9 +226,13 @@ s32 check_horizontal_wind(struct MarioState *m) {
         if (speed > 48.0f) {
             m->slideVelX = m->slideVelX * 48.0f / speed;
             m->slideVelZ = m->slideVelZ * 48.0f / speed;
+#ifdef ALO
             // ex-alo change
             // properly set this to 48 instead of 32
             speed = 48.0f;
+#else
+            speed = 32.0f; //! This was meant to be 48?
+#endif
         } else if (speed > 32.0f) {
             speed = 32.0f;
         }
@@ -2121,11 +2125,11 @@ s32 act_special_triple_jump(struct MarioState *m) {
             if (m->actionState++ != 0) {
                 set_mario_action(m, ACT_FREEFALL_LAND_STOP, 0);
             }
-#if SPECIAL_TRIPLE_JUMP_AIR_STEPS
+            // Vanilla bounces on the first landing; alo accidentally
+            // compiled this out when SPECIAL_TRIPLE_JUMP_AIR_STEPS is off.
             else {
                 m->vel[1] = 42.0f;
             }
-#endif
             play_mario_landing_sound(m, SOUND_ACTION_TERRAIN_LANDING);
             break;
         

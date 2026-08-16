@@ -57,7 +57,12 @@ struct LandingAction sDoubleJumpLandAction = {
 };
 
 struct LandingAction sTripleJumpLandAction = {
+#ifdef ALO
+    // ex-alo change: allow jumping out of a triple jump landing
     4, 0, ACT_FREEFALL, ACT_TRIPLE_JUMP_LAND_STOP, ACT_JUMP, ACT_FREEFALL, ACT_BEGIN_SLIDING,
+#else
+    4, 0, ACT_FREEFALL, ACT_TRIPLE_JUMP_LAND_STOP, ACT_UNINITIALIZED, ACT_FREEFALL, ACT_BEGIN_SLIDING,
+#endif
 };
 
 struct LandingAction sBackflipLandAction = {
@@ -199,13 +204,18 @@ void update_sliding_angle(struct MarioState *m, f32 accel, f32 lossFactor) {
     facingDYaw = m->faceAngle[1] - m->slideYaw;
     newFacingDYaw = facingDYaw;
 
-    //! -0x4000 not handled - can slide down a slope while facing perpendicular to it
-    //  fixed second check from > 0x4000 to >= 0x4000
     if (newFacingDYaw > 0 && newFacingDYaw <= 0x4000) {
         if ((newFacingDYaw -= 0x200) < 0) {
             newFacingDYaw = 0;
         }
+#ifdef ALO
+    // ex-alo change: handle exactly -0x4000 (vanilla lets you slide down a
+    // slope while facing perpendicular to it)
     } else if (newFacingDYaw >= -0x4000 && newFacingDYaw < 0) {
+#else
+    //! -0x4000 not handled - can slide down a slope while facing perpendicular to it
+    } else if (newFacingDYaw > -0x4000 && newFacingDYaw < 0) {
+#endif
         if ((newFacingDYaw += 0x200) > 0) {
             newFacingDYaw = 0;
         }
@@ -387,9 +397,13 @@ void update_shell_speed(struct MarioState *m) {
     if (m->floorHeight < m->waterLevel) {
         m->floorHeight = m->waterLevel;
         m->floor = &gWaterSurfacePseudoFloor;
+#ifdef ALO
         // ex-alo change
         // make waterLevel originOffset negative
         m->floor->originOffset = -m->waterLevel;
+#else
+        m->floor->originOffset = m->waterLevel; //! Negative origin offset
+#endif
     }
 
     if (m->floor != NULL && m->floor->type == SURFACE_SLOW) {

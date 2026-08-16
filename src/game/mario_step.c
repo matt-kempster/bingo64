@@ -315,6 +315,7 @@ static s32 perform_ground_quarter_step(struct MarioState *m, Vec3f nextPos) {
         return GROUND_STEP_HIT_WALL_STOP_QSTEPS;
     }
 
+#ifdef ALO
     // ex-alo change
     // Negative originOffset and direct use of Mario's water level
     if ((m->action & ACT_FLAG_RIDING_SHELL) && floorHeight < m->waterLevel) {
@@ -322,6 +323,14 @@ static s32 perform_ground_quarter_step(struct MarioState *m, Vec3f nextPos) {
         floor = &gWaterSurfacePseudoFloor;
         floor->originOffset = -floorHeight;
     }
+#else
+    f32 waterLevel = find_water_level(nextPos[0], nextPos[2]);
+    if ((m->action & ACT_FLAG_RIDING_SHELL) && floorHeight < waterLevel) {
+        floorHeight = waterLevel;
+        floor = &gWaterSurfacePseudoFloor;
+        floor->originOffset = floorHeight; //! Wrong origin offset (no effect)
+    }
+#endif
 
     if (nextPos[1] > floorHeight + 100.0f) {
 #if LEDGE_CLIMB_PROTECTION
@@ -371,11 +380,17 @@ static s32 perform_ground_quarter_step(struct MarioState *m, Vec3f nextPos) {
         }
     }
 #else
+#ifdef ALO
     // ex-alo change
     // Changed 160.0f to Mario's hitboxHeight value
     if (floorHeight + m->marioObj->hitboxHeight >= ceilHeight) {
         return GROUND_STEP_HIT_WALL_STOP_QSTEPS;
     }
+#else
+    if (floorHeight + 160.0f >= ceilHeight) {
+        return GROUND_STEP_HIT_WALL_STOP_QSTEPS;
+    }
+#endif
 #endif
 
     vec3f_set(m->pos, nextPos[0], floorHeight, nextPos[2]);
@@ -669,6 +684,7 @@ s32 perform_air_quarter_step(struct MarioState *m, Vec3f intendedPos, u32 stepAr
         return AIR_STEP_HIT_WALL;
     }
 
+#ifdef ALO
     // ex-alo change
     // Negative originOffset and direct use of Mario's water level
     if ((m->action & ACT_FLAG_RIDING_SHELL) && floorHeight < m->waterLevel) {
@@ -676,11 +692,24 @@ s32 perform_air_quarter_step(struct MarioState *m, Vec3f intendedPos, u32 stepAr
         floor = &gWaterSurfacePseudoFloor;
         floor->originOffset = -floorHeight;
     }
+#else
+    f32 waterLevel = find_water_level(nextPos[0], nextPos[2]);
+    if ((m->action & ACT_FLAG_RIDING_SHELL) && floorHeight < waterLevel) {
+        floorHeight = waterLevel;
+        floor = &gWaterSurfacePseudoFloor;
+        floor->originOffset = floorHeight; //! Incorrect origin offset (no effect)
+    }
+#endif
 
     if (nextPos[1] <= floorHeight) {
+#ifdef ALO
         // ex-alo change
         // Changed 160.0f to Mario's hitboxHeight value
-        if (ceilHeight - floorHeight > m->marioObj->hitboxHeight) {
+        if (ceilHeight - floorHeight > m->marioObj->hitboxHeight)
+#else
+        if (ceilHeight - floorHeight > 160.0f)
+#endif
+        {
             m->pos[0] = nextPos[0];
             m->pos[2] = nextPos[2];
             m->floor = floor;

@@ -1575,8 +1575,6 @@ u32 interact_pole(struct MarioState *m, UNUSED u32 interactType, struct Object *
             //       This is fixed in the Shindou version. 
 #if BUGFIX_PRESERVE_VEL_POLE
             m->marioObj->oMarioPoleYawVel = (s32)(m->forwardVel * 0x100 + 0x1000);
-#else
-            m->marioObj->oMarioPoleYawVel = 0x1000;
 #endif
 
             if (o->oBingoId != 0 && is_new_kill(BINGO_UPDATE_GRABBED_POLE, o->oBingoId)) {
@@ -1613,6 +1611,12 @@ u32 interact_pole(struct MarioState *m, UNUSED u32 interactType, struct Object *
                 return set_mario_action(m, ACT_GRAB_POLE_SLOW, 0);
             }
 
+#if !BUGFIX_PRESERVE_VEL_POLE
+            //! @bug (vanilla) m->forwardVel was already zeroed above, so this
+            // is always 0x1000. alo's restructure left fast grabs at 0 when
+            // the bugfix is off; vanilla sets it here.
+            m->marioObj->oMarioPoleYawVel = (s32)(m->forwardVel * 0x100 + 0x1000);
+#endif
             reset_mario_pitch(m);
 #ifdef RUMBLE_FEEDBACK
             queue_rumble_data(5, 80);
