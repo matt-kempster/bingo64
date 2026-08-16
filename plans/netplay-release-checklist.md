@@ -183,10 +183,12 @@ this section are confirmed by reading `server/relay.py`.
 
 ## 4. Server operations
 
-- [ ] **playit agent as a service (verify).** The relay runs under
-      systemd (`bingo64-relay.service`, Restart=always) — confirm the
-      playit agent is also a systemd unit (not a tmux/ssh session) and
-      both come back after a `sudo reboot` test.
+- [x] **playit agent as a service.** VERIFIED 2026-08-16 by SSH: the
+      relay runs as `bingo64.service` and playit as `playit.service`
+      (/opt/playit/playitd), both proper systemd units on the VM
+      (instance `mario-server`, us-east1-c, IPv6-only — admin access
+      is `gcloud compute ssh --tunnel-through-iap`). The reboot drill
+      below is still worth one run.
 - [ ] **VM reboot drill (untested).** Reboot the e2-micro; confirm
       relay + tunnel return with no hands and the tunnel address is
       unchanged.
