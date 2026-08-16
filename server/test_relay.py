@@ -441,6 +441,46 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         b.send("Q")
         await a.wait_line("B 2", timeout=2)   # no 30s timeout wait
 
+    async def test_back_to_lobby_and_rematch(self):
+        a, b = await self.two_joined()
+        a.send("K")                    # lobby phase: nothing to reset
+        b.send("R 1")
+        await a.wait_line("R 2 1")
+        a.send("X")
+        await b.wait_line("S ")
+        a.send("C 7")
+        await b.wait_line("C 7 1")
+        b.send("F")
+        await a.wait_line("F 2 1 ")
+        b.send("K")                    # not the host: ignored
+        a.send("K")
+        await a.wait_line("K")
+        await b.wait_line("K")
+        self.assertEqual(b.count("K"), 1)
+        await a.wait_line("N 2 bob 0 0 1", skip=1)  # roster re-sent, unready
+        # The room is reusable: the same host starts a fresh race and the
+        # claim board really was cleared (a re-claim of cell 7 would be
+        # dropped as a duplicate otherwise).
+        a.send("X")
+        await b.wait_line("S ", skip=1)
+        a.send("C 7")
+        await b.wait_line("C 7 1", skip=1)
+
+    async def test_host_passes_mid_race(self):
+        relaymod.UDP_TIMEOUT_S = 1.0
+        a, b = await self.two_joined(keepalive=0.3)
+        a.send("X")
+        await b.wait_line("S ")
+        a.close()                          # the host vanishes mid-race
+        self._cleanup.remove(a)
+        await b.wait_line("D 1", timeout=5)  # seat held for a reconnect...
+        await b.wait_line("H 2", timeout=5)  # ...but the host role moved on
+        b.send("K")                        # so the new host can end the race
+        await b.wait_line("B 1")           # held seat released for good
+        await b.wait_line("K")
+        b.send("X")
+        await b.wait_line("S ", skip=1)    # and start a fresh one
+
     async def test_room_full_refusal(self):
         clients = []
         for i in range(relaymod.MAX_ROOM):

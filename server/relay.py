@@ -74,6 +74,12 @@ Line protocol (space-separated fields):
                              seed proposal (0 = random at start).
     X                        the host starts the race (allowed even if
                              not everyone is ready)
+    K                        the host ends the race: back to the lobby.
+                             Clears seed/claims/results/ready, releases
+                             seats held for mid-race reconnects (those
+                             players hear B like any lobby-phase drop),
+                             and broadcasts K + a fresh roster. A
+                             rematch is simply K followed by X.
     F                        local win condition met (line modes; the
                              server ignores it in lockout)
     L                        list public rooms
@@ -92,7 +98,13 @@ Line protocol (space-separated fields):
     R <id> <0|1>             ready change
     O <mode>                 the host changed the room's game mode
     H <id>                   who the host is (on join, and when the host
-                             role passes to someone else)
+                             role passes to someone else — the role now
+                             passes in every phase, not just the lobby,
+                             so a started room is never left hostless)
+    K                        the room went back to the lobby: forget the
+                             race (seed, claims, results, ready marks)
+                             and return to the lobby screen. Followed by
+                             a full roster re-send with everyone unready.
     S <seed> <delta> <mode> <unlock> <maskhex>
                              the race starts: shared seed, room options,
                              and delta = frames (30/s) until GO. Negative
@@ -408,6 +420,35 @@ class Relay:
         print("[%s] room '%s' starting: %d players, seed %d, mode %d"
               % (ts(), room.name, len(room.members), room.seed, room.mode))
 
+    def reset_room(self, room):
+        """The host ended the race: back to the lobby, roster intact."""
+        if not room.started:
+            return
+        # Seats held for mid-race reconnects are now plain lobby-phase
+        # departures: the race they could have rejoined no longer exists.
+        for id_ in sorted(room.disconnected):
+            room.broadcast("B %d" % id_)
+            room.tokens.pop(id_, None)
+        room.disconnected.clear()
+        room.started_at = None
+        room.seed = 0
+        room.claims.clear()
+        room.finishers = []
+        room.winner = None
+        room.broadcast("K")
+        for c in room.members.values():
+            c.ready = False
+            room.broadcast(room.roster_line(c.id, c.name, c.color,
+                                            False, True))
+        print("[%s] room '%s' back to lobby (%d members)"
+              % (ts(), room.name, len(room.members)))
+
+    def pass_host(self, room, leaving_id):
+        """Keep the host role on a connected member in every phase."""
+        if leaving_id == room.creator_id and room.members:
+            room.creator_id = min(room.members)
+            room.broadcast("H %d" % room.creator_id)
+
     def send_room_snapshot(self, room, client):
         """Roster, claims and race status, for a joiner or reconnector."""
         client.send("H %d" % room.creator_id)
@@ -565,6 +606,11 @@ class Relay:
             if client.id != room.creator_id:
                 return True
             self.start_race(room)
+        elif cmd == "K" and client.room:
+            room = client.room
+            if client.id != room.creator_id:
+                return True
+            self.reset_room(room)
         elif cmd == "Q":
             self.drop(client, "left")
             return False
@@ -599,11 +645,11 @@ class Relay:
         if not room.members:
             del self.rooms[room.name]
             print("[%s] room '%s' closed" % (ts(), room.name))
-        elif not room.started:
-            # The host role passes on.
-            if client.id == room.creator_id:
-                room.creator_id = min(room.members)
-                room.broadcast("H %d" % room.creator_id)
+        else:
+            # The host role passes on to a connected member in every
+            # phase (a mid-race dropout may return, but not as host:
+            # someone present must be able to end or restart the race).
+            self.pass_host(room, client.id)
 
     async def handle_tcp(self, reader, writer):
         client = TcpClient(writer)
