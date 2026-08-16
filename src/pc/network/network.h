@@ -7,7 +7,7 @@
 // Talks to server/relay.py with a line-based text protocol over TCP, or
 // over UDP when the server address is prefixed "udp:" (for tunnels that
 // only carry UDP; see the transport notes atop network.c).
-// Protocol version 4: join a room, ready up in the file-select lobby,
+// Protocol version 5: join a room, ready up in the file-select lobby,
 // receive the shared seed + room options in the S (start) message, then
 // exchange ghost states and cell claims during the race. The welcome
 // carries a reconnect token: if the connection drops mid-race the client
@@ -15,7 +15,10 @@
 // replays the room state (claims, finishes).
 // Everything here is PC-only; the N64 build never sees this header.
 
-#define NET_PROTOCOL_VERSION 4
+// 5: K back-to-lobby broadcast + host passing in every phase. During
+// active development the version bumps on every wire change — the old
+// side is refused outright ("E version"), never accommodated.
+#define NET_PROTOCOL_VERSION 5
 
 #define NET_MAX_GHOSTS  15
 #define NET_MAX_PLAYERS 16

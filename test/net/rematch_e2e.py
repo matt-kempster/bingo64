@@ -28,6 +28,9 @@ PORT = 64222
 SCRATCH = tempfile.mkdtemp(prefix="rematch_e2e_")
 print("logs: %s" % SCRATCH)
 
+sys.path.insert(0, os.path.join(REPO, "server"))
+from relay import PROTOCOL_VERSION
+
 failures = []
 
 
@@ -86,7 +89,7 @@ def main():
 
     try:
         host = HostBot()
-        host.send("J 4 e2e hostbot 1 0")
+        host.send("J %d e2e hostbot 1 0" % PROTOCOL_VERSION)
         check(host.wait_for("W ", 5) is not None, "hostbot welcomed")
         check(host.wait_for("N ", 30) is not None, "game client joined")
 

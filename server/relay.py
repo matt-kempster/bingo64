@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bingo64 relay server, protocol v4.
+"""Bingo64 relay server, protocol v5.
 
 A small room server for online bingo (plans/online-bingo.md Part D).
 Clients speak a line-based text protocol; the server groups them into
@@ -53,8 +53,8 @@ Game modes (shared enum with the client, see src/game/bingo.h):
 Line protocol (space-separated fields):
 
   client -> server
-    J 4 <room> <name> <color> <flags> [token]
-                             join a room. The protocol version (4) comes
+    J 5 <room> <name> <color> <flags> [token]
+                             join a room. The protocol version (5) comes
                              first; older clients are refused with
                              "E version". color is a palette index 0..7.
                              flags apply only when this join creates the
@@ -131,7 +131,9 @@ import random
 import struct
 import time
 
-PROTOCOL_VERSION = 4
+# Bumped on every wire change while the protocol is under active
+# development; mismatched peers are refused ("E version"), not served.
+PROTOCOL_VERSION = 5
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
