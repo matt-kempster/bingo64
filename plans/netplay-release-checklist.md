@@ -95,20 +95,22 @@ this section are confirmed by reading `server/relay.py`.
       (test_tied_finishes_get_distinct_places): frame-identical times
       keep distinct places in arrival order — simple, stable, and every
       client sees identical standings. No shared places.
-- [ ] **Ready-state edge cases (partly verified 2026-08-16).** A joiner
-      during the countdown is accepted (not refused) and their S
-      carries the remaining delta (test_join_during_countdown) —
-      correction to the note below: `J` is never refused for started
-      rooms, late join is by design. Still to check by hand: un-ready
-      during countdown (relay ignores R once started), host force-start
-      with 0 ready.
+- [x] **Ready-state edge cases.** VERIFIED 2026-08-16, all as tests:
+      a joiner during the countdown is accepted and their S carries the
+      remaining delta (`J` is never refused for started rooms — late
+      join by design); un-ready during the countdown is ignored and
+      never echoed (test_ready_ignored_once_started); the host can
+      force-start with zero players ready
+      (test_force_start_with_nobody_ready).
 - [x] **Room capacity UX.** DONE 2026-08-16: the client rewrites
       "E room_full" to "that room is full" on the lobby status line
       (version mismatches likewise say "update needed: game is v5,
       server v4").
-- [ ] **Name/color collisions (verify).** Two players named "mario"
-      with the same color: everything keys off ids, but can you tell
-      the ghosts/standings apart? Consider a join-time dedup suffix.
+- [x] **Name collisions.** DONE 2026-08-16: the relay suffixes a
+      newcomer whose name is taken in the room (second "mario" becomes
+      "mario2"; held mid-race seats count as taken). Colors may still
+      match — the roster shows both name and chip, so humans can sort
+      that out themselves.
 - [ ] **Change name/color/mode while connected (missing, known).** No
       protocol message; today you must disconnect, edit, reconnect.
       Fine for MVP? At minimum gray the fields out while connected so
@@ -169,12 +171,12 @@ this section are confirmed by reading `server/relay.py`.
       through playit: NAT rebinds mid-session (address migration is
       handled and unit-tested — confirm live), tunnel hiccups, GCP
       egress. Leave two clients connected overnight; check journalctl.
-- [ ] **Garbage and abuse (verify).** Internet background radiation
-      hits the tunnel port: bad magic drops silently (good). Check a
-      malformed-but-valid-magic flood can't grow state (UDP_MAX_CONNS
-      caps conns; confirm unknown-conn packets don't allocate). Room
-      creation spam: 512-conn cap is the only limit — fine for MVP,
-      note rate limiting as post-MVP.
+- [ ] **Garbage and abuse (partly verified 2026-08-16).** Bad magic
+      drops silently; a valid-magic flood from random conn_ids stops
+      allocating at UDP_MAX_CONNS (test_unknown_conn_flood_is_capped —
+      unknown-conn packets DO allocate a session each, but the cap
+      holds and 30s silence reaps them). Still open: room-creation spam
+      has only the conn cap; rate limiting is post-MVP.
 - [ ] **Version-mismatch UX (verify).** Old exe vs new server → `E
       version`. Confirm the lobby message tells the user to update, not
       just "refused".

@@ -534,6 +534,52 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(delta, 0)
         self.assertLessEqual(delta, relaymod.COUNTDOWN_FRAMES)
 
+    async def test_duplicate_names_get_suffixed(self):
+        a = self.track(RefClient(self.udp_port))
+        b = self.track(RefClient(self.udp_port))
+        await a.start()
+        await b.start()
+        a.join("testroom", "mario")
+        await a.wait_line("W ")
+        b.join("testroom", "mario")
+        await b.wait_line("W ")
+        await a.wait_line("N 2 mario2")     # the newcomer was renamed
+        await b.wait_line("N 1 mario ")     # the original kept the name
+
+    async def test_force_start_with_nobody_ready(self):
+        # Ready marks are advisory: the host may start a race where not
+        # a single member (including the host) pressed READY.
+        a, b = await self.two_joined()
+        a.send("X")
+        await a.wait_line("S ")
+        await b.wait_line("S ")
+
+    async def test_ready_ignored_once_started(self):
+        a, b = await self.two_joined()
+        a.send("X")
+        await b.wait_line("S ")
+        b.send("R 0")                       # un-ready during the countdown
+        b.send("C 3")                       # flush ordering
+        await a.wait_line("C 3 2")
+        self.assertEqual(a.count("R 2 "), 0)  # never echoed to the room
+
+    async def test_unknown_conn_flood_is_capped(self):
+        # Background-radiation guard: valid-magic garbage from random
+        # conn_ids must not grow state past UDP_MAX_CONNS.
+        saved = relaymod.UDP_MAX_CONNS
+        relaymod.UDP_MAX_CONNS = 8
+        try:
+            baseline = len(self.endpoint.conns)
+            flooder = self.track(RefClient(self.udp_port))
+            await flooder.start()
+            for cid in range(1000, 1030):
+                flooder.cid = cid
+                flooder._sendto(flooder._dgram(UDP_KEEPALIVE, 0))
+            await asyncio.sleep(0.3)
+            self.assertLessEqual(len(self.endpoint.conns) - baseline, 8)
+        finally:
+            relaymod.UDP_MAX_CONNS = saved
+
     async def test_room_full_refusal(self):
         clients = []
         for i in range(relaymod.MAX_ROOM):

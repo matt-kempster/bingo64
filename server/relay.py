@@ -547,6 +547,14 @@ class Relay:
                 if len(room.members) >= MAX_ROOM:
                     client.send("E room_full")
                     return False
+                # Two "mario"s in one room: ghosts and standings key off
+                # ids, but humans key off names — suffix the newcomer.
+                taken = ({c.name for c in room.members.values()}
+                         | {nm for nm, _ in room.disconnected.values()})
+                suffix = 2
+                while name in taken:
+                    name = "%.13s%d" % (sanitize_name(parts[3]), suffix)
+                    suffix += 1
                 client.name = name
                 client.color = color
                 client.id = room.next_id
