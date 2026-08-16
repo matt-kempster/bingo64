@@ -11,6 +11,7 @@
 #define TEXT_OPT_VIDEO     _("DISPLAY")
 #define TEXT_OPT_AUDIO     _("SOUND")
 #define TEXT_OPT_SETTINGS  _("SETTINGS")
+#define TEXT_OPT_ONLINE    _("ONLINE")
 #define TEXT_TOUCH_CONTROLS _("TOUCH CONTROLS")
 
 // Markers
@@ -100,6 +101,9 @@
 
 #define TEXT_TOUCH_AUTOHIDE _("AUTOHIDE TOUCH CONTROLS")
 
+#define TEXT_OPT_NET_LEAVE _("LEAVE RACE")
+#define TEXT_OPT_NET_LOBBY _("BACK TO LOBBY")
+
 #else // VERSION
 
 // Markers
@@ -176,6 +180,9 @@
 #define TEXT_OPT_RUMBLE    _("Rumble Strength")
 
 #define TEXT_TOUCH_AUTOHIDE _("Autohide Touch Controls")
+
+#define TEXT_OPT_NET_LEAVE _("Leave Race")
+#define TEXT_OPT_NET_LOBBY _("Back To Lobby")
 
 #endif // VERSION
 

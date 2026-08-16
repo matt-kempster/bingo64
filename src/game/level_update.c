@@ -25,6 +25,9 @@
 #include "bingo.h"
 #include "bingo_net.h"
 #include "bingo_tracking_star.h"
+#ifdef EXT_OPTIONS_MENU
+#include "extras/options_menu.h"
+#endif
 #include "debug_course.h"
 #include "interaction.h"
 #ifdef VERSION_EU
@@ -1052,6 +1055,12 @@ s32 play_mode_normal(void) {
 
     bingo_net_update();
 
+    // The host ended the online race: leave the level and return to the
+    // file select lobby (-10 special warp, levels/scripts.c).
+    if (bingo_net_take_lobby_return()) {
+        fade_into_special_warp(-10, 0);
+    }
+
     warp_area();
     check_instant_warp();
 
@@ -1100,6 +1109,24 @@ s32 play_mode_normal(void) {
 }
 
 s32 play_mode_paused(void) {
+    // The host ended the online race while we sat on the pause screen
+    // (or its R options menu): force-unpause and take the lobby warp.
+    if (bingo_net_take_lobby_return()) {
+        // Pause-screen render state (not exported by ingame_menu.h; the
+        // debug menu's force-quit declares these the same way).
+        extern s16 gMenuMode;
+        extern s8 gMenuState;
+#ifdef EXT_OPTIONS_MENU
+        optmenu_open = 0;
+#endif
+        gMenuMode = MENU_MODE_NONE;
+        gMenuState = 0;
+        raise_background_noise(1);
+        gCameraMovementFlags &= ~CAM_MOVE_PAUSE_SCREEN;
+        fade_into_special_warp(-10, 0);
+        return 0;
+    }
+
     if (gMenuOptSelectIndex == MENU_OPT_NONE) {
         set_menu_mode(MENU_MODE_RENDER_PAUSE_SCREEN);
     } else if (gMenuOptSelectIndex == MENU_OPT_DEFAULT) {

@@ -28,6 +28,13 @@ s32 bingo_net_local_cell_count(void); // cells the local player owns online
 s32 bingo_net_race_decided(void);     // an online winner exists (lockout)
 s32 bingo_net_local_won(void);        // ...and it is the local player
 
+// The room went back to the lobby: clear the local race state so the
+// next race sets up from scratch (called by the PC network client).
+void bingo_net_on_room_reset(void);
+// Level-update poll, 1 exactly once after a room reset: leave the level
+// and warp back to the file select lobby. Always 0 on N64 / offline.
+s32 bingo_net_take_lobby_return(void);
+
 #ifndef TARGET_N64
 // The palette index of the peer driving this ghost puppet (0 = red).
 s32 bingo_net_ghost_color(struct Object *obj);

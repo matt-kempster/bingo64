@@ -106,6 +106,15 @@ s32 network_take_go_flag(void);
 // Host only: start the race now (ready marks are advisory; the host may
 // force-start). The server answers with the S start broadcast.
 void network_start_race(void);
+// Host only, once a race started: end it and send the whole room back to
+// the lobby. The server answers with a K broadcast; the local reset and
+// the warp to the file select both happen in reaction to that, so the
+// host takes the same path as everyone else.
+void network_request_lobby(void);
+// Returns 1 exactly once after the server reset the room to the lobby
+// (K, or a rejoin that voided our old race): if we are in a level, warp
+// back to the file select; at the file select, just consume it.
+s32 network_take_lobby_return_flag(void);
 // Leave the room / abort the connection. Also clears NET_STATE_ERROR.
 void network_disconnect(void);
 

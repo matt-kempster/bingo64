@@ -22,6 +22,7 @@
 #ifndef TARGET_N64
 #include "pc/pc_main.h"
 #include "pc/controller/controller_api.h"
+#include "pc/network/network.h"
 
 #include <stdbool.h>
 #endif
@@ -115,6 +116,14 @@ static const u8 optsSettingsStr[][SIZEOPTC(32)] = {
     { TEXT_OPT_MOUSE },
 };
 
+#ifndef TARGET_N64
+static const u8 optsOnlineStr[][SIZEOPTC(32)] = {
+    { TEXT_OPT_ONLINE },
+    { TEXT_OPT_NET_LEAVE },
+    { TEXT_OPT_NET_LOBBY },
+};
+#endif
+
 #if !defined(TARGET_N64) && !defined(TARGET_PORT_CONSOLE)
 static const u8 optBindStr[][SIZEOPTC(32)] = {
     { TEXT_OPT_UNBOUND },
@@ -178,6 +187,25 @@ static void optvideo_reset_window(UNUSED struct Option *self, s32 arg) {
 
 static void optvideo_apply(UNUSED struct Option *self, s32 arg) {
     if (!arg) configWindow.settings_changed = true;
+}
+
+/* online race actions (the ONLINE submenu only shows while connected) */
+
+static void optnet_act_leave(UNUSED struct Option *self, s32 arg) {
+    if (!arg && network_active()) {
+        network_disconnect(); // courtesy quit; keep playing offline
+        optmenu_toggle();     // close the menu (also saves the config)
+    }
+}
+
+static void optnet_act_lobby(UNUSED struct Option *self, s32 arg) {
+    if (!arg) {
+        // Host only (network_request_lobby self-gates): end the race for
+        // the whole room. The server's K broadcast performs the local
+        // reset and the warp, so just close the menu and let it arrive.
+        network_request_lobby();
+        optmenu_toggle();
+    }
 }
 #endif
 
@@ -329,6 +357,24 @@ static struct Option optsMain[] = {
 };
 
 static struct SubMenu menuMain = DEF_SUBMENU( optMainStr[0], optsMain );
+
+#ifndef TARGET_N64
+/* the ONLINE submenu (race actions), shown only while connected */
+
+static struct Option optsOnline[] = {
+    DEF_OPT_BUTTON( optsOnlineStr[1], optnet_act_leave ),
+    DEF_OPT_BUTTON( optsOnlineStr[2], optnet_act_lobby ), // host only
+};
+
+static struct SubMenu menuOnline = DEF_SUBMENU( optsOnlineStr[0], optsOnline );
+
+static struct Option optOnlineEntry = DEF_OPT_SUBMENU( optsOnlineStr[0], &menuOnline );
+
+// While connected, the main list gains the ONLINE entry at the top:
+// menuMain.opts points at this copy of optsMain with it prepended
+// (rebuilt every time the menu opens, so it tracks the connection).
+static struct Option optsMainOnline[sizeof(optsMain) / sizeof(optsMain[0]) + 1];
+#endif
 
 /* implementation */
 
@@ -548,17 +594,36 @@ void optmenu_toggle(void) {
         play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
         #endif
 
+        menuMain.opts = optsMain;
+        menuMain.numOpts = sizeof(optsMain) / sizeof(optsMain[0]);
 #ifdef CHEATS_ACTIONS
         // HACK: hide the last option in main if cheats are disabled
-        menuMain.numOpts = sizeof(optsMain) / sizeof(optsMain[0]);
         if (!Cheats.EnableCheats) {
             menuMain.numOpts--;
-            if (menuMain.select >= menuMain.numOpts) {
-                menuMain.select = 0; // don't bother
-                menuMain.scroll = 0;
+        }
+#endif
+#ifndef TARGET_N64
+        if (network_active()) {
+            // Prepend the ONLINE entry (cheats stay last, see above).
+            s32 i;
+            optsMainOnline[0] = optOnlineEntry;
+            for (i = 0; i < menuMain.numOpts; i++) {
+                optsMainOnline[i + 1] = optsMain[i];
+            }
+            menuMain.opts = optsMainOnline;
+            menuMain.numOpts++;
+            // BACK TO LOBBY is the host's call; everyone else only leaves.
+            menuOnline.numOpts = network_is_host() ? 2 : 1;
+            if (menuOnline.select >= menuOnline.numOpts) {
+                menuOnline.select = 0;
+                menuOnline.scroll = 0;
             }
         }
 #endif
+        if (menuMain.select >= menuMain.numOpts) {
+            menuMain.select = 0; // don't bother
+            menuMain.scroll = 0;
+        }
 
         currentMenu = &menuMain;
         optmenu_open = 1;

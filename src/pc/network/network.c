@@ -27,6 +27,7 @@
 #include "game/game_init.h"
 #include "game/area.h"
 #include "game/bingo.h"
+#include "game/bingo_net.h"
 #include "game/level_update.h"
 #include "game/object_list_processor.h"
 #include "engine/math_util.h"
@@ -120,6 +121,8 @@ static s32 sFinishSent = 0;
 static s32 sHostId = 0;        // who may edit settings and start the race
 static s32 sGoFlag = 0;        // set once when we enter RACING; file select
                                // consumes it to auto-launch the game at GO
+static s32 sLobbyReturnFlag = 0;  // set once when the room resets to the
+                                  // lobby; the game warps to file select
 static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
                                    // us whether we are the host
 
@@ -311,6 +314,30 @@ static s32 slot_for_id(s32 id) {
     return -1;
 }
 
+// Forget everything scoped to the current race — seed, results, claims,
+// ghosts, the finish latch — keeping the roster and our seat. Runs when
+// the room returns to the lobby (K) and when a rejoin voided our old
+// race; either way the game side resets its board and, if we are in a
+// level, warps back to the file select (the lobby-return flag).
+static void reset_race_state(void) {
+    s32 i;
+    for (i = 0; i < MAX_ID; i++) {
+        sIdToSlot[i] = -1;
+    }
+    memset(gNetGhosts, 0, sizeof(gNetGhosts));
+    sClaimHead = sClaimTail = 0;
+    sResultCount = 0;
+    sWinnerId = 0;
+    sFinishSent = 0;
+    sGoFlag = 0;
+    sSeedValid = 0;
+    sSharedSeed = 0;
+    sGoFrame = 0;
+    sLocalReady = 0;
+    bingo_net_on_room_reset();
+    sLobbyReturnFlag = 1;
+}
+
 // Forget every room member and ghost (a reconnect that came back with a
 // fresh id: the server no longer knew us, so the old session is void).
 static void reset_room_state(void) {
@@ -345,8 +372,12 @@ static void handle_line(char *line) {
                 sResyncFlag = 1;
             } else {
                 if (sWasReconnect) {
-                    // The server dropped our seat; start over as a new member.
+                    // The server dropped our seat; start over as a new
+                    // member. The race we were in is void too (if the
+                    // room is mid-race after all, the S replay follows
+                    // and re-enters us as a late joiner).
                     reset_room_state();
+                    reset_race_state();
                     sResyncFlag = 1;
                 }
                 printf("net: joined as #%d\n", id);
@@ -528,6 +559,15 @@ static void handle_line(char *line) {
             printf("net: race decided, #%d wins (%d frames)\n", id, frames);
             fflush(stdout);
         }
+    } else if (cmd == 'K') {
+        // The host ended the race: the whole room is back in the lobby.
+        // The server re-sends the roster (everyone unready) right after.
+        printf("net: back to the lobby\n");
+        fflush(stdout);
+        reset_race_state();
+        if (network_active()) {
+            sState = NET_STATE_LOBBY;
+        }
     } else if (cmd == 'E') {
         char msg[48];
         snprintf(msg, sizeof(msg), "server refused: %s", line + 2);
@@ -676,6 +716,7 @@ static void reset_session_state(void) {
     sHostId = 0;
     sPendingRoomMode = -1;
     sGoFlag = 0;
+    sLobbyReturnFlag = 0;
 }
 
 // Resolve the saved server, start the nonblocking connect and arm the
@@ -1048,6 +1089,19 @@ void network_start_race(void) {
     if (network_is_host() && sState == NET_STATE_LOBBY) {
         net_send_line("X\n");
     }
+}
+
+void network_request_lobby(void) {
+    if (network_is_host() && (sState == NET_STATE_COUNTDOWN
+                              || sState == NET_STATE_RACING)) {
+        net_send_line("K\n");
+    }
+}
+
+s32 network_take_lobby_return_flag(void) {
+    s32 flag = sLobbyReturnFlag;
+    sLobbyReturnFlag = 0;
+    return flag;
 }
 
 s32 network_has_seed(u32 *seed) {

@@ -1055,6 +1055,9 @@ static void check_main_menu_clicked_buttons(void) {
  */
 void bhv_menu_button_manager_loop(void) {
 #ifndef TARGET_N64
+    // A room reset (back to lobby) while we're already at the file
+    // select needs no warp; consume the flag so it can't fire later.
+    network_take_lobby_return_flag();
     // The room's GO: every player's game launches itself, no clicking.
     if (network_take_go_flag() && sSelectedFileNum == 0) {
         s32 d;

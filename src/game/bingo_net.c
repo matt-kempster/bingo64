@@ -166,9 +166,31 @@ static void resend_missed_claims(void) {
     }
 }
 
+// Latched once we told the server we finished; cleared when the race
+// state resets (bingo_net_on_room_reset) or the connection ends.
+static s32 sFinishAnnounced = 0;
+
+// The room went back to the lobby (host pressed BACK TO LOBBY, or a
+// rejoin voided the race we were in): clear the local race so the next
+// one sets up from scratch. Called from the network client's handler;
+// the warp to the file select is driven separately by the lobby-return
+// flag (see bingo_net_take_lobby_return / file_select).
+void bingo_net_on_room_reset(void) {
+    gBingoInitialized = 0;
+    gbGlobalBingoTimer = 0;
+    gbBingosCompleted = 0;
+    gbBingoShowCongratsCounter = 0;
+    sFinishAnnounced = 0;
+}
+
+// Level-update poll: 1 exactly once after a room reset, meaning "leave
+// the level and return to the file select lobby".
+s32 bingo_net_take_lobby_return(void) {
+    return network_take_lobby_return_flag();
+}
+
 // Called once per gameplay frame from play_mode_normal.
 void bingo_net_update(void) {
-    static s32 sFinishAnnounced = 0;
     if (!network_active()) {
         sFinishAnnounced = 0;
         return;
@@ -438,6 +460,13 @@ s32 bingo_net_race_decided(void) {
 }
 
 s32 bingo_net_local_won(void) {
+    return 0;
+}
+
+void bingo_net_on_room_reset(void) {
+}
+
+s32 bingo_net_take_lobby_return(void) {
     return 0;
 }
 

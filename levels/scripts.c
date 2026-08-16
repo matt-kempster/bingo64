@@ -54,6 +54,7 @@ static const LevelScript script_L2[4];
 static const LevelScript goto_mario_head_regular[4];
 static const LevelScript goto_mario_head_dizzy[4];
 static const LevelScript script_L5[4];
+static const LevelScript goto_file_select[4];
 
 #define STUB_LEVEL(_0, _1, _2, _3, _4, _5, _6, _7, _8)
 #ifdef RM2C
@@ -161,6 +162,7 @@ const LevelScript level_main_scripts_entry[] = {
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ -3, goto_mario_head_dizzy),
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ -8, script_L1),
     JUMP_IF(/*op*/ OP_EQ, /*arg*/ -9, script_L5),
+    JUMP_IF(/*op*/ OP_EQ, /*arg*/ -10, goto_file_select),
 };
 
 static const LevelScript script_L1[] = {
@@ -181,6 +183,12 @@ static const LevelScript goto_mario_head_dizzy[] = {
 
 static const LevelScript script_L5[] = {
     EXIT_AND_EXECUTE(/*seg*/ 0x14, _introSegmentRomStart, _introSegmentRomEnd, level_intro_entry_4),
+};
+
+// Straight back to the file select, skipping the Mario head: the online
+// room returned to the lobby (which lives on the file select screen).
+static const LevelScript goto_file_select[] = {
+    EXIT_AND_EXECUTE(/*seg*/ 0x14, _menuSegmentRomStart, _menuSegmentRomEnd, level_main_menu_entry_1),
 };
 
 // Include the level jumptable.
