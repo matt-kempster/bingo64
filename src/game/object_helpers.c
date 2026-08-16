@@ -159,6 +159,7 @@ Gfx *geo_switch_anim_state(s32 callContext, struct GraphNode *node, UNUSED void 
     return NULL;
 }
 
+#if BETTER_ROOM_CHECKS || defined(ALO)
 Gfx *geo_switch_area(s32 callContext, struct GraphNode *node, UNUSED void *context) {
     struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
 #if BETTER_ROOM_CHECKS
@@ -199,6 +200,37 @@ Gfx *geo_switch_area(s32 callContext, struct GraphNode *node, UNUSED void *conte
 
     return NULL;
 }
+#else
+// Vanilla control flow: room tracked whenever a floor exists (including
+// room 0), selectedCase untouched outside render passes. (alo's rewrite
+// above only updates gMarioCurrentRoom for rooms > 0 and zeroes the case
+// on non-render callbacks.)
+Gfx *geo_switch_area(s32 callContext, struct GraphNode *node, UNUSED void *context) {
+    s16 sp26;
+    struct Surface *sp20;
+    struct GraphNodeSwitchCase *switchCase = (struct GraphNodeSwitchCase *) node;
+
+    if (callContext == GEO_CONTEXT_RENDER) {
+        if (gMarioObject == NULL) {
+            switchCase->selectedCase = 0;
+        } else {
+            find_room_floor(gMarioObject->oPosX, gMarioObject->oPosY, gMarioObject->oPosZ, &sp20);
+
+            if (sp20) {
+                gMarioCurrentRoom = sp20->room;
+                sp26 = sp20->room - 1;
+                print_debug_top_down_objectinfo("areainfo %d", sp20->room);
+
+                if (sp26 >= 0) {
+                    switchCase->selectedCase = sp26;
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+#endif
 
 void obj_update_pos_from_parent_transformation(Mat4 a0, struct Object *a1) {
     f32 spC = a1->oParentRelativePosX;

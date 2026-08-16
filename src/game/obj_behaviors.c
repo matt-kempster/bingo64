@@ -174,9 +174,13 @@ s8 turn_obj_away_from_steep_floor(struct Surface *objFloor, f32 floorY, f32 objV
     f32 floor_nX, floor_nY, floor_nZ, objVelXCopy, objVelZCopy, objYawX, objYawZ;
 
     if (objFloor == NULL) {
+#ifdef ALO
         // ex-alo change
         // replaces weird trunc value to an actual degree value (originally 32767.999200000002)
         o->oMoveAngleYaw += 0x8000;
+#else
+        o->oMoveAngleYaw += 32767.999200000002; /* effectively +=32767: s32 += double truncates */
+#endif
         return FALSE;
     }
 
