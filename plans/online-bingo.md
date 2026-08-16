@@ -175,8 +175,11 @@ The online components:
   makes the same board.
 - `src/game/bingo_net.c`: ghost Mario puppets (up to 15, animated, no
   collision) and the claim hooks in `set_objective_state`.
-- `test/net/protocol_test.py` proves the server. The emulator and host
-  tests prove the game still plays the same offline.
+- `server/test_relay.py` proves the server (transport + room flows) and
+  `test/net/rematch_e2e.py` proves the in-game join/race/back-to-lobby
+  loop. The emulator and host tests prove the game still plays the same
+  offline. (The original `test/net/protocol_test.py` spoke protocol v1
+  and was retired when v5 was current.)
 
 Not done yet: name tags over ghosts, team colors, lockout UI (cells
 claimed by others look the same as own claims), Windows sockets, and a
