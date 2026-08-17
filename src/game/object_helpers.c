@@ -185,6 +185,12 @@ Gfx *geo_switch_area(s32 callContext, struct GraphNode *node, UNUSED void *conte
         } else {
             floor = gMarioState->floor;
         }
+        // No floor this frame (mid-warp, void edge): keep the current room.
+        // Vanilla guards this; the alo restructure dropped it, and reading
+        // floor->room here was a live segfault (castle basement, twice).
+        if (floor == NULL) {
+            return NULL;
+        }
 #endif
 
         print_debug_top_down_objectinfo("areainfo %d", ROOM_ID(room));
