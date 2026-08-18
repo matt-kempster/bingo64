@@ -259,6 +259,15 @@ this section are confirmed by reading `server/relay.py`.
       closed!) or use a provided `race.bat` with
       `--net-server udp:... --net-room ...`. Include the "config is
       rewritten on exit" gotcha.
+- [ ] **GATE: the `_bingo64.kempster.com` TXT record must exist before
+      any release ships.** Fresh installs default to `net_server auto`,
+      which resolves that record (implemented 2026-08-16, verified
+      against example.com). Existing configs keep their stored address,
+      so nothing breaks meanwhile — but a release without the record
+      gives new players "auto server lookup failed" out of the box.
+      Record: name `_bingo64`, type TXT, TTL 300, value
+      `udp:mauritania-defines.tun.ply.gg:16118` (ONE string only —
+      >512-byte TXT sets truncate).
 - [ ] **Tag a GitHub release** once the sweep is green.
 - [ ] **Versioning at 1.0 (design agreed 2026-08-16, not yet needed).**
       Until the first public release, the clobber-freely rule stands:
