@@ -106,6 +106,7 @@
 #define TEXT_OPT_NET_SURE   _("ARE YOU SURE")
 #define TEXT_OPT_NET_KEEP   _("KEEP RACING")
 #define TEXT_OPT_NET_ENDALL _("END THE RACE FOR ALL")
+#define TEXT_OPT_NET_SELFCOL _("WEAR MY COLOR ONLINE")
 
 #else // VERSION
 
@@ -189,6 +190,7 @@
 #define TEXT_OPT_NET_SURE   _("ARE YOU SURE")
 #define TEXT_OPT_NET_KEEP   _("Keep Racing")
 #define TEXT_OPT_NET_ENDALL _("End The Race For All")
+#define TEXT_OPT_NET_SELFCOL _("Wear My Color Online")
 
 #endif // VERSION
 

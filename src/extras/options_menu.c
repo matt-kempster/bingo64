@@ -114,6 +114,7 @@ static const u8 optsAudioStr[][SIZEOPTC(32)] = {
 static const u8 optsSettingsStr[][SIZEOPTC(32)] = {
     { TEXT_OPT_HUD },
     { TEXT_OPT_MOUSE },
+    { TEXT_OPT_NET_SELFCOL },
 };
 
 #ifndef TARGET_N64
@@ -322,6 +323,9 @@ static struct Option optsSettings[] = {
     DEF_OPT_TOGGLE( optsSettingsStr[0], &configHUD ),
 #ifdef MOUSE_ACTIONS
     DEF_OPT_TOGGLE( optsSettingsStr[1], &configMouse ),
+#endif
+#ifndef TARGET_N64
+    DEF_OPT_TOGGLE( optsSettingsStr[2], &configNetSelfColor ),
 #endif
 };
 

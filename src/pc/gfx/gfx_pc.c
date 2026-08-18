@@ -377,9 +377,27 @@ static bool gfx_texture_cache_lookup(int tile, struct TextureHashmapNode **n, co
     #undef CMPADDR
 }
 
+// The cap's M emblem draws with a texture-alpha lerp between the texel and
+// the lit cap shade (that is already how the emblem's surroundings pick up
+// cap red). The ROM texture bakes the letter as opaque red, so it ignores
+// the net-palette hat tints. Rewrite opaque texels to white with
+// alpha = whiteness: the letter (and its antialiasing) then follows the
+// cap color for every palette, including vanilla red.
+static void patch_mario_logo_alpha(uint8_t *rgba32, uint32_t px_count) {
+    for (uint32_t i = 0; i < px_count; i++) {
+        uint8_t *p = rgba32 + 4 * i;
+        if (p[3] == 0) continue; // outside the patch: keep full cap shade
+        uint8_t whiteness = p[1] < p[2] ? p[1] : p[2];
+        p[0] = p[1] = p[2] = 255;
+        p[3] = whiteness;
+    }
+}
+
 #ifndef EXTERNAL_DATA
 
 static uint8_t rgba32_buf[32768] __attribute__((aligned(32)));
+
+extern const uint8_t mario_texture_m_logo[];
 
 static void import_texture_rgba16(int tile) {
     for (uint32_t i = 0; i < rdp.loaded_texture[tile].size_bytes / 2; i++) {
@@ -396,6 +414,10 @@ static void import_texture_rgba16(int tile) {
 
     uint32_t width = rdp.texture_tile.line_size_bytes / 2;
     uint32_t height = rdp.loaded_texture[tile].size_bytes / rdp.texture_tile.line_size_bytes;
+
+    if (rdp.loaded_texture[tile].addr == mario_texture_m_logo) {
+        patch_mario_logo_alpha(rgba32_buf, rdp.loaded_texture[tile].size_bytes / 2);
+    }
 
     gfx_rapi->upload_texture(rgba32_buf, width, height);
 }
@@ -592,6 +614,9 @@ static inline void load_texture(const char *fullpath) {
         u8 *data = stbi_load_from_memory(imgdata, imgsize, &w, &h, NULL, 4);
         free(imgdata);
         if (data) {
+            if (strstr(fullpath, "mario_logo") != NULL) {
+                patch_mario_logo_alpha(data, (uint32_t) (w * h));
+            }
             gfx_rapi->upload_texture(data, w, h);
             stbi_image_free(data); // don't need this anymore
             return;

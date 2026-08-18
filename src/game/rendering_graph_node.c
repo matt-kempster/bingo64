@@ -11,6 +11,11 @@
 #include "rendering_graph_node.h"
 #include "shadow.h"
 #include "bingo_net.h"
+#ifndef TARGET_N64
+#include "object_list_processor.h"
+#include "pc/configfile.h"
+#include "pc/network/network.h"
+#endif
 
 #include "config.h"
 #include "config/config_world.h"
@@ -303,6 +308,15 @@ void append_dl_and_return(struct GraphNodeDisplayList *node) {
                 bingo_net_ghost_color((struct Object *) gCurGraphNodeObject));
             geo_append_display_list(tinted, LAYER_ALPHA);
             geo_append_display_list(tinted, LAYER_TRANSPARENT);
+        } else if (layer == LAYER_OPAQUE && configNetSelfColor
+                   && (struct Object *) gCurGraphNodeObject == gMarioObject
+                   && gMarioObject != NULL && network_active()) {
+            // Local Mario wears his own net color while connected (same
+            // memoized clones the ghosts use; color 0 = vanilla red = no-op).
+            geo_append_display_list(
+                bingo_net_tinted_dl(node->displayList,
+                                    (s32) (configNetColor % NET_COLOR_COUNT)),
+                layer);
         } else
 #endif
         geo_append_display_list(node->displayList, layer);

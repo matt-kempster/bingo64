@@ -49,7 +49,9 @@ ALIGNED8 static const Texture mario_texture_yellow_button[] = {
 };
 
 // 0x04001890
-ALIGNED8 static const Texture mario_texture_m_logo[] = {
+// Non-static: the PC renderer recolors the M at texture-import time so it
+// follows the (possibly palette-tinted) cap shade; see gfx_pc.c.
+ALIGNED8 const Texture mario_texture_m_logo[] = {
 #include "actors/mario/mario_logo.rgba16.inc.c"
 };
 
