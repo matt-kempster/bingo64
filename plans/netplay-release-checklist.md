@@ -189,9 +189,12 @@ this section are confirmed by reading `server/relay.py`.
       (instance `mario-server`, us-east1-c, IPv6-only — admin access
       is `gcloud compute ssh --tunnel-through-iap`). The reboot drill
       below is still worth one run.
-- [ ] **VM reboot drill (untested).** Reboot the e2-micro; confirm
-      relay + tunnel return with no hands and the tunnel address is
-      unchanged.
+- [x] **VM reboot drill.** VERIFIED 2026-08-18, the hard way: billing
+      lapse TERMINATED the VM; after re-linking billing and one
+      `instances start` (first attempt hit the post-billing "nic0 is
+      frozen" state — cleared in ~90s), relay + playit returned with
+      no hands and the tunnel address was unchanged (v5 RefClient
+      probe PASS through the tunnel).
 - [ ] **Log hygiene (verify).** journalctl works (python3 -u). Confirm
       journald caps disk usage (default is fine, but MemoryMax=256M on
       the service + unbounded logs on a 30GB disk — check

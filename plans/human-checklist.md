@@ -23,13 +23,14 @@ is only the parts that block on YOU. Ordered roughly by "do this next".
 
 ## Accounts & infra — only your logins can do these
 
-- [ ] **URGENT — reopen the GCP billing account.** Discovered 2026-08-18:
-      billing account 01120E-C741C1-31B871 is CLOSED, which disabled
-      billing on the project and suspended the VM — the relay is DOWN.
-      Reopen at console.cloud.google.com/billing (likely needs a valid
-      card; free tier still requires an open billing account). Then
-      Claude re-links the project, starts mario-server, and verifies
-      the relay + tunnel return.
+- [x] **GCP billing outage — RESOLVED 2026-08-18.** Old billing account
+      closed under us → VM terminated → relay down. Matt made a new
+      billing account (with $7 budget tripwire); project re-linked,
+      VM restarted, relay + tunnel verified back (v5 probe PASS).
+      Watch the budget emails — a card hiccup on the new account would
+      repeat this silently. Fallback if it recurs: the relay can move
+      to any always-on box; the playit tunnel address follows the
+      playit account, not the VM.
 - [ ] **RELEASE GATE — create the DNS TXT record** at your kempster.com
       registrar: name `_bingo64`, type TXT, TTL 300, value
       `udp:mauritania-defines.tun.ply.gg:16118` (one string). Fresh
