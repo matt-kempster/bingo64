@@ -481,11 +481,14 @@ endif
 ifeq ($(TARGET_N64),1)
   ifeq ($(COMPILER_TYPE),gcc)
     MIPSISET     := -mips3
-    OPT_FLAGS    := -Ofast
+    # -Ofast implies -ffast-math (-freciprocal-math turns x/43.0f into
+    # x*(1/43.0f) etc.), which breaks bit-fidelity against the IDO
+    # reference ROM. IEEE-strict -O2 for vanilla-by-construction.
+    OPT_FLAGS    := -O2 -ffp-contract=off
   else ifeq ($(COMPILER_TYPE),clang)
     # clang doesn't support ABI 'o32' for 'mips3'
     MIPSISET     := -mips2
-    OPT_FLAGS    := -Ofast
+    OPT_FLAGS    := -O2 -ffp-contract=off
   endif
 else
   ifeq ($(COMPILER_OPT),default)
