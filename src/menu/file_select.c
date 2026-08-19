@@ -1418,6 +1418,14 @@ static void draw_main_menu_pc(void) {
     // Centered under the doors (world x -2800/+2800 -> screen 117/203).
     net_print_ascii_centered(117, 101, "1 PLAYER");
     net_print_ascii_centered(203, 101, "ONLINE");
+    // Two lines of what-is-this for the first-time player, quiet, at the
+    // bottom of the room. Instructions, not decoration.
+    // Wording still being workshopped (Matt, 2026-08-19) — kept out of
+    // playtest builds until it lands.
+    // gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 140));
+    // net_print_ascii_centered(160, 40, "EVERY SEED DEALS A CARD OF 25 GOALS.");
+    // net_print_ascii_centered(160, 28, "FIVE IN A ROW IS BINGO. GO FAST.");
+    // gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
     if (network_active()) {
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
         net_print_ascii(100, 62, "IN AN ONLINE ROOM");
@@ -2172,8 +2180,14 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
     sLobbyExitRequest = 0;
     gSeedTypingActive = 0;
 #endif
+#ifndef TARGET_N64
+    // Spawn the hand dead center, just below and between the two doors.
+    sCursorPos[0] = 0.0f;
+    sCursorPos[1] = -35.0f;
+#else
     sCursorPos[0] = 94.0f;
     sCursorPos[1] = 20.0f;
+#endif
     sClickPos[0] = -10000;
     sClickPos[1] = -10000;
     sCursorClickingTimer = 0;
