@@ -172,7 +172,12 @@ void apply_mario_platform_displacement(void) {
 
     // ex-alo change
     // Intangible check to fix Mario going out of camera view on moving platforms during cutscenes
+#ifdef ALO
+    // ex-alo change: skip platform displacement while Mario is intangible
     if (!(gTimeStopState & TIME_STOP_ACTIVE) && gMarioObject != NULL && platform != NULL && !(gMarioStates[0].action & ACT_FLAG_INTANGIBLE)) {
+#else
+    if (!(gTimeStopState & TIME_STOP_ACTIVE) && gMarioObject != NULL && platform != NULL) {
+#endif
         apply_platform_displacement(TRUE, platform);
     }
 }

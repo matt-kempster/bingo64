@@ -1,0 +1,40 @@
+# Movement corpus for the frame-differential harness (diff_test.py).
+# Boot timing must match warp_bob.txt exactly (START 150, A 320); the
+# harness pokes gTestWarpRequest=LEVEL_BOB at frame 450; A at 700 picks
+# star 1; Mario idles in BOB by ~750 (the sync point). Everything after
+# is free movement: runs, single/double/triple jumps, dives, a long jump,
+# a jump kick, a backflip, direction changes.
+150 155 START
+320 322 A
+700 702 A
+# run forward, triple jump chain
+780 900 STICK 0 127
+805 807 A
+835 837 A
+865 867 A
+# dive out of the run, recover
+900 960 STICK 0 127
+910 912 B
+# turn and run back, hop
+970 1030 STICK 0 -80
+1005 1007 A
+# long jump (crouch during run + A)
+1040 1100 STICK 0 127
+1055 1075 Z
+1058 1060 A
+# jump kick
+1110 1160 STICK 0 127
+1120 1122 A
+1125 1127 B
+# stationary crouch -> backflip
+1170 1200 Z
+1180 1182 A
+# strafe left, jump, dive
+1210 1270 STICK -100 0
+1230 1232 A
+1235 1237 B
+# final forward run with two jumps
+1280 1340 STICK 0 127
+1300 1302 A
+1310 1312 A
+1350 1352 A

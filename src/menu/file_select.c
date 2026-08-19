@@ -537,6 +537,9 @@ static void spawn_submenu_button(s32 id, s32 model, struct Object *parent,
                                  s16 x, s16 y, f32 scale) {
     sMainMenuButtons[id] = spawn_object_rel_with_rot(
         parent, model, bhvMenuButton, x, y, -100, 0, -0x8000, 0);
+    // spawn_object_rel_with_rot keeps the vanilla zOff-as-roll typo; these
+    // buttons want an exact zero roll, so set the angle explicitly.
+    obj_set_angle(sMainMenuButtons[id], 0, -0x8000, 0);
     sMainMenuButtons[id]->oMenuButtonScale = scale;
 }
 

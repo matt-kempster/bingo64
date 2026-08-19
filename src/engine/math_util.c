@@ -12,6 +12,12 @@
 #include "config/config_world.h"
 #include "engine/rand.h"
 
+#ifdef ALO
+// The retired sm64ex-alo trig/approach/spline core (never compiled;
+// ALO is defined nowhere). The live bodies below are verbatim vanilla.
+#include "math_util_alo.inc"
+#endif
+
 
 Mat4 identityMtx = {
     { 1.0f, 0.0f, 0.0f, 0.0f },
@@ -1296,37 +1302,54 @@ Bool32 approach_s16_bool(s16 *current, s32 target, s32 inc, s32 dec) {
     return (*current != target);
 }
 
+#ifndef ALO
 /**
  * Return the value 'current' after it tries to approach target, going up at
  * most 'inc' and going down at most 'dec'.
  */
 s32 approach_s32(s32 current, s32 target, s32 inc, s32 dec) {
-    s32 dist = (target - current);
-    if (dist > 0) { // current < target
-        current = ((dist >  inc) ? (current + inc) : target);
-    } else if (dist < 0) { // current > target
-        current = ((dist < -dec) ? (current - dec) : target);
+    //! If target is close to the max or min s32, then it's possible to overflow
+    // past it without stopping.
+
+    if (current < target) {
+        current += inc;
+        if (current > target) {
+            current = target;
+        }
+    } else {
+        current -= dec;
+        if (current < target) {
+            current = target;
+        }
     }
     return current;
 }
+#endif
 Bool32 approach_s32_bool(s32 *current, s32 target, s32 inc, s32 dec) {
     *current = approach_s32(*current, target, inc, dec);
     return (*current != target);
 }
 
+#ifndef ALO
 /**
  * Return the value 'current' after it tries to approach target, going up at
  * most 'inc' and going down at most 'dec'.
  */
 f32 approach_f32(f32 current, f32 target, f32 inc, f32 dec) {
-    f32 dist = (target - current);
-    if (dist >= 0.0f) { // target >= current
-        current = ((dist >  inc) ? (current + inc) : target);
-    } else { // target < current
-        current = ((dist < -dec) ? (current - dec) : target);
+    if (current < target) {
+        current += inc;
+        if (current > target) {
+            current = target;
+        }
+    } else {
+        current -= dec;
+        if (current < target) {
+            current = target;
+        }
     }
     return current;
 }
+#endif
 Bool32 approach_f32_bool(f32 *current, f32 target, f32 inc, f32 dec) {
     *current = approach_f32(*current, target, inc, dec);
     return !(*current == target);
@@ -1416,10 +1439,16 @@ s16 abs_angle_diff(s16 a0, s16 a1) {
  * Helper function for atan2s. Does a look up of the arctangent of y/x assuming
  * the resulting angle is in range [0, 0x2000] (1/8 of a circle).
  */
+#ifndef ALO
 static u16 atan2_lookup(f32 y, f32 x) {
-    return (x == 0)
-        ? 0x0
-        : atans(y / x);
+    u16 ret;
+
+    if (x == 0) {
+        ret = gArctanTable[0];
+    } else {
+        ret = gArctanTable[(s32)(y / x * 1024 + 0.5f)];
+    }
+    return ret;
 }
 
 /**
@@ -1428,6 +1457,7 @@ static u16 atan2_lookup(f32 y, f32 x) {
  */
 s16 atan2s(f32 y, f32 x) {
     u16 ret;
+
     if (x >= 0) {
         if (y >= 0) {
             if (y >= x) {
@@ -1467,8 +1497,9 @@ s16 atan2s(f32 y, f32 x) {
  * Compute the atan2 in radians by calling atan2s and converting the result.
  */
 f32 atan2f(f32 y, f32 x) {
-    return angle_to_radians(atan2s(y, x));
+    return (f32) atan2s(y, x) * M_PI / 0x8000;
 }
+#endif
 
 /**
  * Produces values using a cubic b-spline curve. Basically Q is the used output,
@@ -1498,19 +1529,17 @@ void evaluate_cubic_spline(f32 progress, Vec3f pos, Vec3f spline1, Vec3f spline2
     pos[2] = (B[0] * spline1[2]) + (B[1] * spline2[2]) + (B[2] * spline3[2]) + (B[3] * spline4[2]);
 }
 
+#ifndef ALO
 // Variables for a spline curve animation (used for the flight path in the grand star cutscene)
 Vec4s *gSplineKeyframe;
 f32 gSplineKeyframeFraction;
 s32 gSplineState;
 
-enum gSplineStates {
-    CURVE_NONE,
-    CURVE_BEGIN_1,
-    CURVE_BEGIN_2,
-    CURVE_MIDDLE,
-    CURVE_END_1,
-    CURVE_END_2
-};
+#define CURVE_BEGIN_1 1
+#define CURVE_BEGIN_2 2
+#define CURVE_MIDDLE 3
+#define CURVE_END_1 4
+#define CURVE_END_2 5
 
 /**
  * Set 'result' to a 4-vector with weights corresponding to interpolation
@@ -1537,44 +1566,41 @@ enum gSplineStates {
  * TODO: verify the classification of the spline / figure out how polynomials were computed
  */
 void spline_get_weights(Vec4f result, f32 t, UNUSED s32 c) {
-    f32 tinv  = 1 - t;
+    f32 tinv = 1 - t;
     f32 tinv2 = tinv * tinv;
     f32 tinv3 = tinv2 * tinv;
     f32 t2 = t * t;
     f32 t3 = t2 * t;
-    const f32 half    = (0.5f);
-    const f32 quarter = (0.25f);
-    const f32 sixth   = (1.0f / 6.0f);
 
     switch (gSplineState) {
         case CURVE_BEGIN_1:
             result[0] = tinv3;
-            result[1] = ( t3 * (1.75f)) - (t2 * (4.5f)) + (t * (3.0f));
-            result[2] = (-t3 * (11 / 12.0f)) + (t2 * (1.5f));
-            result[3] = t3 * sixth;
+            result[1] = t3 * 1.75f - t2 * 4.5f + t * 3.0f;
+            result[2] = -t3 * (11 / 12.0f) + t2 * 1.5f;
+            result[3] = t3 * (1 / 6.0f);
             break;
         case CURVE_BEGIN_2:
-            result[0] = tinv3 * quarter;
-            result[1] = (t3 * (7 / 12.0f)) - (t2 * (1.25f)) + (t * quarter) + (7 / 12.0f);
-            result[2] = (-t3 * half) + (t2 * half) + (t * half) + sixth;
-            result[3] = t3 * sixth;
+            result[0] = tinv3 * 0.25f;
+            result[1] = t3 * (7 / 12.0f) - t2 * 1.25f + t * 0.25f + (7 / 12.0f);
+            result[2] = -t3 * 0.5f + t2 * 0.5f + t * 0.5f + (1 / 6.0f);
+            result[3] = t3 * (1 / 6.0f);
             break;
         case CURVE_MIDDLE:
-            result[0] = tinv3 * sixth;
-            result[1] = (t3 * half) - t2 + (4.0f / 6.0f);
-            result[2] = (-t3 * half) + (t2 * half) + (t * half) + sixth;
-            result[3] = t3 * sixth;
+            result[0] = tinv3 * (1 / 6.0f);
+            result[1] = t3 * 0.5f - t2 + (4 / 6.0f);
+            result[2] = -t3 * 0.5f + t2 * 0.5f + t * 0.5f + (1 / 6.0f);
+            result[3] = t3 * (1 / 6.0f);
             break;
         case CURVE_END_1:
-            result[0] = tinv3 * sixth;
-            result[1] = (-tinv3 * half) + (tinv2 * half) + (tinv * half) + sixth;
-            result[2] = (tinv3 * (7.0f / 12.0f)) - (tinv2 * (1.25f)) + (tinv * quarter) + (7.0f / 12.0f);
-            result[3] = t3 * quarter;
+            result[0] = tinv3 * (1 / 6.0f);
+            result[1] = -tinv3 * 0.5f + tinv2 * 0.5f + tinv * 0.5f + (1 / 6.0f);
+            result[2] = tinv3 * (7 / 12.0f) - tinv2 * 1.25f + tinv * 0.25f + (7 / 12.0f);
+            result[3] = t3 * 0.25f;
             break;
         case CURVE_END_2:
-            result[0] = tinv3 * sixth;
-            result[1] = (-tinv3 * (11.0f / 12.0f)) + (tinv2 * (1.5f));
-            result[2] = (tinv3 * (1.75f)) - (tinv2 * (4.5f)) + (tinv * (3.0f));
+            result[0] = tinv3 * (1 / 6.0f);
+            result[1] = -tinv3 * (11 / 12.0f) + tinv2 * 1.5f;
+            result[2] = tinv3 * 1.75f - tinv2 * 4.5f + tinv * 3.0f;
             result[3] = t3;
             break;
     }
@@ -1591,7 +1617,7 @@ void spline_get_weights(Vec4f result, f32 t, UNUSED s32 c) {
 void anim_spline_init(Vec4s *keyFrames) {
     gSplineKeyframe = keyFrames;
     gSplineKeyframeFraction = 0;
-    gSplineState = CURVE_BEGIN_1;
+    gSplineState = 1;
 }
 
 /**
@@ -1601,19 +1627,18 @@ void anim_spline_init(Vec4s *keyFrames) {
  */
 s32 anim_spline_poll(Vec3f result) {
     Vec4f weights;
-    s32 i, j;
+    s32 i;
     s32 hasEnded = FALSE;
 
-    vec3_zero(result);
+    vec3f_copy(result, gVec3fZero);
     spline_get_weights(weights, gSplineKeyframeFraction, gSplineState);
     for (i = 0; i < 4; i++) {
-        for (j = 0; j < 3; j++) {
-            result[j] += weights[i] * gSplineKeyframe[i][j + 1];
-        }
+        result[0] += weights[i] * gSplineKeyframe[i][1];
+        result[1] += weights[i] * gSplineKeyframe[i][2];
+        result[2] += weights[i] * gSplineKeyframe[i][3];
     }
 
-    gSplineKeyframeFraction += (gSplineKeyframe[0][0] * (1.0f / 1000.0f));
-    if (gSplineKeyframeFraction >= 1) {
+    if ((gSplineKeyframeFraction += gSplineKeyframe[0][0] / 1000.0f) >= 1) {
         gSplineKeyframe++;
         gSplineKeyframeFraction--;
         switch (gSplineState) {
@@ -1633,6 +1658,7 @@ s32 anim_spline_poll(Vec3f result) {
 
     return hasEnded;
 }
+#endif // !ALO (vanilla trig/approach/spline core)
 
 s16 length_sins(s16 length, s16 direction) {
     return (length * sins(direction));

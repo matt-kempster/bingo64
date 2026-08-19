@@ -26,6 +26,22 @@ cd test/emu && make test         # smoke + RAM tests
 The emulator tests expect mupen64plus in `~/opt/m64p/install` (override
 with `M64P=...`), built with `DEBUGGER=1` for the RAM test.
 
+### Frame-differential test (vanilla gatekeeper)
+
+`cd test/emu && make test-diff` runs the same scripted inputs through two
+ROMs and requires Mario's simulation state (action, angles, position,
+velocity, floor/ceil heights) to be **bit-identical every frame**. ROM A
+defaults to the pre-alo reference build (`/home/matt/b64-prealo`), ROM B
+to this repo's `build/us` ROM; override with `DIFF_ROM_A/DIFF_MAP_A/
+DIFF_ROM_B/DIFF_MAP_B`. This is the acceptance test for the
+vanilla-by-construction policy: a refactor of sim code counts as a noop
+only when this passes. On divergence it prints the first differing frame
+and the exact field deltas (with float bit patterns — it catches 1-ULP
+arithmetic drift). To grow the corpus, copy
+`test/emu/scripts/diff_move_bob.txt`: keep the boot timing, pick a course
+via the `--warp` poke, then script inputs at the mechanic under
+suspicion. See the docstring in `test/emu/diff_test.py`.
+
 ## How the pieces work
 
 **test/host** compiles the real `src/game/bingo*.c` files with plain gcc.

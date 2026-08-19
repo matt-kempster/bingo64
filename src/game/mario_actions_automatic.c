@@ -114,11 +114,15 @@ s32 set_pole_position(struct MarioState *m, f32 offsetY) {
     // Check for a floor.
     struct Surface *floor;
     f32 floorHeight = find_floor(m->pos[0], m->pos[1], m->pos[2], &floor);
+#ifdef ALO
     if (floor == NULL) {
         // Mario doesn't have a floor below the pole.
         set_mario_action(m, ACT_FREEFALL, 0);
         return POLE_FELL_OFF;
-    } else if (m->pos[1] < floorHeight) {
+    } else
+#endif
+    // (vanilla: a NULL floor just leaves floorHeight at -11000 and play continues)
+    if (m->pos[1] < floorHeight) {
         // Mario touched the floor.
         m->pos[1] = floorHeight;
         set_mario_action(m, ACT_IDLE, 0);
