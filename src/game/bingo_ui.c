@@ -153,6 +153,39 @@ void draw_bingo_notices(void) {
     }
 }
 
+// Once first place is taken in an online line/blackout race, the players
+// who did NOT win need to hear about it too — persistently, not as a 5s
+// toast. Lockout is excluded: its verdict ends the race for everyone and
+// draw_bingo_win_screen already shows it. Clears when the results clear
+// (back to lobby / disconnect).
+void draw_bingo_race_verdict(void) {
+#ifndef TARGET_N64
+    s32 i, winnerId = 0, myPlace;
+    char buf[64];
+    if (!network_active() || gbBingoMode == BINGO_MODE_LOCKOUT
+        || !gBingoInitialized) {
+        return;
+    }
+    for (i = 0; i < network_result_count(); i++) {
+        if (network_result(i)->place == 1) {
+            winnerId = network_result(i)->id;
+        }
+    }
+    if (winnerId == 0 || winnerId == network_local_id()) {
+        return;  // no verdict yet, or it's ours (the win overlay's job)
+    }
+    myPlace = network_local_place();
+    if (myPlace > 0) {
+        sprintf(buf, "%s WON - YOU PLACED %d", net_name_of_id(winnerId),
+                myPlace);
+    } else {
+        sprintf(buf, "%s WON - RACE FOR PLACE %d", net_name_of_id(winnerId),
+                network_result_count() + 1);
+    }
+    print_text_centered(160, 189, buf);
+#endif
+}
+
 void draw_bingo_win_screen() {
     char timestamp[16];
     char msg[40];

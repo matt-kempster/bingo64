@@ -664,6 +664,7 @@ void render_hud(void) {
             }
 
             draw_bingo_notices();
+            draw_bingo_race_verdict();
 
 #ifndef TARGET_N64
             if (network_state() == NET_STATE_RECONNECTING
