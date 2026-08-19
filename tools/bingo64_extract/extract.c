@@ -386,22 +386,56 @@ static void write_mapped_file(const char *outdir, const char *name,
 
 /* ------------------------------------------------------------------ */
 
-int main(int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <baserom.us.z64> [outdir]\n", argv[0]);
-        return 1;
-    }
-    const char *outdir = argc > 2 ? argv[2] : "res";
+/* When double-clicked (no args) the console window vanishes on exit, so
+   in that mode hold it open until Enter — success and failure alike. */
+static int sPauseOnExit = 0;
 
-    FILE *f = fopen(argv[1], "rb");
-    if (!f) { fprintf(stderr, "cannot open %s\n", argv[1]); return 1; }
+static int finish(int code) {
+    if (sPauseOnExit) {
+        printf("\nPress Enter to close this window...");
+        fflush(stdout);
+        getchar();
+    }
+    return code;
+}
+
+int main(int argc, char **argv) {
+    const char *rompath = NULL;
+    const char *outdir = "res";
+
+    if (argc >= 2) {
+        rompath = argv[1];
+        if (argc > 2) outdir = argv[2];
+    } else {
+        /* Double-clicked (or run bare): find the ROM ourselves. */
+        static const char *candidates[] = {
+            "baserom.us.z64", "baserom.z64", "baserom.us.n64",
+            "baserom.us.v64", "baserom.n64", "baserom.v64",
+        };
+        size_t i;
+        sPauseOnExit = 1;
+        for (i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+            FILE *probe = fopen(candidates[i], "rb");
+            if (probe) { fclose(probe); rompath = candidates[i]; break; }
+        }
+        if (!rompath) {
+            fprintf(stderr,
+                "No ROM found. Put your US Super Mario 64 ROM in this folder,\n"
+                "named baserom.us.z64, then run bingo64-extract again.\n");
+            return finish(1);
+        }
+        printf("Using %s\n", rompath);
+    }
+
+    FILE *f = fopen(rompath, "rb");
+    if (!f) { fprintf(stderr, "cannot open %s\n", rompath); return finish(1); }
     sRom = malloc(ROM_SIZE);
     size_t got = fread(sRom, 1, ROM_SIZE, f);
     fclose(f);
     if (got != ROM_SIZE) {
         fprintf(stderr, "ROM is %zu bytes, expected %d. This must be the 8MB US ROM.\n",
                 got, ROM_SIZE);
-        return 1;
+        return finish(1);
     }
 
     /* accept byteswapped dumps */
@@ -424,7 +458,7 @@ int main(int argc, char **argv) {
     if (strcmp(hex, sRomSha1) != 0) {
         fprintf(stderr, "This is not the US version of the ROM (sha1 %s,\n"
                         "expected %s). bingo64 needs the 8MB US ROM.\n", hex, sRomSha1);
-        return 1;
+        return finish(1);
     }
     printf("ROM verified (US). Extracting to %s/ ...\n", outdir);
 
@@ -435,7 +469,7 @@ int main(int argc, char **argv) {
         const uint8_t *seg = segment_data(e->mio0, &segsize);
         if (e->pos + e->size > segsize) {
             fprintf(stderr, "out of range: %s\n", e->path);
-            return 1;
+            return finish(1);
         }
         const uint8_t *raw = seg + e->pos;
         int count = e->w * e->h;
@@ -512,6 +546,6 @@ int main(int argc, char **argv) {
         printf("  sound/bank_sets\n");
     }
 
-    printf("Done. Put the res/ folder next to the game executable.\n");
-    return 0;
+    printf("Done. You can start the game now (sm64.us.f3dex2e.exe).\n");
+    return finish(0);
 }

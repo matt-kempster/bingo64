@@ -10,7 +10,7 @@ Setup (one time, about a minute)
 --------------------------------
 1. Put your ROM in this folder, named:  baserom.us.z64
    (.n64 / .v64 dumps are fine too; the extractor converts them.)
-2. Run:  bingo64-extract.exe baserom.us.z64
+2. Double-click:  bingo64-extract.exe   (it finds the ROM by itself)
 3. Start the game:  sm64.us.f3dex2e.exe
 
 If the extractor rejects your ROM, it isn't the US 8MB version --
