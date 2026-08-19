@@ -16,10 +16,12 @@ Stdlib only; no pytest needed.
 """
 
 import asyncio
+import json
 import os
 import random
 import struct
 import sys
+import tempfile
 import time
 import unittest
 
@@ -592,6 +594,83 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         await extra.start()
         extra.join("full", "toolate")
         await extra.wait_line("E room_full")
+
+
+# ---------------------------------------------------------- match log
+
+class _NullClient(relaymod.Client):
+    """Transportless client for driving process_line directly."""
+
+    def __init__(self):
+        super().__init__()
+
+    def send(self, line, lossy=False):
+        pass
+
+    def kick(self):
+        pass
+
+
+class MatchLogTest(unittest.TestCase):
+    """The JSONL history: one parseable event per semantic action, and a
+    disk guard that pauses history without disturbing the relay."""
+
+    def _events(self, logdir):
+        import glob
+        events = []
+        for path in sorted(glob.glob(os.path.join(logdir, "*.jsonl"))):
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    events.append(json.loads(line))
+        return events
+
+    def test_full_race_is_recorded(self):
+        with tempfile.TemporaryDirectory() as logdir:
+            relay = Relay(matchlog=relaymod.MatchLog(logdir))
+            host, other = _NullClient(), _NullClient()
+            relay.process_line(host, "J 5 peach matt 2 0".split())
+            relay.process_line(other, "J 5 peach luigi 4 0".split())
+            relay.process_line(host, "X".split())
+            relay.process_line(host, "C 12".split())
+            relay.process_line(other, "F".split())
+            relay.process_line(other, "Q".split())
+            relay.process_line(host, "Q".split())
+
+            events = self._events(logdir)
+            by_kind = {}
+            for e in events:
+                by_kind.setdefault(e["ev"], []).append(e)
+            for kind in ("room_created", "join", "start", "claim",
+                         "finish", "leave", "room_closed"):
+                self.assertIn(kind, by_kind, "missing event: " + kind)
+            self.assertEqual(len(by_kind["join"]), 2)
+            self.assertEqual(by_kind["join"][0]["name"], "matt")
+            start = by_kind["start"][0]
+            self.assertEqual(len(start["players"]), 2)
+            self.assertGreater(start["seed"], 0)
+            self.assertEqual(by_kind["claim"][0]["cell"], 12)
+            self.assertEqual(by_kind["finish"][0]["place"], 1)
+            for e in events:  # every record is dated and room-stamped
+                self.assertIn("t", e)
+                self.assertEqual(e["room"], "peach")
+
+    def test_disk_guard_pauses_history_not_relay(self):
+        with tempfile.TemporaryDirectory() as logdir:
+            relay = Relay(matchlog=relaymod.MatchLog(logdir))
+            saved = relaymod.MATCHLOG_MIN_FREE
+            relaymod.MATCHLOG_MIN_FREE = 1 << 62  # nothing is this free
+            try:
+                host = _NullClient()
+                relay.process_line(host, "J 5 peach matt 2 0".split())
+                self.assertIsNotNone(relay.log.paused)
+                self.assertEqual(self._events(logdir), [])
+                # The relay itself is unbothered.
+                self.assertIn("peach", relay.rooms)
+            finally:
+                relaymod.MATCHLOG_MIN_FREE = saved
+            relay.process_line(host, "X".split())  # resumes on next event
+            self.assertIsNone(relay.log.paused)
+            self.assertEqual(self._events(logdir)[0]["ev"], "start")
 
 
 if __name__ == "__main__":

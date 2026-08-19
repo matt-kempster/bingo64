@@ -127,6 +127,8 @@ No dependencies beyond the Python standard library.
 
 import argparse
 import asyncio
+import json
+import os
 import random
 import struct
 import time
@@ -400,23 +402,75 @@ class Room:
 
 STATS_INTERVAL_S = 24 * 3600  # one journal line a day proves liveness
 
+# History must never be what fills the disk: below this much free space
+# the match log pauses itself (the relay keeps running regardless).
+MATCHLOG_MIN_FREE = 1 << 30
+
+
+class MatchLog:
+    """Append-only JSONL history of semantic room events, one file per
+    month (<dir>/2026-08.jsonl). Only interpreted events are recorded —
+    never the ghost stream — so a whole race is a few KB and "every
+    match ever" stays a rounding error on the disk. Fail-open: any I/O
+    trouble or a nearly-full disk pauses logging, never the relay."""
+
+    def __init__(self, dirpath):
+        self.dir = dirpath or None  # None/"" = disabled
+        self.paused = None          # reason string while not writing
+        self.written = 0            # events since the last daily summary
+
+    def event(self, ev, room=None, **fields):
+        if self.dir is None:
+            return
+        rec = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+               "ev": ev}
+        if room is not None:
+            rec["room"] = room
+        rec.update(fields)
+        try:
+            os.makedirs(self.dir, exist_ok=True)
+            st = os.statvfs(self.dir)
+            if st.f_bavail * st.f_frsize < MATCHLOG_MIN_FREE:
+                self._pause("disk nearly full")
+                return
+            path = os.path.join(
+                self.dir, time.strftime("%Y-%m", time.gmtime()) + ".jsonl")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, separators=(",", ":"),
+                                   sort_keys=True) + "\n")
+        except OSError as exc:
+            self._pause(str(exc))
+            return
+        if self.paused is not None:
+            print("[%s] matchlog: resumed" % ts())
+            self.paused = None
+        self.written += 1
+
+    def _pause(self, why):
+        if self.paused != why:  # one journal line per distinct trouble
+            print("[%s] matchlog: paused (%s)" % (ts(), why))
+            self.paused = why
+
 
 class Relay:
-    def __init__(self):
+    def __init__(self, matchlog=None):
         self.rooms = {}
         self.stat_joins = 0    # joins since the last daily summary
         self.stat_races = 0    # races started since the last summary
+        self.log = matchlog if matchlog is not None else MatchLog(None)
 
     async def stats_loop(self):
         """A daily heartbeat in the journal, so "is it alive?" never
         needs an ssh session: journalctl -u bingo64-relay | tail."""
         while True:
             await asyncio.sleep(STATS_INTERVAL_S)
-            print("[%s] daily: %d rooms open, %d joins, %d races started"
+            print("[%s] daily: %d rooms open, %d joins, %d races started,"
+                  " %d history events"
                   % (ts(), len(self.rooms), self.stat_joins,
-                     self.stat_races))
+                     self.stat_races, self.log.written))
             self.stat_joins = 0
             self.stat_races = 0
+            self.log.written = 0
 
     def room_for(self, name, public):
         room = self.rooms.get(name)
@@ -425,6 +479,7 @@ class Relay:
             self.rooms[name] = room
             print("[%s] room '%s' created%s"
                   % (ts(), name, " [public]" if public else ""))
+            self.log.event("room_created", room=name, public=bool(public))
         return room
 
     def start_race(self, room):
@@ -438,6 +493,12 @@ class Relay:
         room.broadcast(room.start_line())
         print("[%s] room '%s' starting: %d players, seed %d, mode %d"
               % (ts(), room.name, len(room.members), room.seed, room.mode))
+        self.log.event("start", room=room.name, seed=room.seed,
+                       mode=room.mode, unlock=room.unlock,
+                       mask="%x" % room.mask,
+                       players=[{"id": c.id, "name": c.name,
+                                 "color": c.color}
+                                for c in room.members.values()])
 
     def reset_room(self, room):
         """The host ended the race: back to the lobby, roster intact."""
@@ -461,12 +522,14 @@ class Relay:
                                             False, True))
         print("[%s] room '%s' back to lobby (%d members)"
               % (ts(), room.name, len(room.members)))
+        self.log.event("lobby_reset", room=room.name)
 
     def pass_host(self, room, leaving_id):
         """Keep the host role on a connected member in every phase."""
         if leaving_id == room.creator_id and room.members:
             room.creator_id = min(room.members)
             room.broadcast("H %d" % room.creator_id)
+            self.log.event("host", room=room.name, id=room.creator_id)
 
     def send_room_snapshot(self, room, client):
         """Roster, claims and race status, for a joiner or reconnector."""
@@ -505,6 +568,8 @@ class Relay:
             room.broadcast("V %d %d" % room.winner)
             print("[%s] room '%s': lockout decided, #%d wins with %d squares"
                   % (ts(), room.name, leader_id, leader_count))
+            self.log.event("lockout_win", room=room.name, id=leader_id,
+                           squares=leader_count, frames=room.winner[1])
 
     def resume_session(self, room, client, token, name, color):
         """Find the member this token was issued to; -1 if unknown."""
@@ -575,6 +640,9 @@ class Relay:
                   % (ts(), client.name,
                      "rejoined" if resumed >= 0 else "joined",
                      room.name, client.id, len(room.members)))
+            self.log.event("rejoin" if resumed >= 0 else "join",
+                           room=room.name, id=client.id, name=client.name,
+                           color=client.color, members=len(room.members))
         elif cmd == "G" and client.room and len(parts) == 9:
             client.ghost_updates += 1
             client.room.broadcast(
@@ -595,6 +663,10 @@ class Relay:
             room.broadcast("C %d %d" % (cell, client.id))
             print("[%s] room '%s': cell %d claimed by #%d %s"
                   % (ts(), room.name, cell, client.id, client.name))
+            self.log.event("claim", room=room.name, id=client.id,
+                           cell=cell,
+                           frames=room.elapsed_frames() if room.started
+                           else -1)
             if room.mode == MODE_LOCKOUT:
                 self.adjudicate_lockout(room)
         elif cmd == "F" and client.room:
@@ -609,6 +681,8 @@ class Relay:
             print("[%s] room '%s': #%d %s finished, place %d (%d frames)"
                   % (ts(), room.name, client.id, client.name,
                      place, frames))
+            self.log.event("finish", room=room.name, id=client.id,
+                           place=place, frames=frames)
         elif cmd == "R" and client.room and len(parts) == 2:
             room = client.room
             if room.started:
@@ -664,15 +738,20 @@ class Relay:
             room.broadcast("D %d" % client.id)
             print("[%s] %s %s room '%s' (%d members, may return)"
                   % (ts(), client.name, why, room.name, len(room.members)))
+            self.log.event("drop", room=room.name, id=client.id,
+                           name=client.name, held=True)
         else:
             room.broadcast("B %d" % client.id)
             room.tokens.pop(client.id, None)
             print("[%s] %s left room '%s' (%d members, %d ghost updates relayed)"
                   % (ts(), client.name, room.name, len(room.members),
                      client.ghost_updates))
+            self.log.event("leave", room=room.name, id=client.id,
+                           name=client.name)
         if not room.members:
             del self.rooms[room.name]
             print("[%s] room '%s' closed" % (ts(), room.name))
+            self.log.event("room_closed", room=room.name)
         else:
             # The host role passes on to a connected member in every
             # phase (a mid-race dropout may return, but not as host:
@@ -719,9 +798,15 @@ async def main():
     ap = argparse.ArgumentParser(description="Bingo64 relay server")
     ap.add_argument("--port", type=int, default=64064)
     ap.add_argument("--host", default="0.0.0.0")
+    ap.add_argument("--matchlog",
+                    default=os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "matchlog"),
+                    help="dir for the JSONL match history"
+                         " (empty string disables)")
     args = ap.parse_args()
 
-    relay = Relay()
+    relay = Relay(matchlog=MatchLog(args.matchlog))
     server = await asyncio.start_server(relay.handle_tcp, args.host, args.port)
     loop = asyncio.get_running_loop()
     _, endpoint = await loop.create_datagram_endpoint(
