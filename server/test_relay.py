@@ -596,6 +596,24 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         await extra.wait_line("E room_full")
 
 
+class VersionAnchorTest(unittest.TestCase):
+    """relay.py and the C client must agree on the protocol version —
+    it is also the release version's minor number (v0.<protocol>.<patch>),
+    so a mismatch here means a mislabeled release."""
+
+    def test_protocol_versions_match(self):
+        header = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "..", "src", "pc", "network", "network.h")
+        with open(header, encoding="utf-8") as f:
+            for line in f:
+                if "#define NET_PROTOCOL_VERSION" in line:
+                    c_version = int(line.split()[2])
+                    break
+            else:
+                self.fail("NET_PROTOCOL_VERSION not found in network.h")
+        self.assertEqual(PROTOCOL_VERSION, c_version)
+
+
 # ---------------------------------------------------------- match log
 
 class _NullClient(relaymod.Client):

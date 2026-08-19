@@ -1,36 +1,45 @@
-bingo64 (beta)
-==============
+bingo64 (playtest)
+==================
 
-SM64 Bingo — race your friends to complete bingo objectives.
+SM64 Bingo -- race your friends to complete bingo goals.
 
-This download contains NO Nintendo game data. To play, you must provide
-your own US Super Mario 64 ROM, dumped from a cartridge you own.
+This download contains NO Nintendo game data. You need your own US
+Super Mario 64 ROM, dumped from a cartridge you own.
 
-Setup (one time)
-----------------
-1. Place your ROM in this folder, named:  baserom.us.z64
-   (.n64 and .v64 dumps are accepted too; the extractor converts them.)
+Setup (one time, about a minute)
+--------------------------------
+1. Put your ROM in this folder, named:  baserom.us.z64
+   (.n64 / .v64 dumps are fine too; the extractor converts them.)
 2. Run:  bingo64-extract.exe baserom.us.z64
-   This verifies the ROM is the US version and generates the res/
-   folder (textures, skyboxes, music, sound samples) next to the game.
-3. Start the game:  sm64.us.f3dex2.exe
+3. Start the game:  sm64.us.f3dex2e.exe
 
-If the extractor says the ROM hash doesn't match, your dump is not the
-US 8 MB big-endian ROM. Get a clean dump of the US cartridge.
+If the extractor rejects your ROM, it isn't the US 8MB version --
+get a clean dump of a US cartridge.
 
 Playing online
 --------------
-One player (or a server) runs the relay:  python3 relay.py
-Everyone enters the relay address in the game's ONLINE menu, picks the
-same room name, and readies up on the FILE SELECT screen.
+The game finds the server by itself. In the game:
+
+  ONLINE door -> pick a NAME and COLOR, type the ROOM name your
+  group agreed on -> CONNECT -> READY.
+
+Everyone who types the same room name is in the same race. The host
+(first one in) presses START RACE. Mid-race, pause + R opens the
+online menu (LEAVE RACE; the host can send everyone BACK TO LOBBY).
+
+Good to know
+------------
+- Playtest updates are frequent and sometimes break old versions.
+  If the game says "update needed", download the newest zip.
+- Your ROM and the generated res/ folder stay on your machine.
+  The zip is shareable; your ROM is not.
+- Settings live in %APPDATA%\sm64ex\sm64config.txt -- only edit it
+  while the game is closed (the game rewrites it on exit).
 
 Files
 -----
-sm64.us.f3dex2.exe     the game (contains no ROM data)
-bingo64-extract.exe    asset extractor (run once, needs your ROM)
-res/bingo64.custom.zip bingo64's own art and sound structure data
-relay.py               online relay server (optional, for hosting)
-res/ (generated)       created by the extractor from YOUR rom
-
-Your ROM and the generated res/ folder stay on your machine —
-don't redistribute them.
+sm64.us.f3dex2e.exe     the game (contains no ROM data)
+bingo64-extract.exe     one-time extractor (needs your ROM)
+res/bingo64.custom.zip  bingo64's own art + sound structure
+res/ (generated)        created from YOUR rom by the extractor
+relay.py                server code, for self-hosting (optional)

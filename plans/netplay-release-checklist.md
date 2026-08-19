@@ -272,6 +272,15 @@ this section are confirmed by reading `server/relay.py`.
       `udp:mauritania-defines.tun.ply.gg:16118` (ONE string only —
       >512-byte TXT sets truncate).
 - [ ] **Tag a GitHub release** once the sweep is green.
+- [x] **Versioning convention (playtest era, decided 2026-08-19):**
+      releases are `v0.<protocol>.<patch>` — the minor number IS the
+      wire protocol version (relay.py PROTOCOL_VERSION ==
+      network.h NET_PROTOCOL_VERSION, now enforced by
+      test_protocol_versions_match). Patch bump = same-protocol
+      rebuild, safe update; minor bump = protocol bump, breaks older
+      exes ("update needed"). Zip name: `bingo64-v0.P.N-win64.zip`;
+      git tag `v0.P.N`; GitHub releases published as drafts first.
+      `v1.0.0` is the moment the §6 never-clobber policy activates.
 - [ ] **Versioning at 1.0 (design agreed 2026-08-16, not yet needed).**
       Until the first public release, the clobber-freely rule stands:
       bump both PROTOCOL_VERSIONs, redeploy, old exes get "update
