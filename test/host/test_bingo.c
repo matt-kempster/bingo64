@@ -356,6 +356,28 @@ static void test_weight_budget(void) {
     }
 }
 
+static void test_repeated_generation_resets_budgets(void) {
+    struct BingoObjective first[25];
+    int round;
+    // Regression: usesRemaining budgets used to deplete across in-process
+    // generations (netplay rematches) until a class's weight sum hit 0 and
+    // get_random_objective_type faulted on `% sum` by about the 4th board.
+    // Deliberately NOT calling save_or_restore_weights here: the game must
+    // reset its own budgets now, and the reset must return the tables to
+    // pristine (same seed, same board, no matter how many boards came
+    // before).
+    for (round = 0; round < 12; round++) {
+        memset(gBingoObjectives, 0, sizeof(gBingoObjectives));
+        gbBingoMode = BINGO_MODE_LINE_1;
+        gbBingosCompleted = 0;
+        setup_bingo_objectives(4242);
+        if (round == 0) {
+            memcpy(first, gBingoObjectives, sizeof(first));
+        }
+    }
+    CHECK(memcmp(first, gBingoObjectives, sizeof(first)) == 0);
+}
+
 // ---------------------------------------------------------------------------
 // Event simulations: hand-build an objective, feed it game events through
 // bingo_update, and watch the state change.
@@ -692,6 +714,7 @@ int main(void) {
     RUN_TEST(test_golden_boards);
     RUN_TEST(test_invariant_sweep);
     RUN_TEST(test_weight_budget);
+    RUN_TEST(test_repeated_generation_resets_budgets);
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
     RUN_TEST(test_sim_splatoon_objective);

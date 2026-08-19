@@ -113,6 +113,34 @@ struct ObjectiveWeight sWeightsCenter[] = {
 };
 s32 sWeightsSizeCenter = sizeof(sWeightsCenter) / sizeof(struct ObjectiveWeight);
 
+// The budgets above (usesRemaining) are consumed as a board is dealt, so
+// they must start fresh for every board. Regenerating in-process — netplay
+// rematches, new save files — otherwise drains them until a class's weight
+// sum reaches 0 and get_random_objective_type faults on `% sum`.
+static void reset_weight_budgets(void) {
+    static s32 sFreshUses[128];  // >= total entries across the four tables
+    static s32 sFreshSaved = 0;
+    struct ObjectiveWeight *tables[4];
+    s32 sizes[4];
+    s32 t, i, k;
+
+    tables[0] = sWeightsEasy;   sizes[0] = sWeightsSizeEasy;
+    tables[1] = sWeightsMedium; sizes[1] = sWeightsSizeMedium;
+    tables[2] = sWeightsHard;   sizes[2] = sWeightsSizeHard;
+    tables[3] = sWeightsCenter; sizes[3] = sWeightsSizeCenter;
+    k = 0;
+    for (t = 0; t < 4; t++) {
+        for (i = 0; i < sizes[t]; i++, k++) {
+            if (!sFreshSaved) {
+                sFreshUses[k] = tables[t][i].usesRemaining;
+            } else {
+                tables[t][i].usesRemaining = sFreshUses[k];
+            }
+        }
+    }
+    sFreshSaved = 1;
+}
+
 struct ObjectiveWeight *find_weight(
     enum BingoObjectiveClass class,
     enum BingoObjectiveType objective
@@ -473,6 +501,7 @@ void setup_bingo_objectives(u32 seed) {
 
     // Initialize random number subsystem
     init_genrand(seed);
+    reset_weight_budgets();
 
     gBingoInitialized = 1;
     gBingoInitialSeed = seed;
