@@ -48,7 +48,9 @@
 #endif
 
 #else
-#define FRAME_INTERVAL_US_NUMERATOR 100000
+// NTSC paces at 60000/1001 fields/s (59.94 Hz), so a console game frame is
+// 1001/30000 s, not 1/30 s. An even 30 fps runs the whole game 0.1% fast.
+#define FRAME_INTERVAL_US_NUMERATOR 100100
 
 #ifdef HIGH_FPS_PC
 #define FRAME_INTERVAL_US_DENOMINATOR 6

@@ -53,7 +53,9 @@ void Sleep(unsigned long ms);
 #ifdef VERSION_EU
 #define FRAMERATE 25
 #else
-#define FRAMERATE 30
+// NTSC paces at 60000/1001 fields/s (59.94 Hz), so a console game frame is
+// 30000/1001 per second (~29.97), not an even 30 (which runs 0.1% fast).
+#define FRAMERATE (30000.0 / 1001.0)
 #endif
 
 // Only used on console targets
