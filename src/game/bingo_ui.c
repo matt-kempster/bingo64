@@ -95,8 +95,11 @@ static struct NetGhost *ghost_for_name(const char *name) {
     return NULL;
 }
 
-// Short course code ("bob", "castle") for a level id, lowercased for the
-// dialog font (narrower glyphs), into out[8]. Empty when unknown.
+// Community-standard course code ("BoB", "WF", "WMotR") for a level id,
+// into out[8]; "Castle" for the hub levels, empty when unknown. The
+// shared courseAbbreviations table already uses the standard forms
+// except BOB (the board's HUD-font captions are caps-only, so the
+// shared table can't hold the lowercase o).
 static void course_code_for_level(s16 level, char out[8]) {
     const char *src;
     s32 i;
@@ -106,13 +109,15 @@ static void course_code_for_level(s16 level, char out[8]) {
         return;
     }
     course = gLevelToCourseNumTable[level - 1];
-    if (course > 0 && course <= 24) {
+    if (course == COURSE_BOB) {
+        src = "BoB";
+    } else if (course > 0 && course <= 24) {
         src = courseAbbreviations[course - 1];
     } else {
-        src = "castle";
+        src = "Castle";
     }
     for (i = 0; src[i] != '\0' && i < 7; i++) {
-        out[i] = (src[i] >= 'A' && src[i] <= 'Z') ? src[i] + 0x20 : src[i];
+        out[i] = src[i];
     }
     out[i] = '\0';
 }
@@ -634,6 +639,8 @@ void draw_bingo_screen() {
         char name_print[24];
         char detail[32];
         char course[8];
+        s32 quadY[NET_MAX_PLAYERS];
+        s32 nQuads = 0;
         s32 rowY = 162;
         gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
         for (i = 0; i < NET_MAX_PLAYERS && rowY > 60; i++) {
@@ -666,6 +673,11 @@ void draw_bingo_screen() {
                 gNetColorRGB[p->color % NET_COLOR_COUNT][0],
                 gNetColorRGB[p->color % NET_COLOR_COUNT][1],
                 gNetColorRGB[p->color % NET_COLOR_COUNT][2], 255, TRUE, 1);
+            // Data row: "<n> [] ; in BoB" while racing (the [] square
+            // symbol is drawn as a literal quad below, ';' renders as
+            // the dialog font's interpunct) or "1st ; 12'34.50" once
+            // finished. Count right-aligned to the square, interpunct
+            // column fixed so the rows read as a table.
             if (res != NULL && gbBingoMode != BINGO_MODE_LOCKOUT) {
                 getTimeFmtPrecise(timestamp, res->frames);
                 time_fmt_dialog(timestamp);
@@ -675,7 +687,8 @@ void draw_bingo_screen() {
                 print_generic_string_ascii_detail(244, rowY - 12, detail,
                                                   255, 255, 255, 255,
                                                   TRUE, 1);
-                print_generic_string_ascii_detail(276, rowY - 12, timestamp,
+                sprintf(detail, "; %s", timestamp);
+                print_generic_string_ascii_detail(266, rowY - 12, detail,
                                                   255, 255, 255, 255,
                                                   TRUE, 1);
             } else {
@@ -688,17 +701,36 @@ void draw_bingo_screen() {
                         course_code_for_level(g->level, course);
                     }
                 }
-                sprintf(detail, "%d sq", net_cell_count_of_id(p->id));
-                print_generic_string_ascii_detail(244, rowY - 12, detail,
-                                                  255, 255, 255, 255,
-                                                  TRUE, 1);
-                print_generic_string_ascii_detail(276, rowY - 12, course,
+                sprintf(detail, "%d", net_cell_count_of_id(p->id));
+                print_generic_string_ascii_detail(
+                    250 - get_string_width_ascii(detail), rowY - 12, detail,
+                    255, 255, 255, 255, TRUE, 1);
+                if (nQuads < NET_MAX_PLAYERS) {
+                    quadY[nQuads++] = rowY - 12;
+                }
+                // Hubs skip the "in" so "Castle" fits the fixed column.
+                if (course[0] == '\0') {
+                    detail[0] = '\0';
+                } else if (strcmp(course, "Castle") == 0) {
+                    sprintf(detail, "; %s", course);
+                } else {
+                    sprintf(detail, "; in %s", course);
+                }
+                print_generic_string_ascii_detail(264, rowY - 12, detail,
                                                   255, 255, 255, 255,
                                                   TRUE, 1);
             }
             rowY -= 30;
         }
         gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+        // The [] "squares" symbol after each count: a literal little
+        // square, drop-shadowed like the text (quads can't be drawn
+        // inside the ia-text block).
+        for (i = 0; i < nQuads; i++) {
+            s32 qy = 231 - quadY[i];  // fillrect y for this data row's caps
+            print_solid_color_quad(255, qy + 1, 260, qy + 6, 0, 0, 0, 255);
+            print_solid_color_quad(254, qy, 259, qy + 5, 255, 255, 255, 255);
+        }
     }
 #endif
 

@@ -108,6 +108,16 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   columns (x=244 status: "2 sq" / "1st"; x=276 where/time: lowercase
   course code / 0'21.86). course_code_for_level now emits lowercase.
 
+- roster polish round 2 (Matt): data row is now "2 [] ; in BoB" — the
+  squares unit is a literal drawn quad (no square glyph in the dialog
+  font), the delimiter is the dialog font's interpunct 0xFC (ascii ';'
+  now maps to it in draw_util's converter), courses read "in BoB" /
+  "in WF" ("Castle" drops the "in" to fit the fixed column), and
+  course codes use the community-standard caps — the repo's
+  courseAbbreviations already had them except BOB, which the roster
+  displays as BoB (the shared table stays caps: the board's HUD-font
+  captions can't render lowercase).
+
 ## Deferred / follow-ups
 
 - Room-setting visibility tiers + whereabouts toggle → protocol v6

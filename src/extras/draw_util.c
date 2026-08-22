@@ -88,6 +88,7 @@ static u8 ascii_to_font_char(u8 c) {
 
     if (c == '\'') return 0x3E;
     if (c == '.')  return 0x3F;
+    if (c == ';')  return 0xFC;  // interpunct (Bingo64: roster delimiter)
     if (c == ',')  return 0x6F;
     if (c == ' ')  return 0x9E;
     if (c == '-')  return 0x9F;
