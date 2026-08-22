@@ -708,13 +708,15 @@ void draw_bingo_screen() {
                 if (nQuads < NET_MAX_PLAYERS) {
                     quadY[nQuads++] = rowY - 12;
                 }
-                // Hubs skip the "in" so "Castle" fits the fixed column.
+                // No interpunct here: the square symbol already breaks
+                // the fields, and the two small glyphs clash side by
+                // side. Hubs skip the "in" so "Castle" fits the column.
                 if (course[0] == '\0') {
                     detail[0] = '\0';
                 } else if (strcmp(course, "Castle") == 0) {
-                    sprintf(detail, "; %s", course);
+                    sprintf(detail, "%s", course);
                 } else {
-                    sprintf(detail, "; in %s", course);
+                    sprintf(detail, "in %s", course);
                 }
                 print_generic_string_ascii_detail(264, rowY - 12, detail,
                                                   255, 255, 255, 255,
