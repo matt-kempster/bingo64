@@ -127,11 +127,16 @@ No dependencies beyond the Python standard library.
 
 import argparse
 import asyncio
+import functools
 import json
 import os
 import random
 import struct
 import time
+
+# Under systemd, stdout is a pipe and Python block-buffers it: journal
+# lines otherwise sit unflushed for days on a quiet relay.
+print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.

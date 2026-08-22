@@ -195,10 +195,17 @@ this section are confirmed by reading `server/relay.py`.
       frozen" state — cleared in ~90s), relay + playit returned with
       no hands and the tunnel address was unchanged (v5 RefClient
       probe PASS through the tunnel).
-- [ ] **Log hygiene (verify).** journalctl works (python3 -u). Confirm
-      journald caps disk usage (default is fine, but MemoryMax=256M on
-      the service + unbounded logs on a 30GB disk — check
-      SystemMaxUse).
+- [ ] **Log hygiene (verify).** Confirm journald caps disk usage
+      (default is fine, but MemoryMax=256M on the service + unbounded
+      logs on a 30GB disk — check SystemMaxUse).
+- [ ] **Journal buffering fix — ships with next relay deploy.** Found
+      2026-08-22: the live unit runs python3 WITHOUT -u, so relay
+      print() output block-buffers and the journal showed nothing
+      since the Aug 19 restart (daily heartbeat included; the matchlog
+      was unaffected, it flushes its own file). relay.py now forces
+      flush=True on print (committed with this item); lands on the
+      next `server/deploy/update.sh` run — no dedicated restart, the
+      relay holds room state in memory so don't bounce it idly.
 - [x] **Uptime visibility.** DONE 2026-08-16: Relay.stats_loop prints a
       daily "N rooms open, N joins, N races started" journal line
       (counters reset each day). `journalctl -u bingo64-relay | tail`
@@ -233,6 +240,17 @@ this section are confirmed by reading `server/relay.py`.
       only type a name and room? Or keep it blank to avoid strangers
       landing on Matt's relay? (Room names are effectively passwords —
       probably fine to default it.)
+- [ ] **Mute-toggle ambush (playtest bug, 2026-08-22).** M silently
+      toggles a hard window mute (`gAudioMuted`, controller_keyboard.c)
+      that zeroes the whole audio buffer — no indicator anywhere, and
+      the settings menu still shows audio enabled. Bit Matt live: he
+      was on the lobby OPTIONS screen when the host hit GO; the forced
+      `text_input_stop()` turned his in-flight typing back into game
+      input and an `m` muted the race. Fix: (a) draw a small MUTED
+      indicator on the HUD while it's set (minimum), (b) swallow the
+      M hotkey for a few frames after text input closes, or make the
+      toggle an explicit keybind/config entry. Candidate for the 5.3
+      patch batch alongside the controller fixes.
 - [ ] **Settings bundles (Matt's ask, 2026-08-16).** Friends should not
       have to use the in-game text fields at all: ship a preset next to
       the exe that carries server/room/name so the lobby is just
