@@ -359,7 +359,7 @@ static void notice_about(s32 id, const char *what) {
     struct NetPlayer *p = player_for_id(id, 0);
     if (p != NULL) {
         bingo_notice_rich(p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
-                          what, -1);
+                          what, -1, NULL);
     } else {
         char buf[64];
         snprintf(buf, sizeof(buf), "someone %s", what);

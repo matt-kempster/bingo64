@@ -99,6 +99,15 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   "QUATE* 2 BOB" after quate went silent). Reusable rig for all
   future presence work.
 
+- toast copy + roster table (Matt's review, 2026-08-22 evening): claim
+  toasts now read "quate completed <icon> WF*7" — verb changed from
+  "got", and the cell's mini subtitle (objective->title, with the HUD
+  0xFA star translated to the dialog font's '*' star) rides after the
+  icon for disambiguation. The L-screen roster became a two-line
+  aligned table per player: colored name row, then a data row at fixed
+  columns (x=244 status: "2 sq" / "1st"; x=276 where/time: lowercase
+  course code / 0'21.86). course_code_for_level now emits lowercase.
+
 ## Deferred / follow-ups
 
 - Room-setting visibility tiers + whereabouts toggle → protocol v6

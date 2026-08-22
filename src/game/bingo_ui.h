@@ -10,12 +10,13 @@ void draw_bingo_hud_timer(void);
 void draw_bingo_screen(void);
 void draw_bingo_win_screen(void);
 
-// Toast feed for online events ("Quate got [icon]", "Boop left"). Toasts
-// expire after 4s; rich toasts open with a hat-colored name and can end
-// with a board-icon glyph (-1 = none).
+// Toast feed for online events ("Quate completed [icon] TTC 80", "Boop
+// left"). Toasts expire after 4s; rich toasts open with a hat-colored name
+// and can carry a board-icon glyph (-1 = none) plus a tail after it
+// (usually the cell's title; NULL = none).
 void bingo_notice(const char *text);
 void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
-                       s32 icon);
+                       s32 icon, const char *tail);
 void draw_bingo_notices(void);  // HUD hook (bottom-center subtitles)
 void draw_bingo_race_verdict(void);  // HUD hook (persistent, top center)
 // Newest notice and its age in frames, or NULL: the lobby status line

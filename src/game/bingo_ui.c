@@ -95,8 +95,8 @@ static struct NetGhost *ghost_for_name(const char *name) {
     return NULL;
 }
 
-// Short course code ("BOB", "CASTLE") for a level id, uppercased for the
-// HUD font, into out[8]. Empty string when the level is unknown.
+// Short course code ("bob", "castle") for a level id, lowercased for the
+// dialog font (narrower glyphs), into out[8]. Empty when unknown.
 static void course_code_for_level(s16 level, char out[8]) {
     const char *src;
     s32 i;
@@ -109,10 +109,10 @@ static void course_code_for_level(s16 level, char out[8]) {
     if (course > 0 && course <= 24) {
         src = courseAbbreviations[course - 1];
     } else {
-        src = "CASTLE";
+        src = "castle";
     }
     for (i = 0; src[i] != '\0' && i < 7; i++) {
-        out[i] = (src[i] >= 'a' && src[i] <= 'z') ? src[i] - 0x20 : src[i];
+        out[i] = (src[i] >= 'A' && src[i] <= 'Z') ? src[i] + 0x20 : src[i];
     }
     out[i] = '\0';
 }
@@ -144,12 +144,14 @@ static s32 net_cell_count_of_id(s32 id) {
 #define BINGO_NOTICE_MAX 3
 #define BINGO_NOTICE_LEN 48
 #define BINGO_NOTICE_NAME_LEN 20
+#define BINGO_NOTICE_TAIL_LEN 32
 #define BINGO_NOTICE_LIFE 120   // frames a notice stays up (4 seconds)
 #define BINGO_NOTICE_FADE 30    // fade-out tail within that life
 
 struct BingoNotice {
     char name[BINGO_NOTICE_NAME_LEN]; // "" = no colored prefix
     char text[BINGO_NOTICE_LEN];
+    char tail[BINGO_NOTICE_TAIL_LEN]; // after the icon (the cell's title)
     u8 rgb[3];                        // name color (hat color)
     s16 icon;                         // BingoObjectiveIcon, -1 = none
     u32 frame;                        // gGlobalTimer at push
@@ -167,9 +169,9 @@ static void bingo_notice_drop_oldest(void) {
 }
 
 void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
-                       s32 icon) {
+                       s32 icon, const char *tail) {
     struct BingoNotice *n;
-    s32 i;
+    s32 i, o;
     if (sNoticeCount == BINGO_NOTICE_MAX) {
         bingo_notice_drop_oldest();
     }
@@ -182,6 +184,19 @@ void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
         n->text[i] = text[i];
     }
     n->text[i] = '\0';
+    // The tail is usually a board-cell title: ASCII plus the HUD font's
+    // 0xFA filled star, which the dialog font spells '*' (also a star).
+    o = 0;
+    if (tail != NULL) {
+        for (i = 0; tail[i] != '\0' && o < BINGO_NOTICE_TAIL_LEN - 1; i++) {
+            if ((u8) tail[i] == 0xFA) {
+                n->tail[o++] = '*';
+            } else if (tail[i] >= ' ' && tail[i] <= '~') {
+                n->tail[o++] = tail[i];
+            }
+        }
+    }
+    n->tail[o] = '\0';
     n->rgb[0] = rgb[0];
     n->rgb[1] = rgb[1];
     n->rgb[2] = rgb[2];
@@ -198,7 +213,7 @@ void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
 
 void bingo_notice(const char *text) {
     static const u8 white[3] = { 255, 255, 255 };
-    bingo_notice_rich("", white, text, -1);
+    bingo_notice_rich("", white, text, -1, NULL);
 }
 
 // The latest toast's full line ("name text"), for the lobby status row.
@@ -225,15 +240,16 @@ static void bingo_notice_demo_tick(void) {
     }
     switch (next++ % 4) {
         case 0:
-            bingo_notice_rich("Quate", gNetColorRGB[5], "got",
-                              BINGO_ICON_STAR);
+            bingo_notice_rich("Quate", gNetColorRGB[5], "completed",
+                              BINGO_ICON_STAR, "WF\xFA""7");
             break;
         case 1:
-            bingo_notice_rich("leGlitch", gNetColorRGB[1], "got",
-                              BINGO_ICON_COIN);
+            bingo_notice_rich("leGlitch", gNetColorRGB[1], "completed",
+                              BINGO_ICON_COIN, "TTC 80");
             break;
         case 2:
-            bingo_notice_rich("Boop", gNetColorRGB[3], "reconnected", -1);
+            bingo_notice_rich("Boop", gNetColorRGB[3], "reconnected", -1,
+                              NULL);
             break;
         case 3:
             bingo_notice("the host ended the race");
@@ -249,13 +265,16 @@ static void bingo_notice_demo_tick(void) {
 // tuned with Matt 2026-08-22: text -5, icon -4 relative to yText).
 static void draw_quiet_line(s32 xLeft, s32 yText, const char *name,
                             const u8 nameRGB[3], const char *text,
-                            const u8 textRGB[3], s32 icon, u8 alpha) {
+                            const u8 textRGB[3], s32 icon, const char *tail,
+                            u8 alpha) {
     s32 nameW = (name != NULL && name[0] != '\0')
                     ? get_string_width_ascii((char *) name) + 4 : 0;
     s32 textW = (text != NULL && text[0] != '\0')
                     ? get_string_width_ascii((char *) text) : 0;
     s32 iconW = icon >= 0 ? 20 : 0;
-    s32 total = nameW + textW + iconW;
+    s32 tailW = (tail != NULL && tail[0] != '\0')
+                    ? get_string_width_ascii((char *) tail) + 4 : 0;
+    s32 total = nameW + textW + iconW + tailW;
     s32 x = xLeft >= 0 ? xLeft : (SCREEN_WIDTH - total) / 2;
 
     // The dimmed strip (fillrect coords: origin top-left, y down).
@@ -273,6 +292,12 @@ static void draw_quiet_line(s32 xLeft, s32 yText, const char *name,
         print_generic_string_ascii_detail(x + nameW, yText - 5, text,
                                           textRGB[0], textRGB[1], textRGB[2],
                                           alpha, TRUE, 1);
+    }
+    if (tailW > 0) {
+        print_generic_string_ascii_detail(x + nameW + textW + iconW + 4,
+                                          yText - 5, tail, textRGB[0],
+                                          textRGB[1], textRGB[2], alpha,
+                                          TRUE, 1);
     }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 
@@ -322,7 +347,7 @@ void draw_bingo_notices(void) {
             }
         }
         draw_quiet_line(20, 24 + 21 * row, n->name, n->rgb, n->text,
-                        sQuietWhite, n->icon, (u8) alpha);
+                        sQuietWhite, n->icon, n->tail, (u8) alpha);
     }
 #endif
 }
@@ -357,7 +382,7 @@ void draw_bingo_race_verdict(void) {
     draw_quiet_line(-1, 189, net_name_of_id(winnerId),
                     gNetColorRGB[network_color_of_id(winnerId)
                                  % NET_COLOR_COUNT],
-                    buf, sQuietWhite, -1, 255);
+                    buf, sQuietWhite, -1, NULL, 255);
 #endif
 }
 
@@ -378,10 +403,10 @@ static void time_fmt_dialog(char *s) {
 static void draw_win_hint(s32 showSuperPlayer) {
     if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
         draw_quiet_line(-1, 38, NULL, NULL, "press L again to dismiss",
-                        sQuietWhite, -1, 255);
+                        sQuietWhite, -1, NULL, 255);
     } else if (showSuperPlayer) {
         draw_quiet_line(-1, 38, NULL, NULL, "you are a super player",
-                        sQuietWhite, -1, 255);
+                        sQuietWhite, -1, NULL, 255);
     }
 }
 #endif
@@ -400,13 +425,13 @@ void draw_bingo_win_screen() {
         if (winner == network_local_id()) {
             // Your win: same quiet strip, celebratory rainbow text.
             sprintf(msg, "you win %d squares", net_cell_count_of_id(winner));
-            draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, 255);
+            draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, NULL, 255);
         } else {
             sprintf(msg, "wins %d squares", net_cell_count_of_id(winner));
             draw_quiet_line(-1, 60, net_name_of_id(winner),
                             gNetColorRGB[network_color_of_id(winner)
                                          % NET_COLOR_COUNT],
-                            msg, sQuietWhite, -1, 255);
+                            msg, sQuietWhite, -1, NULL, 255);
         }
         draw_win_hint(FALSE);
         return;
@@ -420,7 +445,7 @@ void draw_bingo_win_screen() {
                 timestamp);
         draw_quiet_line(-1, 60, NULL, NULL, msg,
                         network_local_place() == 1 ? rainbow : sQuietWhite,
-                        -1, 255);
+                        -1, NULL, 255);
         draw_win_hint(TRUE);
         return;
     }
@@ -429,7 +454,7 @@ void draw_bingo_win_screen() {
     getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
     time_fmt_dialog(timestamp);
     sprintf(msg, "your time is %s", timestamp);
-    draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, 255);
+    draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, NULL, 255);
     draw_win_hint(TRUE);
 #else
     getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
@@ -609,9 +634,9 @@ void draw_bingo_screen() {
         char name_print[24];
         char detail[32];
         char course[8];
-        s32 rowY = 150;
+        s32 rowY = 162;
         gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-        for (i = 0; i < NET_MAX_PLAYERS && rowY > 40; i++) {
+        for (i = 0; i < NET_MAX_PLAYERS && rowY > 60; i++) {
             struct NetPlayer *p = &gNetPlayers[i];
             const struct NetResult *res = NULL;
             const char *mark = "";
@@ -633,12 +658,26 @@ void draw_bingo_screen() {
                     mark = "?";
                 }
             }
+            // Two aligned lines per player: the colored name, then a data
+            // row at fixed column x's so the roster reads as a table.
+            sprintf(name_print, "%s%s", p->name, mark);
+            print_generic_string_ascii_detail(
+                236, rowY, name_print,
+                gNetColorRGB[p->color % NET_COLOR_COUNT][0],
+                gNetColorRGB[p->color % NET_COLOR_COUNT][1],
+                gNetColorRGB[p->color % NET_COLOR_COUNT][2], 255, TRUE, 1);
             if (res != NULL && gbBingoMode != BINGO_MODE_LOCKOUT) {
                 getTimeFmtPrecise(timestamp, res->frames);
                 time_fmt_dialog(timestamp);
-                sprintf(detail, "%d%s %s", res->place,
+                sprintf(detail, "%d%s", res->place,
                         res->place == 1 ? "st" : res->place == 2 ? "nd"
-                        : res->place == 3 ? "rd" : "th", timestamp);
+                        : res->place == 3 ? "rd" : "th");
+                print_generic_string_ascii_detail(244, rowY - 12, detail,
+                                                  255, 255, 255, 255,
+                                                  TRUE, 1);
+                print_generic_string_ascii_detail(276, rowY - 12, timestamp,
+                                                  255, 255, 255, 255,
+                                                  TRUE, 1);
             } else {
                 course[0] = '\0';
                 if (p->id == network_local_id()) {
@@ -649,19 +688,15 @@ void draw_bingo_screen() {
                         course_code_for_level(g->level, course);
                     }
                 }
-                sprintf(detail, "%d %s", net_cell_count_of_id(p->id),
-                        course);
+                sprintf(detail, "%d sq", net_cell_count_of_id(p->id));
+                print_generic_string_ascii_detail(244, rowY - 12, detail,
+                                                  255, 255, 255, 255,
+                                                  TRUE, 1);
+                print_generic_string_ascii_detail(276, rowY - 12, course,
+                                                  255, 255, 255, 255,
+                                                  TRUE, 1);
             }
-            sprintf(name_print, "%s%s", p->name, mark);
-            print_generic_string_ascii_detail(
-                236, rowY, name_print,
-                gNetColorRGB[p->color % NET_COLOR_COUNT][0],
-                gNetColorRGB[p->color % NET_COLOR_COUNT][1],
-                gNetColorRGB[p->color % NET_COLOR_COUNT][2], 255, TRUE, 1);
-            print_generic_string_ascii_detail(
-                236 + get_string_width_ascii(name_print) + 6, rowY, detail,
-                255, 255, 255, 255, TRUE, 1);
-            rowY -= 15;
+            rowY -= 30;
         }
         gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
     }

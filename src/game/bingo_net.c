@@ -153,7 +153,8 @@ static void apply_remote_claims(void) {
                     bingo_notice_rich(
                         gNetPlayers[i].name,
                         gNetColorRGB[gNetPlayers[i].color % NET_COLOR_COUNT],
-                        "got", gBingoObjectives[cell].icon);
+                        "completed", gBingoObjectives[cell].icon,
+                        gBingoObjectives[cell].title);
                     break;
                 }
             }
