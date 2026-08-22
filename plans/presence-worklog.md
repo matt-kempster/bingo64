@@ -197,6 +197,17 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   Relay tests 23/23 incl. new test_v6_visibility_settings; e2e.py
   gained $E2E_ROOMOPTS/$E2E_PREFIX for screenshot passes per config.
 
+- v6 DEPLOYED live (2026-08-22 ~23:31 UTC, room empty per Matt).
+  New "?" occupancy probe (no join needed) answers
+  "? rooms= members= racing="; deploy/update.sh asks it before
+  restarting and aborts on members>0 (BINGO64_FORCE=1 overrides).
+  Verified live: real client joined via the auto TXT resolver
+  against the v6 relay; probe answers rooms=0 over gcloud ssh; the
+  journald flush fix rode along and log lines now appear instantly.
+  gcloud lives at ~/google-cloud-sdk/bin (not on the default PATH).
+  bingo64-v6.exe staged in AppData; bingo64-presence.exe (v5) is now
+  DEAD against the live relay — players must switch to the v6 exe.
+
 ## Deferred / follow-ups
 
 - Relay-side visibility enforcement (see checklist §2) — potentially

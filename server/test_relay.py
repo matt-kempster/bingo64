@@ -381,6 +381,16 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         await b.wait_line("O 4")
         self.assertEqual(b.count("R 1 1"), 1)  # dup was dropped, not re-run
 
+    async def test_status_probe(self):
+        a, b = await self.two_joined()
+        t = self.track(TcpRef(self.tcp_port))
+        await t.start()
+        t.send("?")
+        line = await t.wait_line("? ")
+        self.assertIn("rooms=1", line)
+        self.assertIn("members=2", line)
+        self.assertIn("racing=0", line)
+
     async def test_v6_visibility_settings(self):
         a, b = await self.two_joined()
         # Defaults ride the welcome: open claims, whereabouts shared.

@@ -87,6 +87,10 @@ Line protocol (space-separated fields):
     F                        local win condition met (line modes; the
                              server ignores it in lockout)
     L                        list public rooms
+    ?                        occupancy probe (no join needed): one
+                             "? rooms=<n> members=<m> racing=<r>" reply,
+                             then the connection closes. deploy/update.sh
+                             asks this before restarting the service.
     Q                        leaving on purpose (UDP: a courtesy so the
                              room hears B/D now instead of after the
                              silence timeout; TCP just closes)
@@ -629,6 +633,16 @@ class Relay:
         """Handle one message. Returns False when the connection is done
         (refused): the caller severs the transport, without drop()."""
         cmd = parts[0]
+        if cmd == "?":
+            # Occupancy probe, no join needed: deploys ask this before
+            # restarting (a restart drops everyone in a race). One line,
+            # then the connection is done.
+            occupied = [r for r in self.rooms.values() if r.members]
+            client.send("? rooms=%d members=%d racing=%d"
+                        % (len(occupied),
+                           sum(len(r.members) for r in occupied),
+                           sum(1 for r in occupied if r.started)))
+            return False
         if cmd == "J" and client.room is None and len(parts) >= 3:
             if parts[1] != str(PROTOCOL_VERSION):
                 client.send("E version %d" % PROTOCOL_VERSION)

@@ -25,14 +25,48 @@ cd "$(dirname "$0")/.."   # server/
 INSTANCE="${BINGO64_INSTANCE:-mario-server}"
 ZONE="${BINGO64_ZONE:-us-east1-c}"
 REMOTE_PATH=/home/kidpixel/relay.py
+PORT="${BINGO64_PORT:-64064}"
 SERVICE=bingo64
 DEPLOY_CMD="sudo install -o kidpixel -g kidpixel -m 644 /tmp/relay.py ${REMOTE_PATH} \
   && sudo systemctl restart ${SERVICE} \
   && sleep 1 \
   && sudo systemctl --no-pager --lines=3 status ${SERVICE}"
+# The relay's "?" occupancy probe (v6+), asked over TCP on the VM
+# itself. A pre-v6 relay never answers; that reads as "can't tell".
+PROBE_CMD='python3 -c "
+import socket
+s = socket.create_connection((\"127.0.0.1\", '"${PORT}"'), timeout=3)
+s.sendall(b\"?\n\")
+s.settimeout(3)
+print(s.recv(256).decode().strip())
+" 2>/dev/null || echo probe-no-reply'
 
 echo "== tests first: a broken relay never ships =="
 python3 test_relay.py 2>&1 | tail -3
+
+remote() {
+    if [[ -n "${BINGO64_SSH:-}" ]]; then
+        ssh "${BINGO64_SSH}" "$1"
+    else
+        gcloud compute ssh "${INSTANCE}" --zone="${ZONE}" \
+            --tunnel-through-iap --command="$1"
+    fi
+}
+
+echo "== occupancy check: a restart drops everyone in a race =="
+OCC="$(remote "${PROBE_CMD}" || echo probe-failed)"
+echo "relay says: ${OCC}"
+if [[ "${OCC}" == *"members="* && "${OCC}" != *"members=0"* ]]; then
+    if [[ -z "${BINGO64_FORCE:-}" ]]; then
+        echo "ABORT: players are in a room. Deploy between races, or"
+        echo "BINGO64_FORCE=1 to drop them on purpose."
+        exit 1
+    fi
+    echo "BINGO64_FORCE set: deploying over live players."
+elif [[ "${OCC}" != *"members=0"* ]]; then
+    echo "WARNING: no occupancy answer (pre-v6 relay or probe failure);"
+    echo "cannot tell if rooms are live. Continuing."
+fi
 
 if [[ -n "${BINGO64_SSH:-}" ]]; then
     echo "== deploying via ssh to ${BINGO64_SSH} =="
