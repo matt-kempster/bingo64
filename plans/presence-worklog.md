@@ -72,6 +72,16 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   apply_remote_claims; network.c notice_about now colors names; two
   screenshot-tuned alignment passes (text +1, icon -2 within the 19px
   strip, row pitch 21). Verified in BOB via `--level 9` under Xvfb.
+  Third alignment pass from Matt's own read of the screenshots (text
+  -6, icon +1 from the v1 offsets).
+- quiet banners: draw_quiet_line extracted and reused for the
+  persistent race verdict ("Quate | won - you placed 2", winner name
+  in hat color, centered y=189) and the win screen — all three cases
+  (lockout, race finish, solo) now dialog-font strips; your OWN win
+  (lockout win / place 1 / solo completion) renders in color-cycling
+  rainbow (sins-based, ~2s period). Dismiss hint is one centered line.
+  BINGO64_WIN_DEMO=1 dev hook overlays the solo banner for screenshots.
+  N64 keeps the old HUD-font win screen untouched.
 
 ## Deferred / follow-ups
 

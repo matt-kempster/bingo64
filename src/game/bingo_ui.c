@@ -18,6 +18,7 @@
 #include "ingame_menu.h"
 #include "menu/file_select.h"
 #include "engine/behavior_script.h"
+#include "engine/math_util.h"
 #include "level_update.h"
 #include "strcpy.h"
 #include "segment2.h"
@@ -205,60 +206,87 @@ static void bingo_notice_demo_tick(void) {
 }
 #endif
 
+#ifndef TARGET_N64
+// One quiet line: dim strip + optional hat-colored name + text + optional
+// board icon, in the dialog font. xLeft < 0 centers the line. The text and
+// icon y offsets center both optically in the 19px strip (screenshot-
+// tuned with Matt 2026-08-22: text -5, icon -4 relative to yText).
+static void draw_quiet_line(s32 xLeft, s32 yText, const char *name,
+                            const u8 nameRGB[3], const char *text,
+                            const u8 textRGB[3], s32 icon, u8 alpha) {
+    s32 nameW = (name != NULL && name[0] != '\0')
+                    ? get_string_width_ascii((char *) name) + 4 : 0;
+    s32 textW = (text != NULL && text[0] != '\0')
+                    ? get_string_width_ascii((char *) text) : 0;
+    s32 iconW = icon >= 0 ? 20 : 0;
+    s32 total = nameW + textW + iconW;
+    s32 x = xLeft >= 0 ? xLeft : (SCREEN_WIDTH - total) / 2;
+
+    // The dimmed strip (fillrect coords: origin top-left, y down).
+    print_solid_color_quad(x - 6, SCREEN_HEIGHT - (yText + 13),
+                           x + total + 6, SCREEN_HEIGHT - (yText - 6),
+                           0, 0, 0, (u8) (140 * alpha / 255));
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    if (nameW > 0) {
+        print_generic_string_ascii_detail(x, yText - 5, name, nameRGB[0],
+                                          nameRGB[1], nameRGB[2], alpha,
+                                          TRUE, 1);
+    }
+    if (textW > 0) {
+        print_generic_string_ascii_detail(x + nameW, yText - 5, text,
+                                          textRGB[0], textRGB[1], textRGB[2],
+                                          alpha, TRUE, 1);
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
+    if (icon >= 0) {
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+        print_bingo_icon_alpha(x + nameW + textW + 4, yText - 4, icon, alpha);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+    }
+}
+
+static const u8 sQuietWhite[3] = { 255, 255, 255 };
+
+// Celebratory register for YOUR OWN win: the same quiet strip, but the
+// text color cycles through a rainbow.
+static void rainbow_rgb(u8 rgb[3]) {
+    u16 t = (u16) (gGlobalTimer * 0x400);
+    rgb[0] = (u8) (155 + 100.0f * sins(t));
+    rgb[1] = (u8) (155 + 100.0f * sins((u16) (t + 0x5555)));
+    rgb[2] = (u8) (155 + 100.0f * sins((u16) (t + 0xAAAA)));
+}
+#endif
+
 void draw_bingo_notices(void) {
 #ifndef TARGET_N64
     s32 i;
     bingo_notice_demo_tick();
+    // Dev-only: BINGO64_WIN_DEMO=1 overlays the (solo) win banner so its
+    // layout can be screenshot-tested without finishing a board.
+    if (getenv("BINGO64_WIN_DEMO") != NULL) {
+        draw_bingo_win_screen();
+    }
     while (sNoticeCount > 0
            && gGlobalTimer - sNotices[0].frame > BINGO_NOTICE_LIFE) {
         bingo_notice_drop_oldest();
     }
     for (i = 0; i < sNoticeCount; i++) {
-        // Oldest reads first: it sits highest, newest at the bottom.
+        // Oldest reads first: it sits highest, newest at the bottom;
+        // bottom-left aligned, strips grow rightward per row.
         s32 row = sNoticeCount - 1 - i;
-        s32 yText = 24 + 21 * row;
         struct BingoNotice *n = &sNotices[i];
         u32 age = gGlobalTimer - n->frame;
         s32 alpha = 255;
-        s32 nameW, textW, iconW, total, x;
         if (age > BINGO_NOTICE_LIFE - BINGO_NOTICE_FADE) {
             alpha = 255 * (BINGO_NOTICE_LIFE - (s32) age) / BINGO_NOTICE_FADE;
             if (alpha <= 0) {
                 continue;
             }
         }
-        nameW = n->name[0] != '\0' ? get_string_width_ascii(n->name) + 4 : 0;
-        textW = n->text[0] != '\0' ? get_string_width_ascii(n->text) : 0;
-        iconW = n->icon >= 0 ? 20 : 0;
-        total = nameW + textW + iconW;
-        x = 20;  // bottom-left aligned; strips grow rightward per row
-
-        // The dimmed strip (fillrect coords: origin top-left, y down).
-        print_solid_color_quad(x - 6, SCREEN_HEIGHT - (yText + 13),
-                               x + total + 6, SCREEN_HEIGHT - (yText - 6),
-                               0, 0, 0, (u8) (140 * alpha / 255));
-
-        // Text rides 1px high and icons 2px low of the naive positions so
-        // both center optically in the 19px strip (screenshot-tuned).
-        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-        if (n->name[0] != '\0') {
-            print_generic_string_ascii_detail(x, yText + 1, n->name,
-                                              n->rgb[0], n->rgb[1], n->rgb[2],
-                                              (u8) alpha, TRUE, 1);
-        }
-        if (n->text[0] != '\0') {
-            print_generic_string_ascii_detail(x + nameW, yText + 1, n->text,
-                                              255, 255, 255, (u8) alpha,
-                                              TRUE, 1);
-        }
-        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
-
-        if (n->icon >= 0) {
-            gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
-            print_bingo_icon_alpha(x + nameW + textW + 4, yText - 5, n->icon,
-                                   (u8) alpha);
-            gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
-        }
+        draw_quiet_line(20, 24 + 21 * row, n->name, n->rgb, n->text,
+                        sQuietWhite, n->icon, (u8) alpha);
     }
 #endif
 }
@@ -286,53 +314,88 @@ void draw_bingo_race_verdict(void) {
     }
     myPlace = network_local_place();
     if (myPlace > 0) {
-        sprintf(buf, "%s WON - YOU PLACED %d", net_name_of_id(winnerId),
-                myPlace);
+        sprintf(buf, "won - you placed %d", myPlace);
     } else {
-        sprintf(buf, "%s WON - RACE FOR PLACE %d", net_name_of_id(winnerId),
-                network_result_count() + 1);
+        sprintf(buf, "won - race for place %d", network_result_count() + 1);
     }
-    print_text_centered(160, 189, buf);
+    draw_quiet_line(-1, 189, net_name_of_id(winnerId),
+                    gNetColorRGB[network_color_of_id(winnerId)
+                                 % NET_COLOR_COUNT],
+                    buf, sQuietWhite, -1, 255);
 #endif
 }
+
+#ifndef TARGET_N64
+// getTimeFmtPrecise emits the HUD font's [ ] codes for the minute/second
+// marks; the dialog font blanks those, so swap in its ' and . glyphs.
+static void time_fmt_dialog(char *s) {
+    for (; *s != '\0'; s++) {
+        if (*s == '[') {
+            *s = '\'';
+        } else if (*s == ']') {
+            *s = '.';
+        }
+    }
+}
+
+// The dismiss/congrats hint under the win/finish message.
+static void draw_win_hint(s32 showSuperPlayer) {
+    if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
+        draw_quiet_line(-1, 38, NULL, NULL, "press L again to dismiss",
+                        sQuietWhite, -1, 255);
+    } else if (showSuperPlayer) {
+        draw_quiet_line(-1, 38, NULL, NULL, "you are a super player",
+                        sQuietWhite, -1, 255);
+    }
+}
+#endif
 
 void draw_bingo_win_screen() {
     char timestamp[16];
     char msg[40];
 
 #ifndef TARGET_N64
+    u8 rainbow[3];
+    rainbow_rgb(rainbow);
     if (network_active() && gbBingoMode == BINGO_MODE_LOCKOUT
         && network_race_winner_id() != 0) {
         // Lockout ends for the whole room at once: show the verdict.
         s32 winner = network_race_winner_id();
         if (winner == network_local_id()) {
-            sprintf(msg, "YOU WIN %d SQUARES", net_cell_count_of_id(winner));
+            // Your win: same quiet strip, celebratory rainbow text.
+            sprintf(msg, "you win %d squares", net_cell_count_of_id(winner));
+            draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, 255);
         } else {
-            sprintf(msg, "%s WINS %d SQUARES", net_name_of_id(winner),
-                    net_cell_count_of_id(winner));
+            sprintf(msg, "wins %d squares", net_cell_count_of_id(winner));
+            draw_quiet_line(-1, 60, net_name_of_id(winner),
+                            gNetColorRGB[network_color_of_id(winner)
+                                         % NET_COLOR_COUNT],
+                            msg, sQuietWhite, -1, 255);
         }
-        print_text(30, 60, msg);
-        if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
-            print_text(60, 40, "PRESS L AGAIN TO");
-            print_text(110, 20, "DISMISS");
-        }
+        draw_win_hint(FALSE);
         return;
     }
     if (network_active() && network_local_place() > 0) {
         // A race finish: our official place and server-timed result.
+        // Winning the race gets the rainbow; placing is told quietly.
         getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
-        sprintf(msg, "FINISHED NUMBER %d IN %s", network_local_place(), timestamp);
-        print_text(16, 60, msg);
-        if (gbBingoShowCongratsCounter == (gbBingoShowCongratsLimit - 1)) {
-            print_text(60, 40, "PRESS L AGAIN TO");
-            print_text(110, 20, "DISMISS");
-        } else {
-            print_text(30, 40, "YOU ARE A SUPER PLAYER");
-        }
+        time_fmt_dialog(timestamp);
+        sprintf(msg, "finished number %d in %s", network_local_place(),
+                timestamp);
+        draw_quiet_line(-1, 60, NULL, NULL, msg,
+                        network_local_place() == 1 ? rainbow : sQuietWhite,
+                        -1, 255);
+        draw_win_hint(TRUE);
         return;
     }
-#endif
 
+    // Solo: completing the board is a win.
+    getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
+    time_fmt_dialog(timestamp);
+    sprintf(msg, "your time is %s", timestamp);
+    draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, 255);
+    draw_win_hint(TRUE);
+#else
     getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
     sprintf(msg, "YOUR TIME IS %s", timestamp);
     // TODO: insert 0/0.5 spaces at front to center align:
@@ -344,6 +407,7 @@ void draw_bingo_win_screen() {
     } else {
         print_text(30, 40, "YOU ARE A SUPER PLAYER");
     }
+#endif
 }
 
 void draw_bingo_hud_timer() {
