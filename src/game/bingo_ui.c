@@ -27,7 +27,10 @@
 #include "segment2.h"
 #include "extras/draw_util.h"
 #ifndef TARGET_N64
+#include <string.h>
 #include "pc/network/network.h"
+#include "bingo_const.h"
+#include "level_table.h"
 #endif
 
 s8 gBingoAllowBoardToShow;
@@ -79,6 +82,39 @@ static const char *net_name_of_id(s32 id) {
         }
     }
     return "?";
+}
+
+// The peer's ghost, which carries their whereabouts and last-heard time.
+static struct NetGhost *ghost_for_name(const char *name) {
+    s32 i;
+    for (i = 0; i < NET_MAX_GHOSTS; i++) {
+        if (gNetGhosts[i].active && strcmp(gNetGhosts[i].name, name) == 0) {
+            return &gNetGhosts[i];
+        }
+    }
+    return NULL;
+}
+
+// Short course code ("BOB", "CASTLE") for a level id, uppercased for the
+// HUD font, into out[8]. Empty string when the level is unknown.
+static void course_code_for_level(s16 level, char out[8]) {
+    const char *src;
+    s32 i;
+    s8 course;
+    out[0] = '\0';
+    if (level <= 0 || level >= LEVEL_COUNT) {
+        return;
+    }
+    course = gLevelToCourseNumTable[level - 1];
+    if (course > 0 && course <= 24) {
+        src = courseAbbreviations[course - 1];
+    } else {
+        src = "CASTLE";
+    }
+    for (i = 0; src[i] != '\0' && i < 7; i++) {
+        out[i] = (src[i] >= 'a' && src[i] <= 'z') ? src[i] - 0x20 : src[i];
+    }
+    out[i] = '\0';
 }
 
 // Cells each room member owns (their bit is set in gBingoCellClaimers).
@@ -564,32 +600,70 @@ void draw_bingo_screen() {
     print_text_tiny(240, 196, time_print);
 
 #ifndef TARGET_N64
-    // Online: live standings (lockout) or the finishers so far (races),
-    // stacked under the timer in the right column.
+    // Online: the presence roster in the right column, dialog font (PC
+    // has the room — Matt's call). One row per member: the name in the
+    // player's hat color (with ? appended when the connection is in
+    // doubt: server dropped them, or their ghost is 2s+ silent), then
+    // place + time once finished, else claim count + current course.
     if (network_active()) {
-        char row_print[40];
-        s32 rowY = 184;
-        if (gbBingoMode == BINGO_MODE_LOCKOUT) {
-            for (i = 0; i < NET_MAX_PLAYERS && rowY > 100; i++) {
-                struct NetPlayer *p = &gNetPlayers[i];
-                if (!p->active) {
-                    continue;
+        char name_print[24];
+        char detail[32];
+        char course[8];
+        s32 rowY = 150;
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+        for (i = 0; i < NET_MAX_PLAYERS && rowY > 40; i++) {
+            struct NetPlayer *p = &gNetPlayers[i];
+            const struct NetResult *res = NULL;
+            const char *mark = "";
+            s32 r;
+            if (!p->active) {
+                continue;
+            }
+            for (r = 0; r < network_result_count(); r++) {
+                if (network_result(r)->id == p->id) {
+                    res = network_result(r);
+                    break;
                 }
-                sprintf(row_print, "%s%s %d", hud_upper(p->name),
-                        p->connected ? "" : "*", net_cell_count_of_id(p->id));
-                print_text_tiny(240, rowY, row_print);
-                rowY -= 9;
             }
-        } else {
-            for (i = 0; i < network_result_count() && rowY > 100; i++) {
-                const struct NetResult *r = network_result(i);
-                getTimeFmtPreciseTiny(timestamp, r->frames);
-                sprintf(row_print, "%d %s %s", r->place,
-                        net_name_of_id(r->id), timestamp);
-                print_text_tiny(240, rowY, row_print);
-                rowY -= 9;
+            if (p->id != network_local_id()) {
+                struct NetGhost *g = ghost_for_name(p->name);
+                if (!p->connected
+                    || (g != NULL
+                        && gGlobalTimer - g->lastUpdateFrame > 60)) {
+                    mark = "?";
+                }
             }
+            if (res != NULL && gbBingoMode != BINGO_MODE_LOCKOUT) {
+                getTimeFmtPrecise(timestamp, res->frames);
+                time_fmt_dialog(timestamp);
+                sprintf(detail, "%d%s %s", res->place,
+                        res->place == 1 ? "st" : res->place == 2 ? "nd"
+                        : res->place == 3 ? "rd" : "th", timestamp);
+            } else {
+                course[0] = '\0';
+                if (p->id == network_local_id()) {
+                    course_code_for_level(gCurrLevelNum, course);
+                } else {
+                    struct NetGhost *g = ghost_for_name(p->name);
+                    if (g != NULL) {
+                        course_code_for_level(g->level, course);
+                    }
+                }
+                sprintf(detail, "%d %s", net_cell_count_of_id(p->id),
+                        course);
+            }
+            sprintf(name_print, "%s%s", p->name, mark);
+            print_generic_string_ascii_detail(
+                236, rowY, name_print,
+                gNetColorRGB[p->color % NET_COLOR_COUNT][0],
+                gNetColorRGB[p->color % NET_COLOR_COUNT][1],
+                gNetColorRGB[p->color % NET_COLOR_COUNT][2], 255, TRUE, 1);
+            print_generic_string_ascii_detail(
+                236 + get_string_width_ascii(name_print) + 6, rowY, detail,
+                255, 255, 255, 255, TRUE, 1);
+            rowY -= 15;
         }
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
     }
 #endif
 

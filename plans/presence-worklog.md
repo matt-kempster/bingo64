@@ -82,6 +82,22 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   rainbow (sins-based, ~2s period). Dismiss hint is one centered line.
   BINGO64_WIN_DEMO=1 dev hook overlays the solo banner for screenshots.
   N64 keeps the old HUD-font win screen untouched.
+- L-screen presence roster: the right-column standings block becomes a
+  full roster (all modes) in the DIALOG font (Matt: "bigger font, PC
+  has room") — names in hat colors, `?` appended when the connection
+  is in doubt (dropped OR ghost silent 2s+; dialog font has a real
+  question mark, the tiny font's rendered like a comma). Finished
+  racers show "1st 12'34.50"; racing players show claim count +
+  current course (ghost level → gLevelToCourseNumTable →
+  courseAbbreviations, "CASTLE" for hubs). Rows x=236, y=150 step 15.
+  Verified END-TO-END: scratchpad/presence_e2e.py runs the real relay
+  in-process (test_relay.start_relay) + RefClient host "quate" (UDP) +
+  the actual game as "matt" (TCP, --skip-title, CLI auto-ready);
+  quate sends X (GO), ghosts in BOB, claims cells 7/12 — screenshots
+  caught the live claim toast ("quate got <icon>", pink name, real
+  board icon) and the roster ("MATT 0 CASTLE / QUATE 2 BOB", then
+  "QUATE* 2 BOB" after quate went silent). Reusable rig for all
+  future presence work.
 
 ## Deferred / follow-ups
 
