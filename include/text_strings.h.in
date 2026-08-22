@@ -188,7 +188,7 @@
 #define TEXT_FILE_MARIO_D _("MARIO D")
 
 // Bingo Options
-#define TEXT_GAME_MODE _("Game mode:")
+#define TEXT_GAME_MODE _("Game mode")
 #define TEXT_TARGET_1 _("1 Bingo")
 #define TEXT_TARGET_2 _("2 Bingos")
 #define TEXT_TARGET_3 _("3 Bingos")
@@ -198,13 +198,13 @@
 #define TEXT_SEED_CLICK_HINT _("Click the seed to type one")
 #define TEXT_SEED_TYPING_HINT _("Type digits. Enter when done")
 
-#define TEXT_UNLOCK_GAME _("Unlock Full Game")
+#define TEXT_UNLOCK_GAME _("Unlock full game")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 
 // Online visibility settings (host-owned room options, protocol v6).
-#define TEXT_CLAIMS _("Claims:")
-#define TEXT_LOCATIONS _("Locations:")
-#define TEXT_CLAIMVIS_OPEN _("Open")
+#define TEXT_CLAIMS _("Opp. squares")
+#define TEXT_LOCATIONS _("Opp. locations")
+#define TEXT_CLAIMVIS_OPEN _("Visible")
 #define TEXT_CLAIMVIS_PROGRESS _("Counts")
 #define TEXT_CLAIMVIS_BINGOS _("Bingos")
 #define TEXT_CLAIMVIS_HIDDEN _("Hidden")

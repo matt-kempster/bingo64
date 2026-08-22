@@ -497,17 +497,23 @@ void draw_bingo_win_screen() {
         draw_win_hint(FALSE);
         return;
     }
-    if (network_active() && network_local_place() > 0) {
+    if (network_active()) {
         // A race finish: our official place and server-timed result.
         // Winning the race gets the rainbow; placing is told quietly.
-        getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
-        time_fmt_dialog(timestamp);
-        sprintf(msg, "finished %d%s in %s", network_local_place(),
-                ordinal_suffix(network_local_place()), timestamp);
-        draw_quiet_line(-1, 60, NULL, NULL, msg,
-                        network_local_place() == 1 ? rainbow : sQuietWhite,
-                        -1, NULL, 255);
-        draw_win_hint(TRUE);
+        if (network_local_place() > 0) {
+            getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
+            time_fmt_dialog(timestamp);
+            sprintf(msg, "Finished %d%s in %s", network_local_place(),
+                    ordinal_suffix(network_local_place()), timestamp);
+            draw_quiet_line(-1, 60, NULL, NULL, msg,
+                            network_local_place() == 1 ? rainbow
+                                                       : sQuietWhite,
+                            -1, NULL, 255);
+            draw_win_hint(TRUE);
+        }
+        // else: our finish report's placement is still a round trip
+        // away — draw nothing for those frames rather than flashing
+        // the solo "your time is" banner (Matt saw the flicker).
         return;
     }
 

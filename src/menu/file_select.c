@@ -189,8 +189,11 @@ u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11
 #ifndef TARGET_N64
-// PC adds the online visibility rows (Claims / Locations).
-#define BINGO_CONFIGS_IN_LEFT_COL 5 // not more than 10, hopefully
+// The Opp. rows (visibility of other players' squares/locations) only
+// mean something in an online room; solo shows the classic three. All
+// uses are runtime expressions, so the count may vary per frame — the
+// objective list below the configs reflows with it.
+#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 5 : 3)
 #else
 #define BINGO_CONFIGS_IN_LEFT_COL 3 // not more than 10, hopefully
 #endif
@@ -1741,7 +1744,7 @@ static s32 bingo_config_claimvis(s32 i, u8 **target) {
     gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
     switch (gNetClaimVis) {
         default:
-        case NET_CLAIMVIS_OPEN:     *target = textClaimVisOpen;     return 112;
+        case NET_CLAIMVIS_OPEN:     *target = textClaimVisOpen;     return 94;
         case NET_CLAIMVIS_PROGRESS: *target = textClaimVisProgress; return 101;
         case NET_CLAIMVIS_BINGOS:   *target = textClaimVisBingos;   return 101;
         case NET_CLAIMVIS_HIDDEN:   *target = textClaimVisHidden;   return 101;
@@ -1755,7 +1758,8 @@ static void print_bingo_configs() {
     u8 *label;
     u8 *target;
 
-    for (i = 0; i < BINGO_CONFIGS_IN_LEFT_COL; i++) {
+    s32 cfgs = BINGO_CONFIGS_IN_LEFT_COL;
+    for (i = 0; i < cfgs; i++) {
         if (i == 0) {
             label = textGameMode;
             offsetX = bingo_config_target(i, &target);
@@ -1772,10 +1776,10 @@ static void print_bingo_configs() {
             }
             offsetX = RIGHT_X - 19 - LEFT_X;
 #ifndef TARGET_N64
-        } else if (i == 2) {
+        } else if (i == 2 && cfgs == 5) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 3) {
+        } else if (i == 3 && cfgs == 5) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;

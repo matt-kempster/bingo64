@@ -208,6 +208,19 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   bingo64-v6.exe staged in AppData; bingo64-presence.exe (v5) is now
   DEAD against the live relay — players must switch to the v6 exe.
 
+- Matt's v6 review nits (2026-08-22 late): options labels became
+  "Opp. squares" (values Visible/Counts/Bingos/Hidden) and
+  "Opp. locations", all colons dropped, "Unlock full game"
+  lowercased. The Opp. rows only render while in an online room —
+  offline shows the classic 3 rows (BINGO_CONFIGS_IN_LEFT_COL is now
+  runtime on PC; N64 keeps 3). Win screen: "Finished 2nd in ..."
+  capital F, and the 1-frame flash before it is fixed — between the
+  local finish and the server's F broadcast the win screen fell
+  through to the solo "your time is" banner; online it now draws
+  nothing until the placement arrives. Both option screens
+  screenshot-verified (offline via 1P->OPTIONS clicks, online via a
+  held in-process relay + lobby OPTIONS clicks).
+
 ## Deferred / follow-ups
 
 - Relay-side visibility enforcement (see checklist §2) — potentially
