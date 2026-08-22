@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <ultra64.h>
 #include <PR/os_cont.h>
@@ -23,6 +24,7 @@
 #include "ingame_menu.h"
 #include "bingo_objective_info.h"
 #include "segment2.h"
+#include "extras/draw_util.h"
 #ifndef TARGET_N64
 #include "pc/network/network.h"
 #endif
@@ -94,63 +96,171 @@ static s32 net_cell_count_of_id(s32 id) {
 #endif
 
 // --- In-game notices --------------------------------------------------
-// Small toast queue for online events (someone joined/left/finished, the
-// host changed, the race was ended). Pushed by the PC network client;
-// drawn top-left under the HUD counters in the all-caps HUD font, newest
-// at the bottom. On N64 nothing pushes, so it all compiles to a no-op.
+// Subtitle-style toast feed for online events (someone claimed a square,
+// joined/left/reconnected, the host changed, the race was ended). Pushed
+// by the PC network client and bingo_net; drawn bottom-center as dialog-
+// font text on a dimmed strip, newest at the bottom, ~4s each with a
+// fade-out. A toast optionally opens with the actor's name in their hat
+// color and closes with the claimed square's real board icon. On N64
+// nothing pushes, so it all compiles to a no-op.
 
 #define BINGO_NOTICE_MAX 3
 #define BINGO_NOTICE_LEN 48
-#define BINGO_NOTICE_LIFE 150 // frames a notice stays up (5 seconds)
+#define BINGO_NOTICE_NAME_LEN 20
+#define BINGO_NOTICE_LIFE 120   // frames a notice stays up (4 seconds)
+#define BINGO_NOTICE_FADE 30    // fade-out tail within that life
 
-static char sNoticeText[BINGO_NOTICE_MAX][BINGO_NOTICE_LEN];
-static u32 sNoticeFrame[BINGO_NOTICE_MAX];
+struct BingoNotice {
+    char name[BINGO_NOTICE_NAME_LEN]; // "" = no colored prefix
+    char text[BINGO_NOTICE_LEN];
+    u8 rgb[3];                        // name color (hat color)
+    s16 icon;                         // BingoObjectiveIcon, -1 = none
+    u32 frame;                        // gGlobalTimer at push
+};
+
+static struct BingoNotice sNotices[BINGO_NOTICE_MAX];
 static s32 sNoticeCount = 0;
 
 static void bingo_notice_drop_oldest(void) {
-    s32 i, j;
+    s32 i;
     for (i = 1; i < sNoticeCount; i++) {
-        for (j = 0; j < BINGO_NOTICE_LEN; j++) {
-            sNoticeText[i - 1][j] = sNoticeText[i][j];
-        }
-        sNoticeFrame[i - 1] = sNoticeFrame[i];
+        sNotices[i - 1] = sNotices[i];
     }
     sNoticeCount--;
 }
 
-void bingo_notice(const char *text) {
+void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
+                       s32 icon) {
+    struct BingoNotice *n;
     s32 i;
-    char *dst;
     if (sNoticeCount == BINGO_NOTICE_MAX) {
         bingo_notice_drop_oldest();
     }
-    dst = sNoticeText[sNoticeCount];
-    for (i = 0; text[i] != '\0' && i < BINGO_NOTICE_LEN - 1; i++) {
-        // The HUD font is caps-only.
-        dst[i] = (text[i] >= 'a' && text[i] <= 'z') ? text[i] - 0x20 : text[i];
+    n = &sNotices[sNoticeCount];
+    for (i = 0; name[i] != '\0' && i < BINGO_NOTICE_NAME_LEN - 1; i++) {
+        n->name[i] = name[i];
     }
-    dst[i] = '\0';
-    sNoticeFrame[sNoticeCount] = gGlobalTimer;
+    n->name[i] = '\0';
+    for (i = 0; text[i] != '\0' && i < BINGO_NOTICE_LEN - 1; i++) {
+        n->text[i] = text[i];
+    }
+    n->text[i] = '\0';
+    n->rgb[0] = rgb[0];
+    n->rgb[1] = rgb[1];
+    n->rgb[2] = rgb[2];
+    // Only icons the info table can texture (FAILED/SUCCESS are special-
+    // cased by print_bingo_icon_alpha and always safe).
+    if (icon > BINGO_ICON_SUCCESS
+        && get_objective_info_from_icon(icon) == NULL) {
+        icon = -1;
+    }
+    n->icon = (s16) icon;
+    n->frame = gGlobalTimer;
     sNoticeCount++;
 }
 
+void bingo_notice(const char *text) {
+    static const u8 white[3] = { 255, 255, 255 };
+    bingo_notice_rich("", white, text, -1);
+}
+
+// The latest toast's full line ("name text"), for the lobby status row.
 const char *bingo_notice_latest(u32 *ageFrames) {
+    static char composed[BINGO_NOTICE_NAME_LEN + BINGO_NOTICE_LEN];
+    struct BingoNotice *n;
     if (sNoticeCount == 0) {
         return NULL;
     }
-    *ageFrames = gGlobalTimer - sNoticeFrame[sNoticeCount - 1];
-    return sNoticeText[sNoticeCount - 1];
+    n = &sNotices[sNoticeCount - 1];
+    *ageFrames = gGlobalTimer - n->frame;
+    sprintf(composed, "%s%s%s", n->name, n->name[0] != '\0' ? " " : "",
+            n->text);
+    return composed;
 }
 
+#ifndef TARGET_N64
+// Dev-only: BINGO64_TOAST_DEMO=1 cycles sample toasts through the feed so
+// the rendering can be screenshot-tested without a live room.
+static void bingo_notice_demo_tick(void) {
+    static s32 next = 0;
+    if (getenv("BINGO64_TOAST_DEMO") == NULL || gGlobalTimer % 90 != 0) {
+        return;
+    }
+    switch (next++ % 4) {
+        case 0:
+            bingo_notice_rich("Quate", gNetColorRGB[5], "got",
+                              BINGO_ICON_STAR);
+            break;
+        case 1:
+            bingo_notice_rich("leGlitch", gNetColorRGB[1], "got",
+                              BINGO_ICON_COIN);
+            break;
+        case 2:
+            bingo_notice_rich("Boop", gNetColorRGB[3], "reconnected", -1);
+            break;
+        case 3:
+            bingo_notice("the host ended the race");
+            break;
+    }
+}
+#endif
+
 void draw_bingo_notices(void) {
+#ifndef TARGET_N64
     s32 i;
+    bingo_notice_demo_tick();
     while (sNoticeCount > 0
-           && gGlobalTimer - sNoticeFrame[0] > BINGO_NOTICE_LIFE) {
+           && gGlobalTimer - sNotices[0].frame > BINGO_NOTICE_LIFE) {
         bingo_notice_drop_oldest();
     }
     for (i = 0; i < sNoticeCount; i++) {
-        print_text(20, 168 - 18 * i, sNoticeText[i]);
+        // Oldest reads first: it sits highest, newest at the bottom.
+        s32 row = sNoticeCount - 1 - i;
+        s32 yText = 24 + 21 * row;
+        struct BingoNotice *n = &sNotices[i];
+        u32 age = gGlobalTimer - n->frame;
+        s32 alpha = 255;
+        s32 nameW, textW, iconW, total, x;
+        if (age > BINGO_NOTICE_LIFE - BINGO_NOTICE_FADE) {
+            alpha = 255 * (BINGO_NOTICE_LIFE - (s32) age) / BINGO_NOTICE_FADE;
+            if (alpha <= 0) {
+                continue;
+            }
+        }
+        nameW = n->name[0] != '\0' ? get_string_width_ascii(n->name) + 4 : 0;
+        textW = n->text[0] != '\0' ? get_string_width_ascii(n->text) : 0;
+        iconW = n->icon >= 0 ? 20 : 0;
+        total = nameW + textW + iconW;
+        x = 20;  // bottom-left aligned; strips grow rightward per row
+
+        // The dimmed strip (fillrect coords: origin top-left, y down).
+        print_solid_color_quad(x - 6, SCREEN_HEIGHT - (yText + 13),
+                               x + total + 6, SCREEN_HEIGHT - (yText - 6),
+                               0, 0, 0, (u8) (140 * alpha / 255));
+
+        // Text rides 1px high and icons 2px low of the naive positions so
+        // both center optically in the 19px strip (screenshot-tuned).
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+        if (n->name[0] != '\0') {
+            print_generic_string_ascii_detail(x, yText + 1, n->name,
+                                              n->rgb[0], n->rgb[1], n->rgb[2],
+                                              (u8) alpha, TRUE, 1);
+        }
+        if (n->text[0] != '\0') {
+            print_generic_string_ascii_detail(x + nameW, yText + 1, n->text,
+                                              255, 255, 255, (u8) alpha,
+                                              TRUE, 1);
+        }
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
+        if (n->icon >= 0) {
+            gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+            print_bingo_icon_alpha(x + nameW + textW + 4, yText - 5, n->icon,
+                                   (u8) alpha);
+            gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+        }
     }
+#endif
 }
 
 // Once first place is taken in an online line/blackout race, the players

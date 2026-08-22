@@ -10,10 +10,13 @@ void draw_bingo_hud_timer(void);
 void draw_bingo_screen(void);
 void draw_bingo_win_screen(void);
 
-// Toast queue for online events ("MATT LEFT", "HOST ENDED THE RACE").
-// bingo_notice uppercases and truncates; notices expire after 5s.
+// Toast feed for online events ("Quate got [icon]", "Boop left"). Toasts
+// expire after 4s; rich toasts open with a hat-colored name and can end
+// with a board-icon glyph (-1 = none).
 void bingo_notice(const char *text);
-void draw_bingo_notices(void);  // HUD hook (top-left stack)
+void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
+                       s32 icon);
+void draw_bingo_notices(void);  // HUD hook (bottom-center subtitles)
 void draw_bingo_race_verdict(void);  // HUD hook (persistent, top center)
 // Newest notice and its age in frames, or NULL: the lobby status line
 // shows fresh notices for players who are back at the file select.

@@ -50,9 +50,28 @@ the L-roster itself can ship earlier showing it unconditionally.)
 - Text draws inside `dl_ia_text_begin/end`; icons inside
   `dl_hud_img_begin/end`; the quad is self-contained.
 
+## Screenshot testing (Matt's ask: "this is likely gonna be VERY
+finnicky — use screenshot testing")
+
+Loop: Linux PC build in /home/matt/b64-refresh → run under Xvfb :99
+(`SDL_AUDIODRIVER=dummy`, `BINGO64_TOAST_DEMO=1`) → wait for the
+attract demo (HUD renders there; the demo hook cycles sample toasts
+every 3s) → `import -window <id>` PNGs → eyeball alignment, iterate.
+Gotchas: the SDL window restores a saved position that can sit outside
+the 1280x960 Xvfb root (captures come back black) — `xdotool
+windowmove <id> 0 0` first; capture the game window id, not root.
+`BINGO64_TOAST_DEMO` is a committed, env-gated dev hook in bingo_ui.c.
+
 ## Commits
 
-- (this) worklog: decisions + infra survey.
+- worklog: decisions + infra survey.
+- toast feed v1: subtitle-style restyle of bingo_notice (bottom-LEFT
+  dim strips — Matt switched from centered after seeing screenshots —
+  dialog font, hat-colored names via bingo_notice_rich,
+  real board icon inline); remote-claim toasts wired in bingo_net's
+  apply_remote_claims; network.c notice_about now colors names; two
+  screenshot-tuned alignment passes (text +1, icon -2 within the 19px
+  strip, row pitch 21). Verified in BOB via `--level 9` under Xvfb.
 
 ## Deferred / follow-ups
 

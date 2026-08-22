@@ -353,12 +353,18 @@ static void reset_room_state(void) {
     sWinnerId = 0;
 }
 
-// "<name> <did something>" as an in-game toast (bingo_notice uppercases).
+// "<name> <did something>" as an in-game toast, the name tinted with the
+// player's hat color.
 static void notice_about(s32 id, const char *what) {
     struct NetPlayer *p = player_for_id(id, 0);
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%s %s", p != NULL ? p->name : "someone", what);
-    bingo_notice(buf);
+    if (p != NULL) {
+        bingo_notice_rich(p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
+                          what, -1);
+    } else {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "someone %s", what);
+        bingo_notice(buf);
+    }
 }
 
 static const char *place_suffix(s32 place) {

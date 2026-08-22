@@ -11,6 +11,7 @@
 #include "area.h"
 #include "behavior_data.h"
 #include "bingo.h"
+#include "bingo_ui.h"
 #include "engine/math_util.h"
 #include "game_init.h"
 #include "level_update.h"
@@ -142,6 +143,20 @@ static void apply_remote_claims(void) {
         }
         if (claimer >= 0 && claimer < 32) {
             gBingoCellClaimers[cell] |= (u32) 1 << claimer;
+        }
+        if (claimer != network_local_id()) {
+            // Toast the peer's square: their name in their hat color, the
+            // square as its board icon.
+            s32 i;
+            for (i = 0; i < NET_MAX_PLAYERS; i++) {
+                if (gNetPlayers[i].active && gNetPlayers[i].id == claimer) {
+                    bingo_notice_rich(
+                        gNetPlayers[i].name,
+                        gNetColorRGB[gNetPlayers[i].color % NET_COLOR_COUNT],
+                        "got", gBingoObjectives[cell].icon);
+                    break;
+                }
+            }
         }
         if (gbBingoMode == BINGO_MODE_BLACKOUT
             || gbBingoMode == BINGO_MODE_LOCKOUT
