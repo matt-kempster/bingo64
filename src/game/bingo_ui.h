@@ -19,6 +19,8 @@ void bingo_notice_rich(const char *name, const u8 rgb[3], const char *text,
                        s32 icon, const char *tail);
 void draw_bingo_notices(void);  // HUD hook (bottom-center subtitles)
 void draw_bingo_race_verdict(void);  // HUD hook (persistent, top center)
+void bingo_race_verdict_on_l(void);  // L press: two dismiss the verdict
+void bingo_board_cursor_reset(void); // board closed: drop d-pad cursor
 // Newest notice and its age in frames, or NULL: the lobby status line
 // shows fresh notices for players who are back at the file select.
 const char *bingo_notice_latest(u32 *ageFrames);

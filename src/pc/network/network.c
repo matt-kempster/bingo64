@@ -367,11 +367,14 @@ static void notice_about(s32 id, const char *what) {
     }
 }
 
+// Lowercase: these land in the dialog-font toast feed ("finished 2nd").
 static const char *place_suffix(s32 place) {
-    if (place == 1) return "ST";
-    if (place == 2) return "ND";
-    if (place == 3) return "RD";
-    return "TH";
+    if (place % 100 < 11 || place % 100 > 13) {
+        if (place % 10 == 1) return "st";
+        if (place % 10 == 2) return "nd";
+        if (place % 10 == 3) return "rd";
+    }
+    return "th";
 }
 
 static void handle_line(char *line) {

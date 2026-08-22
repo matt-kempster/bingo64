@@ -54,6 +54,13 @@ static s32 sBingoCursorY = -1;
 #define BINGO_CURSOR_TIMEOUT_FRAMES 6
 static s32 sBingoCursorTimer = 0; // if nonzero, don't move cursor
 
+// Called while the board is hidden: each open starts cursor-less, so the
+// roster column isn't stuck behind a description panel from last time.
+void bingo_board_cursor_reset(void) {
+    sBingoCursorX = -1;
+    sBingoCursorY = -1;
+}
+
 int bingostrlen(char *str) {
     int len = 0;
     while (str[len] != '\0') {
@@ -63,25 +70,24 @@ int bingostrlen(char *str) {
 }
 
 #ifndef TARGET_N64
-// "matt" -> "MATT" in a static buffer, for the all-caps HUD font.
-static const char *hud_upper(const char *name) {
-    static char buf[NET_NAME_LEN];
-    s32 i;
-    for (i = 0; name[i] != '\0' && i < NET_NAME_LEN - 1; i++) {
-        buf[i] = (name[i] >= 'a' && name[i] <= 'z') ? name[i] - 0x20 : name[i];
-    }
-    buf[i] = '\0';
-    return buf;
-}
-
 static const char *net_name_of_id(s32 id) {
     s32 i;
     for (i = 0; i < NET_MAX_PLAYERS; i++) {
         if (gNetPlayers[i].active && gNetPlayers[i].id == id) {
-            return hud_upper(gNetPlayers[i].name);
+            return gNetPlayers[i].name;
         }
     }
     return "?";
+}
+
+// "1st", "2nd", "3rd", "11th"...
+static const char *ordinal_suffix(s32 n) {
+    if (n % 100 < 11 || n % 100 > 13) {
+        if (n % 10 == 1) return "st";
+        if (n % 10 == 2) return "nd";
+        if (n % 10 == 3) return "rd";
+    }
+    return "th";
 }
 
 // The peer's ghost, which carries their whereabouts and last-heard time.
@@ -379,10 +385,23 @@ void draw_bingo_notices(void) {
 // who did NOT win need to hear about it too — persistently, not as a 5s
 // toast. Lockout is excluded: its verdict ends the race for everyone and
 // draw_bingo_win_screen already shows it. Clears when the results clear
-// (back to lobby / disconnect).
+// (back to lobby / disconnect), or on two L presses like the win screen.
+#ifndef TARGET_N64
+static s32 sVerdictWinnerId = 0;
+static s32 sVerdictLPresses = 0;
+#endif
+
+void bingo_race_verdict_on_l(void) {
+#ifndef TARGET_N64
+    if (sVerdictLPresses < 2) {
+        sVerdictLPresses++;
+    }
+#endif
+}
+
 void draw_bingo_race_verdict(void) {
 #ifndef TARGET_N64
-    s32 i, winnerId = 0, myPlace;
+    s32 i, winnerId = 0, myPlace, n;
     char buf[64];
     if (!network_active() || gbBingoMode == BINGO_MODE_LOCKOUT
         || !gBingoInitialized) {
@@ -393,19 +412,33 @@ void draw_bingo_race_verdict(void) {
             winnerId = network_result(i)->id;
         }
     }
+    if (winnerId != sVerdictWinnerId) {
+        // A new verdict (or none): forget dismissal state.
+        sVerdictWinnerId = winnerId;
+        sVerdictLPresses = 0;
+    }
     if (winnerId == 0 || winnerId == network_local_id()) {
         return;  // no verdict yet, or it's ours (the win overlay's job)
     }
+    if (sVerdictLPresses >= 2) {
+        return;  // dismissed
+    }
     myPlace = network_local_place();
     if (myPlace > 0) {
-        sprintf(buf, "won - you placed %d", myPlace);
+        sprintf(buf, "won - you took %d%s place", myPlace,
+                ordinal_suffix(myPlace));
     } else {
-        sprintf(buf, "won - race for place %d", network_result_count() + 1);
+        n = network_result_count() + 1;
+        sprintf(buf, "won - racing for %d%s place", n, ordinal_suffix(n));
     }
     draw_quiet_line(-1, 189, net_name_of_id(winnerId),
                     gNetColorRGB[network_color_of_id(winnerId)
                                  % NET_COLOR_COUNT],
                     buf, sQuietWhite, -1, NULL, 255);
+    if (sVerdictLPresses == 1) {
+        draw_quiet_line(-1, 168, NULL, NULL, "press L again to dismiss",
+                        sQuietWhite, -1, NULL, 255);
+    }
 #endif
 }
 
@@ -428,7 +461,7 @@ static void draw_win_hint(s32 showSuperPlayer) {
         draw_quiet_line(-1, 38, NULL, NULL, "press L again to dismiss",
                         sQuietWhite, -1, NULL, 255);
     } else if (showSuperPlayer) {
-        draw_quiet_line(-1, 38, NULL, NULL, "you are a super player",
+        draw_quiet_line(-1, 38, NULL, NULL, "You are a super player!",
                         sQuietWhite, -1, NULL, 255);
     }
 }
@@ -464,8 +497,8 @@ void draw_bingo_win_screen() {
         // Winning the race gets the rainbow; placing is told quietly.
         getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
         time_fmt_dialog(timestamp);
-        sprintf(msg, "finished number %d in %s", network_local_place(),
-                timestamp);
+        sprintf(msg, "finished %d%s in %s", network_local_place(),
+                ordinal_suffix(network_local_place()), timestamp);
         draw_quiet_line(-1, 60, NULL, NULL, msg,
                         network_local_place() == 1 ? rainbow : sQuietWhite,
                         -1, NULL, 255);
@@ -653,7 +686,9 @@ void draw_bingo_screen() {
     // player's hat color (with ? appended when the connection is in
     // doubt: server dropped them, or their ghost is 2s+ silent), then
     // place + time once finished, else claim count + current course.
-    if (network_active()) {
+    // The d-pad description panel shares this column, so it takes over
+    // while the cursor is up (the cursor resets when the board closes).
+    if (network_active() && sBingoCursorX == -1) {
         char name_print[24];
         char detail[32];
         char course[20];
@@ -700,8 +735,7 @@ void draw_bingo_screen() {
                 getTimeFmtPrecise(timestamp, res->frames);
                 time_fmt_dialog(timestamp);
                 sprintf(detail, "%d%s", res->place,
-                        res->place == 1 ? "st" : res->place == 2 ? "nd"
-                        : res->place == 3 ? "rd" : "th");
+                        ordinal_suffix(res->place));
                 print_generic_string_ascii_detail(244, rowY - 12, detail,
                                                   255, 255, 255, 255,
                                                   TRUE, 1);

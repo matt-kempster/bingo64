@@ -127,6 +127,49 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   courtyard" — only one courtyard level exists; asked whether he wants
   castle grounds split front/back by position.
 
+- roster polish round 3: square+interpunct clashed side by side →
+  racing rows drop the interpunct (the square already breaks the
+  fields; finished rows keep it — no square there). "in Castle"
+  restored (its omission was an interpunct-era width special case).
+  Then Matt's "castle (tippy)" format measured ~95px against the
+  ~54px column and ran off the physical screen edge; he picked the
+  parens-only form: (lobby) (basement) (upstairs) (tippy) (outside)
+  (courtyard), fallback (castle) — parens alone mean "castle" by
+  convention, courses keep "in BoB". E2E fake ghost at level 6 area 3
+  (basement, the widest) verified the fit.
+
+- playtest feedback round (Matt, 2026-08-22 night): five fixes.
+  (1) The persistent race-verdict banner was undismissable → now the
+  win screen's two-L-press pattern: first press shows "press L again
+  to dismiss" under the banner, second hides it; state resets when
+  the winner id changes (next race / back to lobby). hud.c forwards
+  every L buttonPressed via bingo_race_verdict_on_l(). Found via the
+  E2E rig: the PC port renders the HUD twice per game-logic frame
+  (interpolation), so buttonPressed counted twice per physical press
+  — the pre-existing win screen thus dismissed on ONE press and its
+  "press L again" hint never showed on PC. Both counters now
+  debounced on gGlobalTimer in hud.c. E2E extended: quate claims a
+  full row + sends F (the client judges its own bingo; the relay
+  only assigns places), screenshots verify banner, hint after one
+  tap, gone after two.
+  (2) The d-pad objective description overlapped the roster (same
+  right column) → the description takes the column while the cursor
+  is up; the cursor now resets when the board closes (it used to
+  persist forever after the first d-pad touch), so reopening shows
+  the roster again.
+  (3) "finished 1ST" toast → place_suffix in network.c lowercased
+  (was written for the caps-only HUD font) + 11th-13th handled; the
+  roster's inline ordinal ternary replaced by a shared
+  ordinal_suffix() in bingo_ui.c.
+  (4) Verdict copy "won - you placed 2" / "race for place 2" →
+  "won - you took 2nd place" / "won - racing for 2nd place"; win
+  screen "finished number 2 in ..." → "finished 2nd in ...".
+  (5) "QUATE won" → "quate won": net_name_of_id ran names through
+  hud_upper, a leftover from the HUD-font win screen; names now
+  render as typed (the caps-only lobby font is why nobody notices
+  what case they typed). Also "you are a super player" → "You are a
+  super player!".
+
 ## Deferred / follow-ups
 
 - Room-setting visibility tiers + whereabouts toggle → protocol v6

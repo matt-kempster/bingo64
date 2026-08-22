@@ -643,16 +643,26 @@ void render_hud(void) {
         create_dl_ortho_matrix();
 #endif
 
-        if (gPlayer1Controller->buttonPressed & L_TRIG
-            && bingo_race_over()
-            && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit
-        ) {
-            // If you press L twice, the congrats message goes away.
-            gbBingoShowCongratsCounter++;
+        if (gPlayer1Controller->buttonPressed & L_TRIG) {
+            // The PC port renders the HUD twice per game-logic frame
+            // (interpolation), so buttonPressed shows up twice per real
+            // press; count each press once.
+            static u32 sLastLPressFrame = 0;
+            if (gGlobalTimer != sLastLPressFrame) {
+                sLastLPressFrame = gGlobalTimer;
+                if (bingo_race_over()
+                    && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit) {
+                    // If you press L twice, the congrats message goes away.
+                    gbBingoShowCongratsCounter++;
+                }
+                // The race verdict banner dismisses the same way.
+                bingo_race_verdict_on_l();
+            }
         }
         if (gPlayer1Controller->buttonDown & L_TRIG || gForceDrawBingoScreen == 1) {
             draw_bingo_screen();
         } else {
+            bingo_board_cursor_reset();
             if (bingo_race_over() && gbBingoShowCongratsCounter < gbBingoShowCongratsLimit) {
                 draw_bingo_win_screen();
             } else {
