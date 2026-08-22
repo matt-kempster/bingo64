@@ -1702,6 +1702,16 @@ static void print_objective(enum BingoObjectiveType type, s32 pageNo) {
     }
 }
 
+// The config rows' value column: every value's RIGHT edge sits here.
+// (Hand-tuned per-string x offsets drifted — "Lockout" and "Visible"
+// hung short of the column; measure the string instead.)
+#define BINGO_CONFIG_VALUE_RIGHT_X 158
+
+static s32 bingo_config_value_x(u8 *target) {
+    // Returns offsetX (relative to LEFT_X), right-aligning the value.
+    return BINGO_CONFIG_VALUE_RIGHT_X - LEFT_X - get_string_width(target);
+}
+
 static s32 bingo_config_target(s32 i, u8 **target) {
     // Returns offsetX
     if (sToggleCurrentOption && sBingoOptionSelection == i) {
@@ -1712,20 +1722,21 @@ static s32 bingo_config_target(s32 i, u8 **target) {
         default:
         case BINGO_MODE_LINE_1:
             *target = text1Bingo;
-            return 94;
+            break;
         case BINGO_MODE_LINE_2:
             *target = text2Bingos;
-            return 89;
+            break;
         case BINGO_MODE_LINE_3:
             *target = text3Bingos;
-            return 89;
+            break;
         case BINGO_MODE_BLACKOUT:
             *target = textBlackout;
-            return 92;
+            break;
         case BINGO_MODE_LOCKOUT:
             *target = textLockout;
-            return 93;
+            break;
     }
+    return bingo_config_value_x(*target);
 }
 
 #ifndef TARGET_N64
@@ -1744,11 +1755,12 @@ static s32 bingo_config_claimvis(s32 i, u8 **target) {
     gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
     switch (gNetClaimVis) {
         default:
-        case NET_CLAIMVIS_OPEN:     *target = textClaimVisOpen;     return 94;
-        case NET_CLAIMVIS_PROGRESS: *target = textClaimVisProgress; return 101;
-        case NET_CLAIMVIS_BINGOS:   *target = textClaimVisBingos;   return 101;
-        case NET_CLAIMVIS_HIDDEN:   *target = textClaimVisHidden;   return 101;
+        case NET_CLAIMVIS_OPEN:     *target = textClaimVisOpen;     break;
+        case NET_CLAIMVIS_PROGRESS: *target = textClaimVisProgress; break;
+        case NET_CLAIMVIS_BINGOS:   *target = textClaimVisBingos;   break;
+        case NET_CLAIMVIS_HIDDEN:   *target = textClaimVisHidden;   break;
     }
+    return bingo_config_value_x(*target);
 }
 #endif
 
@@ -1774,7 +1786,7 @@ static void print_bingo_configs() {
             } else {
                 target = textOn;
             }
-            offsetX = RIGHT_X - 19 - LEFT_X;
+            offsetX = bingo_config_value_x(target);
 #ifndef TARGET_N64
         } else if (i == 2 && cfgs == 5) {
             label = textClaims;
@@ -1786,7 +1798,7 @@ static void print_bingo_configs() {
                 gNetShowWhereabouts ^= 1;
             }
             target = gNetShowWhereabouts ? textOn : textOff;
-            offsetX = RIGHT_X - 19 - LEFT_X;
+            offsetX = bingo_config_value_x(target);
 #endif
         } else {
             label = textToggleAll;
