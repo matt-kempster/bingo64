@@ -126,6 +126,32 @@ static s32 sLobbyReturnFlag = 0;  // set once when the room resets to the
                                   // lobby; the game warps to file select
 static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
                                    // us whether we are the host
+static s32 sPendingClaimVis = -1;  // visibility settings riding the same W
+static s32 sPendingWhereabouts = -1;
+
+// Room visibility settings (v6). The host's local values are the room's;
+// everyone else receives them via W/O/S.
+s32 gNetClaimVis = NET_CLAIMVIS_OPEN;
+s32 gNetShowWhereabouts = 1;
+
+s32 net_claimvis_coerce(s32 vis, s32 mode) {
+    if (vis < 0) {
+        vis = 0;
+    }
+    if (vis >= NET_CLAIMVIS_COUNT) {
+        vis = NET_CLAIMVIS_COUNT - 1;
+    }
+    if (mode == BINGO_MODE_LOCKOUT || mode == BINGO_MODE_BLACKOUT) {
+        // Lockout is ABOUT the squares; blackout is co-op on a shared
+        // board (peer claims complete YOUR board) — hiding is nonsense.
+        return NET_CLAIMVIS_OPEN;
+    }
+    if (vis == NET_CLAIMVIS_BINGOS
+        && mode != BINGO_MODE_LINE_2 && mode != BINGO_MODE_LINE_3) {
+        return NET_CLAIMVIS_PROGRESS;
+    }
+    return vis;
+}
 
 // The seed proposal from the seed-entry UI (0 = random); implemented in
 // src/menu/file_select.c, linked into every PC build.
@@ -381,11 +407,12 @@ static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
     if (cmd == 'W') {
-        s32 public_ = 0, mode = 0;
+        s32 public_ = 0, mode = 0, claimVis = 0, where = 1;
         s32 id = 0;
         u32 token = 0;
-        if (sscanf(line + 1, "%d %d %d %u", &id, &public_, &mode, &token) == 4) {
-            // A v1/v2 relay packs other fields here; fail loudly instead
+        if (sscanf(line + 1, "%d %d %d %u %d %d", &id, &public_, &mode,
+                   &token, &claimVis, &where) == 6) {
+            // An older relay packs other fields here; fail loudly instead
             // of running a half-broken lobby against an outdated server.
             if (public_ < 0 || public_ > 1 || mode < 0 || mode >= BINGO_MODE_COUNT) {
                 sToken = 0;
@@ -410,9 +437,11 @@ static void handle_line(char *line) {
             fflush(stdout);
             sLocalId = id;
             sToken = token;
-            // The room's current mode; applied in the H handler once we
-            // know whether we are the host (whose own push wins).
+            // The room's current settings; applied in the H handler once
+            // we know whether we are the host (whose own push wins).
             sPendingRoomMode = mode;
+            sPendingClaimVis = claimVis;
+            sPendingWhereabouts = where;
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
             sState = NET_STATE_LOBBY;
@@ -430,8 +459,13 @@ static void handle_line(char *line) {
                 network_push_local_options();
             } else if (sPendingRoomMode >= 0) {
                 gbBingoMode = (enum BingoGameMode) sPendingRoomMode;
+                gNetClaimVis = net_claimvis_coerce(sPendingClaimVis,
+                                                   sPendingRoomMode);
+                gNetShowWhereabouts = sPendingWhereabouts != 0;
             }
             sPendingRoomMode = -1;
+            sPendingClaimVis = -1;
+            sPendingWhereabouts = -1;
             // The role passed on (0 = the initial announcement).
             if (prevHost != 0 && id != prevHost) {
                 if (id == sLocalId) {
@@ -443,9 +477,10 @@ static void handle_line(char *line) {
         }
     } else if (cmd == 'S') {
         u32 seed = 0;
-        s32 delta = 0, mode = 0, unlock = 0;
+        s32 delta = 0, mode = 0, unlock = 0, claimVis = 0, where = 1;
         unsigned long long mask = 0;
-        if (sscanf(line + 1, "%u %d %d %d %llx", &seed, &delta, &mode, &unlock, &mask) == 5) {
+        if (sscanf(line + 1, "%u %d %d %d %llx %d %d", &seed, &delta, &mode,
+                   &unlock, &mask, &claimVis, &where) == 7) {
             s32 i;
             sSharedSeed = seed;
             sSeedValid = 1;
@@ -454,6 +489,8 @@ static void handle_line(char *line) {
             if (mode >= 0 && mode < BINGO_MODE_COUNT) {
                 gbBingoMode = (enum BingoGameMode) mode;
             }
+            gNetClaimVis = net_claimvis_coerce(claimVis, mode);
+            gNetShowWhereabouts = where != 0;
             gBingoFullGameUnlocked = (u8) (unlock != 0);
             for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
                 gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
@@ -570,10 +607,12 @@ static void handle_line(char *line) {
         }
     } else if (cmd == 'O') {
         // The host changed the room options while we sat in the lobby.
-        s32 mode;
-        if (sscanf(line + 1, "%d", &mode) == 1
+        s32 mode, claimVis = 0, where = 1;
+        if (sscanf(line + 1, "%d %d %d", &mode, &claimVis, &where) == 3
             && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
+            gNetClaimVis = net_claimvis_coerce(claimVis, mode);
+            gNetShowWhereabouts = where != 0;
         }
     } else if (cmd == 'F') {
         s32 id, place, frames;
@@ -780,8 +819,12 @@ static void reset_session_state(void) {
     sFinishSent = 0;
     sHostId = 0;
     sPendingRoomMode = -1;
+    sPendingClaimVis = -1;
+    sPendingWhereabouts = -1;
     sGoFlag = 0;
     sLobbyReturnFlag = 0;
+    // gNetClaimVis/gNetShowWhereabouts deliberately survive: they are the
+    // local player's preferred settings for the next room they host.
 }
 
 // --- "auto" server discovery over DNS TXT ------------------------------
@@ -1248,13 +1291,15 @@ s32 network_countdown_frames(void) {
     return 0;
 }
 
-void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed) {
-    char line[80];
+void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
+                          s32 claimVis, s32 whereabouts) {
+    char line[96];
     if (!network_active()) {
         return;
     }
-    snprintf(line, sizeof(line), "O %d %d %llx %u\n",
-             mode, unlock, (unsigned long long) mask, seed);
+    snprintf(line, sizeof(line), "O %d %d %llx %u %d %d\n",
+             mode, unlock, (unsigned long long) mask, seed,
+             claimVis, whereabouts);
     net_send_line(line);
 }
 
@@ -1270,8 +1315,12 @@ void network_push_local_options(void) {
             mask |= (u64) 1 << i;
         }
     }
+    // Coerce before sending so the wire never carries an invalid pair
+    // (the relay would coerce identically anyway).
+    gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
     network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask,
-                         bingo_seed_proposal());
+                         bingo_seed_proposal(), gNetClaimVis,
+                         gNetShowWhereabouts);
 }
 
 s32 network_is_host(void) {

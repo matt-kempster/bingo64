@@ -381,6 +381,25 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         await b.wait_line("O 4")
         self.assertEqual(b.count("R 1 1"), 1)  # dup was dropped, not re-run
 
+    async def test_v6_visibility_settings(self):
+        a, b = await self.two_joined()
+        # Defaults ride the welcome: open claims, whereabouts shared.
+        w = (await a.wait_line("W ")).split()
+        self.assertEqual((w[5], w[6]), ("0", "1"))
+        # BINGOS (2) is meaningless in 1-bingo mode: coerced to PROGRESS.
+        a.send("O 0 0 0 0 2 0")
+        o = (await b.wait_line("O 0")).split()
+        self.assertEqual(o[1:], ["0", "1", "0"])
+        # Blackout is co-op on a shared board: forced open.
+        a.send("O 3 0 0 0 3 1")
+        await b.wait_line("O 3 0 1")
+        # Valid in 2-bingo mode; and the settings ride the start line.
+        a.send("O 1 0 0 0 2 0")
+        await b.wait_line("O 1 2 0")
+        a.send("X")
+        s = (await b.wait_line("S ")).split()
+        self.assertEqual((s[6], s[7]), ("2", "0"))
+
     async def test_reconnect_with_token(self):
         relaymod.UDP_TIMEOUT_S = 1.0
         a, b = await self.two_joined(keepalive=0.3)
@@ -646,8 +665,10 @@ class MatchLogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as logdir:
             relay = Relay(matchlog=relaymod.MatchLog(logdir))
             host, other = _NullClient(), _NullClient()
-            relay.process_line(host, "J 5 peach matt 2 0".split())
-            relay.process_line(other, "J 5 peach luigi 4 0".split())
+            relay.process_line(host, ("J %d peach matt 2 0"
+                                      % PROTOCOL_VERSION).split())
+            relay.process_line(other, ("J %d peach luigi 4 0"
+                                       % PROTOCOL_VERSION).split())
             relay.process_line(host, "X".split())
             relay.process_line(host, "C 12".split())
             relay.process_line(other, "F".split())
@@ -679,7 +700,8 @@ class MatchLogTest(unittest.TestCase):
             relaymod.MATCHLOG_MIN_FREE = 1 << 62  # nothing is this free
             try:
                 host = _NullClient()
-                relay.process_line(host, "J 5 peach matt 2 0".split())
+                relay.process_line(host, ("J %d peach matt 2 0"
+                                          % PROTOCOL_VERSION).split())
                 self.assertIsNotNone(relay.log.paused)
                 self.assertEqual(self._events(logdir), [])
                 # The relay itself is unbothered.

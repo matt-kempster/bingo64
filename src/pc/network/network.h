@@ -7,7 +7,7 @@
 // Talks to server/relay.py with a line-based text protocol over TCP, or
 // over UDP when the server address is prefixed "udp:" (for tunnels that
 // only carry UDP; see the transport notes atop network.c).
-// Protocol version 5: join a room, ready up in the file-select lobby,
+// Protocol version 6: join a room, ready up in the file-select lobby,
 // receive the shared seed + room options in the S (start) message, then
 // exchange ghost states and cell claims during the race. The welcome
 // carries a reconnect token: if the connection drops mid-race the client
@@ -15,10 +15,10 @@
 // replays the room state (claims, finishes).
 // Everything here is PC-only; the N64 build never sees this header.
 
-// 5: K back-to-lobby broadcast + host passing in every phase. During
+// 6: claim-visibility tier + whereabouts toggle ride O/W/S. During
 // active development the version bumps on every wire change — the old
 // side is refused outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 5
+#define NET_PROTOCOL_VERSION 6
 
 #define NET_MAX_GHOSTS  15
 #define NET_MAX_PLAYERS 16
@@ -26,6 +26,29 @@
 #define NET_SERVER_LEN  128
 #define NET_ROOM_LEN    32
 #define NET_COLOR_COUNT 8
+
+// How much of other players' claim activity the room shows (a host-set
+// room setting; the client hides, the relay still relays — a modified
+// client could peek, fine for the playtest). Mirrored in relay.py.
+enum NetClaimVis {
+    NET_CLAIMVIS_OPEN,      // chips + toasts + counts (the default)
+    NET_CLAIMVIS_PROGRESS,  // claim counts only, not which squares
+    NET_CLAIMVIS_BINGOS,    // bingo milestones only (2/3-bingo modes)
+    NET_CLAIMVIS_HIDDEN,    // nothing until players finish
+    NET_CLAIMVIS_COUNT
+};
+
+// The room's visibility settings (defaults: open, whereabouts shared).
+// The host edits them on the options screen; everyone else receives
+// them via W/O/S. Read-only outside network.c/the options screen.
+extern s32 gNetClaimVis;
+extern s32 gNetShowWhereabouts;
+
+// Invalid tier/mode pairs are unrepresentable: lockout is ABOUT the
+// squares (forced OPEN), and the bingo-count tier only means something
+// in the 2/3-bingo modes (falls back to PROGRESS). Mirrors relay.py's
+// coerce_claimvis.
+s32 net_claimvis_coerce(s32 vis, s32 mode);
 
 enum NetState {
     NET_STATE_OFF,          // not connected, no session
@@ -143,7 +166,8 @@ s32 network_countdown_frames(void);
 // mask bit i set = objective type i disabled; seed 0 = random at start.
 // The options that arrive with the start message are applied to the
 // bingo globals directly.
-void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed);
+void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
+                          s32 claimVis, s32 whereabouts);
 // Push the current bingo globals as room options (no-op unless we are
 // the room creator). Called after the welcome and whenever the options
 // screen may have changed them.

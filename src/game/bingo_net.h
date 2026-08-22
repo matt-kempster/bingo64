@@ -25,6 +25,7 @@ s32 bingo_net_obj_is_ghost(struct Object *obj);
 // offline) these report "not online": 0 / 0 / 0.
 s32 bingo_net_racing(void);           // in an online race right now
 s32 bingo_net_local_cell_count(void); // cells the local player owns online
+s32 bingo_net_bingo_count(s32 claimerId); // complete lines a peer holds
 s32 bingo_net_race_decided(void);     // an online winner exists (lockout)
 s32 bingo_net_local_won(void);        // ...and it is the local player
 

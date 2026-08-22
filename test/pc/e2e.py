@@ -9,6 +9,11 @@ once (dismiss hint appears), tap L again (banner gone).
 Run under Xvfb (see test/pc/README.md); screenshots land in $E2E_OUT
 (default: cwd). The game binary comes from $BL (default ~/b64-refresh),
 built by test/pc/linuxbuild.sh.
+
+$E2E_ROOMOPTS, if set, is sent as quate's (the creator's) v6 room
+options before the start — e.g. "O 0 0 0 0 3 0" = 1-bingo, claims
+HIDDEN, whereabouts off. $E2E_PREFIX renames the screenshots (default
+"e2e") so two configurations can run side by side.
 """
 import asyncio
 import os
@@ -29,7 +34,11 @@ def xenv():
     return env
 
 
+PREFIX = os.environ.get("E2E_PREFIX", "e2e")
+
+
 def shot(wid, name):
+    name = PREFIX + name[3:]  # e2e_toast -> <prefix>_toast
     subprocess.run(["import", "-window", wid, "%s/%s.png" % (SP, name)],
                    env=xenv(), check=False)
     print("shot", name, flush=True)
@@ -49,6 +58,9 @@ async def main():
     await quate.start()
     quate.join("demo", "quate", color=5)
     quate.send("R 1")
+    if os.environ.get("E2E_ROOMOPTS"):
+        quate.send(os.environ["E2E_ROOMOPTS"])
+        print("room options:", os.environ["E2E_ROOMOPTS"], flush=True)
     await asyncio.sleep(0.5)
 
     game = subprocess.Popen(

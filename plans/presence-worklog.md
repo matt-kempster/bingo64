@@ -170,11 +170,37 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   what case they typed). Also "you are a super player" → "You are a
   super player!".
 
+- protocol v6: visibility room settings (Matt's interview,
+  2026-08-22 night — he OK'd the version bump): claim-visibility tier
+  Open / Counts / Bingos / Hidden + a separate Locations (whereabouts)
+  toggle, both host-owned room settings on the options screen (two
+  new rows under Game mode; lobby-only, frozen at start like the
+  seed). Invalid states unrepresentable via coerce (client
+  net_claimvis_coerce + relay coerce_claimvis): lockout AND blackout
+  force Open (lockout is about the squares; blackout turned out to be
+  CO-OP on a shared board — peer claims complete your board — so
+  hiding is nonsense there; my interview question wrongly called it a
+  race mode, flagged to Matt), Bingos tier only in 2/3-bingo modes
+  (else falls to Counts). Wire: O grows to
+  "O mode unlock mask seed claimvis where" (rebroadcast
+  "O mode claimvis where"), W and S carry both fields, PROTOCOL 5→6
+  both sides. Client display gating: board chips only in Open; claim
+  toasts per tier ("completed <icon> WF*7" / "completed a square" /
+  "got a bingo" via bingo_net_bingo_count line counting / silence);
+  roster progress column count+square in Open/Counts, "2 *" (dialog
+  star) in Bingos, blank in Hidden; own row always full; whereabouts
+  column obeys Locations (self always shown). Enforcement is
+  CLIENT-side (Matt: ok for now, relay-side withholding recorded as
+  potentially release-blocking in the checklist §2). Local R-menu
+  toggle: Settings → "Online Toasts" (configBingoToasts) mutes the
+  feed locally; notices still age (lobby status line unaffected).
+  Relay tests 23/23 incl. new test_v6_visibility_settings; e2e.py
+  gained $E2E_ROOMOPTS/$E2E_PREFIX for screenshot passes per config.
+
 ## Deferred / follow-ups
 
-- Room-setting visibility tiers + whereabouts toggle → protocol v6
-  (options message grows); hold until no active playtest evening.
-- R-menu local toggles (toasts on/off) — after the toast ships.
+- Relay-side visibility enforcement (see checklist §2) — potentially
+  release-blocking; client-side hiding shipped with v6.
 - Reconnect replay can re-deliver a claim burst; the 3-slot cap
   contains the spam, revisit if it looks bad in practice.
 - Sound cue: skipped by design for now.

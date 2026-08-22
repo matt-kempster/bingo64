@@ -135,28 +135,66 @@ static void spawn_missing_ghosts(void) {
 //             the owner's color). Counting is owner-based.
 //   line modes  race: a peer's claim is recorded for display only; each
 //             player completes their own board.
+// Complete lines (rows, cols, both diagonals) a peer holds on the shared
+// claim map; the BINGOS visibility tier announces these milestones and
+// the roster shows them per player.
+s32 bingo_net_bingo_count(s32 claimer) {
+    u32 bit = (u32) 1 << claimer;
+    s32 n = 0, i, j;
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5 && (gBingoCellClaimers[5 * i + j] & bit); j++) {}
+        n += j == 5;
+        for (j = 0; j < 5 && (gBingoCellClaimers[5 * j + i] & bit); j++) {}
+        n += j == 5;
+    }
+    for (j = 0; j < 5 && (gBingoCellClaimers[6 * j] & bit); j++) {}
+    n += j == 5;
+    for (j = 0; j < 5 && (gBingoCellClaimers[4 * j + 4] & bit); j++) {}
+    n += j == 5;
+    return n;
+}
+
 static void apply_remote_claims(void) {
     s32 cell, claimer;
     while (network_poll_claim(&cell, &claimer)) {
+        s32 prevBingos = 0, newBingos = 0;
         if (cell < 0 || cell >= 25) {
             continue;
         }
         if (claimer >= 0 && claimer < 32) {
+            prevBingos = bingo_net_bingo_count(claimer);
             gBingoCellClaimers[cell] |= (u32) 1 << claimer;
+            newBingos = bingo_net_bingo_count(claimer);
         }
         if (claimer != network_local_id()) {
-            // Toast the peer's square: their name in their hat color, the
-            // square as its board icon.
+            // Toast the peer's progress — as much of it as the room's
+            // claim-visibility tier shows.
             s32 i;
             for (i = 0; i < NET_MAX_PLAYERS; i++) {
-                if (gNetPlayers[i].active && gNetPlayers[i].id == claimer) {
+                const struct NetPlayer *p = &gNetPlayers[i];
+                if (!p->active || p->id != claimer) {
+                    continue;
+                }
+                if (gNetClaimVis == NET_CLAIMVIS_OPEN) {
+                    // Their name in their hat color, the square as its
+                    // board icon plus its caption.
                     bingo_notice_rich(
-                        gNetPlayers[i].name,
-                        gNetColorRGB[gNetPlayers[i].color % NET_COLOR_COUNT],
+                        p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
                         "completed", gBingoObjectives[cell].icon,
                         gBingoObjectives[cell].title);
-                    break;
+                } else if (gNetClaimVis == NET_CLAIMVIS_PROGRESS) {
+                    bingo_notice_rich(
+                        p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
+                        "completed a square", -1, NULL);
+                } else if (gNetClaimVis == NET_CLAIMVIS_BINGOS
+                           && newBingos > prevBingos) {
+                    bingo_notice_rich(
+                        p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
+                        newBingos == 1 ? "got a bingo"
+                                       : "got another bingo", -1, NULL);
                 }
+                // NET_CLAIMVIS_HIDDEN: silence until the finish line.
+                break;
             }
         }
         if (gbBingoMode == BINGO_MODE_BLACKOUT

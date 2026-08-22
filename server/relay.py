@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bingo64 relay server, protocol v5.
+"""Bingo64 relay server, protocol v6.
 
 A small room server for online bingo (plans/online-bingo.md Part D).
 Clients speak a line-based text protocol; the server groups them into
@@ -53,8 +53,8 @@ Game modes (shared enum with the client, see src/game/bingo.h):
 Line protocol (space-separated fields):
 
   client -> server
-    J 5 <room> <name> <color> <flags> [token]
-                             join a room. The protocol version (5) comes
+    J 6 <room> <name> <color> <flags> [token]
+                             join a room. The protocol version (6) comes
                              first; older clients are refused with
                              "E version". color is a palette index 0..7.
                              flags apply only when this join creates the
@@ -67,11 +67,15 @@ Line protocol (space-separated fields):
     C <cell>                 claim board cell 0..24
     R <0|1>                  ready toggle (a roster signal only; the race
                              starts when the host sends X)
-    O <mode> <unlock> <maskhex> <seed>
+    O <mode> <unlock> <maskhex> <seed> <claimvis> <where>
                              room settings (host only, before the start):
                              game mode 0..4, full-game unlock,
-                             disabled-objective bitmask as hex, and the
-                             seed proposal (0 = random at start).
+                             disabled-objective bitmask as hex, the
+                             seed proposal (0 = random at start), the
+                             claim-visibility tier 0..3 (open/progress/
+                             bingos/hidden; invalid tier+mode pairs are
+                             coerced, see coerce_claimvis), and whether
+                             player whereabouts are shared (0/1).
     X                        the host starts the race (allowed even if
                              not everyone is ready)
     K                        the host ends the race: back to the lobby.
@@ -88,15 +92,16 @@ Line protocol (space-separated fields):
                              silence timeout; TCP just closes)
 
   server -> client
-    W <id> <public> <mode> <token>
-                             welcome: player id, room mode and the
-                             reconnect token. NO seed here: it arrives in
-                             S at start.
+    W <id> <public> <mode> <token> <claimvis> <where>
+                             welcome: player id, room mode/visibility
+                             settings and the reconnect token. NO seed
+                             here: it arrives in S at start.
     N <id> <name> <color> <ready> <connected>
                              roster entry (sent for yourself too, and
                              re-sent when someone's state changes)
     R <id> <0|1>             ready change
-    O <mode>                 the host changed the room's game mode
+    O <mode> <claimvis> <where>
+                             the host changed the room's settings
     H <id>                   who the host is (on join, and when the host
                              role passes to someone else — the role now
                              passes in every phase, not just the lobby,
@@ -105,7 +110,7 @@ Line protocol (space-separated fields):
                              race (seed, claims, results, ready marks)
                              and return to the lobby screen. Followed by
                              a full roster re-send with everyone unready.
-    S <seed> <delta> <mode> <unlock> <maskhex>
+    S <seed> <delta> <mode> <unlock> <maskhex> <claimvis> <where>
                              the race starts: shared seed, room options,
                              and delta = frames (30/s) until GO. Negative
                              delta means the race started -delta frames
@@ -140,13 +145,34 @@ print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
 
+MODE_LINE_2 = 1
+MODE_LINE_3 = 2
 MODE_BLACKOUT = 3
 MODE_LOCKOUT = 4
+
+# Claim-visibility tiers (v6 room setting, mirrored in network.h).
+CLAIMVIS_OPEN = 0      # chips + toasts + counts: everything (default)
+CLAIMVIS_PROGRESS = 1  # counts only, not which squares
+CLAIMVIS_BINGOS = 2    # bingo milestones only (2/3-bingo modes)
+CLAIMVIS_HIDDEN = 3    # nothing until finishes
+
+
+def coerce_claimvis(vis, mode):
+    """Invalid tier/mode pairs are unrepresentable: lockout is ABOUT the
+    squares and blackout is co-op on a shared board (both always open),
+    and the bingo-count tier only means something in the 2/3-bingo modes
+    (mirrored in the C client)."""
+    vis = max(CLAIMVIS_OPEN, min(CLAIMVIS_HIDDEN, vis))
+    if mode in (MODE_BLACKOUT, MODE_LOCKOUT):
+        return CLAIMVIS_OPEN
+    if vis == CLAIMVIS_BINGOS and mode not in (MODE_LINE_2, MODE_LINE_3):
+        return CLAIMVIS_PROGRESS
+    return vis
 
 # UDP transport constants (mirrored in src/pc/network/network.c).
 UDP_MAGIC = 0xB6
@@ -365,6 +391,8 @@ class Room:
         self.mode = 0
         self.unlock = 0
         self.mask = 0
+        self.claimvis = CLAIMVIS_OPEN
+        self.whereabouts = 1
         # Results.
         self.finishers = []     # (id, place, frames)
         self.winner = None      # (id, frames), lockout
@@ -387,8 +415,11 @@ class Room:
         return max(0, -self.start_delta_frames())
 
     def start_line(self):
-        return "S %d %d %d %d %x" % (self.seed, self.start_delta_frames(),
-                                     self.mode, self.unlock, self.mask)
+        return "S %d %d %d %d %x %d %d" % (self.seed,
+                                           self.start_delta_frames(),
+                                           self.mode, self.unlock,
+                                           self.mask, self.claimvis,
+                                           self.whereabouts)
 
     def roster_line(self, id_, name, color, ready, connected):
         return "N %d %s %d %d %d" % (id_, name, color,
@@ -633,9 +664,10 @@ class Relay:
                 room.tokens[client.id] = random.randrange(1, 2 ** 32)
             client.room = room
             self.stat_joins += 1
-            client.send("W %d %d %d %d"
+            client.send("W %d %d %d %d %d %d"
                         % (client.id, 1 if room.public else 0,
-                           room.mode, room.tokens[client.id]))
+                           room.mode, room.tokens[client.id],
+                           room.claimvis, room.whereabouts))
             self.send_room_snapshot(room, client)
             # Announce the (re)arrival to everyone else.
             room.broadcast(room.roster_line(client.id, client.name,
@@ -707,7 +739,14 @@ class Relay:
                 room.mask = 0
             if len(parts) >= 5:
                 room.seed_proposal = clamped_int(parts[4], 0, 999999998)
-            room.broadcast("O %d" % room.mode, skip=client.id)
+            if len(parts) >= 7:
+                room.claimvis = clamped_int(parts[5], 0, 3)
+                room.whereabouts = clamped_int(parts[6], 0, 1)
+            # The mode may have changed out from under the tier.
+            room.claimvis = coerce_claimvis(room.claimvis, room.mode)
+            room.broadcast("O %d %d %d" % (room.mode, room.claimvis,
+                                           room.whereabouts),
+                           skip=client.id)
         elif cmd == "X" and client.room:
             room = client.room
             if client.id != room.creator_id:

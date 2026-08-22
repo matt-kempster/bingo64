@@ -5,12 +5,13 @@
 # under ~/opt. Stage the result yourself, e.g.:
 #   cp ~/b64-win/build/us_pc/sm64.us.f3dex2e.exe \
 #      /mnt/c/Users/Matt/AppData/Local/bingo64-test/bingo64-<tag>.exe
-set -e
+set -e -o pipefail  # pipefail: make's status must survive the tail pipe
 WT="$(cd "$(dirname "$0")/../.." && pwd)"
 BW="${BW:-$HOME/b64-win}"
 rsync -a "$WT/src/" "$BW/src/"
 rsync -a "$WT/bin/" "$BW/bin/"
 rsync -a "$WT/data/" "$BW/data/"
+rsync -a "$WT/include/" "$BW/include/"
 rsync -a "$WT/Makefile" "$WT/defines.mk" "$BW/"
 export PATH=$HOME/opt/llvm-mingw-20240221-ucrt-ubuntu-20.04-x86_64/bin:$HOME/opt/cross-bin:$PATH
 cd "$BW"

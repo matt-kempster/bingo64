@@ -115,6 +115,7 @@ static const u8 optsSettingsStr[][SIZEOPTC(32)] = {
     { TEXT_OPT_HUD },
     { TEXT_OPT_MOUSE },
     { TEXT_OPT_NET_SELFCOL },
+    { TEXT_OPT_NET_TOASTS },
 };
 
 #ifndef TARGET_N64
@@ -326,6 +327,7 @@ static struct Option optsSettings[] = {
 #endif
 #ifndef TARGET_N64
     DEF_OPT_TOGGLE( optsSettingsStr[2], &configNetSelfColor ),
+    DEF_OPT_TOGGLE( optsSettingsStr[3], &configBingoToasts ),
 #endif
 };
 

@@ -118,15 +118,23 @@ this section are confirmed by reading `server/relay.py`.
 
 ## 2. Presence and whereabouts
 
-- [ ] **Show where each player is (missing — Matt's ask).** Roster
-      and/or board screen shows each racer's current course ("BobOmb
-      Battlefield", "Castle", star select...). Data is nearly free: a
-      small addition to the ghost payload or a low-rate reliable
-      message on level change. Show on the bingo board screen next to
-      the color chips.
-- [ ] **Privacy toggle for whereabouts.** A lobby/options setting,
-      OFF = the client doesn't broadcast location (not merely hides it
-      locally). Decide the default (suggest: ON, it's a race).
+- [x] **Show where each player is (missing — Matt's ask).** DONE on
+      the `presence` branch: L-screen roster shows per-player claim
+      count + whereabouts ("in BoB", "(basement)"), derived from the
+      ghost stream.
+- [x] **Privacy toggle for whereabouts.** DONE (protocol v6): host-set
+      room setting "Locations" on the options screen, default ON. Note
+      it HIDES client-side; the ghosts still stream (they drive the
+      in-level ghost rendering).
+- [ ] **Relay-side visibility enforcement (POTENTIALLY RELEASE-
+      BLOCKING — Matt, 2026-08-22).** The v6 claim-visibility tiers
+      and the whereabouts toggle are enforced by the displaying
+      client; the relay still broadcasts everything, so a modified
+      client can peek. Fine among playtest friends; before a public
+      release decide whether the relay should withhold C/G from
+      non-owners per the room settings (needs an end-of-race reveal
+      and reconnect-replay care, and lockout still requires full claim
+      sync).
 - [ ] **Ghost visibility toggle (design).** Some players find ghosts
       distracting or spoilery (they reveal routes). Local setting:
       ghosts ON / OFF / same-course-only. Purely client-side.

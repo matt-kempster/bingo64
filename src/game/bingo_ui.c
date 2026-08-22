@@ -29,6 +29,8 @@
 #ifndef TARGET_N64
 #include <string.h>
 #include "pc/network/network.h"
+#include "pc/configfile.h"
+#include "bingo_net.h"
 #include "bingo_const.h"
 #include "level_table.h"
 #endif
@@ -361,6 +363,9 @@ void draw_bingo_notices(void) {
     while (sNoticeCount > 0
            && gGlobalTimer - sNotices[0].frame > BINGO_NOTICE_LIFE) {
         bingo_notice_drop_oldest();
+    }
+    if (!configBingoToasts) {
+        return;  // local mute (R menu); notices still age out above
     }
     for (i = 0; i < sNoticeCount; i++) {
         // Oldest reads first: it sits highest, newest at the bottom;
@@ -744,23 +749,40 @@ void draw_bingo_screen() {
                                                   255, 255, 255, 255,
                                                   TRUE, 1);
             } else {
+                s32 self = p->id == network_local_id();
                 course[0] = '\0';
-                if (p->id == network_local_id()) {
+                // Whereabouts are a room setting (your own always show).
+                if (self) {
                     whereabouts_for_level(gCurrLevelNum, gCurrAreaIndex,
                                           gMarioState->pos[1], course);
-                } else {
+                } else if (gNetShowWhereabouts) {
                     struct NetGhost *g = ghost_for_name(p->name);
                     if (g != NULL) {
                         whereabouts_for_level(g->level, g->area, g->pos[1],
                                               course);
                     }
                 }
-                sprintf(detail, "%d", net_cell_count_of_id(p->id));
-                print_generic_string_ascii_detail(
-                    250 - get_string_width_ascii(detail), rowY - 12, detail,
-                    255, 255, 255, 255, TRUE, 1);
-                if (nQuads < NET_MAX_PLAYERS) {
-                    quadY[nQuads++] = rowY - 12;
+                // Progress column by the room's claim-visibility tier:
+                // count + square symbol, bingo milestones ("2 bingos"),
+                // or nothing at all. Your own row always shows.
+                if (self || gNetClaimVis <= NET_CLAIMVIS_PROGRESS) {
+                    sprintf(detail, "%d", net_cell_count_of_id(p->id));
+                    print_generic_string_ascii_detail(
+                        250 - get_string_width_ascii(detail), rowY - 12,
+                        detail, 255, 255, 255, 255, TRUE, 1);
+                    if (nQuads < NET_MAX_PLAYERS) {
+                        quadY[nQuads++] = rowY - 12;
+                    }
+                } else if (gNetClaimVis == NET_CLAIMVIS_BINGOS) {
+                    // Same table cell, star unit instead of the square:
+                    // "2 * in BoB" = two bingos ('*' is the dialog ★).
+                    sprintf(detail, "%d", bingo_net_bingo_count(p->id));
+                    print_generic_string_ascii_detail(
+                        250 - get_string_width_ascii(detail), rowY - 12,
+                        detail, 255, 255, 255, 255, TRUE, 1);
+                    print_generic_string_ascii_detail(253, rowY - 12, "*",
+                                                      255, 255, 255, 255,
+                                                      TRUE, 1);
                 }
                 // No interpunct here: the square symbol already breaks
                 // the fields, and the two small glyphs clash side by
@@ -795,8 +817,9 @@ void draw_bingo_screen() {
 
 #ifndef TARGET_N64
     // Who claimed what: a small color chip per claiming peer next to each
-    // cell's icon (several can stack in the race modes).
-    if (network_active()) {
+    // cell's icon (several can stack in the race modes). Only when the
+    // room shows WHICH squares (the OPEN tier).
+    if (network_active() && gNetClaimVis == NET_CLAIMVIS_OPEN) {
         s32 chip;
         gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
         gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);

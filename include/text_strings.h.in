@@ -201,6 +201,14 @@
 #define TEXT_UNLOCK_GAME _("Unlock Full Game")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 
+// Online visibility settings (host-owned room options, protocol v6).
+#define TEXT_CLAIMS _("Claims:")
+#define TEXT_LOCATIONS _("Locations:")
+#define TEXT_CLAIMVIS_OPEN _("Open")
+#define TEXT_CLAIMVIS_PROGRESS _("Counts")
+#define TEXT_CLAIMVIS_BINGOS _("Bingos")
+#define TEXT_CLAIMVIS_HIDDEN _("Hidden")
+
 #define TEXT_SINGLE_STAR _("Single Star")
 #define TEXT_MULTI_STAR _("Multiple Stars")
 #define TEXT_A_BUTTON _("A Button Challenge")

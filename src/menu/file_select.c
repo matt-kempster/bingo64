@@ -188,7 +188,12 @@ u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 
 s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11
+#ifndef TARGET_N64
+// PC adds the online visibility rows (Claims / Locations).
+#define BINGO_CONFIGS_IN_LEFT_COL 5 // not more than 10, hopefully
+#else
 #define BINGO_CONFIGS_IN_LEFT_COL 3 // not more than 10, hopefully
+#endif
 #define BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE (BINGO_ENTRIES_PER_COL - BINGO_CONFIGS_IN_LEFT_COL)
 #define BINGO_INSTRUCTIONS_IN_RIGHT_COL 3
 #define BINGO_OPTIONS_IN_RIGHT_COL (BINGO_ENTRIES_PER_COL - BINGO_INSTRUCTIONS_IN_RIGHT_COL)
@@ -1514,6 +1519,15 @@ static unsigned char textUnlockGame[] = { TEXT_UNLOCK_GAME };
 static unsigned char textToggleAll[] = { TEXT_TOGGLE_ALL };
 static unsigned char textEmpty[] = { 0xFF };
 
+#ifndef TARGET_N64
+static unsigned char textClaims[] = { TEXT_CLAIMS };
+static unsigned char textLocations[] = { TEXT_LOCATIONS };
+static unsigned char textClaimVisOpen[] = { TEXT_CLAIMVIS_OPEN };
+static unsigned char textClaimVisProgress[] = { TEXT_CLAIMVIS_PROGRESS };
+static unsigned char textClaimVisBingos[] = { TEXT_CLAIMVIS_BINGOS };
+static unsigned char textClaimVisHidden[] = { TEXT_CLAIMVIS_HIDDEN };
+#endif
+
 static unsigned char textDPad[] = { TEXT_DPAD };
 static unsigned char textPressA[] = { TEXT_PRESS_A };
 static unsigned char textPressRL_1[] = { TEXT_PRESS_RL_1 };
@@ -1711,42 +1725,77 @@ static s32 bingo_config_target(s32 i, u8 **target) {
     }
 }
 
+#ifndef TARGET_N64
+// The Claims row's value text and its right-ish x offset, tier-aware.
+static s32 bingo_config_claimvis(s32 i, u8 **target) {
+    if (sToggleCurrentOption && sBingoOptionSelection == i) {
+        sToggleCurrentOption = 0;
+        // Cycle, skipping tiers the current mode can't represent (in
+        // lockout this sticks at Open, which IS the rule).
+        do {
+            gNetClaimVis = (gNetClaimVis + 1) % NET_CLAIMVIS_COUNT;
+        } while (net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode)
+                 != gNetClaimVis);
+    }
+    // The mode row may have invalidated the tier since it was set.
+    gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
+    switch (gNetClaimVis) {
+        default:
+        case NET_CLAIMVIS_OPEN:     *target = textClaimVisOpen;     return 112;
+        case NET_CLAIMVIS_PROGRESS: *target = textClaimVisProgress; return 101;
+        case NET_CLAIMVIS_BINGOS:   *target = textClaimVisBingos;   return 101;
+        case NET_CLAIMVIS_HIDDEN:   *target = textClaimVisHidden;   return 101;
+    }
+}
+#endif
+
 static void print_bingo_configs() {
-    s32 i;
+    s32 i, j;
     s32 offsetX;
     u8 *label;
     u8 *target;
 
     for (i = 0; i < BINGO_CONFIGS_IN_LEFT_COL; i++) {
-        switch (i) {
-            case 0:
-                label = textGameMode;
-                offsetX = bingo_config_target(i, &target);
-                break;
-            case 2:
-                label = textToggleAll;
-                if (sToggleCurrentOption && sBingoOptionSelection == i) {
-                    sToggleCurrentOption = 0;
-                    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-                        gBingoObjectivesDisabled[i] ^= 1;
-                    }
+        if (i == 0) {
+            label = textGameMode;
+            offsetX = bingo_config_target(i, &target);
+        } else if (i == 1) {
+            label = textUnlockGame;
+            if (sToggleCurrentOption && sBingoOptionSelection == i) {
+                sToggleCurrentOption = 0;
+                gBingoFullGameUnlocked ^= 1;
+            }
+            if (!gBingoFullGameUnlocked) {
+                target = textOff;
+            } else {
+                target = textOn;
+            }
+            offsetX = RIGHT_X - 19 - LEFT_X;
+#ifndef TARGET_N64
+        } else if (i == 2) {
+            label = textClaims;
+            offsetX = bingo_config_claimvis(i, &target);
+        } else if (i == 3) {
+            label = textLocations;
+            if (sToggleCurrentOption && sBingoOptionSelection == i) {
+                sToggleCurrentOption = 0;
+                gNetShowWhereabouts ^= 1;
+            }
+            target = gNetShowWhereabouts ? textOn : textOff;
+            offsetX = RIGHT_X - 19 - LEFT_X;
+#endif
+        } else {
+            label = textToggleAll;
+            if (sToggleCurrentOption && sBingoOptionSelection == i) {
+                sToggleCurrentOption = 0;
+                // j, not i: clobbering the loop index skipped this row's
+                // own label print for a frame (old bug).
+                for (j = 0; j < BINGO_OBJECTIVE_TOTAL_AMOUNT; j++) {
+                    gBingoObjectivesDisabled[j] ^= 1;
                 }
-                target = textEmpty;
-                offsetX = 0;
-                break;
-            case 1:
-                label = textUnlockGame;
-                if (sToggleCurrentOption && sBingoOptionSelection == i) {
-                    sToggleCurrentOption = 0;
-                    gBingoFullGameUnlocked ^= 1;
-                }
-                if (!gBingoFullGameUnlocked) {
-                    target = textOff;
-                } else {
-                    target = textOn;
-                }
-                offsetX = RIGHT_X - 19 - LEFT_X;
-                break;
+            }
+            target = textEmpty;
+            offsetX = 0;
         }
 
         gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));

@@ -35,6 +35,7 @@ extern char configNetServer[128];
 extern char configNetRoom[32];
 extern unsigned int configNetColor;
 extern bool configNetSelfColor;
+extern bool configBingoToasts;
 extern unsigned int configMasterVolume;
 extern unsigned int configMusicVolume;
 extern unsigned int configSfxVolume;

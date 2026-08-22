@@ -107,6 +107,7 @@
 #define TEXT_OPT_NET_KEEP   _("KEEP RACING")
 #define TEXT_OPT_NET_ENDALL _("END THE RACE FOR ALL")
 #define TEXT_OPT_NET_SELFCOL _("WEAR MY COLOR ONLINE")
+#define TEXT_OPT_NET_TOASTS _("ONLINE TOASTS")
 
 #else // VERSION
 
@@ -191,6 +192,7 @@
 #define TEXT_OPT_NET_KEEP   _("Keep Racing")
 #define TEXT_OPT_NET_ENDALL _("End The Race For All")
 #define TEXT_OPT_NET_SELFCOL _("Wear My Color Online")
+#define TEXT_OPT_NET_TOASTS _("Online Toasts")
 
 #endif // VERSION
 
