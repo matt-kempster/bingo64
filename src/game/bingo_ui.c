@@ -710,11 +710,9 @@ void draw_bingo_screen() {
                 }
                 // No interpunct here: the square symbol already breaks
                 // the fields, and the two small glyphs clash side by
-                // side. Hubs skip the "in" so "Castle" fits the column.
+                // side.
                 if (course[0] == '\0') {
                     detail[0] = '\0';
-                } else if (strcmp(course, "Castle") == 0) {
-                    sprintf(detail, "%s", course);
                 } else {
                     sprintf(detail, "in %s", course);
                 }
