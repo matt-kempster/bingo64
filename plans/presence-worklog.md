@@ -118,6 +118,15 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   displays as BoB (the shared table stays caps: the board's HUD-font
   captions can't render lowercase).
 
+- castle whereabouts refined (Matt): the hub blob became in lobby /
+  in basement / upstairs / in tippy (castle interior by area, area 2
+  split at y=2000 for the third floor), outside (grounds), in
+  courtyard (Boo courtyard). whereabouts_for_level now returns the
+  whole phrase — adverbs carry no "in". E2E fake ghost verified tippy
+  (level 6 area 2 y=3000). OPEN: Matt said "courtyard and back
+  courtyard" — only one courtyard level exists; asked whether he wants
+  castle grounds split front/back by position.
+
 ## Deferred / follow-ups
 
 - Room-setting visibility tiers + whereabouts toggle → protocol v6

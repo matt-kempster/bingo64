@@ -95,31 +95,60 @@ static struct NetGhost *ghost_for_name(const char *name) {
     return NULL;
 }
 
-// Community-standard course code ("BoB", "WF", "WMotR") for a level id,
-// into out[8]; "Castle" for the hub levels, empty when unknown. The
-// shared courseAbbreviations table already uses the standard forms
-// except BOB (the board's HUD-font captions are caps-only, so the
-// shared table can't hold the lowercase o).
-static void course_code_for_level(s16 level, char out[8]) {
-    const char *src;
-    s32 i;
+// The second-floor area of the castle interior also holds the third
+// floor; Mario's height tells them apart (3F landing sits well above
+// 2000 units, the 2F rooms well below).
+#define CASTLE_TIPPY_MIN_Y 2000.0f
+
+// Community-standard whereabouts phrase for a level ("in BoB",
+// "in WMotR"), with the castle refined by area/height into in lobby /
+// in basement / upstairs / in tippy (plus outside and in courtyard),
+// into out[16]; empty when unknown. The preposition lives here because
+// adverbs ("outside", "upstairs") take none. The shared
+// courseAbbreviations table already uses the standard forms except BOB
+// (the board's HUD-font captions are caps-only, so the shared table
+// can't hold the lowercase o).
+static void whereabouts_for_level(s16 level, s16 area, f32 posY,
+                                  char out[16]) {
+    const char *src = NULL;
+    const char *prep = "in ";
+    s32 i, o = 0;
     s8 course;
     out[0] = '\0';
     if (level <= 0 || level >= LEVEL_COUNT) {
         return;
     }
-    course = gLevelToCourseNumTable[level - 1];
-    if (course == COURSE_BOB) {
-        src = "BoB";
-    } else if (course > 0 && course <= 24) {
-        src = courseAbbreviations[course - 1];
+    if (level == LEVEL_CASTLE) {
+        if (area == 3) {
+            src = "basement";
+        } else if (area == 2) {
+            src = posY > CASTLE_TIPPY_MIN_Y ? "tippy" : "upstairs";
+            prep = posY > CASTLE_TIPPY_MIN_Y ? prep : "";
+        } else {
+            src = "lobby";
+        }
+    } else if (level == LEVEL_CASTLE_GROUNDS) {
+        src = "outside";
+        prep = "";
+    } else if (level == LEVEL_CASTLE_COURTYARD) {
+        src = "courtyard";
     } else {
-        src = "Castle";
+        course = gLevelToCourseNumTable[level - 1];
+        if (course == COURSE_BOB) {
+            src = "BoB";
+        } else if (course > 0 && course <= 24) {
+            src = courseAbbreviations[course - 1];
+        } else {
+            src = "Castle";  // bowser arenas and other odd interiors
+        }
     }
-    for (i = 0; src[i] != '\0' && i < 7; i++) {
-        out[i] = src[i];
+    for (i = 0; prep[i] != '\0' && o < 15; i++) {
+        out[o++] = prep[i];
     }
-    out[i] = '\0';
+    for (i = 0; src[i] != '\0' && o < 15; i++) {
+        out[o++] = src[i];
+    }
+    out[o] = '\0';
 }
 
 // Cells each room member owns (their bit is set in gBingoCellClaimers).
@@ -638,7 +667,7 @@ void draw_bingo_screen() {
     if (network_active()) {
         char name_print[24];
         char detail[32];
-        char course[8];
+        char course[16];
         s32 quadY[NET_MAX_PLAYERS];
         s32 nQuads = 0;
         s32 rowY = 162;
@@ -694,11 +723,13 @@ void draw_bingo_screen() {
             } else {
                 course[0] = '\0';
                 if (p->id == network_local_id()) {
-                    course_code_for_level(gCurrLevelNum, course);
+                    whereabouts_for_level(gCurrLevelNum, gCurrAreaIndex,
+                                          gMarioState->pos[1], course);
                 } else {
                     struct NetGhost *g = ghost_for_name(p->name);
                     if (g != NULL) {
-                        course_code_for_level(g->level, course);
+                        whereabouts_for_level(g->level, g->area, g->pos[1],
+                                              course);
                     }
                 }
                 sprintf(detail, "%d", net_cell_count_of_id(p->id));
@@ -710,13 +741,8 @@ void draw_bingo_screen() {
                 }
                 // No interpunct here: the square symbol already breaks
                 // the fields, and the two small glyphs clash side by
-                // side.
-                if (course[0] == '\0') {
-                    detail[0] = '\0';
-                } else {
-                    sprintf(detail, "in %s", course);
-                }
-                print_generic_string_ascii_detail(264, rowY - 12, detail,
+                // side. The whereabouts phrase carries its own "in".
+                print_generic_string_ascii_detail(264, rowY - 12, course,
                                                   255, 255, 255, 255,
                                                   TRUE, 1);
             }
