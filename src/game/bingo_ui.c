@@ -889,8 +889,13 @@ void draw_bingo_screen() {
                                     gNetColorRGB[color][1],
                                     gNetColorRGB[color][2], 230);
                     {
-                        s32 rx = ix + 18;
-                        s32 ry = iy + 9 + chip * 6;
+                        // Upper-left of the cell: the gap between the
+                        // grid line and the icon, top-aligned -- clear
+                        // of the "1x" add-on text (top-right) and of
+                        // most captions.
+                        s32 rx = ix - 5;  // flush left of the icon,
+                                          // clear of the grid bar
+                        s32 ry = iy + chip * 6;
                         // A 5x5 square with its corners knocked off
                         // reads as a round dot at this size.
                         gDPFillRectangle(gDisplayListHead++,
