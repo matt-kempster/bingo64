@@ -154,6 +154,41 @@ s32 bingo_net_bingo_count(s32 claimer) {
     return n;
 }
 
+// A mid-race disconnect must not re-attribute the board (the claim bits
+// in gBingoCellClaimers survive, but sLocalId and gNetPlayers are wiped
+// with the session, so everything used to render as "yours"): the local
+// id and every peer's hat color are snapshotted each frame while
+// connected, and the board reads the frozen copy once the connection
+// dies. Cleared with the rest of the race state on room reset.
+static s32 sFrozenLocalId = 0;
+static u8 sFrozenColors[32];
+
+static void freeze_ownership_snapshot(void) {
+    s32 i;
+    sFrozenLocalId = network_local_id();
+    for (i = 0; i < NET_MAX_PLAYERS; i++) {
+        const struct NetPlayer *p = &gNetPlayers[i];
+        if (p->active && p->id >= 0 && p->id < 32) {
+            sFrozenColors[p->id] = p->color;
+        }
+    }
+}
+
+s32 bingo_net_dropped(void) {
+    return !network_active() && sFrozenLocalId != 0;
+}
+
+s32 bingo_net_display_id(void) {
+    return network_active() ? network_local_id() : sFrozenLocalId;
+}
+
+s32 bingo_net_display_color(s32 id) {
+    if (network_active()) {
+        return network_color_of_id(id);
+    }
+    return (id >= 0 && id < 32) ? sFrozenColors[id] : 0;
+}
+
 static void apply_remote_claims(void) {
     s32 cell, claimer;
     while (network_poll_claim(&cell, &claimer)) {
@@ -235,6 +270,7 @@ void bingo_net_on_room_reset(void) {
     gbBingosCompleted = 0;
     gbBingoShowCongratsCounter = 0;
     sFinishAnnounced = 0;
+    sFrozenLocalId = 0;
 }
 
 // EXIT GAME on the pause options menu: back out to the file select
@@ -269,6 +305,7 @@ void bingo_net_update(void) {
         sFinishAnnounced = 0;
         return;
     }
+    freeze_ownership_snapshot();
     spawn_missing_ghosts();
     if (gBingoInitialized) {
         apply_remote_claims();
@@ -305,7 +342,17 @@ void bingo_net_update(void) {
 
 // Called by set_objective_state when a cell completes locally.
 void bingo_net_on_local_complete(struct BingoObjective *objective) {
-    if (!network_active() || gBingoNetApplyingRemoteClaim) {
+    if (gBingoNetApplyingRemoteClaim) {
+        return;
+    }
+    if (!network_active()) {
+        // A dropped race plays on offline: keep our own attribution
+        // current so the frozen board (chips, lockout count) stays
+        // truthful. Never set online: there the server echo owns the bit.
+        if (sFrozenLocalId > 0) {
+            gBingoCellClaimers[objective - gBingoObjectives] |=
+                (u32) 1 << sFrozenLocalId;
+        }
         return;
     }
     network_notify_local_claim(objective - gBingoObjectives);
@@ -317,7 +364,7 @@ s32 bingo_net_racing(void) {
 
 s32 bingo_net_local_cell_count(void) {
     s32 i, count = 0;
-    u32 myBit = (u32) 1 << network_local_id();
+    u32 myBit = (u32) 1 << bingo_net_display_id();
     for (i = 0; i < 25; i++) {
         if (gBingoCellClaimers[i] & myBit) {
             count++;
@@ -548,6 +595,10 @@ s32 bingo_net_take_lobby_return(void) {
 }
 
 void bingo_net_keepalive(void) {
+}
+
+s32 bingo_net_dropped(void) {
+    return 0;
 }
 
 #endif

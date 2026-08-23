@@ -845,7 +845,8 @@ void draw_bingo_screen() {
     // Who claimed what: a small color chip per claiming peer next to each
     // cell's icon (several can stack in the race modes). Only when the
     // room shows WHICH squares (the OPEN tier).
-    if (network_active() && gNetClaimVis == NET_CLAIMVIS_OPEN) {
+    if ((network_active() || bingo_net_dropped())
+        && gNetClaimVis == NET_CLAIMVIS_OPEN) {
         s32 chip;
         gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
         gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
@@ -859,7 +860,7 @@ void draw_bingo_screen() {
                     if (!(mask & ((u32) 1 << id))) {
                         continue;
                     }
-                    color = network_color_of_id(id);
+                    color = bingo_net_display_color(id);
                     gDPSetPrimColor(gDisplayListHead++, 0, 0,
                                     gNetColorRGB[color][0],
                                     gNetColorRGB[color][1],

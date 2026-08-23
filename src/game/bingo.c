@@ -125,6 +125,12 @@ s32 bingo_race_won(void) {
             // the winner (first to 13 in 1v1, uncatchable lead otherwise).
             return bingo_net_local_won();
         }
+        if (bingo_net_dropped()) {
+            // An online lockout whose connection died: the board still
+            // holds everyone's squares, so counting all complete cells
+            // would hand us our opponents' progress. Only ours count.
+            return bingo_net_local_cell_count() >= BINGO_LOCKOUT_TARGET;
+        }
         // Solo lockout: race to any 13 squares.
         return bingo_complete_cell_count() >= BINGO_LOCKOUT_TARGET;
     }

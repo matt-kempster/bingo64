@@ -28,6 +28,8 @@ s32 bingo_net_local_cell_count(void); // cells the local player owns online
 s32 bingo_net_bingo_count(s32 claimerId); // complete lines a peer holds
 s32 bingo_net_race_decided(void);     // an online winner exists (lockout)
 s32 bingo_net_local_won(void);        // ...and it is the local player
+s32 bingo_net_dropped(void);          // race lost its connection, board
+                                      // still carries online claims
 
 // The room went back to the lobby: clear the local race state so the
 // next race sets up from scratch (called by the PC network client).
@@ -39,6 +41,11 @@ void bingo_net_request_menu_return(void);
 void bingo_net_keepalive(void);
 
 #ifndef TARGET_N64
+// Claim-attribution lookups that survive a mid-race disconnect: live
+// network values while connected, the frozen last-known snapshot after.
+s32 bingo_net_display_id(void);         // the local player's id
+s32 bingo_net_display_color(s32 id);    // a claimer's palette index
+
 // The palette index of the peer driving this ghost puppet (0 = red).
 s32 bingo_net_ghost_color(struct Object *obj);
 

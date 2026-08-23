@@ -310,9 +310,12 @@ void append_dl_and_return(struct GraphNodeDisplayList *node) {
             geo_append_display_list(tinted, LAYER_TRANSPARENT);
         } else if (layer == LAYER_OPAQUE && configNetSelfColor
                    && (struct Object *) gCurGraphNodeObject == gMarioObject
-                   && gMarioObject != NULL && network_active()) {
+                   && gMarioObject != NULL
+                   && (network_active() || bingo_net_dropped())) {
             // Local Mario wears his own net color while connected (same
             // memoized clones the ghosts use; color 0 = vanilla red = no-op).
+            // A race that lost its connection keeps the color: reverting
+            // to red mid-level reads as a bug, not a state change.
             geo_append_display_list(
                 bingo_net_tinted_dl(node->displayList,
                                     (s32) (configNetColor % NET_COLOR_COUNT)),

@@ -264,9 +264,11 @@ windowmove <id> 0 0` first; capture the game window id, not root.
 - Reconnect replay can re-deliver a claim burst; the 3-slot cap
   contains the spam, revisit if it looks bad in practice.
 - Sound cue: skipped by design for now.
-- Dropout claim attribution (zcoop98, 2026-08-23): after dropping out
-  of an online match mid-game, the board falls back to local mode and
-  every completed objective renders as yours. Fix = freeze the
-  last-known claim ownership when the connection dies instead of
-  reverting to solo coloring. Needs a look at what network_disconnect
-  clears vs what the board reads.
+- ~~Dropout claim attribution (zcoop98, 2026-08-23)~~ DONE 2026-08-23:
+  bingo_net.c snapshots the local id + per-id hat colors every frame
+  while connected and the board reads the frozen copy after a terminal
+  disconnect (`bingo_net_dropped`). Covers the owner chips, the solo
+  lockout win-count fallback (peers' squares no longer count as yours),
+  local Mario's hat color, and post-drop completions (self bit set
+  locally). E2E: lockout race, 12 quate + 2 zed claims, relay killed +
+  resume refused ("E") -> chips/color persist, no bogus win banner.
