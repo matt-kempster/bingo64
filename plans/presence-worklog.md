@@ -237,6 +237,26 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   scenario (E2E_ROOMOPTS mode 4 → quate claims the 13 majority,
   relay decides) — banner/hint/dismiss screenshot-verified.
 
+- "auto server lookup failed" root-caused twice (2026-08-22 night):
+  first pass added retries + a net_auto_cache config fallback
+  (legit hardening, wrong diagnosis); Matt still failed → the REAL
+  bug: net_dial ran the auto TXT lookup before WSAStartup, so on a
+  fresh Windows launch socket() died with WSANOTINITIALISED — auto
+  NEVER worked cold on Windows, and only seemed flaky because a
+  prior manual-address dial initialized Winsock. Linux (all E2E) was
+  immune, which is why tests stayed green. WSAStartup hoisted to the
+  top of net_dial.
+
+- RELEASE v1.0-beta.6 drafted (Matt said "deploy as 5.3"; the
+  convention ties the beta number to the protocol — this is wire v6
+  and refuses 5.x, so it ships as beta.6). Board overlay now prints
+  "V1.0 BETA <protocol>" instead of the stale "VERSION 0.11a".
+  make_release.sh run from ~/b64-win (winbuild.sh now rsyncs tools/
+  + server/ so the extractor and the packed relay.py match); audit
+  passed ("no ROM-derived bytes"); zip layout matches 5.2. Branch
+  `presence` pushed to origin; DRAFT release created for Matt to
+  publish (his final check per the drafts-first convention).
+
 ## Deferred / follow-ups
 
 - Relay-side visibility enforcement (see checklist §2) — potentially
