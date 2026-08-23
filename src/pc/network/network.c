@@ -990,6 +990,25 @@ static s32 net_dial(const char **err) {
     char portbuf[16];
     struct addrinfo hints, *res = NULL, *ai;
 
+#ifdef _WIN32
+    // Winsock init MUST precede the auto lookup below — its DNS query
+    // opens a socket, and socket() before WSAStartup fails with
+    // WSANOTINITIALISED. This sat lower in the function once, which
+    // made "auto" fail 100% of the time on a fresh Windows launch
+    // (and mysteriously work after any non-auto dial).
+    {
+        static s32 sWsaReady = 0;
+        if (!sWsaReady) {
+            WSADATA wsa;
+            if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+                *err = "WSAStartup failed";
+                return 0;
+            }
+            sWsaReady = 1;
+        }
+    }
+#endif
+
     // "auto": ask the TXT record where the server lives today. Looked up
     // fresh on every dial so a reconnect loop follows a moved tunnel.
     if (strcmp(addr, "auto") == 0 || strcmp(addr, "AUTO") == 0) {
@@ -1024,20 +1043,6 @@ static s32 net_dial(const char **err) {
     sGhostIn = sGhostOut = 0;
     sLastInboundFrame = gGlobalTimer;
     sLastResendFrame = sLastKeepaliveFrame = gGlobalTimer;
-
-#ifdef _WIN32
-    {
-        static s32 sWsaReady = 0;
-        if (!sWsaReady) {
-            WSADATA wsa;
-            if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-                *err = "WSAStartup failed";
-                return 0;
-            }
-            sWsaReady = 1;
-        }
-    }
-#endif
 
     colon = strrchr(addr, ':');
     if (colon != NULL) {
