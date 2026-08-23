@@ -421,6 +421,8 @@ void get_lose_hat_objective_desc(struct BingoObjective *obj, char *desc) {
     char suffix[20];
     if (obj->state == BINGO_STATE_COMPLETE) {
         strcpy(suffix, ": Complete!");
+    } else {
+        strcpy(suffix, "");
     }
     sprintf(desc, "Lose Mario's hat%s", suffix);
 }
@@ -464,6 +466,8 @@ void get_bowser_objective_desc(struct BingoObjective *obj, char *desc) {
 
     if (obj->state == BINGO_STATE_COMPLETE) {
         strcpy(suffix, ": Complete!");
+    } else {
+        strcpy(suffix, "");
     }
     sprintf(desc, "Defeat Bowser %d (in %s)%s", bowserNum, revEncLevelName + 3, suffix);
 }
