@@ -237,10 +237,30 @@ void bingo_net_on_room_reset(void) {
     sFinishAnnounced = 0;
 }
 
-// Level-update poll: 1 exactly once after a room reset, meaning "leave
-// the level and return to the file select lobby".
+// EXIT GAME on the pause options menu: back out to the file select
+// instead of killing the process (SamuRoy). Reuses the host-kick warp
+// machinery below; network state (if any) is untouched, so online you
+// stay in the room, same as when the host ends the race.
+static s32 sLocalMenuReturn = 0;
+
+void bingo_net_request_menu_return(void) {
+    bingo_net_on_room_reset();
+    sLocalMenuReturn = 1;
+}
+
+// Level-update poll: 1 exactly once after a room reset or a local EXIT
+// GAME, meaning "leave the level and return to the file select lobby".
 s32 bingo_net_take_lobby_return(void) {
-    return network_take_lobby_return_flag();
+    s32 local = sLocalMenuReturn;
+    sLocalMenuReturn = 0;
+    return local || network_take_lobby_return_flag();
+}
+
+// Service the connection outside play_mode_normal (pause and area/level
+// transitions): keeps our G heartbeats and inbound pumping alive so the
+// other players' rosters don't flip us to "?" during every load.
+void bingo_net_keepalive(void) {
+    network_update();
 }
 
 // Called once per gameplay frame from play_mode_normal.
@@ -520,8 +540,14 @@ s32 bingo_net_local_won(void) {
 void bingo_net_on_room_reset(void) {
 }
 
+void bingo_net_request_menu_return(void) {
+}
+
 s32 bingo_net_take_lobby_return(void) {
     return 0;
+}
+
+void bingo_net_keepalive(void) {
 }
 
 #endif

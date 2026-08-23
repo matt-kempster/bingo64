@@ -1302,6 +1302,12 @@ s32 update_level(void) {
 #endif
     }
 
+    // play_mode_normal services the connection itself (bingo_net_update);
+    // every other mode still heartbeats so peers don't see "?" mid-load.
+    if (sCurrPlayMode != PLAY_MODE_NORMAL) {
+        bingo_net_keepalive();
+    }
+
     bingo_update(BINGO_UPDATE_TIMER_FRAME_STAR);
 
     if (changeLevel) {

@@ -23,6 +23,7 @@
 #include "pc/pc_main.h"
 #include "pc/controller/controller_api.h"
 #include "pc/network/network.h"
+#include "game/bingo_net.h"
 
 #include <stdbool.h>
 #endif
@@ -182,7 +183,16 @@ static const u8 *filterChoices[] = {
 
 #ifndef TARGET_N64
 static void optmenu_act_exit(UNUSED struct Option *self, s32 arg) {
-    if (!arg) game_exit(); // only exit on A press and not directions
+    if (arg) return; // only act on A press and not directions
+    if (sCurrPlayMode == PLAY_MODE_PAUSED) {
+        // In-game: exit to the file select instead of killing the process
+        // (SamuRoy) -- play_mode_paused force-unpauses and takes the same
+        // warp the host's back-to-lobby kick uses.
+        bingo_net_request_menu_return();
+        optmenu_toggle(); // close + save the config
+    } else {
+        game_exit(); // already at the menu: quit for real
+    }
 }
 
 #if !defined(TARGET_PORT_CONSOLE) && !defined(TARGET_ANDROID)

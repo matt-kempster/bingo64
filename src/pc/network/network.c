@@ -438,6 +438,13 @@ static void handle_line(char *line) {
             fflush(stdout);
             sLocalId = id;
             sToken = token;
+            // Persist the token across game restarts (see network_connect).
+            configNetToken = token;
+            snprintf(configNetTokenRoom, sizeof(configNetTokenRoom),
+                     "%s", sSavedRoom);
+            snprintf(configNetTokenServer, sizeof(configNetTokenServer),
+                     "%s", sSavedServer);
+            configfile_save(configfile_name());
             // The room's current settings; applied in the H handler once
             // we know whether we are the host (whose own push wins).
             sPendingRoomMode = mode;
@@ -1119,6 +1126,16 @@ s32 network_connect(const char *server, const char *room, const char *name,
              (name != NULL && name[0]) ? name : "mario");
     sSavedColor = color % NET_COLOR_COUNT;
     sSavedFlags = flagsPublic ? 1 : 0;
+
+    // A restarted game presents the persisted token when rejoining the
+    // same room on the same server: the relay hands back the old seat
+    // (id, claims) instead of suffixing the name to "name2". A stale
+    // token is harmless -- the relay just treats us as a fresh join.
+    if (sToken == 0 && configNetToken != 0
+        && strcmp(sSavedServer, configNetTokenServer) == 0
+        && strcmp(sSavedRoom, configNetTokenRoom) == 0) {
+        sToken = configNetToken;
+    }
 
     if (!net_dial(&err)) {
         net_fail(err);

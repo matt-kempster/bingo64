@@ -35,6 +35,8 @@ void bingo_net_on_room_reset(void);
 // Level-update poll, 1 exactly once after a room reset: leave the level
 // and warp back to the file select lobby. Always 0 on N64 / offline.
 s32 bingo_net_take_lobby_return(void);
+void bingo_net_request_menu_return(void);
+void bingo_net_keepalive(void);
 
 #ifndef TARGET_N64
 // The palette index of the peer driving this ghost puppet (0 = red).

@@ -79,6 +79,12 @@ bool configNetSelfColor = true;  // render your own Mario in your net color
 bool configBingoToasts = true;   // draw the online toast feed in-game
 // Last successful "auto" server lookup; the fallback when DNS is flaky.
 char configNetAutoCache[128] = "";
+// Resume token from the last room joined (and which room/server it
+// belongs to): a restarted game presents it on the next join to the same
+// room and reclaims its old seat instead of rejoining as "name2".
+unsigned int configNetToken = 0;
+char configNetTokenRoom[32] = "";
+char configNetTokenServer[128] = "";
 unsigned int configSfxVolume = MAX_VOLUME;
 unsigned int configEnvVolume = MAX_VOLUME;
 
@@ -176,6 +182,9 @@ static const struct ConfigOption options[] = {
     {.name = "net_self_color",       .type = CONFIG_TYPE_BOOL, .boolValue = &configNetSelfColor},
     {.name = "bingo_toasts",         .type = CONFIG_TYPE_BOOL, .boolValue = &configBingoToasts},
     {.name = "net_auto_cache",       .type = CONFIG_TYPE_STRING, .strValue = configNetAutoCache, .strLen = sizeof(configNetAutoCache)},
+    {.name = "net_token",            .type = CONFIG_TYPE_UINT, .uintValue = &configNetToken},
+    {.name = "net_token_room",       .type = CONFIG_TYPE_STRING, .strValue = configNetTokenRoom, .strLen = sizeof(configNetTokenRoom)},
+    {.name = "net_token_server",     .type = CONFIG_TYPE_STRING, .strValue = configNetTokenServer, .strLen = sizeof(configNetTokenServer)},
     {.name = "master_volume",        .type = CONFIG_TYPE_UINT, .uintValue = &configMasterVolume},
     {.name = "music_volume",         .type = CONFIG_TYPE_UINT, .uintValue = &configMusicVolume},
     {.name = "sfx_volume",           .type = CONFIG_TYPE_UINT, .uintValue = &configSfxVolume},
