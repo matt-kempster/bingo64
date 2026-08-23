@@ -86,20 +86,23 @@ unsigned int configEnvVolume = MAX_VOLUME;
 // Keyboard defaults (first column, PS/2 set-1 scancodes): stick on WASD,
 // C-buttons on the arrow keys, D-pad on T/F/G/H, A=L, B=comma, Start=Space,
 // L=Q, R=RShift, Z=K.
+// Gamepad defaults (SDL GameController buttons + trigger virtual keys):
+// A=A/Cross, B=X/Square, Start=Start/Options, L=LB/L1, R=RB/R1 + RT/R2,
+// Z=LT/L2 + L3, D-pad=D-pad (0x100B-0x100E).
 unsigned int configKeyA[MAX_BINDS]          = { 0x0026,   0x1000,     0x1101     };
 unsigned int configKeyB[MAX_BINDS]          = { 0x0033,   0x1002,     0x1103     };
 unsigned int configKeyStart[MAX_BINDS]      = { 0x0039,   0x1006,     0x1102     };
 unsigned int configKeyL[MAX_BINDS]          = { 0x0010,   0x1009,     VK_INVALID };
-unsigned int configKeyR[MAX_BINDS]          = { 0x0036,   0x100A,     VK_INVALID };
-unsigned int configKeyZ[MAX_BINDS]          = { 0x0025,   0x1007,     VK_INVALID };
+unsigned int configKeyR[MAX_BINDS]          = { 0x0036,   0x100A,     0x101B     };
+unsigned int configKeyZ[MAX_BINDS]          = { 0x0025,   0x101A,     0x1007     };
 unsigned int configKeyCUp[MAX_BINDS]        = { 0x0148,   VK_INVALID, VK_INVALID };
 unsigned int configKeyCDown[MAX_BINDS]      = { 0x0150,   VK_INVALID, VK_INVALID };
 unsigned int configKeyCLeft[MAX_BINDS]      = { 0x014B,   VK_INVALID, VK_INVALID };
 unsigned int configKeyCRight[MAX_BINDS]     = { 0x014D,   VK_INVALID, VK_INVALID };
-unsigned int configKeyDUp[MAX_BINDS]        = { 0x0014,   VK_INVALID, VK_INVALID };
-unsigned int configKeyDDown[MAX_BINDS]      = { 0x0022,   VK_INVALID, VK_INVALID };
-unsigned int configKeyDLeft[MAX_BINDS]      = { 0x0021,   VK_INVALID, VK_INVALID };
-unsigned int configKeyDRight[MAX_BINDS]     = { 0x0023,   VK_INVALID, VK_INVALID };
+unsigned int configKeyDUp[MAX_BINDS]        = { 0x0014,   0x100B,     VK_INVALID };
+unsigned int configKeyDDown[MAX_BINDS]      = { 0x0022,   0x100C,     VK_INVALID };
+unsigned int configKeyDLeft[MAX_BINDS]      = { 0x0021,   0x100D,     VK_INVALID };
+unsigned int configKeyDRight[MAX_BINDS]     = { 0x0023,   0x100E,     VK_INVALID };
 unsigned int configKeyStickUp[MAX_BINDS]    = { 0x0011,   VK_INVALID, VK_INVALID };
 unsigned int configKeyStickDown[MAX_BINDS]  = { 0x001F,   VK_INVALID, VK_INVALID };
 unsigned int configKeyStickLeft[MAX_BINDS]  = { 0x001E,   VK_INVALID, VK_INVALID };
