@@ -9,6 +9,18 @@
 #define VK_LTRIGGER 0x101A
 #define VK_RTRIGGER 0x101B
 
+// virtual buttons for the analog stick directions, so the sticks can be
+// captured in the rebind menu and bound like buttons (SDL2 backend).
+// Order matters: left stick then right, each up/down/left/right.
+#define VK_LSTICK_UP    0x1020
+#define VK_LSTICK_DOWN  0x1021
+#define VK_LSTICK_LEFT  0x1022
+#define VK_LSTICK_RIGHT 0x1023
+#define VK_RSTICK_UP    0x1024
+#define VK_RSTICK_DOWN  0x1025
+#define VK_RSTICK_LEFT  0x1026
+#define VK_RSTICK_RIGHT 0x1027
+
 // fake buttons for binding the stick directions
 #define STICK_UP    0x80000
 #define STICK_DOWN  0x40000

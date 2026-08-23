@@ -32,8 +32,14 @@
 #define VK_BASE_SDL_MOUSE (VK_BASE_SDL_GAMEPAD + VK_OFS_SDL_MOUSE)
 #define MAX_JOYBINDS 32
 #define MAX_MOUSEBUTTONS 8 // arbitrary
-#define MAX_JOYBUTTONS 32  // arbitrary; includes virtual keys for triggers
+#define MAX_JOYBUTTONS 64  // arbitrary; includes virtual keys for triggers and stick directions
 #define AXIS_THRESHOLD (30 * 256)
+// stick directions need a firmer tilt than the triggers to count as a press,
+// matching the old hardcoded right-stick-as-C threshold
+#define AXIS_DIGITAL_THRESHOLD 0x4000
+
+#define VK_OFS_STICK_DIR (VK_LSTICK_UP - VK_BASE_SDL_GAMEPAD)
+#define STICK_DIR_COUNT 8
 
 static bool init_ok;
 static bool haptics_enabled;
@@ -45,6 +51,12 @@ static u32 num_joy_binds = 0;
 static bool joy_buttons[MAX_JOYBUTTONS] = { false };
 static u32 last_joybutton = VK_INVALID;
 
+// A stick with any of its direction keys bound in the config is "remapped":
+// it loses its legacy hardcoded role (left = movement, right = C-buttons).
+static bool l_stick_rebound = false;
+static bool r_stick_rebound = false;
+static s32 ext_stick_source = 1; // stick feeding ext_stick: 0 left, 1 right, -1 none
+
 #ifdef MOUSE_ACTIONS
 static u32 mouse_binds[MAX_JOYBINDS][2];
 static u32 num_mouse_binds = 0;
@@ -53,13 +65,17 @@ static u32 last_mouse = VK_INVALID;
 
 static inline void controller_add_binds(const u32 mask, const u32 *btns) {
     for (u32 i = 0; i < MAX_BINDS; ++i) {
-        if (btns[i] >= VK_BASE_SDL_GAMEPAD && btns[i] <= VK_BASE_SDL_GAMEPAD + VK_SIZE) {
+        // mouse VKs live inside the gamepad VK_SIZE range, so the upper bound
+        // must stop at VK_BASE_SDL_MOUSE or mouse binds corrupt joy_binds
+        if (btns[i] >= VK_BASE_SDL_GAMEPAD && btns[i] < VK_BASE_SDL_MOUSE
+            && num_joy_binds < MAX_JOYBINDS) {
             joy_binds[num_joy_binds][0] = btns[i] - VK_BASE_SDL_GAMEPAD;
             joy_binds[num_joy_binds][1] = mask;
             ++num_joy_binds;
         }
 #ifdef MOUSE_ACTIONS
-        if (btns[i] >= VK_BASE_SDL_MOUSE && num_joy_binds < MAX_JOYBINDS && configMouse) {
+        if (btns[i] >= VK_BASE_SDL_MOUSE && btns[i] < VK_BASE_SDL_MOUSE + MAX_MOUSEBUTTONS
+            && num_mouse_binds < MAX_JOYBINDS && configMouse) {
             mouse_binds[num_mouse_binds][0] = btns[i] - VK_BASE_SDL_MOUSE;
             mouse_binds[num_mouse_binds][1] = mask;
             ++num_mouse_binds;
@@ -94,6 +110,22 @@ static void controller_sdl_bind(void) {
     controller_add_binds(L_TRIG,       configKeyL);
     controller_add_binds(R_TRIG,       configKeyR);
     controller_add_binds(START_BUTTON, configKeyStart);
+
+    l_stick_rebound = r_stick_rebound = false;
+    ext_stick_source = -1;
+    for (u32 i = 0; i < num_joy_binds; ++i) {
+        const u32 vk = joy_binds[i][0];
+        if (vk < VK_OFS_STICK_DIR || vk >= VK_OFS_STICK_DIR + STICK_DIR_COUNT)
+            continue;
+        const bool left = vk < VK_OFS_STICK_DIR + 4;
+        if (left) l_stick_rebound = true;
+        else      r_stick_rebound = true;
+        // the camera / ext stick follows whichever stick drives the C-buttons
+        if (joy_binds[i][1] & (U_CBUTTONS | D_CBUTTONS | L_CBUTTONS | R_CBUTTONS))
+            ext_stick_source = left ? 0 : 1;
+    }
+    if (!r_stick_rebound)
+        ext_stick_source = 1; // legacy: an untouched right stick is the C-stick
 }
 
 static void controller_sdl_init(void) {
@@ -249,10 +281,26 @@ static void controller_sdl_read(OSContPad *pad) {
     update_button(VK_LTRIGGER - VK_BASE_SDL_GAMEPAD, ltrig > AXIS_THRESHOLD);
     update_button(VK_RTRIGGER - VK_BASE_SDL_GAMEPAD, rtrig > AXIS_THRESHOLD);
 
+    // stick directions as virtual buttons, so the rebind menu can capture
+    // stick motion and any control can be bound to a stick direction
+    const s32 stick_dirs[STICK_DIR_COUNT] = {
+        -lefty, lefty, -leftx, leftx,      // left stick: up, down, left, right
+        -righty, righty, -rightx, rightx,  // right stick
+    };
+    for (u32 i = 0; i < STICK_DIR_COUNT; ++i)
+        update_button(VK_OFS_STICK_DIR + i, stick_dirs[i] > AXIS_DIGITAL_THRESHOLD);
+
     u32 buttons_down = 0;
-    for (u32 i = 0; i < num_joy_binds; ++i)
-        if (joy_buttons[joy_binds[i][0]])
+    for (u32 i = 0; i < num_joy_binds; ++i) {
+        const u32 vk = joy_binds[i][0];
+        // stick directions bound to the N64 stick keep their analog value:
+        // routed below, not treated as digital presses
+        if (vk >= VK_OFS_STICK_DIR && vk < VK_OFS_STICK_DIR + STICK_DIR_COUNT
+            && (joy_binds[i][1] & (STICK_XMASK | STICK_YMASK)))
+            continue;
+        if (joy_buttons[vk])
             buttons_down |= joy_binds[i][1];
+    }
 
     pad->button |= buttons_down;
 
@@ -267,27 +315,63 @@ static void controller_sdl_read(OSContPad *pad) {
     else if (ystick == STICK_UP)
         pad->stick_y = 127;
 
-    if (rightx < -0x4000) pad->button |= L_CBUTTONS;
-    if (rightx > 0x4000) pad->button |= R_CBUTTONS;
-    if (righty < -0x4000) pad->button |= U_CBUTTONS;
-    if (righty > 0x4000) pad->button |= D_CBUTTONS;
+    const uint32_t stickDeadzoneActual = configStickDeadzone * DEADZONE_STEP;
+    const uint32_t deadzone_sq = (uint32_t)(stickDeadzoneActual * stickDeadzoneActual);
 
-    uint32_t magnitude_sq = (uint32_t)(leftx * leftx) + (uint32_t)(lefty * lefty);
-    uint32_t stickDeadzoneActual = configStickDeadzone * DEADZONE_STEP;
-    if (magnitude_sq > (uint32_t)(stickDeadzoneActual * stickDeadzoneActual)) {
-        // Game expects stick coordinates within -80..80
-        // 32768 / 409 = ~80
-        pad->stick_x = leftx / 409;
-        pad->stick_y = -lefty / 409;
+    // legacy fixed roles apply only while a stick has no direction bound
+    if (!r_stick_rebound) {
+        if (rightx < -0x4000) pad->button |= L_CBUTTONS;
+        if (rightx > 0x4000) pad->button |= R_CBUTTONS;
+        if (righty < -0x4000) pad->button |= U_CBUTTONS;
+        if (righty > 0x4000) pad->button |= D_CBUTTONS;
     }
 
-    magnitude_sq = (uint32_t)(rightx * rightx) + (uint32_t)(righty * righty);
-    stickDeadzoneActual = configStickDeadzone * DEADZONE_STEP;
-    if (magnitude_sq > (uint32_t)(stickDeadzoneActual * stickDeadzoneActual)) {
-        // Game expects stick coordinates within -80..80
-        // 32768 / 409 = ~80
-        pad->ext_stick_x = rightx / 409;
-        pad->ext_stick_y = -righty / 409;
+    if (!l_stick_rebound) {
+        uint32_t magnitude_sq = (uint32_t)(leftx * leftx) + (uint32_t)(lefty * lefty);
+        if (magnitude_sq > deadzone_sq) {
+            // Game expects stick coordinates within -80..80
+            // 32768 / 409 = ~80
+            pad->stick_x = leftx / 409;
+            pad->stick_y = -lefty / 409;
+        }
+    }
+
+    // stick directions bound to the N64 stick route their analog value
+    if (l_stick_rebound || r_stick_rebound) {
+        s32 sx = 0, sy = 0;
+        for (u32 i = 0; i < num_joy_binds; ++i) {
+            const u32 vk = joy_binds[i][0];
+            if (vk < VK_OFS_STICK_DIR || vk >= VK_OFS_STICK_DIR + STICK_DIR_COUNT)
+                continue;
+            s32 v = stick_dirs[vk - VK_OFS_STICK_DIR];
+            if (v < 0) v = 0;
+            switch (joy_binds[i][1] & (STICK_XMASK | STICK_YMASK)) {
+                case STICK_UP:    sy += v; break;
+                case STICK_DOWN:  sy -= v; break;
+                case STICK_LEFT:  sx -= v; break;
+                case STICK_RIGHT: sx += v; break;
+            }
+        }
+        // both sticks may feed one direction; keep the squares in s32 range
+        if (sx > 32767) sx = 32767; else if (sx < -32767) sx = -32767;
+        if (sy > 32767) sy = 32767; else if (sy < -32767) sy = -32767;
+        if ((uint32_t)(sx * sx) + (uint32_t)(sy * sy) > deadzone_sq) {
+            pad->stick_x = sx / 409;
+            pad->stick_y = sy / 409;
+        }
+    }
+
+    // the ext (camera) stick follows whichever stick drives the C-buttons
+    if (ext_stick_source >= 0) {
+        const int16_t ex = ext_stick_source == 0 ? leftx : rightx;
+        const int16_t ey = ext_stick_source == 0 ? lefty : righty;
+        uint32_t magnitude_sq = (uint32_t)(ex * ex) + (uint32_t)(ey * ey);
+        if (magnitude_sq > deadzone_sq) {
+            // Game expects stick coordinates within -80..80
+            // 32768 / 409 = ~80
+            pad->ext_stick_x = ex / 409;
+            pad->ext_stick_y = -ey / 409;
+        }
     }
 }
 
