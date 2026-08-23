@@ -701,8 +701,14 @@ void draw_bingo_screen() {
     sprintf(seed_print, "SEED %09d", gBingoInitialSeed);
     print_text_tiny(240, 214, seed_print);
 #ifndef TARGET_N64
-    // The release version's beta number IS the protocol version.
-    sprintf(seed_print, "V1.0 BETA %d", NET_PROTOCOL_VERSION);
+    // The release version's beta number IS the protocol version;
+    // client-only fixes append a patch number without touching it.
+    if (NET_VERSION_PATCH) {
+        sprintf(seed_print, "V1.0 BETA %d.%d", NET_PROTOCOL_VERSION,
+                NET_VERSION_PATCH);
+    } else {
+        sprintf(seed_print, "V1.0 BETA %d", NET_PROTOCOL_VERSION);
+    }
     print_text_tiny(240, 205, seed_print);
 #else
     print_text_tiny(240, 205, "VERSION 0.11a");
