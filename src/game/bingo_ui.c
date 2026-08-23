@@ -481,20 +481,34 @@ void draw_bingo_win_screen() {
     rainbow_rgb(rainbow);
     if (network_active() && gbBingoMode == BINGO_MODE_LOCKOUT
         && network_race_winner_id() != 0) {
-        // Lockout ends for the whole room at once: show the verdict.
+        // Lockout ends for the whole room at once: show the verdict in
+        // the same register as the race finish ("Finished 1st in ..."),
+        // with the server-timed decision, not the local clock (which
+        // keeps running for everyone who didn't win).
         s32 winner = network_race_winner_id();
+        s32 i, frames = -1;
+        for (i = 0; i < network_result_count(); i++) {
+            if (network_result(i)->id == winner) {
+                frames = network_result(i)->frames;
+            }
+        }
+        getTimeFmtPrecise(timestamp,
+                          frames >= 0 ? frames : gbGlobalBingoTimer);
+        time_fmt_dialog(timestamp);
         if (winner == network_local_id()) {
             // Your win: same quiet strip, celebratory rainbow text.
-            sprintf(msg, "you win %d squares", net_cell_count_of_id(winner));
+            sprintf(msg, "Won %d squares in %s",
+                    net_cell_count_of_id(winner), timestamp);
             draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, NULL, 255);
         } else {
-            sprintf(msg, "wins %d squares", net_cell_count_of_id(winner));
+            sprintf(msg, "won %d squares in %s",
+                    net_cell_count_of_id(winner), timestamp);
             draw_quiet_line(-1, 60, net_name_of_id(winner),
                             gNetColorRGB[network_color_of_id(winner)
                                          % NET_COLOR_COUNT],
                             msg, sQuietWhite, -1, NULL, 255);
         }
-        draw_win_hint(FALSE);
+        draw_win_hint(winner == network_local_id());
         return;
     }
     if (network_active()) {

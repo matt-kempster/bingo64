@@ -127,11 +127,21 @@ async def main():
                                env=xenv())
             if el > 24 and "win" not in did:
                 did.add("win")
-                # bottom row of the board: a bingo line -> quate wins.
-                for c in (0, 1, 2, 3, 4):
-                    quate.send("C %d" % c)
-                quate.send("F")
-                print("quate claimed a full row and finished", flush=True)
+                if "O 4" in os.environ.get("E2E_ROOMOPTS", ""):
+                    # Lockout: the relay decides at the 13-square
+                    # majority (it ignores F in this mode).
+                    for c in range(13):
+                        quate.send("C %d" % c)
+                    print("quate claimed 13 squares (lockout)",
+                          flush=True)
+                else:
+                    # bottom row of the board: a bingo line -> quate
+                    # wins (the client judges its own bingo, reports F).
+                    for c in (0, 1, 2, 3, 4):
+                        quate.send("C %d" % c)
+                    quate.send("F")
+                    print("quate claimed a full row and finished",
+                          flush=True)
             if el > 28 and "s3" not in did:
                 did.add("s3")
                 shot(wid, "e2e_verdict")

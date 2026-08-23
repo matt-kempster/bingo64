@@ -221,6 +221,22 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   screenshot-verified (offline via 1P->OPTIONS clicks, online via a
   held in-process relay + lobby OPTIONS clicks).
 
+- options value column right-aligned by measurement (Matt: "Visible"
+  and "Lockout" hung short): the hand-tuned per-string x offsets are
+  gone — bingo_config_value_x() right-aligns every value (mode,
+  tier, On/Off) to BINGO_CONFIG_VALUE_RIGHT_X 158 via
+  get_string_width. Window-size question answered (sm64config.txt
+  window_w/h persisted on quit, shared by all exes in the folder;
+  640x480 only on fresh config) — Matt: current behavior is fine.
+
+- lockout verdict rewritten in the race register (Matt: "you win 13
+  squares is pathetic"): "Won 13 squares in 0'21.20" rainbow for the
+  winner / "quate won 13 squares in 0'21.20" for the rest, using the
+  V result's server time (local clocks keep running for losers).
+  Winner now gets the super-player hint. e2e.py grew a lockout
+  scenario (E2E_ROOMOPTS mode 4 → quate claims the 13 majority,
+  relay decides) — banner/hint/dismiss screenshot-verified.
+
 ## Deferred / follow-ups
 
 - Relay-side visibility enforcement (see checklist §2) — potentially
