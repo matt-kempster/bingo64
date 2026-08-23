@@ -12,6 +12,10 @@ rsync -a "$WT/src/" "$BW/src/"
 rsync -a "$WT/bin/" "$BW/bin/"
 rsync -a "$WT/data/" "$BW/data/"
 rsync -a "$WT/include/" "$BW/include/"
+# tools/ + server/ ride along for release assembly (make_release.sh
+# packs server/relay.py and builds the extractor from tools/).
+rsync -a "$WT/tools/" "$BW/tools/"
+rsync -a "$WT/server/" "$BW/server/"
 rsync -a "$WT/Makefile" "$WT/defines.mk" "$BW/"
 export PATH=$HOME/opt/llvm-mingw-20240221-ucrt-ubuntu-20.04-x86_64/bin:$HOME/opt/cross-bin:$PATH
 cd "$BW"
