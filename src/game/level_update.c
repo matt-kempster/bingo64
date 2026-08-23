@@ -412,6 +412,8 @@ void init_mario_after_warp(void) {
             load_mario_area();
         }
 
+#ifdef ALO
+        // ex-alo change
         // Don't reset Mario on the same warp area, preserves cap powerup like in SM64DS
         if (sWarpDest.type != WARP_TYPE_SAME_AREA) {
             init_mario();
@@ -419,6 +421,12 @@ void init_mario_after_warp(void) {
             vec3s_copy(gMarioState->faceAngle, gMarioSpawnInfo->startAngle);
             vec3s_to_vec3f(gMarioState->pos, gMarioSpawnInfo->startPos);
         }
+#else
+        // alo's same-area skip left level_trigger_warp's invincTimer = -1 in
+        // place forever (teleporters warp within one area), making Mario
+        // permanently invulnerable to enemy contact. Vanilla always re-inits.
+        init_mario();
+#endif
 
         set_mario_initial_action(gMarioState, marioSpawnType, sWarpDest.arg);
 
