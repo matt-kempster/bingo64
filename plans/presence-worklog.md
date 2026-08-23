@@ -257,6 +257,19 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   `presence` pushed to origin; DRAFT release created for Matt to
   publish (his final check per the drafts-first convention).
 
+- RELEASE v1.0-beta.6.1 drafted (2026-08-23): client-only patch, wire
+  protocol stays 6 so beta.6 and 6.1 share rooms and the live server
+  is untouched. New NET_VERSION_PATCH define renders "V1.0 BETA 6.1"
+  on the board (resets to 0 on the next protocol bump). Contents:
+  teleporter invulnerability fix, controller batch (D-pad automap,
+  Z->LT, rebindable sticks, raw-joystick fallback), SETTINGS door,
+  EXIT GAME to menu, load heartbeats, seat-reclaim tokens, dropout
+  ownership freeze, lockout red-X + owner tile, race dots. Gotcha:
+  ~/b64-win/build had 5 stale ELF .o files (a past non-cross make?)
+  that broke the COFF link -- swept by magic-bytes scan, rebuilt.
+  Audit passed; zip layout matches beta.6; exe staged to
+  AppData/Local/bingo64-test/. DRAFT for Matt to publish.
+
 ## Deferred / follow-ups
 
 - Relay-side visibility enforcement (see checklist §2) — potentially
