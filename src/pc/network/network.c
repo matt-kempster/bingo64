@@ -24,6 +24,7 @@
 #include "macros.h"
 
 #include "../cliopts.h"
+#include "../configfile.h"
 #include "game/game_init.h"
 #include "game/area.h"
 #include "game/bingo.h"
@@ -949,12 +950,29 @@ static s32 dns_txt_query_once(const char *resolverIp, const char *name,
 
 static s32 net_resolve_auto(char *out, size_t outsz, const char **err) {
     static const char *resolvers[] = { "1.1.1.1", "8.8.8.8" };
-    size_t r;
-    for (r = 0; r < sizeof(resolvers) / sizeof(resolvers[0]); r++) {
-        if (dns_txt_query_once(resolvers[r], NET_AUTO_TXT_HOST, out, outsz)) {
-            printf("net: auto server -> %s\n", out);
-            return 1;
+    size_t r, attempt;
+    // DNS over UDP is lossy: one datagram per resolver with a 1.2s
+    // timeout produced spurious "lookup failed" (Matt hit one). Sweep
+    // the resolvers twice before giving up.
+    for (attempt = 0; attempt < 2; attempt++) {
+        for (r = 0; r < sizeof(resolvers) / sizeof(resolvers[0]); r++) {
+            if (dns_txt_query_once(resolvers[r], NET_AUTO_TXT_HOST,
+                                   out, outsz)) {
+                printf("net: auto server -> %s\n", out);
+                fflush(stdout);
+                // Remember the answer: the fallback for the next time
+                // DNS is having a moment (persisted via sm64config).
+                snprintf(configNetAutoCache, sizeof(configNetAutoCache),
+                         "%s", out);
+                return 1;
+            }
         }
+    }
+    if (configNetAutoCache[0] != '\0') {
+        snprintf(out, outsz, "%s", configNetAutoCache);
+        printf("net: auto lookup failed; using cached %s\n", out);
+        fflush(stdout);
+        return 1;
     }
     *err = "auto server lookup failed";
     return 0;

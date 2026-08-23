@@ -77,6 +77,8 @@ char configNetRoom[32] = "bingo";
 unsigned int configNetColor = 0;
 bool configNetSelfColor = true;  // render your own Mario in your net color
 bool configBingoToasts = true;   // draw the online toast feed in-game
+// Last successful "auto" server lookup; the fallback when DNS is flaky.
+char configNetAutoCache[128] = "";
 unsigned int configSfxVolume = MAX_VOLUME;
 unsigned int configEnvVolume = MAX_VOLUME;
 
@@ -170,6 +172,7 @@ static const struct ConfigOption options[] = {
     {.name = "net_color",            .type = CONFIG_TYPE_UINT, .uintValue = &configNetColor},
     {.name = "net_self_color",       .type = CONFIG_TYPE_BOOL, .boolValue = &configNetSelfColor},
     {.name = "bingo_toasts",         .type = CONFIG_TYPE_BOOL, .boolValue = &configBingoToasts},
+    {.name = "net_auto_cache",       .type = CONFIG_TYPE_STRING, .strValue = configNetAutoCache, .strLen = sizeof(configNetAutoCache)},
     {.name = "master_volume",        .type = CONFIG_TYPE_UINT, .uintValue = &configMasterVolume},
     {.name = "music_volume",         .type = CONFIG_TYPE_UINT, .uintValue = &configMusicVolume},
     {.name = "sfx_volume",           .type = CONFIG_TYPE_UINT, .uintValue = &configSfxVolume},
