@@ -44,6 +44,9 @@
 static bool init_ok;
 static bool haptics_enabled;
 static SDL_GameController *sdl_cntrl;
+// raw fallback for pads SDL has no gamepad mapping for (e.g. some 8BitDo
+// models); buttons, hat and axes go through the same virtual-key bind system
+static SDL_Joystick *sdl_joy;
 static SDL_Haptic *sdl_haptic;
 
 static u32 joy_binds[MAX_JOYBINDS][2];
@@ -232,8 +235,14 @@ static void controller_sdl_read(OSContPad *pad) {
         sdl_cntrl = NULL;
         sdl_haptic = NULL;
     }
+    if (sdl_joy != NULL && !SDL_JoystickGetAttached(sdl_joy)) {
+        SDL_HapticClose(sdl_haptic);
+        SDL_JoystickClose(sdl_joy);
+        sdl_joy = NULL;
+        sdl_haptic = NULL;
+    }
 
-    if (sdl_cntrl == NULL) {
+    if (sdl_cntrl == NULL && sdl_joy == NULL) {
         for (int i = 0; i < SDL_NumJoysticks(); i++) {
             if (SDL_IsGameController(i)) {
                 sdl_cntrl = SDL_GameControllerOpen(i);
@@ -243,18 +252,44 @@ static void controller_sdl_read(OSContPad *pad) {
                 }
             }
         }
+        // No mapped gamepad found: open the first joystick raw. Everything is
+        // rebindable in the Options menu, and a gamecontrollerdb.txt in the
+        // game folder can supply a proper mapping instead.
         if (sdl_cntrl == NULL) {
+            for (int i = 0; i < SDL_NumJoysticks(); i++) {
+                sdl_joy = SDL_JoystickOpen(i);
+                if (sdl_joy != NULL) {
+                    printf("controller '%s' has no gamepad mapping, using raw joystick mode\n",
+                           SDL_JoystickNameForIndex(i));
+                    sdl_haptic = controller_sdl_init_haptics(i);
+                    break;
+                }
+            }
+        }
+        if (sdl_cntrl == NULL && sdl_joy == NULL) {
             return;
         }
     }
 
-    int16_t leftx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTX);
-    int16_t lefty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTY);
-    int16_t rightx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTX);
-    int16_t righty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTY);
+    int16_t leftx, lefty, rightx, righty, ltrig, rtrig;
+    if (sdl_cntrl != NULL) {
+        leftx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTX);
+        lefty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTY);
+        rightx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTX);
+        righty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTY);
 
-    int16_t ltrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-    int16_t rtrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        ltrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        rtrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+    } else {
+        // raw mode: assume the common axis order, sticks first then triggers
+        const int naxes = SDL_JoystickNumAxes(sdl_joy);
+        leftx  = naxes > 0 ? SDL_JoystickGetAxis(sdl_joy, 0) : 0;
+        lefty  = naxes > 1 ? SDL_JoystickGetAxis(sdl_joy, 1) : 0;
+        rightx = naxes > 2 ? SDL_JoystickGetAxis(sdl_joy, 2) : 0;
+        righty = naxes > 3 ? SDL_JoystickGetAxis(sdl_joy, 3) : 0;
+        ltrig  = naxes > 4 ? SDL_JoystickGetAxis(sdl_joy, 4) : 0;
+        rtrig  = naxes > 5 ? SDL_JoystickGetAxis(sdl_joy, 5) : 0;
+    }
 
 #ifdef TARGET_WEB
     // Firefox has a bug: https://bugzilla.mozilla.org/show_bug.cgi?id=1606562
@@ -270,12 +305,32 @@ static void controller_sdl_read(OSContPad *pad) {
     }
 #endif
 
-    for (u32 i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i) {
-        const bool new = SDL_GameControllerGetButton(sdl_cntrl, i);
+    if (sdl_cntrl != NULL) {
+        for (u32 i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i) {
+            const bool new = SDL_GameControllerGetButton(sdl_cntrl, i);
 #ifdef TOUCH_CONTROLS
-        if (new) gTouchControlsInUse = FALSE;
+            if (new) gTouchControlsInUse = FALSE;
 #endif
-        update_button(i, new);
+            update_button(i, new);
+        }
+    } else {
+        const int nbtns = SDL_JoystickNumButtons(sdl_joy);
+        const bool hasHat = SDL_JoystickNumHats(sdl_joy) > 0;
+        const int rawMax = VK_LTRIGGER - VK_BASE_SDL_GAMEPAD; // keep clear of the trigger/stick virtual keys
+        for (int i = 0; i < nbtns && i < rawMax; ++i) {
+            // the first hat owns the D-pad virtual keys below
+            if (hasHat && i >= SDL_CONTROLLER_BUTTON_DPAD_UP && i <= SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
+                continue;
+            update_button(i, SDL_JoystickGetButton(sdl_joy, i));
+        }
+        // hat -> D-pad virtual keys, so the default D-pad binds work raw too
+        if (hasHat) {
+            const u8 hat = SDL_JoystickGetHat(sdl_joy, 0);
+            update_button(SDL_CONTROLLER_BUTTON_DPAD_UP,    (hat & SDL_HAT_UP) != 0);
+            update_button(SDL_CONTROLLER_BUTTON_DPAD_DOWN,  (hat & SDL_HAT_DOWN) != 0);
+            update_button(SDL_CONTROLLER_BUTTON_DPAD_LEFT,  (hat & SDL_HAT_LEFT) != 0);
+            update_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, (hat & SDL_HAT_RIGHT) != 0);
+        }
     }
 
     update_button(VK_LTRIGGER - VK_BASE_SDL_GAMEPAD, ltrig > AXIS_THRESHOLD);
@@ -428,6 +483,10 @@ static void controller_sdl_shutdown(void) {
         if (sdl_cntrl) {
             SDL_GameControllerClose(sdl_cntrl);
             sdl_cntrl = NULL;
+        }
+        if (sdl_joy) {
+            SDL_JoystickClose(sdl_joy);
+            sdl_joy = NULL;
         }
         SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
     }
