@@ -888,6 +888,22 @@ void draw_bingo_screen() {
             switch (objective->state) {
                 case BINGO_STATE_COMPLETE:
                     icon = BINGO_ICON_SUCCESS;
+#ifndef TARGET_N64
+                    // Lockout: a square an opponent took is lost to us,
+                    // so the green check (which reads "done by you")
+                    // becomes the red X. A pending local claim has no
+                    // owner bits yet and stays a check until the server
+                    // hands the square to whoever won the race for it.
+                    if (gbBingoMode == BINGO_MODE_LOCKOUT
+                        && (network_active() || bingo_net_dropped())) {
+                        u32 owners = gBingoCellClaimers[5 * i + j];
+                        if (owners != 0
+                            && !(owners
+                                 & ((u32) 1 << bingo_net_display_id()))) {
+                            icon = BINGO_ICON_FAILED;
+                        }
+                    }
+#endif
                     break;
                 case BINGO_STATE_FAILED_IN_THIS_COURSE:
                     icon = BINGO_ICON_FAILED;
