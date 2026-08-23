@@ -264,3 +264,9 @@ windowmove <id> 0 0` first; capture the game window id, not root.
 - Reconnect replay can re-deliver a claim burst; the 3-slot cap
   contains the spam, revisit if it looks bad in practice.
 - Sound cue: skipped by design for now.
+- Dropout claim attribution (zcoop98, 2026-08-23): after dropping out
+  of an online match mid-game, the board falls back to local mode and
+  every completed objective renders as yours. Fix = freeze the
+  last-known claim ownership when the connection dies instead of
+  reverting to solo coloring. Needs a look at what network_disconnect
+  clears vs what the board reads.
