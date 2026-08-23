@@ -30,6 +30,8 @@ checked off in one place.
 
 ### Things I may or may not do
 
+- [ ] Timeout / sudden death: cap game length with a timer; on expiry,
+      sudden death decides the winner (e.g. next claim wins)
 - [ ] PC port release (v0.12)
 - [ ] Press L: Big board, little board, off (?)
 - [ ] Soft reset (v0.11)
