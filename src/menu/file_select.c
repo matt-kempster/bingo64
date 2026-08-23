@@ -44,6 +44,12 @@
 #include "pc/controller/text_input.h"
 #endif
 
+#ifndef TARGET_N64
+// The settings door hosts the regular options menu (needs EXT_OPTIONS_MENU,
+// which the PC build always enables).
+#include "extras/options_menu.h"
+#endif
+
 #ifdef COMMAND_LINE_OPTIONS
 #include "pc/cliopts.h"
 #endif
@@ -540,6 +546,8 @@ void exit_score_file_to_score_menu(struct Object *scoreFileButton, s8 scoreButto
 
 static s8 s1PExitRequest = 0;
 static s8 sLobbyExitRequest = 0;
+static s8 sSettingsExitRequest = 0;
+static s8 sSettingsMenuEntered = 0;
 
 static void spawn_submenu_button(s32 id, s32 model, struct Object *parent,
                                  s16 x, s16 y, f32 scale) {
@@ -816,6 +824,33 @@ static void lobby_screen_loop(void) {
     }
     exit_submenu_screen(door, MENU_BUTTON_NONE, &sLobbyExitRequest);
 }
+
+// The settings screen: the purple door grown fullscreen, hosting the
+// regular options menu (controls/display/sound) so everything can be set
+// up before starting a game. The pause-menu options code is reused
+// wholesale; closing the menu with R saves the config, rebinds the
+// controls, and shrinks back to the doors.
+static void settings_screen_loop(void) {
+    struct Object *door = sMainMenuButtons[MENU_BUTTON_SETTINGS];
+
+    if (door->oMenuButtonState == MENU_BUTTON_STATE_FULLSCREEN
+        && !sSettingsExitRequest) {
+        if (!sSettingsMenuEntered) {
+            if (!optmenu_open) {
+                optmenu_toggle();
+            }
+            sSettingsMenuEntered = 1;
+        } else if (!optmenu_open) {
+            // The menu closed itself (R): optmenu_toggle already saved.
+            sSettingsMenuEntered = 0;
+            sTextBaseAlpha = 0;
+            sSettingsExitRequest = 1;
+        } else {
+            optmenu_check_buttons();
+        }
+    }
+    exit_submenu_screen(door, MENU_BUTTON_NONE, &sSettingsExitRequest);
+}
 #endif
 
 #ifdef TARGET_N64
@@ -970,17 +1005,23 @@ void bhv_menu_button_manager_init(void) {
     );
     sMainMenuButtons[MENU_BUTTON_SEED_OPTION]->oMenuButtonScale = 1.0f;
 #else
-    // The PC main screen is just two doors: 1P (green, the play/seed setup
-    // screen) and NET (yellow, the online lobby), centered side by side.
+    // The PC main screen is three doors: 1P (green, the play/seed setup
+    // screen), NET (red, the online lobby) and SETTINGS (purple, the
+    // options menu), centered in a row.
     sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A] = spawn_object_rel_with_rot(
-        gCurrentObject, MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, bhvMenuButton, -2800, 800, 0, 0, 0, 0
+        gCurrentObject, MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, bhvMenuButton, -4600, 800, 0, 0, 0, 0
     );
     sMainMenuButtons[MENU_BUTTON_PLAY_FILE_A]->oMenuButtonScale = 1.0f;
 
     sMainMenuButtons[MENU_BUTTON_ONLINE] = spawn_object_rel_with_rot(
-        gCurrentObject, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, 2800, 800, 0, 0, 0, 0
+        gCurrentObject, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, 0, 800, 0, 0, 0, 0
     );
     sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonScale = 1.0f;
+
+    sMainMenuButtons[MENU_BUTTON_SETTINGS] = spawn_object_rel_with_rot(
+        gCurrentObject, MODEL_MAIN_MENU_PURPLE_SOUND_BUTTON, bhvMenuButton, 4600, 800, 0, 0, 0, 0
+    );
+    sMainMenuButtons[MENU_BUTTON_SETTINGS]->oMenuButtonScale = 1.0f;
 
     // The options screen has no backdrop object of its own on PC: the
     // clicked OPTIONS sub-button itself grows fullscreen (vanilla
@@ -1053,6 +1094,13 @@ static void check_main_menu_clicked_buttons(void) {
         sMainMenuButtons[MENU_BUTTON_ONLINE]->oMenuButtonState =
             MENU_BUTTON_STATE_GROWING;
         sSelectedButtonID = MENU_BUTTON_ONLINE;
+    } else if (check_clicked_button(sMainMenuButtons[MENU_BUTTON_SETTINGS]->oPosX,
+                                    sMainMenuButtons[MENU_BUTTON_SETTINGS]->oPosY,
+                                    200.0f) == TRUE) {
+        play_sound(SOUND_MENU_CAMERA_ZOOM_IN, gGlobalSoundSource);
+        sMainMenuButtons[MENU_BUTTON_SETTINGS]->oMenuButtonState =
+            MENU_BUTTON_STATE_GROWING;
+        sSelectedButtonID = MENU_BUTTON_SETTINGS;
     }
 #endif
 }
@@ -1090,6 +1138,12 @@ void bhv_menu_button_manager_loop(void) {
         // buttons; drop the alias so nothing touches the deleted object.
         if (sSelectedButtonID == MENU_BUTTON_SEED_OPTION) {
             sMainMenuButtons[MENU_BUTTON_SEED_OPTION] = NULL;
+        }
+        // A race GO while the settings menu is up: close it (which saves
+        // the config) so it doesn't hang over the fade-out.
+        if (optmenu_open) {
+            optmenu_toggle();
+            sSettingsMenuEntered = 0;
         }
     }
 #endif
@@ -1134,6 +1188,9 @@ void bhv_menu_button_manager_loop(void) {
 #ifndef TARGET_N64
         case MENU_BUTTON_ONLINE:
             lobby_screen_loop();
+            break;
+        case MENU_BUTTON_SETTINGS:
+            settings_screen_loop();
             break;
 #endif
     }
@@ -1426,9 +1483,10 @@ static void draw_main_menu_pc(void) {
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-    // Centered under the doors (world x -2800/+2800 -> screen 117/203).
-    net_print_ascii_centered(117, 101, "1 PLAYER");
-    net_print_ascii_centered(203, 101, "ONLINE");
+    // Centered under the doors (world x -4600/0/+4600 -> screen 89/160/231).
+    net_print_ascii_centered(89, 101, "1 PLAYER");
+    net_print_ascii_centered(160, 101, "ONLINE");
+    net_print_ascii_centered(231, 101, "SETTINGS");
     // Two lines of what-is-this for the first-time player, quiet, at the
     // bottom of the room. Instructions, not decoration.
     // Wording still being workshopped (Matt, 2026-08-19) — kept out of
@@ -2185,6 +2243,17 @@ static void print_file_select_strings(void) {
             online_lobby_draw(sTextBaseAlpha, sCursorPos[0] + 160.0f,
                               sCursorPos[1] + 120.0f);
             break;
+        case MENU_BUTTON_SETTINGS:
+            if (optmenu_open) {
+                optmenu_y_offset = 20;  // centered box on this page's backdrop
+                optmenu_draw();
+                optmenu_y_offset = 0;
+                optmenu_draw_prompt();  // "R: Return"
+                if (gMenuTextAlpha < 250) {
+                    gMenuTextAlpha += 25;  // prompt alpha, normally pause-driven
+                }
+            }
+            break;
 #endif
     }
     // Timers for menu alpha text and the main menu itself
@@ -2222,7 +2291,14 @@ Gfx *geo_file_select_strings_and_menu_cursor(s32 callContext, UNUSED struct Grap
         gDPSetIod(gDisplayListHead++, iodFileSelect);
 #endif
         print_file_select_strings();
-        print_menu_cursor();
+#ifndef TARGET_N64
+        // The settings screen has no clickable elements; a parked hand
+        // cursor on top of the options menu just reads as a glitch.
+        if (sSelectedButtonID != MENU_BUTTON_SETTINGS)
+#endif
+        {
+            print_menu_cursor();
+        }
 #ifdef TARGET_N3DS
         gDPForceFlush(gDisplayListHead++);
         gDPSet2d(gDisplayListHead++, 0);
@@ -2246,6 +2322,8 @@ s32 lvl_init_menu_values_and_cursor_pos(UNUSED s32 arg, UNUSED s32 unused) {
 #ifndef TARGET_N64
     s1PExitRequest = 0;
     sLobbyExitRequest = 0;
+    sSettingsExitRequest = 0;
+    sSettingsMenuEntered = 0;
     gSeedTypingActive = 0;
 #endif
 #ifndef TARGET_N64

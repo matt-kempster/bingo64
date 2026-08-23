@@ -76,5 +76,8 @@ void optmenu_draw_prompt(void);
 void optmenu_check_buttons(void);
 
 extern u8 optmenu_open;
+// Vertical shift for the menu box/list in screen px (positive = up); 0 is
+// the classic pause-overlay placement. Set around optmenu_draw and restore.
+extern s16 optmenu_y_offset;
 
 #endif // OPTIONS_MENU_H

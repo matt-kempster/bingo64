@@ -41,6 +41,11 @@
 
 u8 optmenu_open = 0;
 
+// Vertical shift for the menu box and list, in screen px (positive = up).
+// The pause overlay keeps the classic low placement (0); the file select's
+// settings page raises the box to sit centered on its clean backdrop.
+s16 optmenu_y_offset = 0;
+
 #if !defined(TARGET_N64) && !defined(TARGET_PORT_CONSOLE)
 static u8 optmenu_binding = 0;
 static u8 optmenu_bind_idx = 0;
@@ -574,14 +579,16 @@ void optmenu_draw(void) {
     s16 scroll;
     s16 scrollpos;
     f32 sinpos;
+    // Quads and the scissor are top-down; the item/arrow text is bottom-up.
+    const s16 up = optmenu_y_offset;
 
-    print_solid_color_quad(47, 83, 281, 84, 0x0, 0x0, 0x0, 0xFF);
-    print_solid_color_quad(47, 218, 281, 219, 0x0, 0x0, 0x0, 0xFF);
-    print_solid_color_quad(47, 83, 48, 219, 0x0, 0x0, 0x0, 0xFF);
-    print_solid_color_quad(280, 83, 281, 219, 0x0, 0x0, 0x0, 0xFF);
-    print_solid_color_quad(271, 83, 272, 219, 0x0, 0x0, 0x0, 0xFF);
+    print_solid_color_quad(47, 83 - up, 281, 84 - up, 0x0, 0x0, 0x0, 0xFF);
+    print_solid_color_quad(47, 218 - up, 281, 219 - up, 0x0, 0x0, 0x0, 0xFF);
+    print_solid_color_quad(47, 83 - up, 48, 219 - up, 0x0, 0x0, 0x0, 0xFF);
+    print_solid_color_quad(280, 83 - up, 281, 219 - up, 0x0, 0x0, 0x0, 0xFF);
+    print_solid_color_quad(271, 83 - up, 272, 219 - up, 0x0, 0x0, 0x0, 0xFF);
 
-    print_solid_color_quad(48, 84, 272, 218, 0x0, 0x0, 0x0, 0x50);
+    print_solid_color_quad(48, 84 - up, 272, 218 - up, 0x0, 0x0, 0x0, 0x50);
 
     const s16 labelX = get_hudstr_centered_x(SCREEN_WIDTH / 2, currentMenu->label);
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
@@ -590,25 +597,25 @@ void optmenu_draw(void) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
 
     if (currentMenu->numOpts > 4) {
-        print_solid_color_quad(272, 84, 280, 218, 0x80, 0x80, 0x80, 0xFF);
+        print_solid_color_quad(272, 84 - up, 280, 218 - up, 0x80, 0x80, 0x80, 0xFF);
         scrollpos = (62)*((f32)currentMenu->scroll/(currentMenu->numOpts-4));
-        print_solid_color_quad(272, 84 + scrollpos,280,156+scrollpos,0xFF,0xFF,0xFF, 0xFF);
+        print_solid_color_quad(272, 84 + scrollpos - up,280,156+scrollpos - up,0xFF,0xFF,0xFF, 0xFF);
     }
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 80, SCREEN_WIDTH, SCREEN_HEIGHT);
+    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 80 - up, SCREEN_WIDTH, SCREEN_HEIGHT);
     for (i = 0; i < currentMenu->numOpts; i++) {
         scroll = 140-(32*i)+(currentMenu->scroll*32);
         // FIXME: just start from the first visible option bruh
         if (scroll <= 140 && scroll > 32)
-            optmenu_draw_opt(&currentMenu->opts[i], SCREEN_WIDTH / 2, scroll, (currentMenu->select == i));
+            optmenu_draw_opt(&currentMenu->opts[i], SCREEN_WIDTH / 2, scroll + up, (currentMenu->select == i));
     }
 
     sinpos = sins(gGlobalTimer*5000)*4;
     gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, 255);
-    print_generic_string(80 - sinpos, 132 - (32 * (currentMenu->select - currentMenu->scroll)), optSmallStr[2]);
-    print_generic_string(232 + sinpos, 132 - (32 * (currentMenu->select - currentMenu->scroll)), optSmallStr[3]);
+    print_generic_string(80 - sinpos, 132 + up - (32 * (currentMenu->select - currentMenu->scroll)), optSmallStr[2]);
+    print_generic_string(232 + sinpos, 132 + up - (32 * (currentMenu->select - currentMenu->scroll)), optSmallStr[3]);
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 

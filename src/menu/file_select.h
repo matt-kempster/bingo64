@@ -55,6 +55,10 @@ enum MenuButtonTypes {
     // The online lobby screen (PC only; the button is not spawned on N64)
     MENU_BUTTON_ONLINE,
 
+    // The settings screen (PC only): the third main-screen door, hosting
+    // the regular options menu (controls/display/sound) before a game.
+    MENU_BUTTON_SETTINGS,
+
     // PC-only submenu buttons, spawned while their screen is fullscreen
     // (vanilla score-file-button style) and deleted on exit.
     MENU_BUTTON_1P_START,      // 1P setup: start the game
