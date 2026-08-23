@@ -842,9 +842,12 @@ void draw_bingo_screen() {
     }
 
 #ifndef TARGET_N64
-    // Who claimed what: a small color chip per claiming peer next to each
-    // cell's icon (several can stack in the race modes). Only when the
-    // room shows WHICH squares (the OPEN tier).
+    // Who claimed what. Only when the room shows WHICH squares (the
+    // OPEN tier). Lockout: claims are exclusive, so the one owner's
+    // color becomes a tile behind the whole icon (the icon on top says
+    // check = yours, X = lost). Race modes: a small colored dot per
+    // claiming peer, stacked below the "1x"-style add-on text so the
+    // two never collide.
     if ((network_active() || bingo_net_dropped())
         && gNetClaimVis == NET_CLAIMVIS_OPEN) {
         s32 chip;
@@ -853,7 +856,27 @@ void draw_bingo_screen() {
         for (i = 0; i < 5; i++) {
             for (j = 0; j < 5; j++) {
                 u32 mask = gBingoCellClaimers[5 * i + j];
+                s32 ix = BINGO_MIN_X + spacing * j;  // icon left edge
+                s32 iy = 224 - (27 + spacing * i);   // icon top edge
                 s32 id;
+                if (mask == 0) {
+                    continue;
+                }
+                if (gbBingoMode == BINGO_MODE_LOCKOUT) {
+                    s32 color;
+                    for (id = 0; id < 32 && !(mask & ((u32) 1 << id));
+                         id++) {}
+                    color = bingo_net_display_color(id);
+                    // Translucent enough that the X stays readable even
+                    // when the owner's hat color is also red.
+                    gDPSetPrimColor(gDisplayListHead++, 0, 0,
+                                    gNetColorRGB[color][0],
+                                    gNetColorRGB[color][1],
+                                    gNetColorRGB[color][2], 110);
+                    gDPFillRectangle(gDisplayListHead++, ix - 1, iy - 1,
+                                     ix + 17, iy + 17);
+                    continue;
+                }
                 chip = 0;
                 for (id = 0; id < 32 && chip < 4; id++) {
                     s32 color;
@@ -866,9 +889,14 @@ void draw_bingo_screen() {
                                     gNetColorRGB[color][1],
                                     gNetColorRGB[color][2], 230);
                     {
-                        s32 rx = BINGO_MIN_X + spacing * j + 18;
-                        s32 ry = (224 - (27 + spacing * i)) + chip * 6;
-                        gDPFillRectangle(gDisplayListHead++, rx, ry, rx + 5, ry + 5);
+                        s32 rx = ix + 18;
+                        s32 ry = iy + 9 + chip * 6;
+                        // A 5x5 square with its corners knocked off
+                        // reads as a round dot at this size.
+                        gDPFillRectangle(gDisplayListHead++,
+                                         rx, ry + 1, rx + 5, ry + 4);
+                        gDPFillRectangle(gDisplayListHead++,
+                                         rx + 1, ry, rx + 4, ry + 5);
                     }
                     chip++;
                 }
