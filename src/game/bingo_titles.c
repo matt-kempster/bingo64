@@ -100,6 +100,16 @@ void get_dangerous_wallkicks_title(struct BingoObjective *objective) {
     sprintf(objective->title, "%dx %dc", data->toGetEachCourse, data->toGetTotal);
 }
 
+void get_stars_multiple_levels_title(struct BingoObjective *objective) {
+    struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
+    if (data->toGetEachCourse == 1) {
+        // The classic 1-of-N form keeps its familiar title.
+        sprintf(objective->title, "x%d", data->toGetTotal);
+    } else {
+        sprintf(objective->title, "%dx %dc", data->toGetEachCourse, data->toGetTotal);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void get_objective_title(struct BingoObjective *objective) {
@@ -139,7 +149,6 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_RACING_STARS:
         case BINGO_OBJECTIVE_SECRETS_STARS:
         case BINGO_OBJECTIVE_MULTISTAR:
-        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
         case BINGO_OBJECTIVE_WING_CAP_BOX:
         case BINGO_OBJECTIVE_VANISH_CAP_BOX:
@@ -160,6 +169,9 @@ void get_objective_title(struct BingoObjective *objective) {
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             get_dangerous_wallkicks_title(objective);
+            break;
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+            get_stars_multiple_levels_title(objective);
             break;
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
             get_roof_without_cannon_objective_title(objective);

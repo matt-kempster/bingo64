@@ -123,6 +123,7 @@ static void dump_cell(FILE *out, int i) {
                     o->data.courseCollectableData.course, o->data.courseCollectableData.toGet);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             fprintf(out, " toGetTotal=%d toGetEachCourse=%d",
                     o->data.multiCourseCollectableData.toGetTotal,
                     o->data.multiCourseCollectableData.toGetEachCourse);
@@ -635,6 +636,71 @@ static void test_sim_timed_star(void) {
     CHECK_EQ_INT(o->data.starTimerObjective.timer, 0);
 }
 
+static void test_sim_stars_in_level_k(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    o->type = BINGO_OBJECTIVE_STARS_IN_LEVEL;
+    o->data.courseCollectableData.course = 5;
+    o->data.courseCollectableData.toGet = 3;
+    o->data.courseCollectableData.gotten = 0;
+
+    // Two stars in the course: progress, not complete.
+    gCurrCourseNum = 5;
+    bingo_set_star(4, 0);  // bingo_set_star indexes courses from 0
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(4, 1);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 2);
+
+    // A star in some other course does nothing.
+    gCurrCourseNum = 6;
+    bingo_set_star(5, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    // The third star in the right course completes it (across visits).
+    gCurrCourseNum = 5;
+    bingo_set_star(4, 2);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+static void test_sim_stars_multiple_levels_k(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    o->type = BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS;
+    o->data.multiCourseCollectableData.toGetTotal = 2;
+    o->data.multiCourseCollectableData.gottenTotal = 0;
+    o->data.multiCourseCollectableData.toGetEachCourse = 2;
+    o->data.multiCourseCollectableData.gottenThisCourse = 0;
+
+    // One star each in three courses: no course reaches the per-course
+    // count of 2, so nothing qualifies.
+    gCurrCourseNum = 4;
+    bingo_set_star(3, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(4, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(5, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.multiCourseCollectableData.gottenTotal, 0);
+
+    // A second star in one course: one course down.
+    bingo_set_star(3, 1);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.multiCourseCollectableData.gottenTotal, 1);
+
+    // A second star in another: that's 2 courses at 2 stars each.
+    bingo_set_star(5, 1);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
 static void test_sim_row_completion_wins(void) {
     int i;
     reset_sim();
@@ -801,6 +867,8 @@ int main(void) {
     RUN_TEST(test_sim_kill_collectable);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);
+    RUN_TEST(test_sim_stars_in_level_k);
+    RUN_TEST(test_sim_stars_multiple_levels_k);
     RUN_TEST(test_sim_row_completion_wins);
     RUN_TEST(test_win_detection);
     RUN_TEST(test_regeneration_resets_completion);

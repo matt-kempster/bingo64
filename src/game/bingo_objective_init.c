@@ -603,15 +603,22 @@ s32 bingo_objective_stars_in_level_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
     enum CourseNum course;
+    s32 stars;
 
+    // 7 demands the 100-coin star; anything below it does not, which is
+    // most of the difficulty gap between adjacent counts.
     switch (class) {
+        case BINGO_CLASS_MEDIUM:
+            stars = random_range_inclusive(3, 4);
+            break;
         default:
-            course = random_main_course();
+            stars = random_range_inclusive(5, 7);
             break;
     }
+    course = random_main_course();
 
     objective->data.courseCollectableData.course = course;
-    objective->data.courseCollectableData.toGet = 7;
+    objective->data.courseCollectableData.toGet = stars;
     objective->data.courseCollectableData.gotten = 0;
 }
 
@@ -715,17 +722,69 @@ s32 bingo_objective_multistar_init(enum BingoObjectiveClass class) {
     }
 }
 
-s32 bingo_objective_stars_multiple_levels(enum BingoObjectiveClass class) {
+s32 bingo_objective_stars_multiple_levels_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 starsEach;
+    s32 courses;
+
+    // K stars in each of N main courses. The (K, N) pairs per class keep
+    // the total effort near the old 1-of-N budgets: a deeper visit costs
+    // less than a fresh course entry, so K > 1 trades course count for
+    // star count at a slight discount. K never goes high enough to demand
+    // a 100-coin star.
     switch (class) {
         case BINGO_CLASS_EASY:
-            return random_range_inclusive(3, 5);
+            starsEach = 1;
+            courses = random_range_inclusive(3, 5);
+            break;
         case BINGO_CLASS_MEDIUM:
-            return random_range_inclusive(4, 6);
+            if (random_u16() % 2 == 0) {
+                starsEach = 1;
+                courses = random_range_inclusive(4, 6);
+            } else {
+                starsEach = 2;
+                courses = random_range_inclusive(2, 3);
+            }
+            break;
         case BINGO_CLASS_HARD:
-            return random_range_inclusive(7, 10);
+            switch (random_u16() % 3) {
+                case 0:
+                    starsEach = 1;
+                    courses = random_range_inclusive(7, 10);
+                    break;
+                case 1:
+                    starsEach = 2;
+                    courses = random_range_inclusive(4, 5);
+                    break;
+                default:
+                    starsEach = 3;
+                    courses = random_range_inclusive(3, 4);
+                    break;
+            }
+            break;
         case BINGO_CLASS_CENTER:
-            return random_range_inclusive(11, 15);
+            switch (random_u16() % 3) {
+                case 0:
+                    starsEach = 1;
+                    courses = random_range_inclusive(11, 15);
+                    break;
+                case 1:
+                    starsEach = 2;
+                    courses = random_range_inclusive(7, 8);
+                    break;
+                default:
+                    starsEach = 3;
+                    courses = random_range_inclusive(5, 6);
+                    break;
+            }
+            break;
     }
+
+    objective->data.multiCourseCollectableData.toGetTotal = courses;
+    objective->data.multiCourseCollectableData.gottenTotal = 0;
+    objective->data.multiCourseCollectableData.toGetEachCourse = starsEach;
+    objective->data.multiCourseCollectableData.gottenThisCourse = 0;
 }
 
 s32 bingo_objective_exclamation_mark_box_init(enum BingoObjectiveClass class) {
@@ -877,8 +936,6 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_multicoin_init(class);
         case BINGO_OBJECTIVE_MULTISTAR:
             return bingo_objective_multistar_init(class);
-        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
-            return bingo_objective_stars_multiple_levels(class);
         case BINGO_OBJECTIVE_BLJ:
             return bingo_objective_blj_init(class);
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
@@ -957,6 +1014,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_splatoon_init(objective, class);
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
             return bingo_objective_stars_in_level_init(objective, class);
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+            return bingo_objective_stars_multiple_levels_init(objective, class);
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             return bingo_objective_dangerous_wall_kicks_init(objective, class);
         case BINGO_OBJECTIVE_RACING_STARS:

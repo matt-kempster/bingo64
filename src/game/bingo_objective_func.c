@@ -207,11 +207,16 @@ s32 objective_obtain_1ups_in_level(struct BingoObjective *objective, enum BingoO
 }
 
 s32 objective_obtain_stars_in_level(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
-    enum CourseNum course = objective->data.courseCollectableData.course;
-    if (update == BINGO_UPDATE_STAR && gCurrCourseNum == course) {
-        if (bingo_get_course_count(course) >= 7) {
+    struct CourseCollectableData *data = &objective->data.courseCollectableData;
+    s32 count;
+    if (update == BINGO_UPDATE_STAR && gCurrCourseNum == data->course) {
+        count = bingo_get_course_count(data->course);
+        if (count >= data->toGet) {
             set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (count > data->gotten) {
+            bingo_hud_update_number(objective->icon, count);
         }
+        data->gotten = count;
     }
 }
 
@@ -272,16 +277,17 @@ s32 objective_secrets_stars(struct BingoObjective *objective, enum BingoObjectiv
 }
 
 s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
     s32 count = 0;
     s32 old_count = 0;
     enum CourseNum course;
     if (update == BINGO_UPDATE_STAR) {
         for (course = COURSE_BOB; course <= COURSE_RR; course++) {
-            count += bingo_get_course_count(course) > 0 ? 1 : 0;
+            count += bingo_get_course_count(course) >= data->toGetEachCourse ? 1 : 0;
         }
-        old_count = objective->data.collectableData.gotten;
-        objective->data.collectableData.gotten = count;
-        if (count == objective->data.collectableData.toGet) {
+        old_count = data->gottenTotal;
+        data->gottenTotal = count;
+        if (count >= data->toGetTotal) {
             set_objective_state(objective, BINGO_STATE_COMPLETE);
         } else if (count > old_count) {
             bingo_hud_update_number(objective->icon, count);

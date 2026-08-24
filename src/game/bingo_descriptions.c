@@ -404,17 +404,41 @@ void get_1up_level_objective_desc(struct BingoObjective *obj, char *desc) {
 }
 
 void get_stars_in_level_objective_desc(struct BingoObjective *obj, char *desc) {
+    struct CourseCollectableData *data = &obj->data.courseCollectableData;
     char revEncLevelName[60];
     char suffix[30];
 
-    get_level_name(revEncLevelName, obj->data.starObjective.course);
+    get_level_name(revEncLevelName, data->course);
     if (obj->state == BINGO_STATE_COMPLETE) {
         strcpy(suffix, ": Complete!");
     } else {
         sprintf(suffix, ". Remaining: %d",
-                7 - bingo_get_course_count(obj->data.starObjective.course));
+                data->toGet - bingo_get_course_count(data->course));
     }
-    sprintf(desc, "Collect all the stars in %s%s", revEncLevelName + 3, suffix);
+    if (data->toGet == 7) {
+        sprintf(desc, "Collect all the stars in %s%s", revEncLevelName + 3, suffix);
+    } else {
+        sprintf(desc, "Collect %d stars in %s%s",
+                data->toGet, revEncLevelName + 3, suffix);
+    }
+}
+
+void get_stars_multiple_levels_objective_desc(struct BingoObjective *obj, char *desc) {
+    struct MultiCourseCollectableData *data = &obj->data.multiCourseCollectableData;
+    char suffix[30];
+
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Courses done: %d", data->gottenTotal);
+    }
+    if (data->toGetEachCourse == 1) {
+        sprintf(desc, "Collect one star in %d unique main courses%s",
+                data->toGetTotal, suffix);
+    } else {
+        sprintf(desc, "Collect %d stars in each of %d main courses%s",
+                data->toGetEachCourse, data->toGetTotal, suffix);
+    }
 }
 
 void get_lose_hat_objective_desc(struct BingoObjective *obj, char *desc) {
@@ -495,9 +519,6 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_RED_COIN:
             strcpy(verb, "Collect");
             break;
-        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
-            strcpy(verb, "Collect one star in");
-            break;
         case BINGO_OBJECTIVE_AMPS:
             strcpy(verb, "Get zapped by");
             break;
@@ -522,9 +543,6 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
     }
 
     switch (obj->type) {
-        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
-            strcpy(collectName, "main courses");
-            break;
         case BINGO_OBJECTIVE_BLJ:
             strcpy(collectName, "BLJs in unique courses");
             printUnique = 0;
@@ -713,8 +731,10 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_KILL_SCUTTLEBUGS:
         case BINGO_OBJECTIVE_KILL_BULLIES:
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
-        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             get_collectable_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+            get_stars_multiple_levels_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             get_dangerous_wall_kicks_objective_desc(objective, desc);
