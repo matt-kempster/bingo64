@@ -131,8 +131,24 @@ static void controller_sdl_bind(void) {
         ext_stick_source = 1; // legacy: an untouched right stick is the C-stick
 }
 
+#include "gamecontrollerdb_n64.inc"
+
 static void controller_sdl_init(void) {
-    // try loading an external gamecontroller mapping file
+    // built-in mappings for N64-style pads the linked SDL doesn't know
+    // (8BitDo 64, NSO N64, Hyperkin, Raphnet, ...); without one of these
+    // the pad opens in raw-joystick mode and every button lands wrong
+    {
+        SDL_RWops *rw = SDL_RWFromConstMem(gamecontrollerdb_n64,
+                                           sizeof(gamecontrollerdb_n64) - 1);
+        if (rw) {
+            int nummaps = SDL_GameControllerAddMappingsFromRW(rw, SDL_TRUE);
+            if (nummaps >= 0)
+                printf("loaded %d built-in N64-pad controller mappings\n", nummaps);
+        }
+    }
+
+    // try loading an external gamecontroller mapping file (overrides the
+    // built-ins above: a same-GUID mapping added later replaces the old one)
     uint64_t gcsize = 0;
     void *gcdata = fs_load_file("gamecontrollerdb.txt", &gcsize);
     if (gcdata && gcsize) {
@@ -259,8 +275,10 @@ static void controller_sdl_read(OSContPad *pad) {
             for (int i = 0; i < SDL_NumJoysticks(); i++) {
                 sdl_joy = SDL_JoystickOpen(i);
                 if (sdl_joy != NULL) {
-                    printf("controller '%s' has no gamepad mapping, using raw joystick mode\n",
-                           SDL_JoystickNameForIndex(i));
+                    char guid[33];
+                    SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof(guid));
+                    printf("controller '%s' (guid %s) has no gamepad mapping, using raw joystick mode\n",
+                           SDL_JoystickNameForIndex(i), guid);
                     sdl_haptic = controller_sdl_init_haptics(i);
                     break;
                 }
