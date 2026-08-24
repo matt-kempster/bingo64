@@ -29,6 +29,7 @@ u32 gBingoInitialSeed = 0;
 s64 gbGlobalBingoTimer = 0;
 enum BingoGameMode gbBingoMode = BINGO_MODE_LINE_1;
 s32 gbBingosCompleted = 0;
+s32 gbBingoTimeout = 0;
 u32 gBingoCellClaimers[25] = { 0 };
 s32 gbBingoShowCongratsCounter = 0;
 s32 gbBingoShowCongratsLimit = 2;
@@ -137,8 +138,27 @@ s32 bingo_race_won(void) {
     return gbBingosCompleted >= bingo_mode_line_target();
 }
 
+s32 bingo_timeout_frames(void) {
+    return gbBingoTimeout * 60 * 30;
+}
+
+s32 bingo_race_timed_out(void) {
+    if (bingo_net_racing()) {
+        // Online the relay owns the clock and announces expiry (T),
+        // breaking ties; never call it locally off a drifting timer.
+        return bingo_net_race_timed_out();
+    }
+    // Solo (or a dropped race): the local clock decides. A win at the
+    // buzzer is still a win.
+    return gbBingoTimeout > 0 && !bingo_race_won()
+           && gbGlobalBingoTimer >= bingo_timeout_frames();
+}
+
 s32 bingo_race_over(void) {
     if (bingo_race_won()) {
+        return 1;
+    }
+    if (bingo_race_timed_out()) {
         return 1;
     }
     // An online lockout decided for someone else ends the race for us too.

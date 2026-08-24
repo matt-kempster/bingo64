@@ -60,9 +60,11 @@ async def start_relay():
         lambda: UdpEndpoint(relay), local_addr=(LOOPBACK, 0))
     udp_port = transport.get_extra_info("sockname")[1]
     tick = asyncio.ensure_future(endpoint.tick_loop())
+    sweep = asyncio.ensure_future(relay.timeout_loop())
 
     async def shutdown():
         tick.cancel()
+        sweep.cancel()
         transport.close()
         server.close()
         await server.wait_closed()
@@ -393,13 +395,14 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_v6_visibility_settings(self):
         a, b = await self.two_joined()
-        # Defaults ride the welcome: open claims, whereabouts shared.
+        # Defaults ride the welcome: open claims, whereabouts shared,
+        # no timeout.
         w = (await a.wait_line("W ")).split()
-        self.assertEqual((w[5], w[6]), ("0", "1"))
+        self.assertEqual((w[5], w[6], w[7]), ("0", "1", "0"))
         # BINGOS (2) is meaningless in 1-bingo mode: coerced to PROGRESS.
         a.send("O 0 0 0 0 2 0")
         o = (await b.wait_line("O 0")).split()
-        self.assertEqual(o[1:], ["0", "1", "0"])
+        self.assertEqual(o[1:], ["0", "1", "0", "0"])
         # Blackout is co-op on a shared board: forced open.
         a.send("O 3 0 0 0 3 1")
         await b.wait_line("O 3 0 1")
@@ -408,7 +411,48 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         await b.wait_line("O 1 2 0")
         a.send("X")
         s = (await b.wait_line("S ")).split()
-        self.assertEqual((s[6], s[7]), ("2", "0"))
+        self.assertEqual((s[6], s[7], s[8]), ("2", "0", "0"))
+
+    async def test_v7_timeout_setting(self):
+        a, b = await self.two_joined()
+        # The timeout rides O; off-menu values are coerced to off.
+        a.send("O 4 0 0 0 0 1 15")
+        o = (await b.wait_line("O 4")).split()
+        self.assertEqual(o[4], "15")
+        a.send("O 3 0 0 0 0 1 7")
+        o = (await b.wait_line("O 3")).split()
+        self.assertEqual(o[4], "0")
+        # And rides the start line.
+        a.send("O 0 0 0 0 0 1 5")
+        await b.wait_line("O 0 0 1 5")
+        a.send("X")
+        s = (await b.wait_line("S ")).split()
+        self.assertEqual(s[8], "5")
+
+    async def test_v7_timeout_ends_race(self):
+        a, b = await self.two_joined()
+        a.send("O 4 0 0 0 0 1 5")     # lockout, 5 minute timeout
+        await b.wait_line("O 4")
+        a.send("X")
+        await b.wait_line("S ")
+        a.send("C 3")                  # alice 2 squares, bob 1
+        a.send("C 4")
+        b.send("C 5")
+        await b.wait_line("C 4 1")
+        # Rewind the clock so the room is past its limit, then let the
+        # once-a-second sweep end it.
+        room = self.endpoint.relay.rooms["testroom"]
+        room.started_at -= 5 * 60 + 5
+        t = (await b.wait_line("T ", timeout=10)).split()
+        # Alice leads on squares: winner by tiebreak.
+        self.assertEqual((t[1], t[3]), ("1", "1"))
+        # The race is over: late claims and finishes are refused.
+        b.send("C 6")
+        b.send("F")
+        a.send("C 7")
+        await asyncio.sleep(0.5)
+        self.assertEqual(b.count("C 6"), 0)
+        self.assertEqual(b.count("C 7"), 0)
 
     async def test_reconnect_with_token(self):
         relaymod.UDP_TIMEOUT_S = 1.0

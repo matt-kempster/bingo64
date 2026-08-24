@@ -716,6 +716,40 @@ static void test_regeneration_resets_completion(void) {
                                  get_unique_id(BINGO_UPDATE_KILLED_GOOMBA, 1.0f, 2.0f, 3.0f)));
 }
 
+// Solo timeout: the race ends when the clock hits the limit, the timer
+// freezes there, and a win at the buzzer still counts.
+static void test_solo_timeout(void) {
+    s32 i;
+    reset_sim();
+    gbBingoTimeout = 5;  // minutes
+    gbGlobalBingoTimer = 0;
+    CHECK_EQ_INT(bingo_race_timed_out(), 0);
+    CHECK_EQ_INT(bingo_race_over(), 0);
+
+    // One frame before the limit: still racing.
+    gbGlobalBingoTimer = bingo_timeout_frames() - 1;
+    bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    CHECK_EQ_INT(bingo_race_timed_out(), 1);  // ...and that tick hit it
+    CHECK_EQ_INT(bingo_race_over(), 1);
+
+    // The timer froze at the limit.
+    for (i = 0; i < 10; i++) {
+        bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    }
+    CHECK_EQ_INT((s32) gbGlobalBingoTimer, bingo_timeout_frames());
+
+    // A board won before the buzzer is a win, not a timeout.
+    reset_sim();
+    gbBingoTimeout = 5;
+    gbBingosCompleted = 1;
+    gbGlobalBingoTimer = bingo_timeout_frames() + 100;
+    CHECK_EQ_INT(bingo_race_timed_out(), 0);
+    CHECK_EQ_INT(bingo_race_over(), 1);
+
+    gbBingoTimeout = 0;  // leave the option off for the other tests
+    gbGlobalBingoTimer = 0;
+}
+
 int main(void) {
     // BOARD_SEED=n prints that board instead of running tests. Handy for
     // comparing against what the ROM shows on screen, and used as the
@@ -770,5 +804,6 @@ int main(void) {
     RUN_TEST(test_sim_row_completion_wins);
     RUN_TEST(test_win_detection);
     RUN_TEST(test_regeneration_resets_completion);
+    RUN_TEST(test_solo_timeout);
     return test_summary();
 }

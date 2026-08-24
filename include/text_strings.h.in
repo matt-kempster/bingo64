@@ -201,6 +201,15 @@
 #define TEXT_UNLOCK_GAME _("Unlock full game")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 
+// Race timeout (v7 room setting; the race ends at the limit and ties
+// are broken by progress, see relay.py timeout_rank).
+#define TEXT_TIMEOUT _("Timeout")
+#define TEXT_TIMEOUT_5 _("5 min")
+#define TEXT_TIMEOUT_15 _("15 min")
+#define TEXT_TIMEOUT_30 _("30 min")
+#define TEXT_TIMEOUT_45 _("45 min")
+#define TEXT_TIMEOUT_60 _("60 min")
+
 // Online visibility settings (host-owned room options, protocol v6).
 #define TEXT_CLAIMS _("Opp. squares")
 #define TEXT_LOCATIONS _("Opp. locations")

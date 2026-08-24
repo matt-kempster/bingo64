@@ -196,12 +196,12 @@ s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
-// mean something in an online room; solo shows the classic three. All
-// uses are runtime expressions, so the count may vary per frame — the
-// objective list below the configs reflows with it.
-#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 5 : 3)
+// mean something in an online room; solo shows mode/unlock/timeout/
+// toggle-all. All uses are runtime expressions, so the count may vary
+// per frame — the objective list below the configs reflows with it.
+#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 6 : 4)
 #else
-#define BINGO_CONFIGS_IN_LEFT_COL 3 // not more than 10, hopefully
+#define BINGO_CONFIGS_IN_LEFT_COL 4 // not more than 10, hopefully
 #endif
 #define BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE (BINGO_ENTRIES_PER_COL - BINGO_CONFIGS_IN_LEFT_COL)
 #define BINGO_INSTRUCTIONS_IN_RIGHT_COL 3
@@ -1577,6 +1577,12 @@ static unsigned char textBlackout[] = { TEXT_TARGET_BLACKOUT };
 static unsigned char textLockout[] = { TEXT_TARGET_LOCKOUT };
 
 static unsigned char textUnlockGame[] = { TEXT_UNLOCK_GAME };
+static unsigned char textTimeout[] = { TEXT_TIMEOUT };
+static unsigned char textTimeout5[] = { TEXT_TIMEOUT_5 };
+static unsigned char textTimeout15[] = { TEXT_TIMEOUT_15 };
+static unsigned char textTimeout30[] = { TEXT_TIMEOUT_30 };
+static unsigned char textTimeout45[] = { TEXT_TIMEOUT_45 };
+static unsigned char textTimeout60[] = { TEXT_TIMEOUT_60 };
 static unsigned char textToggleAll[] = { TEXT_TOGGLE_ALL };
 static unsigned char textEmpty[] = { 0xFF };
 
@@ -1797,6 +1803,31 @@ static s32 bingo_config_target(s32 i, u8 **target) {
     return bingo_config_value_x(*target);
 }
 
+// The Timeout row: cycle OFF -> 5 -> 15 -> 30 -> 45 -> 60 minutes.
+static s32 bingo_config_timeout(s32 i, u8 **target) {
+    static const s32 choices[] = { 0, 5, 15, 30, 45, 60 };
+    s32 j, cur = 0;
+    for (j = 0; j < 6; j++) {
+        if (gbBingoTimeout == choices[j]) {
+            cur = j;
+        }
+    }
+    if (sToggleCurrentOption && sBingoOptionSelection == i) {
+        sToggleCurrentOption = 0;
+        cur = (cur + 1) % 6;
+        gbBingoTimeout = choices[cur];
+    }
+    switch (gbBingoTimeout) {
+        default: *target = textOff;       break;
+        case 5:  *target = textTimeout5;  break;
+        case 15: *target = textTimeout15; break;
+        case 30: *target = textTimeout30; break;
+        case 45: *target = textTimeout45; break;
+        case 60: *target = textTimeout60; break;
+    }
+    return bingo_config_value_x(*target);
+}
+
 #ifndef TARGET_N64
 // The Claims row's value text and its right-ish x offset, tier-aware.
 static s32 bingo_config_claimvis(s32 i, u8 **target) {
@@ -1845,11 +1876,14 @@ static void print_bingo_configs() {
                 target = textOn;
             }
             offsetX = bingo_config_value_x(target);
+        } else if (i == 2) {
+            label = textTimeout;
+            offsetX = bingo_config_timeout(i, &target);
 #ifndef TARGET_N64
-        } else if (i == 2 && cfgs == 5) {
+        } else if (i == 3 && cfgs == 6) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 3 && cfgs == 5) {
+        } else if (i == 4 && cfgs == 6) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;

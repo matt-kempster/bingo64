@@ -119,6 +119,8 @@ static s32 sResyncFlag = 0;
 static struct NetResult sResults[NET_MAX_PLAYERS];
 static s32 sResultCount = 0;
 static s32 sWinnerId = 0;      // lockout: the decided winner
+static s32 sTimedOut = 0;      // the relay ended the race on the timeout
+static s32 sTiebreakWin = 0;   // ...and the winner won by tiebreak
 static s32 sFinishSent = 0;
 static s32 sHostId = 0;        // who may edit settings and start the race
 static s32 sGoFlag = 0;        // set once when we enter RACING; file select
@@ -129,6 +131,7 @@ static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
                                    // us whether we are the host
 static s32 sPendingClaimVis = -1;  // visibility settings riding the same W
 static s32 sPendingWhereabouts = -1;
+static s32 sPendingTimeout = -1;   // race timeout (minutes) riding the same W
 
 // Room visibility settings (v6). The host's local values are the room's;
 // everyone else receives them via W/O/S.
@@ -356,6 +359,8 @@ static void reset_race_state(void) {
     sClaimHead = sClaimTail = 0;
     sResultCount = 0;
     sWinnerId = 0;
+    sTimedOut = 0;
+    sTiebreakWin = 0;
     sFinishSent = 0;
     sGoFlag = 0;
     sSeedValid = 0;
@@ -378,6 +383,8 @@ static void reset_room_state(void) {
     sClaimHead = sClaimTail = 0;
     sResultCount = 0;
     sWinnerId = 0;
+    sTimedOut = 0;
+    sTiebreakWin = 0;
 }
 
 // "<name> <did something>" as an in-game toast, the name tinted with the
@@ -408,11 +415,11 @@ static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
     if (cmd == 'W') {
-        s32 public_ = 0, mode = 0, claimVis = 0, where = 1;
+        s32 public_ = 0, mode = 0, claimVis = 0, where = 1, timeoutMin = 0;
         s32 id = 0;
         u32 token = 0;
-        if (sscanf(line + 1, "%d %d %d %u %d %d", &id, &public_, &mode,
-                   &token, &claimVis, &where) == 6) {
+        if (sscanf(line + 1, "%d %d %d %u %d %d %d", &id, &public_, &mode,
+                   &token, &claimVis, &where, &timeoutMin) == 7) {
             // An older relay packs other fields here; fail loudly instead
             // of running a half-broken lobby against an outdated server.
             if (public_ < 0 || public_ > 1 || mode < 0 || mode >= BINGO_MODE_COUNT) {
@@ -450,6 +457,7 @@ static void handle_line(char *line) {
             sPendingRoomMode = mode;
             sPendingClaimVis = claimVis;
             sPendingWhereabouts = where;
+            sPendingTimeout = timeoutMin;
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
             sState = NET_STATE_LOBBY;
@@ -470,10 +478,12 @@ static void handle_line(char *line) {
                 gNetClaimVis = net_claimvis_coerce(sPendingClaimVis,
                                                    sPendingRoomMode);
                 gNetShowWhereabouts = sPendingWhereabouts != 0;
+                gbBingoTimeout = sPendingTimeout;
             }
             sPendingRoomMode = -1;
             sPendingClaimVis = -1;
             sPendingWhereabouts = -1;
+            sPendingTimeout = -1;
             // The role passed on (0 = the initial announcement).
             if (prevHost != 0 && id != prevHost) {
                 if (id == sLocalId) {
@@ -486,9 +496,11 @@ static void handle_line(char *line) {
     } else if (cmd == 'S') {
         u32 seed = 0;
         s32 delta = 0, mode = 0, unlock = 0, claimVis = 0, where = 1;
+        s32 timeoutMin = 0;
         unsigned long long mask = 0;
-        if (sscanf(line + 1, "%u %d %d %d %llx %d %d", &seed, &delta, &mode,
-                   &unlock, &mask, &claimVis, &where) == 7) {
+        if (sscanf(line + 1, "%u %d %d %d %llx %d %d %d", &seed, &delta,
+                   &mode, &unlock, &mask, &claimVis, &where,
+                   &timeoutMin) == 8) {
             s32 i;
             sSharedSeed = seed;
             sSeedValid = 1;
@@ -499,6 +511,7 @@ static void handle_line(char *line) {
             }
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
+            gbBingoTimeout = timeoutMin;
             gBingoFullGameUnlocked = (u8) (unlock != 0);
             for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
                 gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
@@ -615,12 +628,14 @@ static void handle_line(char *line) {
         }
     } else if (cmd == 'O') {
         // The host changed the room options while we sat in the lobby.
-        s32 mode, claimVis = 0, where = 1;
-        if (sscanf(line + 1, "%d %d %d", &mode, &claimVis, &where) == 3
+        s32 mode, claimVis = 0, where = 1, timeoutMin = 0;
+        if (sscanf(line + 1, "%d %d %d %d", &mode, &claimVis, &where,
+                   &timeoutMin) == 4
             && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
+            gbBingoTimeout = timeoutMin;
         }
     } else if (cmd == 'F') {
         s32 id, place, frames;
@@ -656,6 +671,33 @@ static void handle_line(char *line) {
                 sResultCount = 1;
             }
             printf("net: race decided, #%d wins (%d frames)\n", id, frames);
+            fflush(stdout);
+        }
+    } else if (cmd == 'T') {
+        // The room's timeout expired: the relay ended the race. id is the
+        // winner (0 = a dead-even draw); tiebreak says whether they won by
+        // the standings comparison rather than a regular finish. In line
+        // modes the F placements for everyone still racing arrived just
+        // before this.
+        s32 id, frames, tiebreak;
+        if (sscanf(line + 1, "%d %d %d", &id, &frames, &tiebreak) == 3) {
+            sTimedOut = 1;
+            sTiebreakWin = tiebreak != 0;
+            if (id > 0) {
+                s32 i, known = 0;
+                sWinnerId = id;
+                for (i = 0; i < sResultCount; i++) {
+                    known |= sResults[i].id == id;
+                }
+                if (!known && sResultCount < NET_MAX_PLAYERS) {
+                    sResults[sResultCount].id = id;
+                    sResults[sResultCount].place = 1;
+                    sResults[sResultCount].frames = frames;
+                    sResultCount++;
+                }
+            }
+            printf("net: race timed out, winner #%d (tiebreak %d)\n",
+                   id, tiebreak);
             fflush(stdout);
         }
     } else if (cmd == 'K') {
@@ -1332,14 +1374,14 @@ s32 network_countdown_frames(void) {
 }
 
 void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
-                          s32 claimVis, s32 whereabouts) {
+                          s32 claimVis, s32 whereabouts, s32 timeoutMin) {
     char line[96];
     if (!network_active()) {
         return;
     }
-    snprintf(line, sizeof(line), "O %d %d %llx %u %d %d\n",
+    snprintf(line, sizeof(line), "O %d %d %llx %u %d %d %d\n",
              mode, unlock, (unsigned long long) mask, seed,
-             claimVis, whereabouts);
+             claimVis, whereabouts, timeoutMin);
     net_send_line(line);
 }
 
@@ -1360,7 +1402,7 @@ void network_push_local_options(void) {
     gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
     network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask,
                          bingo_seed_proposal(), gNetClaimVis,
-                         gNetShowWhereabouts);
+                         gNetShowWhereabouts, gbBingoTimeout);
 }
 
 s32 network_is_host(void) {
@@ -1466,6 +1508,14 @@ s32 network_local_place(void) {
 
 s32 network_race_winner_id(void) {
     return sWinnerId;
+}
+
+s32 network_race_timed_out(void) {
+    return sTimedOut;
+}
+
+s32 network_race_won_by_tiebreak(void) {
+    return sTimedOut && sTiebreakWin;
 }
 
 s32 network_take_resync_flag(void) {

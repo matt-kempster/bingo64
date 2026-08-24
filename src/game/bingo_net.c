@@ -382,6 +382,14 @@ s32 bingo_net_local_won(void) {
            && network_race_winner_id() == network_local_id();
 }
 
+s32 bingo_net_race_timed_out(void) {
+    return network_active() && network_race_timed_out();
+}
+
+s32 bingo_net_race_tiebreak(void) {
+    return network_active() && network_race_won_by_tiebreak();
+}
+
 s32 bingo_net_obj_is_ghost(struct Object *obj) {
     return obj != NULL && obj->behavior == segmented_to_virtual(bhvNetGhost);
 }
@@ -598,6 +606,14 @@ void bingo_net_keepalive(void) {
 }
 
 s32 bingo_net_dropped(void) {
+    return 0;
+}
+
+s32 bingo_net_race_timed_out(void) {
+    return 0;
+}
+
+s32 bingo_net_race_tiebreak(void) {
     return 0;
 }
 

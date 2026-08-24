@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bingo64 relay server, protocol v6.
+"""Bingo64 relay server, protocol v7.
 
 A small room server for online bingo (plans/online-bingo.md Part D).
 Clients speak a line-based text protocol; the server groups them into
@@ -53,8 +53,8 @@ Game modes (shared enum with the client, see src/game/bingo.h):
 Line protocol (space-separated fields):
 
   client -> server
-    J 6 <room> <name> <color> <flags> [token]
-                             join a room. The protocol version (6) comes
+    J 7 <room> <name> <color> <flags> [token]
+                             join a room. The protocol version (7) comes
                              first; older clients are refused with
                              "E version". color is a palette index 0..7.
                              flags apply only when this join creates the
@@ -67,15 +67,17 @@ Line protocol (space-separated fields):
     C <cell>                 claim board cell 0..24
     R <0|1>                  ready toggle (a roster signal only; the race
                              starts when the host sends X)
-    O <mode> <unlock> <maskhex> <seed> <claimvis> <where>
+    O <mode> <unlock> <maskhex> <seed> <claimvis> <where> <timeout>
                              room settings (host only, before the start):
                              game mode 0..4, full-game unlock,
                              disabled-objective bitmask as hex, the
                              seed proposal (0 = random at start), the
                              claim-visibility tier 0..3 (open/progress/
                              bingos/hidden; invalid tier+mode pairs are
-                             coerced, see coerce_claimvis), and whether
-                             player whereabouts are shared (0/1).
+                             coerced, see coerce_claimvis), whether
+                             player whereabouts are shared (0/1), and
+                             the race timeout in minutes (0 = off,
+                             else one of TIMEOUT_CHOICES).
     X                        the host starts the race (allowed even if
                              not everyone is ready)
     K                        the host ends the race: back to the lobby.
@@ -96,7 +98,7 @@ Line protocol (space-separated fields):
                              silence timeout; TCP just closes)
 
   server -> client
-    W <id> <public> <mode> <token> <claimvis> <where>
+    W <id> <public> <mode> <token> <claimvis> <where> <timeout>
                              welcome: player id, room mode/visibility
                              settings and the reconnect token. NO seed
                              here: it arrives in S at start.
@@ -104,7 +106,7 @@ Line protocol (space-separated fields):
                              roster entry (sent for yourself too, and
                              re-sent when someone's state changes)
     R <id> <0|1>             ready change
-    O <mode> <claimvis> <where>
+    O <mode> <claimvis> <where> <timeout>
                              the host changed the room's settings
     H <id>                   who the host is (on join, and when the host
                              role passes to someone else — the role now
@@ -114,7 +116,7 @@ Line protocol (space-separated fields):
                              race (seed, claims, results, ready marks)
                              and return to the lobby screen. Followed by
                              a full roster re-send with everyone unready.
-    S <seed> <delta> <mode> <unlock> <maskhex> <claimvis> <where>
+    S <seed> <delta> <mode> <unlock> <maskhex> <claimvis> <where> <timeout>
                              the race starts: shared seed, room options,
                              and delta = frames (30/s) until GO. Negative
                              delta means the race started -delta frames
@@ -123,6 +125,14 @@ Line protocol (space-separated fields):
     C <cell> <id>            cell claim accepted (relayed to whole room)
     F <id> <place> <frames>  a racer finished (authoritative time)
     V <id> <frames>          lockout decided: winner and time
+    T <id> <frames> <tiebreak>
+                             the room's timeout expired: the race is
+                             over. id = the winner (0 = dead-even draw),
+                             tiebreak = 1 when the standings comparison
+                             decided it (see timeout_rank), 0 when a
+                             regular finisher already held first place.
+                             Line modes: F placements for everyone still
+                             racing are broadcast immediately before.
     D <id>                   peer disconnected mid-race (may return)
     B <id>                   peer left for good
     P <name> <members> <started>
@@ -149,21 +159,26 @@ print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.
-PROTOCOL_VERSION = 6
+PROTOCOL_VERSION = 7
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
 
+MODE_LINE_1 = 0
 MODE_LINE_2 = 1
 MODE_LINE_3 = 2
 MODE_BLACKOUT = 3
 MODE_LOCKOUT = 4
+MODE_LINE_MODES = (MODE_LINE_1, MODE_LINE_2, MODE_LINE_3)
 
 # Claim-visibility tiers (v6 room setting, mirrored in network.h).
 CLAIMVIS_OPEN = 0      # chips + toasts + counts: everything (default)
 CLAIMVIS_PROGRESS = 1  # counts only, not which squares
 CLAIMVIS_BINGOS = 2    # bingo milestones only (2/3-bingo modes)
 CLAIMVIS_HIDDEN = 3    # nothing until finishes
+
+# Race timeouts the menu offers, in minutes (v7 room setting; 0 = off).
+TIMEOUT_CHOICES = (0, 5, 15, 30, 45, 60)
 
 
 def coerce_claimvis(vis, mode):
@@ -177,6 +192,60 @@ def coerce_claimvis(vis, mode):
     if vis == CLAIMVIS_BINGOS and mode not in (MODE_LINE_2, MODE_LINE_3):
         return CLAIMVIS_PROGRESS
     return vis
+
+
+# The 12 winnable lines of the 5x5 board, as cell indices. The board is
+# stored column-major on the client, but lines are symmetric so only the
+# set of lines matters here.
+BOARD_LINES = tuple(
+    [tuple(range(r * 5, r * 5 + 5)) for r in range(5)]
+    + [tuple(range(c, 25, 5)) for c in range(5)]
+    + [tuple(range(0, 25, 6)), tuple(range(4, 21, 4))]
+)
+
+
+def timeout_progress(mode, my_claims):
+    """One player's standing when the clock runs out. my_claims is their
+    ordered [(frames, cell)]. Returns (metric, reach_frame): metric is a
+    tuple comparing DESCENDING (bigger = better); reach_frame is when the
+    final metric value was first attained, comparing ASCENDING ("first to
+    get that number" breaks the tie). Lockout and blackout rank by squares
+    held; line modes by bingos, then the longest partial line."""
+    if mode not in MODE_LINE_MODES:
+        n = len(my_claims)
+        return (n,), (my_claims[-1][0] if n else 0)
+    cells = set()
+    best = (0, 0)
+    reach = 0
+    for frames, cell in my_claims:
+        cells.add(cell)
+        bingos = sum(1 for line in BOARD_LINES
+                     if all(c in cells for c in line))
+        longest = max(sum(1 for c in line if c in cells)
+                      for line in BOARD_LINES)
+        cur = (bingos, longest)
+        if cur > best:
+            best = cur
+            reach = frames
+    return best, reach
+
+
+def timeout_rank(mode, claim_seq, racer_ids):
+    """Rank racers for a timeout verdict. claim_seq is the room's ordered
+    [(frames, id, cell)]. Returns [(id, metric, reach_frame)] best first;
+    an exact tie (same metric, and claims are server-sequenced so equal
+    reach frames mean equal order) falls back to the lower id, which can
+    only happen between players with no progress at all."""
+    per = {i: [] for i in racer_ids}
+    for frames, cid, cell in claim_seq:
+        if cid in per:
+            per[cid].append((frames, cell))
+    ranked = []
+    for cid in racer_ids:
+        metric, reach = timeout_progress(mode, per[cid])
+        ranked.append((cid, metric, reach))
+    ranked.sort(key=lambda r: (tuple(-v for v in r[1]), r[2], r[0]))
+    return ranked
 
 # UDP transport constants (mirrored in src/pc/network/network.c).
 UDP_MAGIC = 0xB6
@@ -397,9 +466,13 @@ class Room:
         self.mask = 0
         self.claimvis = CLAIMVIS_OPEN
         self.whereabouts = 1
+        self.timeout_min = 0    # race timeout in minutes (0 = off)
         # Results.
         self.finishers = []     # (id, place, frames)
         self.winner = None      # (id, frames), lockout
+        self.claim_seq = []     # (frames, id, cell) in acceptance order
+        self.timeout_result = None  # (winner_id, frames, tiebreak) once
+                                    # the race ended on the timeout
 
     @property
     def started(self):
@@ -419,11 +492,12 @@ class Room:
         return max(0, -self.start_delta_frames())
 
     def start_line(self):
-        return "S %d %d %d %d %x %d %d" % (self.seed,
-                                           self.start_delta_frames(),
-                                           self.mode, self.unlock,
-                                           self.mask, self.claimvis,
-                                           self.whereabouts)
+        return "S %d %d %d %d %x %d %d %d" % (self.seed,
+                                              self.start_delta_frames(),
+                                              self.mode, self.unlock,
+                                              self.mask, self.claimvis,
+                                              self.whereabouts,
+                                              self.timeout_min)
 
     def roster_line(self, id_, name, color, ready, connected):
         return "N %d %s %d %d %d" % (id_, name, color,
@@ -555,6 +629,8 @@ class Relay:
         room.claims.clear()
         room.finishers = []
         room.winner = None
+        room.claim_seq = []
+        room.timeout_result = None
         room.broadcast("K")
         for c in room.members.values():
             c.ready = False
@@ -588,10 +664,13 @@ class Relay:
             client.send("F %d %d %d" % (id_, place, frames))
         if room.winner is not None:
             client.send("V %d %d" % room.winner)
+        if room.timeout_result is not None:
+            client.send("T %d %d %d" % room.timeout_result)
 
     def adjudicate_lockout(self, room):
         """Decide a lockout race: uncatchable lead or exhausted board."""
-        if room.winner is not None or not room.started:
+        if (room.winner is not None or not room.started
+                or room.timeout_result is not None):
             return
         counts = room.claim_counts()
         if not counts:
@@ -610,6 +689,62 @@ class Relay:
                   % (ts(), room.name, leader_id, leader_count))
             self.log.event("lockout_win", room=room.name, id=leader_id,
                            squares=leader_count, frames=room.winner[1])
+
+
+    def resolve_timeout(self, room):
+        """The room's timeout expired: end the race and break the ties.
+        Line modes: everyone still racing gets a place (after the real
+        finishers) by timeout_rank; the winner is the existing 1st-place
+        finisher if there is one, else the standings leader. Lockout and
+        blackout: the standings leader wins outright. A room with zero
+        progress ends in a draw (winner 0)."""
+        if (room.timeout_result is not None or not room.started
+                or room.timeout_min <= 0 or room.winner is not None):
+            return
+        limit = room.timeout_min * 60 * FPS
+        if room.elapsed_frames() < limit:
+            return
+        ids = sorted(room.racer_ids())
+        ranked = timeout_rank(room.mode, room.claim_seq, ids)
+        tiebreak = 1
+        winner = 0
+        if room.mode in MODE_LINE_MODES:
+            pre = list(room.finishers)
+            finished = {f[0] for f in pre}
+            place = len(pre)
+            for cid, _metric, _reach in ranked:
+                if cid in finished:
+                    continue
+                place += 1
+                room.finishers.append((cid, place, limit))
+                room.broadcast("F %d %d %d" % (cid, place, limit))
+            for cid, pl, _frames in pre:
+                if pl == 1:
+                    winner = cid       # a regular finish already won it
+                    tiebreak = 0
+            if winner == 0 and ranked and any(v for v in ranked[0][1]):
+                winner = ranked[0][0]
+        else:
+            if ranked and any(v for v in ranked[0][1]):
+                winner = ranked[0][0]
+        room.timeout_result = (winner, limit, tiebreak)
+        room.broadcast("T %d %d %d" % room.timeout_result)
+        print("[%s] room '%s': timed out after %dm, winner #%d%s"
+              % (ts(), room.name, room.timeout_min, winner,
+                 " (tiebreak)" if winner and tiebreak else ""))
+        self.log.event("timeout", room=room.name, winner=winner,
+                       tiebreak=bool(winner and tiebreak),
+                       minutes=room.timeout_min,
+                       standings=[{"id": cid, "metric": list(metric),
+                                   "reach": reach}
+                                  for cid, metric, reach in ranked])
+
+    async def timeout_loop(self):
+        """Once a second: end any race whose timeout has expired."""
+        while True:
+            await asyncio.sleep(1)
+            for room in list(self.rooms.values()):
+                self.resolve_timeout(room)
 
     def resume_session(self, room, client, token, name, color):
         """Find the member this token was issued to; -1 if unknown."""
@@ -678,10 +813,11 @@ class Relay:
                 room.tokens[client.id] = random.randrange(1, 2 ** 32)
             client.room = room
             self.stat_joins += 1
-            client.send("W %d %d %d %d %d %d"
+            client.send("W %d %d %d %d %d %d %d"
                         % (client.id, 1 if room.public else 0,
                            room.mode, room.tokens[client.id],
-                           room.claimvis, room.whereabouts))
+                           room.claimvis, room.whereabouts,
+                           room.timeout_min))
             self.send_room_snapshot(room, client)
             # Announce the (re)arrival to everyone else.
             room.broadcast(room.roster_line(client.id, client.name,
@@ -704,6 +840,8 @@ class Relay:
             if cell < 0:
                 return True
             room = client.room
+            if room.timeout_result is not None:
+                return True  # the race ended on the timeout
             ids = room.claims.setdefault(cell, [])
             if room.mode in (MODE_BLACKOUT, MODE_LOCKOUT):
                 if ids:
@@ -711,6 +849,9 @@ class Relay:
             elif client.id in ids:
                 return True  # race: once per player
             ids.append(client.id)
+            if room.started:
+                room.claim_seq.append((room.elapsed_frames(), client.id,
+                                       cell))
             room.broadcast("C %d %d" % (cell, client.id))
             print("[%s] room '%s': cell %d claimed by #%d %s"
                   % (ts(), room.name, cell, client.id, client.name))
@@ -723,6 +864,7 @@ class Relay:
         elif cmd == "F" and client.room:
             room = client.room
             if (not room.started or room.mode == MODE_LOCKOUT
+                    or room.timeout_result is not None
                     or any(f[0] == client.id for f in room.finishers)):
                 return True
             place = len(room.finishers) + 1
@@ -757,9 +899,13 @@ class Relay:
                 room.claimvis = clamped_int(parts[5], 0, 3)
                 room.whereabouts = clamped_int(parts[6], 0, 1)
             # The mode may have changed out from under the tier.
+            if len(parts) >= 8:
+                t = clamped_int(parts[7], 0, 60)
+                room.timeout_min = t if t in TIMEOUT_CHOICES else 0
             room.claimvis = coerce_claimvis(room.claimvis, room.mode)
-            room.broadcast("O %d %d %d" % (room.mode, room.claimvis,
-                                           room.whereabouts),
+            room.broadcast("O %d %d %d %d" % (room.mode, room.claimvis,
+                                              room.whereabouts,
+                                              room.timeout_min),
                            skip=client.id)
         elif cmd == "X" and client.room:
             room = client.room
@@ -871,6 +1017,7 @@ async def main():
         lambda: UdpEndpoint(relay), local_addr=(args.host, args.port))
     asyncio.ensure_future(endpoint.tick_loop())
     asyncio.ensure_future(relay.stats_loop())
+    asyncio.ensure_future(relay.timeout_loop())
     print("[%s] bingo64 relay listening on %s:%d tcp+udp (protocol v%d)"
           % (ts(), args.host, args.port, PROTOCOL_VERSION))
     async with server:

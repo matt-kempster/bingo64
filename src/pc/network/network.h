@@ -15,14 +15,15 @@
 // replays the room state (claims, finishes).
 // Everything here is PC-only; the N64 build never sees this header.
 
-// 6: claim-visibility tier + whereabouts toggle ride O/W/S. During
-// active development the version bumps on every wire change — the old
-// side is refused outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 6
+// 7: optional race timeout rides O/W/S; the relay ends the race with the
+// T broadcast (winner by tiebreak) at expiry. During active development
+// the version bumps on every wire change — the old side is refused
+// outright ("E version"), never accommodated.
+#define NET_PROTOCOL_VERSION 7
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.
-#define NET_VERSION_PATCH 1
+#define NET_VERSION_PATCH 0
 
 #define NET_MAX_GHOSTS  15
 #define NET_MAX_PLAYERS 16
@@ -169,9 +170,9 @@ s32 network_countdown_frames(void);
 // Send the room's settings (server only accepts them from the host).
 // mask bit i set = objective type i disabled; seed 0 = random at start.
 // The options that arrive with the start message are applied to the
-// bingo globals directly.
+// bingo globals directly. timeoutMin: race timeout in minutes (0 = off).
 void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
-                          s32 claimVis, s32 whereabouts);
+                          s32 claimVis, s32 whereabouts, s32 timeoutMin);
 // Push the current bingo globals as room options (no-op unless we are
 // the room creator). Called after the welcome and whenever the options
 // screen may have changed them.
@@ -199,8 +200,13 @@ s32 network_result_count(void);
 const struct NetResult *network_result(s32 i);
 // Place of the local player (0 = still racing).
 s32 network_local_place(void);
-// Lockout: the server-decided winner id (0 = not decided).
+// Lockout: the server-decided winner id (0 = not decided). A timeout's
+// tiebreak winner (any mode) reports here too.
 s32 network_race_winner_id(void);
+// The relay ended the race at the room's timeout (T broadcast).
+s32 network_race_timed_out(void);
+// ...and the winner was decided by the tiebreak (not a regular finish).
+s32 network_race_won_by_tiebreak(void);
 
 // After a reconnect resync this returns 1 exactly once: the caller
 // (bingo_net_update) re-sends any local completions the server missed.

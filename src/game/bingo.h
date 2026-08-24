@@ -19,6 +19,13 @@ enum BingoGameMode {
 
 #define BINGO_LOCKOUT_TARGET 13
 
+// Optional race timeout in minutes (0 = off; the menu offers 5/15/30/45/60).
+// Online it is a host-owned room option like the mode; the relay ends the
+// race at expiry and breaks ties. Solo the race just ends.
+extern s32 gbBingoTimeout;
+s32 bingo_timeout_frames(void);   // the limit in 30fps frames (0 = off)
+s32 bingo_race_timed_out(void);
+
 // Global bingo state information
 extern s32 gBingoInitialized;
 extern u32 gBingoInitialSeed;

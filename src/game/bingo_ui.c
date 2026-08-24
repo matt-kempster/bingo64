@@ -474,11 +474,48 @@ static void draw_win_hint(s32 showSuperPlayer) {
 
 void draw_bingo_win_screen() {
     char timestamp[16];
-    char msg[40];
+    char msg[56];
 
 #ifndef TARGET_N64
     u8 rainbow[3];
     rainbow_rgb(rainbow);
+    if (network_active() && network_race_timed_out()) {
+        // The relay ended the race on the room's timeout. A tiebreak
+        // winner gets announced as such; when a regular finisher already
+        // held first place (line modes, tiebreak 0), fall through to the
+        // normal finish rendering — placements were broadcast at expiry.
+        s32 winner = network_race_winner_id();
+        if (winner == 0) {
+            draw_quiet_line(-1, 60, NULL, NULL, "Time - dead even, a draw",
+                            sQuietWhite, -1, NULL, 255);
+            draw_win_hint(FALSE);
+            return;
+        }
+        if (network_race_won_by_tiebreak()) {
+            s32 myPlace = network_local_place();
+            if (winner == network_local_id()) {
+                sprintf(msg, "Time - won the tiebreak with %d squares",
+                        net_cell_count_of_id(winner));
+                draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow,
+                                -1, NULL, 255);
+                draw_win_hint(TRUE);
+            } else {
+                if (myPlace > 1) {
+                    sprintf(msg, "won the tiebreak - you took %d%s",
+                            myPlace, ordinal_suffix(myPlace));
+                } else {
+                    sprintf(msg, "won the tiebreak with %d squares",
+                            net_cell_count_of_id(winner));
+                }
+                draw_quiet_line(-1, 60, net_name_of_id(winner),
+                                gNetColorRGB[network_color_of_id(winner)
+                                             % NET_COLOR_COUNT],
+                                msg, sQuietWhite, -1, NULL, 255);
+                draw_win_hint(FALSE);
+            }
+            return;
+        }
+    }
     if (network_active() && gbBingoMode == BINGO_MODE_LOCKOUT
         && network_race_winner_id() != 0) {
         // Lockout ends for the whole room at once: show the verdict in
@@ -531,6 +568,15 @@ void draw_bingo_win_screen() {
         return;
     }
 
+    // Solo: the clock ran out without a win.
+    if (bingo_race_timed_out()) {
+        sprintf(msg, "Time's up - you got %d squares",
+                bingo_complete_cell_count());
+        draw_quiet_line(-1, 60, NULL, NULL, msg, sQuietWhite, -1, NULL, 255);
+        draw_win_hint(FALSE);
+        return;
+    }
+
     // Solo: completing the board is a win.
     getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
     time_fmt_dialog(timestamp);
@@ -538,8 +584,12 @@ void draw_bingo_win_screen() {
     draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, NULL, 255);
     draw_win_hint(TRUE);
 #else
-    getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
-    sprintf(msg, "YOUR TIME IS %s", timestamp);
+    if (bingo_race_timed_out()) {
+        sprintf(msg, "TIMES UP - %d SQUARES", bingo_complete_cell_count());
+    } else {
+        getTimeFmtPrecise(timestamp, gbGlobalBingoTimer);
+        sprintf(msg, "YOUR TIME IS %s", timestamp);
+    }
     // TODO: insert 0/0.5 spaces at front to center align:
     print_text(30, 60, msg);
 
@@ -713,8 +763,16 @@ void draw_bingo_screen() {
 #else
     print_text_tiny(240, 205, "VERSION 0.11a");
 #endif
-    getTimeFmtPreciseTiny(timestamp, gbGlobalBingoTimer);
-    sprintf(time_print, "TIME %s", timestamp);
+    if (gbBingoTimeout > 0) {
+        // A timed race counts down to the buzzer instead of up (the win
+        // and finish messages still report elapsed time).
+        s64 left = bingo_timeout_frames() - gbGlobalBingoTimer;
+        getTimeFmtPreciseTiny(timestamp, left > 0 ? left : 0);
+        sprintf(time_print, "LEFT %s", timestamp);
+    } else {
+        getTimeFmtPreciseTiny(timestamp, gbGlobalBingoTimer);
+        sprintf(time_print, "TIME %s", timestamp);
+    }
     print_text_tiny(240, 196, time_print);
 
 #ifndef TARGET_N64
