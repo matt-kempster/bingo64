@@ -980,6 +980,9 @@ s32 bingo_objective_init(
     enum BingoObjectiveType type
 ) {
     objective->initialized = 1;
+    // A previous session's board lives in the same global array; without
+    // this, a cell completed last race stays COMPLETE on the new board.
+    objective->state = BINGO_STATE_NONE;
     objective->type = type;
     objective->class = class;
     objective->icon = get_objective_info(type)->icon;

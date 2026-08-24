@@ -9,6 +9,8 @@
 #include "engine/rand.h"
 #include "harness.h"
 #include "splatoon.h"
+#include "bingo_tracking_collectables.h"
+#include "bingo_tracking_star.h"
 
 // From glue.c: records bingo_hud_update_number calls.
 extern s32 gGlueHudNumberCalls;
@@ -671,6 +673,49 @@ static void test_win_detection(void) {
     CHECK_EQ_INT(bingo_check_win(), 2);
 }
 
+// Regression: EXIT GAME -> file select -> (maybe swap mode) -> pick a file
+// re-runs setup_bingo_objectives on the same globals, with no memset in
+// between. Completed cells, the race clock, and the star/collectable
+// tracking used to leak into the new race, so the fresh board showed the
+// old board's cells as complete (and objectives re-completed off stale
+// counts) while the timer restarted from zero.
+static void test_regeneration_resets_completion(void) {
+    int i;
+    generate_board(4242);
+
+    // Simulate a played race: complete a row, bank tracking and the clock.
+    for (i = 0; i < 5; i++) {
+        gBingoObjectives[i * 5 + 2].state = BINGO_STATE_COMPLETE;
+    }
+    gbBingosCompleted = bingo_check_win();
+    CHECK_EQ_INT(gbBingosCompleted, 1);
+    bingo_set_star(5, 3);
+    bingo_set_star(-1, 2);
+    CHECK_EQ_INT(bingo_get_star_count(), 2);
+    gbGlobalBingoTimer = 12345;
+    gBingoStickyActNum[0] = 4;
+    gCurrCourseNum = 2;
+    CHECK(is_new_kill(BINGO_UPDATE_KILLED_GOOMBA,
+                      get_unique_id(BINGO_UPDATE_KILLED_GOOMBA, 1.0f, 2.0f, 3.0f)));
+
+    // The relaunch path, exactly as the game runs it: same seed, new mode,
+    // no scrubbing of the globals beforehand.
+    save_or_restore_weights();
+    gbBingoMode = BINGO_MODE_LINE_1;
+    setup_bingo_objectives(4242);
+
+    for (i = 0; i < 25; i++) {
+        CHECK_EQ_INT(gBingoObjectives[i].state, BINGO_STATE_NONE);
+    }
+    CHECK_EQ_INT(bingo_check_win(), 0);
+    CHECK_EQ_INT(gbBingosCompleted, 0);
+    CHECK_EQ_INT((s32) gbGlobalBingoTimer, 0);
+    CHECK_EQ_INT(bingo_get_star_count(), 0);
+    CHECK_EQ_INT(gBingoStickyActNum[0], 0);
+    CHECK(peek_would_be_new_kill(BINGO_UPDATE_KILLED_GOOMBA,
+                                 get_unique_id(BINGO_UPDATE_KILLED_GOOMBA, 1.0f, 2.0f, 3.0f)));
+}
+
 int main(void) {
     // BOARD_SEED=n prints that board instead of running tests. Handy for
     // comparing against what the ROM shows on screen, and used as the
@@ -724,5 +769,6 @@ int main(void) {
     RUN_TEST(test_sim_timed_star);
     RUN_TEST(test_sim_row_completion_wins);
     RUN_TEST(test_win_detection);
+    RUN_TEST(test_regeneration_resets_completion);
     return test_summary();
 }

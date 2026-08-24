@@ -78,6 +78,17 @@ struct UID {
 // I really hope nothing is actually at (0, 0, 0)....
 struct UID sIDTable[TOTAL_UIDS] = { { 0 } };
 
+void bingo_tracking_collectables_reset(void) {
+    s32 i;
+    for (i = 0; i < TOTAL_UIDS; i++) {
+        sIDTable[i].course = 0;
+        sIDTable[i].pos[0] = 0;
+        sIDTable[i].pos[1] = 0;
+        sIDTable[i].pos[2] = 0;
+        sIDTable[i].killed = 0;
+    }
+}
+
 void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) {
     enum BingoObjectiveUpdate i;
     s32 rangeLength = 0;

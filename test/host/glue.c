@@ -88,6 +88,12 @@ s32 bingo_net_race_decided(void) {
 s32 bingo_net_local_won(void) {
     return 0;
 }
+s32 bingo_net_dropped(void) {
+    return 0;
+}
+s32 bingo_net_local_cell_count(void) {
+    return 0;
+}
 
 // Splatoon lives in game/rendering code the tests don't build; the bingo
 // objective only reads the painted counter.

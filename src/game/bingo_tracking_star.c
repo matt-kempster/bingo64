@@ -14,6 +14,14 @@
 u32 gbCourseStars[25] = { 0 };
 u32 gbSecretStarFlags = 0;
 
+void bingo_tracking_star_reset(void) {
+    s32 i;
+    for (i = 0; i < 25; i++) {
+        gbCourseStars[i] = 0;
+    }
+    gbSecretStarFlags = 0;
+}
+
 void bingo_set_star(s16 course, s16 star) {
     if (course == -1) {
         gbSecretStarFlags |= (1 << star);

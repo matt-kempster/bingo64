@@ -6,6 +6,7 @@
 
 extern u32 gbCourseStars[25];
 
+void bingo_tracking_star_reset(void);
 void bingo_set_star(s16 course, s16 star);
 s32 bingo_get_course_count(enum CourseNum course);
 s32 bingo_get_star_count(void);

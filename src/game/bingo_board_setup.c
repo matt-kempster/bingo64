@@ -11,6 +11,8 @@
 #include "bingo_const.h"
 #include "bingo_objective_func.h"
 #include "bingo_objective_init.h"
+#include "bingo_tracking_collectables.h"
+#include "bingo_tracking_star.h"
 #include "segment2.h"
 #include "strcpy.h"
 #include "print.h"
@@ -502,6 +504,19 @@ void setup_bingo_objectives(u32 seed) {
     // Initialize random number subsystem
     init_genrand(seed);
     reset_weight_budgets();
+
+    // A new board is a new race: clear every piece of session state a
+    // previous race may have left behind (star/collectable tracking, the
+    // race clock, sticky star-select acts), or objectives re-complete
+    // from stale counts after EXIT GAME -> file select -> relaunch.
+    bingo_tracking_star_reset();
+    bingo_tracking_collectables_reset();
+    gbGlobalBingoTimer = 0;
+    gbBingosCompleted = 0;
+    gbBingoShowCongratsCounter = 0;
+    for (i = 0; i < COURSE_STAGES_COUNT; i++) {
+        gBingoStickyActNum[i] = 0;
+    }
 
     gBingoInitialized = 1;
     gBingoInitialSeed = seed;
