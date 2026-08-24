@@ -192,18 +192,17 @@ s32 bingo_net_display_color(s32 id) {
 static void apply_remote_claims(void) {
     s32 cell, claimer;
     while (network_poll_claim(&cell, &claimer)) {
-        s32 prevBingos = 0, newBingos = 0;
         if (cell < 0 || cell >= 25) {
             continue;
         }
         if (claimer >= 0 && claimer < 32) {
-            prevBingos = bingo_net_bingo_count(claimer);
             gBingoCellClaimers[cell] |= (u32) 1 << claimer;
-            newBingos = bingo_net_bingo_count(claimer);
         }
         if (claimer != network_local_id()) {
-            // Toast the peer's progress — as much of it as the room's
-            // claim-visibility tier shows.
+            // Toast the peer's progress. Since protocol v7 the relay
+            // only sends us a peer's claim under the OPEN tier — the
+            // other tiers arrive as aggregate M lines and toast in the
+            // network client — so a peer claim here always shows rich.
             s32 i;
             for (i = 0; i < NET_MAX_PLAYERS; i++) {
                 const struct NetPlayer *p = &gNetPlayers[i];
@@ -217,18 +216,7 @@ static void apply_remote_claims(void) {
                         p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
                         "completed", gBingoObjectives[cell].icon,
                         gBingoObjectives[cell].title);
-                } else if (gNetClaimVis == NET_CLAIMVIS_PROGRESS) {
-                    bingo_notice_rich(
-                        p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
-                        "completed a square", -1, NULL);
-                } else if (gNetClaimVis == NET_CLAIMVIS_BINGOS
-                           && newBingos > prevBingos) {
-                    bingo_notice_rich(
-                        p->name, gNetColorRGB[p->color % NET_COLOR_COUNT],
-                        newBingos == 1 ? "got a bingo"
-                                       : "got another bingo", -1, NULL);
                 }
-                // NET_CLAIMVIS_HIDDEN: silence until the finish line.
                 break;
             }
         }
@@ -380,6 +368,37 @@ s32 bingo_net_race_decided(void) {
 s32 bingo_net_local_won(void) {
     return network_active()
            && network_race_winner_id() == network_local_id();
+}
+
+// The progress the room's tier lets us show for a player: our own (and
+// everything under OPEN, or offline/dropped boards) comes from the local
+// claim map; a peer's under a hidden tier comes from the relay's
+// aggregate M lines (which is all we were sent).
+s32 bingo_net_shown_cell_count(s32 id) {
+    s32 n;
+    if (id == bingo_net_display_id() || gNetClaimVis == NET_CLAIMVIS_OPEN
+        || !network_active()) {
+        s32 i, count = 0;
+        u32 bit = (id >= 0 && id < 32) ? ((u32) 1 << id) : 0;
+        for (i = 0; i < 25; i++) {
+            if (gBingoCellClaimers[i] & bit) {
+                count++;
+            }
+        }
+        return count;
+    }
+    n = network_peer_cell_count(id);
+    return n >= 0 ? n : 0;
+}
+
+s32 bingo_net_shown_bingo_count(s32 id) {
+    s32 n;
+    if (id == bingo_net_display_id() || gNetClaimVis == NET_CLAIMVIS_OPEN
+        || !network_active()) {
+        return bingo_net_bingo_count(id);
+    }
+    n = network_peer_bingo_count(id);
+    return n >= 0 ? n : 0;
 }
 
 s32 bingo_net_race_timed_out(void) {
@@ -614,6 +633,14 @@ s32 bingo_net_race_timed_out(void) {
 }
 
 s32 bingo_net_race_tiebreak(void) {
+    return 0;
+}
+
+s32 bingo_net_shown_cell_count(UNUSED s32 id) {
+    return 0;
+}
+
+s32 bingo_net_shown_bingo_count(UNUSED s32 id) {
     return 0;
 }
 

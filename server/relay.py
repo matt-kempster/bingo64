@@ -122,7 +122,16 @@ Line protocol (space-separated fields):
                              delta means the race started -delta frames
                              ago (late joiner / reconnect).
     G <id> <level> <area> <x> <y> <z> <yaw> <animID> <animFrame>
-    C <cell> <id>            cell claim accepted (relayed to whole room)
+    C <cell> <id>            cell claim accepted. OPEN rooms: relayed to
+                             the whole room. Non-OPEN tiers (line modes
+                             only; lockout/blackout coerce to OPEN):
+                             sent only to the claimer, so a modified
+                             client cannot peek at hidden squares —
+                             everyone else hears M instead.
+    M <id> <cells> <bingos>  aggregate progress for one player, sent in
+                             place of their C under the PROGRESS/BINGOS
+                             tiers (a field the tier does not show is
+                             -1; HIDDEN sends neither C nor M).
     F <id> <place> <frames>  a racer finished (authoritative time)
     V <id> <frames>          lockout decided: winner and time
     T <id> <frames> <tiebreak>
@@ -506,6 +515,39 @@ class Room:
     def racer_ids(self):
         return set(self.members) | set(self.disconnected)
 
+    def player_progress_line(self, cid):
+        """The M line for one player under the room's visibility tier:
+        "M <id> <cells> <bingos>", a field the tier does not show is -1.
+        None when the tier shows everything (OPEN sends real claims) or
+        nothing (HIDDEN)."""
+        if self.claimvis == CLAIMVIS_OPEN or self.claimvis == CLAIMVIS_HIDDEN:
+            return None
+        cells = [c for c, ids in self.claims.items() if cid in ids]
+        if self.claimvis == CLAIMVIS_PROGRESS:
+            return "M %d %d -1" % (cid, len(cells))
+        cellset = set(cells)
+        bingos = sum(1 for line in BOARD_LINES
+                     if all(c in cellset for c in line))
+        return "M %d -1 %d" % (cid, bingos)
+
+    def relay_claim(self, cell, cid):
+        """Send an accepted claim to the room under the visibility tier.
+        The claimer always gets the real claim back (the server echo owns
+        their board attribution); what everyone else hears is the tier's
+        business: OPEN the real claim, PROGRESS/BINGOS the aggregate M
+        line, HIDDEN nothing. Lockout and blackout are coerced to OPEN,
+        so the modes whose game logic needs the shared claim map always
+        have it."""
+        line = "C %d %d" % (cell, cid)
+        if self.claimvis == CLAIMVIS_OPEN:
+            self.broadcast(line)
+            return
+        if cid in self.members:
+            self.members[cid].send(line)
+        progress = self.player_progress_line(cid)
+        if progress is not None:
+            self.broadcast(progress, skip=cid)
+
     def claim_counts(self):
         counts = {}
         for ids in self.claims.values():
@@ -655,9 +697,24 @@ class Relay:
                                          other.ready, True))
         for id_, (name, color) in sorted(room.disconnected.items()):
             client.send(room.roster_line(id_, name, color, False, False))
-        for cell, ids in sorted(room.claims.items()):
-            for cid in ids:
-                client.send("C %d %d" % (cell, cid))
+        if room.claimvis == CLAIMVIS_OPEN:
+            for cell, ids in sorted(room.claims.items()):
+                for cid in ids:
+                    client.send("C %d %d" % (cell, cid))
+        else:
+            # Non-OPEN tiers: your own claims verbatim, everyone else as
+            # one aggregate M line per player (nothing under HIDDEN).
+            claimers = set()
+            for cell, ids in sorted(room.claims.items()):
+                claimers.update(ids)
+                if client.id in ids:
+                    client.send("C %d %d" % (cell, client.id))
+            for cid in sorted(claimers):
+                if cid == client.id:
+                    continue
+                progress = room.player_progress_line(cid)
+                if progress is not None:
+                    client.send(progress)
         if room.started:
             client.send(room.start_line())
         for id_, place, frames in room.finishers:
@@ -852,7 +909,7 @@ class Relay:
             if room.started:
                 room.claim_seq.append((room.elapsed_frames(), client.id,
                                        cell))
-            room.broadcast("C %d %d" % (cell, client.id))
+            room.relay_claim(cell, client.id)
             print("[%s] room '%s': cell %d claimed by #%d %s"
                   % (ts(), room.name, cell, client.id, client.name))
             self.log.event("claim", room=room.name, id=client.id,

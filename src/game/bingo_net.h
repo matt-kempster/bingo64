@@ -30,6 +30,10 @@ s32 bingo_net_race_decided(void);     // an online winner exists (lockout)
 s32 bingo_net_local_won(void);        // ...and it is the local player
 s32 bingo_net_race_timed_out(void);   // the relay ended the race on time
 s32 bingo_net_race_tiebreak(void);    // ...and the winner won by tiebreak
+// Progress the room's visibility tier lets us show for a player (peers
+// under a hidden tier report the relay's aggregate, not the claim map).
+s32 bingo_net_shown_cell_count(s32 id);
+s32 bingo_net_shown_bingo_count(s32 id);
 s32 bingo_net_dropped(void);          // race lost its connection, board
                                       // still carries online claims
 

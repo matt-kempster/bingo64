@@ -219,6 +219,12 @@ static s32 sClaimHead = 0, sClaimTail = 0;
 #define MAX_ID 64
 static s8 sIdToSlot[MAX_ID];
 
+// Peer progress under a non-OPEN visibility tier: the relay withholds
+// which squares peers claimed (a modified client can no longer peek)
+// and sends aggregate M lines instead. -1 = nothing received.
+static s16 sPeerCells[MAX_ID];
+static s16 sPeerBingos[MAX_ID];
+
 #ifdef NET_SOCKETS_AVAILABLE
 
 static void net_fail(const char *msg) {
@@ -354,6 +360,8 @@ static void reset_race_state(void) {
     s32 i;
     for (i = 0; i < MAX_ID; i++) {
         sIdToSlot[i] = -1;
+        sPeerCells[i] = -1;
+        sPeerBingos[i] = -1;
     }
     memset(gNetGhosts, 0, sizeof(gNetGhosts));
     sClaimHead = sClaimTail = 0;
@@ -377,6 +385,8 @@ static void reset_room_state(void) {
     s32 i;
     for (i = 0; i < MAX_ID; i++) {
         sIdToSlot[i] = -1;
+        sPeerCells[i] = -1;
+        sPeerBingos[i] = -1;
     }
     memset(gNetGhosts, 0, sizeof(gNetGhosts));
     memset(gNetPlayers, 0, sizeof(gNetPlayers));
@@ -602,6 +612,28 @@ static void handle_line(char *line) {
                 sClaimCells[sClaimTail] = cell;
                 sClaimIds[sClaimTail] = id;
                 sClaimTail = next;
+            }
+        }
+    } else if (cmd == 'M') {
+        // Aggregate peer progress: the non-OPEN tiers' stand-in for a
+        // peer's claim (the relay no longer tells us which square).
+        // A field the tier does not show is -1.
+        s32 id, cells, bingos;
+        if (sscanf(line + 1, "%d %d %d", &id, &cells, &bingos) == 3
+            && id >= 0 && id < MAX_ID) {
+            if (cells >= 0) {
+                sPeerCells[id] = (s16) (cells <= 25 ? cells : 25);
+                if (id != sLocalId) {
+                    notice_about(id, "completed a square");
+                }
+            }
+            if (bingos >= 0) {
+                s32 prev = sPeerBingos[id];
+                sPeerBingos[id] = (s16) (bingos <= 12 ? bingos : 12);
+                if (id != sLocalId && bingos > prev && bingos > 0) {
+                    notice_about(id, bingos == 1 ? "got a bingo"
+                                                 : "got another bingo");
+                }
             }
         }
     } else if (cmd == 'B' || cmd == 'D') {
@@ -1512,6 +1544,14 @@ s32 network_race_winner_id(void) {
 
 s32 network_race_timed_out(void) {
     return sTimedOut;
+}
+
+s32 network_peer_cell_count(s32 id) {
+    return (id >= 0 && id < MAX_ID) ? sPeerCells[id] : -1;
+}
+
+s32 network_peer_bingo_count(s32 id) {
+    return (id >= 0 && id < MAX_ID) ? sPeerBingos[id] : -1;
 }
 
 s32 network_race_won_by_tiebreak(void) {

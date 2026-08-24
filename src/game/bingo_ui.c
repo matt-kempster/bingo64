@@ -500,12 +500,16 @@ void draw_bingo_win_screen() {
                                 -1, NULL, 255);
                 draw_win_hint(TRUE);
             } else {
+                s32 squares = bingo_net_shown_cell_count(winner);
                 if (myPlace > 1) {
                     sprintf(msg, "won the tiebreak - you took %d%s",
                             myPlace, ordinal_suffix(myPlace));
-                } else {
+                } else if (squares > 0) {
                     sprintf(msg, "won the tiebreak with %d squares",
-                            net_cell_count_of_id(winner));
+                            squares);
+                } else {
+                    // A hidden tier kept even the count from us.
+                    strcpy(msg, "won the tiebreak");
                 }
                 draw_quiet_line(-1, 60, net_name_of_id(winner),
                                 gNetColorRGB[network_color_of_id(winner)
@@ -856,7 +860,7 @@ void draw_bingo_screen() {
                 // count + square symbol, bingo milestones ("2 bingos"),
                 // or nothing at all. Your own row always shows.
                 if (self || gNetClaimVis <= NET_CLAIMVIS_PROGRESS) {
-                    sprintf(detail, "%d", net_cell_count_of_id(p->id));
+                    sprintf(detail, "%d", bingo_net_shown_cell_count(p->id));
                     print_generic_string_ascii_detail(
                         250 - get_string_width_ascii(detail), rowY - 12,
                         detail, 255, 255, 255, 255, TRUE, 1);
@@ -866,7 +870,7 @@ void draw_bingo_screen() {
                 } else if (gNetClaimVis == NET_CLAIMVIS_BINGOS) {
                     // Same table cell, star unit instead of the square:
                     // "2 * in BoB" = two bingos ('*' is the dialog ★).
-                    sprintf(detail, "%d", bingo_net_bingo_count(p->id));
+                    sprintf(detail, "%d", bingo_net_shown_bingo_count(p->id));
                     print_generic_string_ascii_detail(
                         250 - get_string_width_ascii(detail), rowY - 12,
                         detail, 255, 255, 255, 255, TRUE, 1);

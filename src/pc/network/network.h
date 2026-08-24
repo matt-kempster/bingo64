@@ -33,8 +33,10 @@
 #define NET_COLOR_COUNT 8
 
 // How much of other players' claim activity the room shows (a host-set
-// room setting; the client hides, the relay still relays — a modified
-// client could peek, fine for the playtest). Mirrored in relay.py.
+// room setting). Since v7 the relay enforces it: under a non-OPEN tier
+// peers' claims never reach the wire — the relay sends aggregate M
+// progress lines instead — so a modified client cannot peek. Mirrored
+// in relay.py.
 enum NetClaimVis {
     NET_CLAIMVIS_OPEN,      // chips + toasts + counts (the default)
     NET_CLAIMVIS_PROGRESS,  // claim counts only, not which squares
@@ -205,6 +207,10 @@ s32 network_local_place(void);
 s32 network_race_winner_id(void);
 // The relay ended the race at the room's timeout (T broadcast).
 s32 network_race_timed_out(void);
+// Aggregate peer progress from the relay's M lines (the non-OPEN tiers'
+// stand-in for peer claims). -1 = nothing received / tier withholds it.
+s32 network_peer_cell_count(s32 id);
+s32 network_peer_bingo_count(s32 id);
 // ...and the winner was decided by the tiebreak (not a regular finish).
 s32 network_race_won_by_tiebreak(void);
 

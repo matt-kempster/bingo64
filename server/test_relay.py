@@ -413,6 +413,53 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         s = (await b.wait_line("S ")).split()
         self.assertEqual((s[6], s[7], s[8]), ("2", "0", "0"))
 
+    async def test_v7_hidden_tiers_filter_claims(self):
+        a, b = await self.two_joined()
+        # PROGRESS tier in 1-bingo mode: peers hear M, never C.
+        a.send("O 0 0 0 0 1 1 0")
+        await b.wait_line("O 0 1 1")
+        a.send("X")
+        await b.wait_line("S ")
+        a.send("C 7")
+        m = (await b.wait_line("M 1 ", timeout=10)).split()
+        self.assertEqual(m[1:], ["1", "1", "-1"])   # count, bingos hidden
+        self.assertEqual(b.count("C 7"), 0)          # the cell never leaks
+        # The claimer still gets their own claim echoed back.
+        await a.wait_line("C 7 1")
+        # A full row under BINGOS-style aggregation: switch not possible
+        # mid-race, but more claims keep arriving as M with the count.
+        a.send("C 8")
+        m = (await b.wait_line("M 1 2", timeout=10)).split()
+        self.assertEqual(m[2], "2")
+        self.assertEqual(b.count("C 8"), 0)
+
+    async def test_v7_hidden_tier_snapshot_filtered(self):
+        a, b = await self.two_joined()
+        a.send("O 1 0 0 0 3 1 0")     # 2-bingo mode, HIDDEN tier
+        await b.wait_line("O 1 3 1")
+        a.send("X")
+        await b.wait_line("S ")
+        a.send("C 3")
+        b.send("C 4")
+        await a.wait_line("C 3 1", timeout=10)  # own echo
+        await b.wait_line("C 4 2", timeout=10)  # own echo
+        await asyncio.sleep(0.3)
+        self.assertEqual(b.count("C 3"), 0)      # hidden: no C, no M
+        self.assertEqual(b.count("M 1"), 0)
+        self.assertEqual(a.count("C 4"), 0)
+        # A reconnector's snapshot replays only their own claims.
+        token_b = int((await b.wait_line("W ")).split()[4])
+        b.close()
+        self._cleanup.remove(b)
+        b2 = self.track(RefClient(self.udp_port, keepalive=0.3))
+        await b2.start()
+        b2.join("testroom", "bob", token=token_b)
+        await b2.wait_line("S ")
+        await b2.wait_line("C 4 2", timeout=10)  # own claim replayed
+        await asyncio.sleep(0.3)
+        self.assertEqual(b2.count("C 3"), 0)     # alice's still hidden
+        self.assertEqual(b2.count("M "), 0)
+
     async def test_v7_timeout_setting(self):
         a, b = await self.two_joined()
         # The timeout rides O; off-menu values are coerced to off.
