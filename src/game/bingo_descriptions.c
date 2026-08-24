@@ -11,6 +11,7 @@
 #include "bingo_objective_func.h"
 #include "bingo_tracking_star.h"
 #include "bingo_objective_init.h"
+#include "level_update.h"
 #include "memory.h"
 #include "segment2.h"
 #include "strcpy.h"
@@ -441,6 +442,17 @@ void get_stars_multiple_levels_objective_desc(struct BingoObjective *obj, char *
     }
 }
 
+void get_lives_objective_desc(struct BingoObjective *obj, char *desc) {
+    char suffix[30];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Current: %d", gHudDisplay.lives);
+    }
+    sprintf(desc, "Get your life counter up to %d%s",
+            obj->data.collectableData.toGet, suffix);
+}
+
 void get_lose_hat_objective_desc(struct BingoObjective *obj, char *desc) {
     char suffix[20];
     if (obj->state == BINGO_STATE_COMPLETE) {
@@ -735,6 +747,9 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             get_stars_multiple_levels_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_LIVES:
+            get_lives_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             get_dangerous_wall_kicks_objective_desc(objective, desc);

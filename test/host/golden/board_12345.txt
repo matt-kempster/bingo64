@@ -1,25 +1,25 @@
-00 type=11 class=2 icon=16 title="TTM 10" course=12 toGet=10
-01 type=38 class=1 icon=39 title="x4" toGet=4
-02 type=11 class=1 icon=16 title="HMC 3" course=6 toGet=3
-03 type=02 class=1 icon=04 title="TTCú1" course=14 star=0
-04 type=23 class=0 icon=21 title="x4" toGet=4
-05 type=11 class=1 icon=16 title="WMotR 3" course=23 toGet=3
-06 type=00 class=0 icon=02 title="TTMú6" course=12 star=5
-07 type=25 class=1 icon=27 title="x7" toGet=7
-08 type=27 class=2 icon=26 title="x6" toGet=6
-09 type=11 class=1 icon=16 title="VCutM 3" course=22 toGet=3
-10 type=25 class=1 icon=27 title="x13" toGet=13
-11 type=30 class=1 icon=30 title="x6" toGet=6
-12 type=10 class=3 icon=12 title="WF 91" course=2 toGet=91
-13 type=02 class=1 icon=04 title="TTCú7" course=14 star=6
-14 type=01 class=1 icon=03 title="RRú2" course=15 star=1 maxTime=5790
-15 type=35 class=1 icon=36 title="x12" toGet=12
-16 type=28 class=2 icon=28 title="x25" toGet=25
-17 type=18 class=1 icon=24 title="x3" toGet=3
-18 type=21 class=0 icon=14 title="x4" toGet=4
-19 type=19 class=1 icon=25 title="x4" toGet=4
-20 type=22 class=0 icon=15 title="x5" toGetTotal=5 toGetEachCourse=1
-21 type=15 class=1 icon=19 title="6x 3c" toGetTotal=3 toGetEachCourse=6
-22 type=12 class=1 icon=17 title="LLL 3" course=7 toGet=3
-23 type=13 class=1 icon=18 title="TTMú3" course=12 toGet=2
-24 type=14 class=2 icon=42 title="RR 200" course=15 toGet=200
+00 type=23 class=2 icon=15 title="3x 4c" toGetTotal=4 toGetEachCourse=3
+01 type=28 class=1 icon=26 title="x6" toGet=6
+02 type=09 class=1 icon=11 title="LLLú2" course=7 star=1
+03 type=33 class=1 icon=32 title="x9" toGet=9
+04 type=42 class=0 icon=43 title="x5" toGet=5
+05 type=42 class=1 icon=43 title="x4" toGet=4
+06 type=14 class=0 icon=42 title="BOB 60" course=1 toGet=60
+07 type=28 class=1 icon=26 title="x7" toGet=7
+08 type=20 class=2 icon=44 title="x13" toGet=13
+09 type=26 class=1 icon=27 title="x8" toGet=8
+10 type=13 class=1 icon=18 title="LLLú3" course=7 toGet=2
+11 type=41 class=1 icon=41 title="x3" toGet=3
+12 type=21 class=3 icon=13 title="327" toGet=327
+13 type=13 class=1 icon=18 title="BBHú4" course=5 toGet=3
+14 type=17 class=1 icon=23 title="x1" toGet=0
+15 type=39 class=1 icon=39 title="x9" toGet=9
+16 type=08 class=2 icon=10 title="BBHú3" course=5 star=2
+17 type=33 class=1 icon=32 title="x7" toGet=7
+18 type=10 class=0 icon=12 title="RR 32" course=15 toGet=32
+19 type=30 class=1 icon=29 title="x13" toGet=13
+20 type=25 class=0 icon=20 title="x3" toGet=3
+21 type=37 class=1 icon=37 title="x14" toGet=14
+22 type=01 class=1 icon=03 title="BBHú3" course=5 star=2 maxTime=1440
+23 type=10 class=1 icon=12 title="TTC 67" course=14 toGet=67
+24 type=22 class=2 icon=14 title="x12" toGet=12

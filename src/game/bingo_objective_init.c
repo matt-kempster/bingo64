@@ -641,6 +641,26 @@ s32 bingo_objective_dangerous_wall_kicks_init(
     objective->data.multiCourseCollectableData.gottenThisCourse = 0;
 }
 
+s32 bingo_objective_lives_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 lives;
+
+    // Everyone starts a race at 4 lives, so the target is the net climb
+    // from there; deaths set you back on the way.
+    switch (class) {
+        case BINGO_CLASS_MEDIUM:
+            lives = random_range_inclusive(8, 10);
+            break;
+        default:
+            lives = random_range_inclusive(12, 15);
+            break;
+    }
+
+    objective->data.collectableData.toGet = lives;
+    objective->data.collectableData.gotten = 0;
+}
+
 s32 bingo_objective_racing_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
@@ -1016,6 +1036,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_stars_in_level_init(objective, class);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return bingo_objective_stars_multiple_levels_init(objective, class);
+        case BINGO_OBJECTIVE_LIVES:
+            return bingo_objective_lives_init(objective, class);
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             return bingo_objective_dangerous_wall_kicks_init(objective, class);
         case BINGO_OBJECTIVE_RACING_STARS:

@@ -256,6 +256,17 @@ void bingo_update(enum BingoObjectiveUpdate update) {
         return;
     }
 
+    // The lives objective tracks the HUD's life counter. Watch it on the
+    // frame tick and re-enter with a real event when it moves, because
+    // timer updates themselves are excluded from the win check below.
+    if (update == BINGO_UPDATE_TIMER_FRAME_GLOBAL) {
+        static s16 sPrevLives = 0;
+        if (gHudDisplay.lives != sPrevLives) {
+            sPrevLives = gHudDisplay.lives;
+            bingo_update(BINGO_UPDATE_LIVES);
+        }
+    }
+
     for (i = 0; i < 25; i++) {
         update_objective(&gBingoObjectives[i], update);
     }

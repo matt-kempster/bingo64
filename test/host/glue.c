@@ -3,7 +3,9 @@
 
 #include <ultra64.h>
 #include "types.h"
+#include "level_update.h"
 
+struct HudDisplay gHudDisplay = { 0 };
 s16 gCurrCourseNum = 0;
 s16 gCurrLevelNum = 0;
 s16 gTTCSpeedSetting = 0;

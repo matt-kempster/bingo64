@@ -5,4 +5,17 @@
 
 extern s16 gTTCSpeedSetting;
 
+// Mirrors the fields bingo code reads from the real struct.
+struct HudDisplay {
+    s16 lives;
+    s16 coins;
+    s16 stars;
+    s16 wedges;
+    s16 keys;
+    s16 flags;
+    u16 timer;
+};
+
+extern struct HudDisplay gHudDisplay;
+
 #endif

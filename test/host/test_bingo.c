@@ -11,6 +11,7 @@
 #include "splatoon.h"
 #include "bingo_tracking_collectables.h"
 #include "bingo_tracking_star.h"
+#include "level_update.h"
 
 // From glue.c: records bingo_hud_update_number calls.
 extern s32 gGlueHudNumberCalls;
@@ -701,6 +702,37 @@ static void test_sim_stars_multiple_levels_k(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
 
+static void test_sim_total_lives(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_LIVES;
+    o->data.collectableData.toGet = 6;
+    o->data.collectableData.gotten = 0;
+
+    // The frame tick watches the HUD lives counter and feeds the
+    // objective whenever it moves.
+    gHudDisplay.lives = 4;
+    bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 4);
+
+    // Down into the negatives: still nothing, and the climb restarts
+    // from wherever the counter actually is.
+    gHudDisplay.lives = -3;
+    bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, -3);
+
+    gHudDisplay.lives = 5;
+    bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    // Reaching the target number completes it.
+    gHudDisplay.lives = 6;
+    bingo_update(BINGO_UPDATE_TIMER_FRAME_GLOBAL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
 static void test_sim_row_completion_wins(void) {
     int i;
     reset_sim();
@@ -869,6 +901,7 @@ int main(void) {
     RUN_TEST(test_sim_timed_star);
     RUN_TEST(test_sim_stars_in_level_k);
     RUN_TEST(test_sim_stars_multiple_levels_k);
+    RUN_TEST(test_sim_total_lives);
     RUN_TEST(test_sim_row_completion_wins);
     RUN_TEST(test_win_detection);
     RUN_TEST(test_regeneration_resets_completion);

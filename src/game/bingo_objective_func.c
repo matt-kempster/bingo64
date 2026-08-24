@@ -21,6 +21,7 @@
 #include "bingo_tracking_collectables.h"
 #include "object_list_processor.h"
 #include "object_constants.h"
+#include "level_update.h"
 
 
 s32 objective_obtain_star(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
@@ -295,6 +296,24 @@ s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum Bingo
     }
 }
 
+s32 objective_total_lives(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+    s32 lives;
+    // BINGO_UPDATE_LIVES fires whenever the HUD's life counter changes, so
+    // this tracks exactly what the player sees. Reaching the target from
+    // below is what completes it; dropping to -3 means climbing all the
+    // way back.
+    if (update == BINGO_UPDATE_LIVES) {
+        lives = gHudDisplay.lives;
+        if (lives >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (lives > data->gotten) {
+            bingo_hud_update_number(objective->icon, lives);
+        }
+        data->gotten = lives;
+    }
+}
+
 s32 objective_flags_collectable(
     struct BingoObjective *objective,
     enum BingoObjectiveUpdate update,
@@ -474,6 +493,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_secrets_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
+        case BINGO_OBJECTIVE_LIVES:
+            return objective_total_lives(objective, update);
         case BINGO_OBJECTIVE_BOWSER:
             return objective_bowser(objective, update);
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
