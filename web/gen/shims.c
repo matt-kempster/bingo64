@@ -76,6 +76,21 @@ void splatoon_clear(void) {
     gSplatoonTotalFloors = 0;
 }
 
+// The total-lives description prints the live HUD counter ("Current: N");
+// the generator has no HUD, so a fresh board always describes 4 lives.
+// (Layout mirrors struct HudDisplay in game/level_update.h, which pulls
+// in too much of the game to include here.)
+struct HudDisplay {
+    s16 lives;
+    s16 coins;
+    s16 stars;
+    s16 wedges;
+    s16 keys;
+    s16 flags;
+    u16 timer;
+};
+struct HudDisplay gHudDisplay = { 4, 0, 0, 8, 0, 0, 0 };
+
 // Same as the game's random_u16 in behavior_script.c: low 16 bits of the
 // Mersenne Twister output.
 unsigned long genrand_int32(void);

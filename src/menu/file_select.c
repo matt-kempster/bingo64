@@ -199,9 +199,9 @@ s32 sBingoOptionSelection = 0;
 // mean something in an online room; solo shows mode/unlock/timeout/
 // toggle-all. All uses are runtime expressions, so the count may vary
 // per frame — the objective list below the configs reflows with it.
-#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 6 : 4)
+#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 7 : 5)
 #else
-#define BINGO_CONFIGS_IN_LEFT_COL 4 // not more than 10, hopefully
+#define BINGO_CONFIGS_IN_LEFT_COL 5 // not more than 10, hopefully
 #endif
 #define BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE (BINGO_ENTRIES_PER_COL - BINGO_CONFIGS_IN_LEFT_COL)
 #define BINGO_INSTRUCTIONS_IN_RIGHT_COL 3
@@ -1584,6 +1584,11 @@ static unsigned char textTimeout30[] = { TEXT_TIMEOUT_30 };
 static unsigned char textTimeout45[] = { TEXT_TIMEOUT_45 };
 static unsigned char textTimeout60[] = { TEXT_TIMEOUT_60 };
 static unsigned char textToggleAll[] = { TEXT_TOGGLE_ALL };
+static unsigned char textPreset[] = { TEXT_PRESET };
+static unsigned char textPresetSrl[] = { TEXT_PRESET_SRL };
+static unsigned char textPresetVanilla[] = { TEXT_PRESET_VANILLA };
+static unsigned char textPresetCasual[] = { TEXT_PRESET_CASUAL };
+static unsigned char textPresetCustom[] = { TEXT_PRESET_CUSTOM };
 static unsigned char textEmpty[] = { 0xFF };
 
 #ifndef TARGET_N64
@@ -1828,6 +1833,24 @@ static s32 bingo_config_timeout(s32 i, u8 **target) {
     return bingo_config_value_x(*target);
 }
 
+// The Preset row: stamp a named objective/unlock loadout. The shown value
+// is computed by matching the current state, so hand-editing any toggle
+// afterwards reads back as Custom (which cycles to the first preset).
+static s32 bingo_config_preset(s32 i, u8 **target) {
+    if (sToggleCurrentOption && sBingoOptionSelection == i) {
+        s32 cur = bingo_preset_current();
+        sToggleCurrentOption = 0;
+        bingo_preset_apply((cur + 1) % BINGO_PRESET_COUNT);
+    }
+    switch (bingo_preset_current()) {
+        case BINGO_PRESET_SRL:     *target = textPresetSrl;     break;
+        case BINGO_PRESET_VANILLA: *target = textPresetVanilla; break;
+        case BINGO_PRESET_CASUAL:  *target = textPresetCasual;  break;
+        default:                   *target = textPresetCustom;  break;
+    }
+    return bingo_config_value_x(*target);
+}
+
 #ifndef TARGET_N64
 // The Claims row's value text and its right-ish x offset, tier-aware.
 static s32 bingo_config_claimvis(s32 i, u8 **target) {
@@ -1862,9 +1885,12 @@ static void print_bingo_configs() {
     s32 cfgs = BINGO_CONFIGS_IN_LEFT_COL;
     for (i = 0; i < cfgs; i++) {
         if (i == 0) {
+            label = textPreset;
+            offsetX = bingo_config_preset(i, &target);
+        } else if (i == 1) {
             label = textGameMode;
             offsetX = bingo_config_target(i, &target);
-        } else if (i == 1) {
+        } else if (i == 2) {
             label = textUnlockGame;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
@@ -1876,14 +1902,14 @@ static void print_bingo_configs() {
                 target = textOn;
             }
             offsetX = bingo_config_value_x(target);
-        } else if (i == 2) {
+        } else if (i == 3) {
             label = textTimeout;
             offsetX = bingo_config_timeout(i, &target);
 #ifndef TARGET_N64
-        } else if (i == 3 && cfgs == 6) {
+        } else if (i == 4 && cfgs == 7) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 4 && cfgs == 6) {
+        } else if (i == 5 && cfgs == 7) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;

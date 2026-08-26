@@ -201,6 +201,14 @@
 #define TEXT_UNLOCK_GAME _("Unlock full game")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 
+// Objective presets (the Preset row stamps a loadout of the objective
+// toggles + the unlock flag; Custom is display-only, never selectable).
+#define TEXT_PRESET _("Preset")
+#define TEXT_PRESET_SRL _("SRL")
+#define TEXT_PRESET_VANILLA _("Vanilla")
+#define TEXT_PRESET_CASUAL _("Casual")
+#define TEXT_PRESET_CUSTOM _("Custom")
+
 // Race timeout (v7 room setting; the race ends at the limit and ties
 // are broken by progress, see relay.py timeout_rank).
 #define TEXT_TIMEOUT _("Timeout")

@@ -360,6 +360,29 @@ struct BingoObjective
 extern struct BingoObjective gBingoObjectives[25];
 extern u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT];
 
+// Objective presets: named loadouts of the objective toggles plus the
+// full-game-unlock flag. Applying one is a stamp, not a mode — the
+// individual toggles stay editable afterwards, and the menu shows the
+// preset name only while the state still matches it exactly.
+enum BingoPresetId {
+    BINGO_PRESET_SRL,
+    BINGO_PRESET_VANILLA,
+    BINGO_PRESET_CASUAL,
+    BINGO_PRESET_COUNT
+};
+
+struct BingoPreset {
+    u64 objectivesDisabled; // bit i = enum BingoObjectiveType i disabled
+    u8 fullGameUnlocked;
+    enum BingoGameMode mode;
+};
+
+extern const struct BingoPreset gBingoPresets[BINGO_PRESET_COUNT];
+
+void bingo_preset_apply(enum BingoPresetId preset);
+// The preset the current toggles + unlock flag match, or -1 (custom).
+s32 bingo_preset_current(void);
+
 // Online: bit i set = the room's player with id i claimed this cell (line
 // modes allow several claimants per cell). Always all-zero on N64/offline.
 extern u32 gBingoCellClaimers[25];

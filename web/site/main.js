@@ -6,6 +6,7 @@ const NUM_TYPES = M._gen_num_objective_types();
 const VERSION = M.UTF8ToString(M._gen_version());
 const OPTIONS = JSON.parse(M.UTF8ToString(M._gen_options_json()));
 const OPTION_LABELS = new Map(OPTIONS.map((opt) => [opt.type, opt.label]));
+const PRESETS = JSON.parse(M.UTF8ToString(M._gen_presets_json()));
 
 // 0xFA is the in-game filled-star glyph; titles carry it as U+00FA.
 const STAR_BYTE = 'ú';
@@ -171,6 +172,35 @@ function render() {
 
   const offCount = state.off.size;
   $('optionsSummary').textContent = offCount > 0 ? `(${offCount} turned off)` : '';
+  syncPresetButtons();
+}
+
+// The active preset is computed, never stored: a button highlights only
+// while the disabled set matches it exactly (same rule as the game's
+// Preset row, minus unlock/mode, which don't exist here).
+function presetMatches(preset) {
+  return preset.off.length === state.off.size
+      && preset.off.every((t) => state.off.has(t));
+}
+
+function buildPresetButtons() {
+  const span = $('presets');
+  for (const preset of PRESETS) {
+    const btn = el('button', 'preset', preset.name);
+    btn.addEventListener('click', () => {
+      state.off = new Set(preset.off);
+      syncOptionCheckboxes();
+      render();
+    });
+    span.appendChild(btn);
+  }
+}
+
+function syncPresetButtons() {
+  const buttons = $('presets').querySelectorAll('button');
+  PRESETS.forEach((preset, i) => {
+    buttons[i].classList.toggle('active', presetMatches(preset));
+  });
 }
 
 function el(tag, className, text) {
@@ -295,4 +325,5 @@ window.addEventListener('hashchange', () => {
 $('version').textContent = VERSION;
 readHash();
 buildOptionsList();
+buildPresetButtons();
 render();

@@ -848,6 +848,42 @@ static void test_solo_timeout(void) {
     gbGlobalBingoTimer = 0;
 }
 
+// ---------------------------------------------------------------------------
+// Presets: each one must round-trip through the match function and must
+// always be able to fill a board — no disabled type may appear in any
+// cell, even where a preset starves a difficulty class down to a few
+// entries (the generator's uniform fallback has to cover those draws).
+
+static void test_presets_generate_clean_boards(void) {
+    s32 p;
+    u32 seed;
+    int i;
+
+    for (p = 0; p < BINGO_PRESET_COUNT; p++) {
+        bingo_preset_apply(p);
+        CHECK_EQ_INT(bingo_preset_current(), p);
+        for (seed = 1; seed <= 200; seed++) {
+            generate_board(seed);
+            for (i = 0; i < 25; i++) {
+                struct BingoObjective *o = &gBingoObjectives[i];
+                CHECK(o->initialized);
+                CHECK(!gBingoObjectivesDisabled[o->type]);
+                if (gCurrentTestFailed) {
+                    printf("  (preset %d, seed %u, cell %d, type %d)\n",
+                           (int) p, seed, i, o->type);
+                    return;
+                }
+            }
+        }
+    }
+
+    // Restore boot defaults for the other tests.
+    memset(gBingoObjectivesDisabled, 0, sizeof(gBingoObjectivesDisabled));
+    gBingoFullGameUnlocked = 1;
+    gbBingoMode = BINGO_MODE_LINE_1;
+    CHECK_EQ_INT(bingo_preset_current(), -1);
+}
+
 int main(void) {
     // BOARD_SEED=n prints that board instead of running tests. Handy for
     // comparing against what the ROM shows on screen, and used as the
@@ -906,5 +942,6 @@ int main(void) {
     RUN_TEST(test_win_detection);
     RUN_TEST(test_regeneration_resets_completion);
     RUN_TEST(test_solo_timeout);
+    RUN_TEST(test_presets_generate_clean_boards);
     return test_summary();
 }

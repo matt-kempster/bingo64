@@ -153,6 +153,37 @@ const char *gen_options_json(void) {
     return sBuf;
 }
 
+// Objective presets, mirroring the game's Preset row. The web generator
+// has no unlock or game-mode concepts, so only the objective mask crosses
+// over, as a list of disabled type numbers. Names must stay plain ASCII
+// (the game's labels live in the menu charmap); keep in sync with
+// enum BingoPresetId.
+static const char *sPresetNames[BINGO_PRESET_COUNT] = { "SRL", "Vanilla", "Casual" };
+
+EMSCRIPTEN_KEEPALIVE
+const char *gen_presets_json(void) {
+    s32 p, t;
+    int first;
+
+    sLen = 0;
+    emitf("[");
+    for (p = 0; p < BINGO_PRESET_COUNT; p++) {
+        emitf(p == 0 ? "{" : ",{");
+        emit_json_str("name", sPresetNames[p]);
+        emitf(",\"off\":[");
+        first = 1;
+        for (t = 0; t < BINGO_OBJECTIVE_TOTAL_AMOUNT; t++) {
+            if ((gBingoPresets[p].objectivesDisabled >> t) & 1) {
+                emitf(first ? "%d" : ",%d", t);
+                first = 0;
+            }
+        }
+        emitf("]}");
+    }
+    emitf("]");
+    return sBuf;
+}
+
 // Raw 16x16 RGBA16 texture bytes (512 of them) for a board icon.
 EMSCRIPTEN_KEEPALIVE
 const u8 *gen_icon_rgba16(s32 icon) {
@@ -205,6 +236,7 @@ static void emit_cell_json(int i) {
                   o->data.courseCollectableData.course, o->data.courseCollectableData.toGet);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             emitf(",\"toGetTotal\":%d,\"toGetEachCourse\":%d",
                   o->data.multiCourseCollectableData.toGetTotal,
                   o->data.multiCourseCollectableData.toGetEachCourse);
@@ -283,6 +315,7 @@ static void emit_cell_dump(int i) {
                   o->data.courseCollectableData.course, o->data.courseCollectableData.toGet);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             emitf(" toGetTotal=%d toGetEachCourse=%d",
                   o->data.multiCourseCollectableData.toGetTotal,
                   o->data.multiCourseCollectableData.toGetEachCourse);

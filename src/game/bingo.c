@@ -62,6 +62,71 @@ s8 gBingoStickyActNum[COURSE_STAGES_COUNT] = { 0 };
 struct BingoObjective gBingoObjectives[25];
 u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
 
+#define OBJ_BIT(name) ((u64) 1 << BINGO_OBJECTIVE_##name)
+#define ALL_OBJECTIVES ((((u64) 1) << BINGO_OBJECTIVE_TOTAL_AMOUNT) - 1)
+
+// SRL-style boards are star/coin/level goals in an unmodified game;
+// modifiers, timers, and counter-grinding collectables are all off.
+#define PRESET_SRL_ENABLED \
+    (OBJ_BIT(STAR) | OBJ_BIT(COIN) | OBJ_BIT(STARS_IN_LEVEL) | OBJ_BIT(BOWSER) \
+     | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(RACING_STARS) | OBJ_BIT(SECRETS_STARS) \
+     | OBJ_BIT(MULTICOIN) | OBJ_BIT(MULTISTAR) | OBJ_BIT(STARS_MULTIPLE_LEVELS) \
+     | OBJ_BIT(RED_COIN))
+
+// Everything that couldn't happen under vanilla rules: the game-modifying
+// stars, splatoon, ordered reds, and forced-timer stars. (TTC Random stays:
+// the clock setting is a vanilla mechanic.)
+#define PRESET_VANILLA_DISABLED \
+    (OBJ_BIT(STAR_TIMED) | OBJ_BIT(STAR_CLICK_GAME) \
+     | OBJ_BIT(STAR_REVERSE_JOYSTICK) | OBJ_BIT(STAR_GREEN_DEMON) \
+     | OBJ_BIT(STAR_DAREDEVIL) | OBJ_BIT(RANDOM_RED_COINS) | OBJ_BIT(SPLATOON))
+
+// Casual keeps the fun modifiers (daredevil, splatoon) but drops anything
+// timed or execution-heavy.
+#define PRESET_CASUAL_DISABLED \
+    (OBJ_BIT(STAR_TIMED) | OBJ_BIT(STAR_A_BUTTON_CHALLENGE) \
+     | OBJ_BIT(STAR_B_BUTTON_CHALLENGE) | OBJ_BIT(STAR_Z_BUTTON_CHALLENGE) \
+     | OBJ_BIT(STAR_CLICK_GAME) | OBJ_BIT(STAR_REVERSE_JOYSTICK) \
+     | OBJ_BIT(STAR_GREEN_DEMON) | OBJ_BIT(DANGEROUS_WALL_KICKS) \
+     | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(BLJ))
+
+// Rows in enum BingoPresetId order. SRL races start from a fresh file
+// (unlock OFF) and play the modern head-to-head format (lockout).
+const struct BingoPreset gBingoPresets[BINGO_PRESET_COUNT] = {
+    { ALL_OBJECTIVES & ~PRESET_SRL_ENABLED, 0, BINGO_MODE_LOCKOUT },
+    { PRESET_VANILLA_DISABLED,              1, BINGO_MODE_LINE_1 },
+    { PRESET_CASUAL_DISABLED,               1, BINGO_MODE_LINE_1 },
+};
+
+void bingo_preset_apply(enum BingoPresetId preset) {
+    s32 i;
+    u64 mask = gBingoPresets[preset].objectivesDisabled;
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
+    }
+    gBingoFullGameUnlocked = gBingoPresets[preset].fullGameUnlocked;
+    gbBingoMode = gBingoPresets[preset].mode;
+}
+
+s32 bingo_preset_current(void) {
+    s32 p;
+    s32 i;
+    u64 mask = 0;
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        if (gBingoObjectivesDisabled[i]) {
+            mask |= (u64) 1 << i;
+        }
+    }
+    for (p = 0; p < BINGO_PRESET_COUNT; p++) {
+        if (gBingoPresets[p].objectivesDisabled == mask
+            && gBingoPresets[p].fullGameUnlocked == (gBingoFullGameUnlocked != 0)
+            && gBingoPresets[p].mode == gbBingoMode) {
+            return p;
+        }
+    }
+    return -1;
+}
+
 
 void disable_bingo_modifiers() {
     if (gBingoClickGameActive) {

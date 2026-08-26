@@ -76,7 +76,7 @@ $(DIST)/bingo64gen.mjs: $(GAME_OBJS) $(WEB_OBJS) | $(DIST)
 		-sMODULARIZE=1 -sEXPORT_ES6=1 \
 		-sENVIRONMENT=web,worker,node \
 		-sALLOW_MEMORY_GROWTH=1 \
-		-sEXPORTED_FUNCTIONS=_gen_board_json,_gen_board_dump,_gen_options_json,_gen_icon_rgba16,_gen_num_objective_types,_gen_version,_malloc,_free \
+		-sEXPORTED_FUNCTIONS=_gen_board_json,_gen_board_dump,_gen_options_json,_gen_presets_json,_gen_icon_rgba16,_gen_num_objective_types,_gen_version,_malloc,_free \
 		-sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8
 
 # Byte-compares the WASM generator against the goldens and against the

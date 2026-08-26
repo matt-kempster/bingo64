@@ -83,6 +83,12 @@ summary:hover { color: var(--text); }
 
 .options-actions p { margin: 0; color: var(--dim); font-size: 0.85rem; }
 
+#presets { display: inline-flex; gap: 6px; }
+button.preset.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .options-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
