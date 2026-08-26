@@ -26,22 +26,25 @@ struct ObjectiveWeight {
 #define NO_LIMIT -1
 
 struct ObjectiveWeight sWeightsEasy[] = {
-    { BINGO_OBJECTIVE_COIN, 12, 2 },
+    { BINGO_OBJECTIVE_COIN, 12, 1 },
     { BINGO_OBJECTIVE_SPLATOON, 8, 1 },
-    { BINGO_OBJECTIVE_STAR, 12, 3 },
+    { BINGO_OBJECTIVE_STAR, 12, NO_LIMIT },
     { BINGO_OBJECTIVE_LOSE_MARIO_HAT, 12, 1 },
     { BINGO_OBJECTIVE_UNIQUE_DEATHS, 8, 1 },
     { BINGO_OBJECTIVE_BLJ, 12, 1 },
-    { BINGO_OBJECTIVE_RACING_STARS, 12, 1 },
+    { BINGO_OBJECTIVE_RACING_STARS, 6, 1 },
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
-    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 6, 1 },
+    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
 };
 s32 sWeightsSizeEasy = sizeof(sWeightsEasy) / sizeof(struct ObjectiveWeight);
 
 struct ObjectiveWeight sWeightsMedium[] = {
-    { BINGO_OBJECTIVE_COIN, 12, NO_LIMIT },
+    // COIN's budget and STAR's unlimited uses keep heavily-masked configs
+    // (the SRL preset above all) star-driven once the rarer entries drain;
+    // with everything enabled neither change is ever reached in practice.
+    { BINGO_OBJECTIVE_COIN, 12, 1 },
     { BINGO_OBJECTIVE_SPLATOON, 8, 2 },
-    { BINGO_OBJECTIVE_STAR, 6, 2 },
+    { BINGO_OBJECTIVE_STAR, 20, NO_LIMIT },
     { BINGO_OBJECTIVE_KILL_GOOMBAS, 6, 2 },
     { BINGO_OBJECTIVE_KILL_BOBOMBS, 6, 2 },
     { BINGO_OBJECTIVE_KILL_SPINDRIFTS, 6, 1 },
@@ -59,33 +62,34 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_STAR_CLICK_GAME, 8, 2 },
     { BINGO_OBJECTIVE_RANDOM_RED_COINS, 12, 3 },
     { BINGO_OBJECTIVE_1UPS_IN_LEVEL, 12, NO_LIMIT },
-    { BINGO_OBJECTIVE_STARS_IN_LEVEL, 8, 1 },
+    { BINGO_OBJECTIVE_STARS_IN_LEVEL, 8, 2 },
     { BINGO_OBJECTIVE_LIVES, 8, 1 },
     { BINGO_OBJECTIVE_UNIQUE_DEATHS, 8, 1 },
     { BINGO_OBJECTIVE_SIGNPOST, 12, 2 },
     { BINGO_OBJECTIVE_SHOOT_CANNONS, 12, 2 },
     { BINGO_OBJECTIVE_RED_COIN, 12, 2 },
     { BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX, 8, 2 },
-    { BINGO_OBJECTIVE_SECRETS_STARS, 8, 1 },
+    { BINGO_OBJECTIVE_SECRETS_STARS, 8, 2 },
     { BINGO_OBJECTIVE_RACING_STARS, 4, 1 },
     { BINGO_OBJECTIVE_WING_CAP_BOX, 4, 2 },
     { BINGO_OBJECTIVE_VANISH_CAP_BOX, 4, 2 },
     { BINGO_OBJECTIVE_METAL_CAP_BOX, 4, 2 },
     { BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS, 12, 1 },
-    { BINGO_OBJECTIVE_MULTISTAR, 6, NO_LIMIT },
-    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 6, 1 },
-    { BINGO_OBJECTIVE_BOWSER, 4, 1 },
-    { BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, 2, 1 },
+    { BINGO_OBJECTIVE_MULTISTAR, 6, 2 },
+    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_BOWSER, 6, 1 },
+    { BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, 4, 1 },
 };
 s32 sWeightsSizeMedium = sizeof(sWeightsMedium) / sizeof(struct ObjectiveWeight);
 
 struct ObjectiveWeight sWeightsHard[] = {
+    { BINGO_OBJECTIVE_STAR, 16, NO_LIMIT },
     { BINGO_OBJECTIVE_STAR_TIMED, 12, 1 },
     { BINGO_OBJECTIVE_SPLATOON, 8, 2 },
     { BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE, 12, 2 },
     { BINGO_OBJECTIVE_1UPS_IN_LEVEL, 12, 1 },
-    { BINGO_OBJECTIVE_STARS_IN_LEVEL, 12, NO_LIMIT },
-    { BINGO_OBJECTIVE_MULTICOIN, 4, NO_LIMIT },
+    { BINGO_OBJECTIVE_STARS_IN_LEVEL, 16, NO_LIMIT },
+    { BINGO_OBJECTIVE_MULTICOIN, 8, NO_LIMIT },
     { BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK, 16, NO_LIMIT },
     { BINGO_OBJECTIVE_STAR_CLICK_GAME, 8, NO_LIMIT },
     { BINGO_OBJECTIVE_STAR_GREEN_DEMON, 12, NO_LIMIT },
@@ -99,13 +103,13 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_KILL_CHUCKYAS, 6, 1 },
     { BINGO_OBJECTIVE_SIGNPOST, 12, 1 },
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
-    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 6, 1 },
+    { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_LIVES, 8, 1 },
 };
 s32 sWeightsSizeHard = sizeof(sWeightsHard) / sizeof(struct ObjectiveWeight);
 
 struct ObjectiveWeight sWeightsCenter[] = {
-    { BINGO_OBJECTIVE_COIN, 12, NO_LIMIT },
+    { BINGO_OBJECTIVE_COIN, 8, NO_LIMIT },
     { BINGO_OBJECTIVE_KILL_GOOMBAS, 6, 1 },
     { BINGO_OBJECTIVE_KILL_BOBOMBS, 6, 1 },
     { BINGO_OBJECTIVE_MULTICOIN, 12, NO_LIMIT },
@@ -204,21 +208,31 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
             size = sWeightsSizeCenter;
             break;
     }
-    sum = 0.0f;
+    // Disabled objectives leave the draw entirely (rather than being
+    // drawn and rejected by the caller), so heavy masks — presets, or a
+    // hand-picked few — keep the class structure and relative weights of
+    // whatever remains. With nothing disabled this consumes the same
+    // random stream as it always did (golden boards depend on that).
+    sum = 0;
     for (i = 0; i < size; i++) {
-        if (weights[i].usesRemaining != 0) {
+        if (weights[i].usesRemaining != 0
+            && !gBingoObjectivesDisabled[weights[i].objective]) {
             sum += weights[i].weight;
         }
     }
-    // TODO: if sum is 0, choose completely randomly
-    // (while initializing usesRemaining given disabled objs)
+    if (sum == 0) {
+        // Every in-budget entry in this class is disabled: nothing to
+        // draw. The caller falls back to uniform-over-enabled.
+        return NULL;
+    }
     want_sum = random_u16() % sum;
 
     i = -1;
     sum = 0;
     do {
         i++;
-        if (weights[i].usesRemaining != 0) {
+        if (weights[i].usesRemaining != 0
+            && !gBingoObjectivesDisabled[weights[i].objective]) {
             sum += weights[i].weight;
         }
     } while (sum < want_sum);
@@ -236,6 +250,14 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
 
     while (attempts > 0) {
         candidate = get_random_objective_type(class);
+        if (candidate == NULL) {
+            // The whole class table is disabled or out of budget under
+            // this mask; fall through to uniform-over-enabled.
+            break;
+        }
+        // The draw is filtered, but the want_sum == 0 edge can still hand
+        // back an ineligible first row (the budget-leak known bug), so
+        // keep the check-and-retry.
         if (!gBingoObjectivesDisabled[candidate->objective]) {
             if (candidate->usesRemaining != NO_LIMIT) {
                 candidate->usesRemaining--;
@@ -244,7 +266,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
         }
         attempts--;
     }
-    // Tried a few times; just give up and get a completely random objective
+    // No weighted pick possible; get a completely random enabled objective
     for (i = BINGO_OBJECTIVE_TYPE_MIN; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
         if (!gBingoObjectivesDisabled[i]) {
             enabledSum++;
@@ -252,7 +274,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
     }
     if (enabledSum == 0) {
         // All objectives are disabled. I guess just allow free play?
-        return;
+        return BINGO_OBJECTIVE_TYPE_MIN;
     }
     randomIndex = (random_u16() % enabledSum) + 1;
     for (i = BINGO_OBJECTIVE_TYPE_MIN; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
@@ -264,6 +286,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
         }
     }
     // We shouldn't get here.
+    return BINGO_OBJECTIVE_TYPE_MIN;
 }
 
 s32 switch_to(s32 exclude) {
