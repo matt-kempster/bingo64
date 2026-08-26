@@ -1591,12 +1591,17 @@ $(BUILD_DIR)/%.inc.c: $(BUILD_DIR)/%
 	$(V)echo >> $@
 
 # Generate animation data
-$(BUILD_DIR)/assets/mario_anim_data.c: $(wildcard assets/anims/*.inc.c)
+# The converter scripts are dependencies too: a build dir surviving a
+# tool change otherwise keeps a stale generated file forever (the rule's
+# sources rarely change), which is exactly what a grafted upstream
+# refresh does — the include the tool emits moved, and the Aug 8 file
+# kept failing to compile long after the tree was fixed.
+$(BUILD_DIR)/assets/mario_anim_data.c: $(wildcard assets/anims/*.inc.c) tools/mario_anims_converter.py
 	@$(PRINT) "$(GREEN)Generating animation data $(NO_COL)\n"
 	$(V)$(PYTHON) tools/mario_anims_converter.py > $@
 
 # Generate demo input data
-$(BUILD_DIR)/assets/demo_data.c: assets/demo_data.json $(wildcard assets/demos/*.bin)
+$(BUILD_DIR)/assets/demo_data.c: assets/demo_data.json $(wildcard assets/demos/*.bin) tools/demo_data_converter.py
 	@$(PRINT) "$(GREEN)Generating demo data $(NO_COL)\n"
 	$(V)$(PYTHON) tools/demo_data_converter.py assets/demo_data.json $(DEF_INC_CFLAGS) $(CUSTOM_C_DEFINES) > $@
 

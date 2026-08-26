@@ -26,7 +26,11 @@ HOST_TESTER = os.path.join(REPO, "test", "host", "build", "run_tests")
 
 # The committed input script always produces this seed. If you change the
 # script's menu timing, this changes too; update it from the failure message.
-EXPECTED_SEED = 231329435
+# (231329435 until Aug 2026: that value came from builds carrying stale
+# pre-graft generated assets — mario_anim_data.c/demo_data.c from before
+# the alo regraft — which shifted boot timing. A from-scratch build of the
+# committed tree produces this.)
+EXPECTED_SEED = 435573511
 
 # BingoObjective layout in the N64 build (32-bit, big-endian):
 # 0 initialized(u8+pad)  4 type  8 state  12 icon  16 class
