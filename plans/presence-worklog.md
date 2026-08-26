@@ -270,10 +270,34 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   Audit passed; zip layout matches beta.6; exe staged to
   AppData/Local/bingo64-test/. DRAFT for Matt to publish.
 
+- RELEASE v1.0-beta.8 PUBLISHED (2026-08-26; Matt, out of town:
+  "fully release it"). Protocol 6→8 in one hop — 7 was never shipped
+  (Matt said "release as 7.0"; as with "deploy as 5.3"→beta.6, the
+  convention ties the number to the wire, which the tree had at 8).
+  Contents since 6.1: race timeout + tiebreak verdicts (v7 wire),
+  RELAY-ENFORCED claim tiers (closes the §2 release-blocker),
+  star-count objectives (K per course, K of N levels), total-lives,
+  objective presets (SRL/Vanilla/Casual, also on the web generator),
+  mask-aware weighted draws + weight retune (all goldens re-blessed),
+  v8 lobby option sync (unlock + mask ride W/O; seed stays host-only),
+  N64-pad built-in mappings, new-board-resets-race fix. Full sweep
+  green: relay 29/29, host 22/22, emu all 5, web check, clean Linux +
+  Windows builds. Same stale-ELF gotcha as 6.1 (one cheats.o, swept by
+  magic bytes — it recurs; suspect something still runs a non-cross
+  make in ~/b64-win). zip packed with python zipfile (no zip(1) on
+  PATH; layout byte-matches 6.1). Prior master push's web-deploy run
+  had FAILED (total-lives commit, missing gHudDisplay in web shims) —
+  this push's run is green, Pages current. exe staged as
+  bingo64-v8.exe in AppData. Release published (not drafted — Matt's
+  explicit remote ask). RELAY NOT DEPLOYED: the permission classifier
+  blocked deploy/update.sh twice; live server still runs v6, so
+  beta.8 exes get "update needed" until Matt runs the deploy himself.
+
 ## Deferred / follow-ups
 
-- Relay-side visibility enforcement (see checklist §2) — potentially
-  release-blocking; client-side hiding shipped with v6.
+- ~~Relay-side visibility enforcement (see checklist §2) — potentially
+  release-blocking; client-side hiding shipped with v6.~~ DONE with
+  beta.8 (6be2a14dc): the relay withholds C/G per the room's tiers.
 - Reconnect replay can re-deliver a claim burst; the 3-slot cap
   contains the spam, revisit if it looks bad in practice.
 - Sound cue: skipped by design for now.

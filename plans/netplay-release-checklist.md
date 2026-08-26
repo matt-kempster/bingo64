@@ -126,8 +126,11 @@ this section are confirmed by reading `server/relay.py`.
       room setting "Locations" on the options screen, default ON. Note
       it HIDES client-side; the ghosts still stream (they drive the
       in-level ghost rendering).
-- [ ] **Relay-side visibility enforcement (POTENTIALLY RELEASE-
-      BLOCKING — Matt, 2026-08-22).** The v6 claim-visibility tiers
+- [x] **Relay-side visibility enforcement (POTENTIALLY RELEASE-
+      BLOCKING — Matt, 2026-08-22).** DONE 2026-08-25 (6be2a14dc,
+      shipped in beta.8): the relay withholds per the room's tiers
+      instead of trusting clients to look away.
+      The v6 claim-visibility tiers
       and the whereabouts toggle are enforced by the displaying
       client; the relay still broadcasts everything, so a modified
       client can peek. Fine among playtest friends; before a public
