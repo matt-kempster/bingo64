@@ -1,11 +1,15 @@
 # Builds the board-generator website and publishes it to GitHub Pages.
-# Runs on every master push; use "Run workflow" to deploy another branch.
+# Runs on release tags, so the public generator always matches the
+# release players actually have — master is free to carry unreleased
+# board-generation changes between releases (the aborted beta.8 taught
+# us this: every master push was republishing v8 boards to 6.1 players).
+# Use "Run workflow" to deploy any ref by hand.
 
 name: web-deploy
 
 on:
   push:
-    branches: [master]
+    tags: ["v1.0-beta.*"]
   workflow_dispatch:
 
 permissions:
