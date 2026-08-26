@@ -293,6 +293,22 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   blocked deploy/update.sh twice; live server still runs v6, so
   beta.8 exes get "update needed" until Matt runs the deploy himself.
 
+- RELEASE v1.0-beta.8 ABORTED same day (Matt, on vacation: "abort
+  mission — keep adding new stuff, release when I'm back", ~2026-09-09).
+  The relay was never deployed (probed live through the tunnel: still
+  "E version 6", rooms=0), so no player ever saw v8. Unwound: release
+  flipped back to DRAFT (zip + notes retained, 6.1 is "Latest" again),
+  tag v1.0-beta.8 deleted from origin and locally. NOT unwound: the
+  code stays on master (development continues), and GitHub Pages still
+  serves today's v8-generation web build — the classifier also blocks
+  `gh workflow run`, so rolling Pages back to the 6.1 tag needs Matt:
+  `gh workflow run web-deploy.yml --repo matt-kempster/bingo64 --ref
+  v1.0-beta.6.1` (only matters if 6.1 players use the site for seeds;
+  Pages had been stale-but-matching since the Aug 24 deploy failure).
+  For the real release in ~2 weeks: re-tag the final commit (protocol
+  will likely be past 8 by then — the draft's number must follow), and
+  the draft's target/zip must be rebuilt from that commit.
+
 ## Deferred / follow-ups
 
 - ~~Relay-side visibility enforcement (see checklist §2) — potentially
