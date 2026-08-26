@@ -400,9 +400,10 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         w = (await a.wait_line("W ")).split()
         self.assertEqual((w[5], w[6], w[7]), ("0", "1", "0"))
         # BINGOS (2) is meaningless in 1-bingo mode: coerced to PROGRESS.
+        # (v8 appends unlock and the objective mask to the rebroadcast.)
         a.send("O 0 0 0 0 2 0")
         o = (await b.wait_line("O 0")).split()
-        self.assertEqual(o[1:], ["0", "1", "0", "0"])
+        self.assertEqual(o[1:], ["0", "1", "0", "0", "0", "0"])
         # Blackout is co-op on a shared board: forced open.
         a.send("O 3 0 0 0 3 1")
         await b.wait_line("O 3 0 1")
@@ -412,6 +413,21 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         a.send("X")
         s = (await b.wait_line("S ")).split()
         self.assertEqual((s[6], s[7], s[8]), ("2", "0", "0"))
+
+    async def test_v8_options_ride_lobby(self):
+        a, b = await self.two_joined()
+        # Host sends the full option line (mode unlock mask seed claimvis
+        # where timeout); guests get everything back except the seed.
+        a.send("O 4 1 7ffdf10ebfe 123 0 1 0")
+        o = (await b.wait_line("O 4")).split()
+        self.assertEqual(o[1:], ["4", "0", "1", "0", "1", "7ffdf10ebfe"])
+        self.assertNotIn("123", o)  # the seed proposal must not leak
+        # A late joiner's welcome carries the same unlock + mask.
+        c = self.track(RefClient(self.udp_port))
+        await c.start()
+        c.join("testroom", "carol")
+        w = (await c.wait_line("W ")).split()
+        self.assertEqual((w[8], w[9]), ("1", "7ffdf10ebfe"))
 
     async def test_v7_hidden_tiers_filter_claims(self):
         a, b = await self.two_joined()

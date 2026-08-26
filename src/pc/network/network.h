@@ -16,10 +16,12 @@
 // Everything here is PC-only; the N64 build never sees this header.
 
 // 7: optional race timeout rides O/W/S; the relay ends the race with the
-// T broadcast (winner by tiebreak) at expiry. During active development
-// the version bumps on every wire change — the old side is refused
-// outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 7
+// T broadcast (winner by tiebreak) at expiry.
+// 8: unlock + objective mask ride W and the O rebroadcast so guests see
+// the room's options live in the lobby (the seed still only rides S).
+// During active development the version bumps on every wire change — the
+// old side is refused outright ("E version"), never accommodated.
+#define NET_PROTOCOL_VERSION 8
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.

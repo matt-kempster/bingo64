@@ -132,6 +132,8 @@ static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
 static s32 sPendingClaimVis = -1;  // visibility settings riding the same W
 static s32 sPendingWhereabouts = -1;
 static s32 sPendingTimeout = -1;   // race timeout (minutes) riding the same W
+static s32 sPendingUnlock = -1;    // full-game unlock riding the same W (v8)
+static unsigned long long sPendingMask = 0;  // objective mask, ditto
 
 // Room visibility settings (v6). The host's local values are the room's;
 // everyone else receives them via W/O/S.
@@ -421,15 +423,29 @@ static const char *place_suffix(s32 place) {
     return "th";
 }
 
+// The room's objective toggles arrive as a u64 bitmask (bit i = type i
+// disabled) on W, O, and S; one decoder keeps the three in lockstep.
+static void apply_objective_mask(unsigned long long mask) {
+    s32 i;
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
+        gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
+    }
+}
+
 static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
     if (cmd == 'W') {
         s32 public_ = 0, mode = 0, claimVis = 0, where = 1, timeoutMin = 0;
+        s32 unlock = 0;
         s32 id = 0;
+        s32 nFields;
         u32 token = 0;
-        if (sscanf(line + 1, "%d %d %d %u %d %d %d", &id, &public_, &mode,
-                   &token, &claimVis, &where, &timeoutMin) == 7) {
+        unsigned long long mask = 0;
+        nFields = sscanf(line + 1, "%d %d %d %u %d %d %d %d %llx", &id,
+                         &public_, &mode, &token, &claimVis, &where,
+                         &timeoutMin, &unlock, &mask);
+        if (nFields == 9) {
             // An older relay packs other fields here; fail loudly instead
             // of running a half-broken lobby against an outdated server.
             if (public_ < 0 || public_ > 1 || mode < 0 || mode >= BINGO_MODE_COUNT) {
@@ -468,12 +484,18 @@ static void handle_line(char *line) {
             sPendingClaimVis = claimVis;
             sPendingWhereabouts = where;
             sPendingTimeout = timeoutMin;
+            sPendingUnlock = unlock;
+            sPendingMask = mask;
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
             sState = NET_STATE_LOBBY;
             if (sAutoReady) {
                 network_set_ready(1);
             }
+        } else if (nFields >= 7) {
+            // A pre-v8 relay that slipped past the version gate.
+            sToken = 0;
+            net_fail("server runs an old relay version");
         }
     } else if (cmd == 'H') {
         s32 id;
@@ -489,11 +511,15 @@ static void handle_line(char *line) {
                                                    sPendingRoomMode);
                 gNetShowWhereabouts = sPendingWhereabouts != 0;
                 gbBingoTimeout = sPendingTimeout;
+                gBingoFullGameUnlocked = (u8) (sPendingUnlock != 0);
+                apply_objective_mask(sPendingMask);
             }
             sPendingRoomMode = -1;
             sPendingClaimVis = -1;
             sPendingWhereabouts = -1;
             sPendingTimeout = -1;
+            sPendingUnlock = -1;
+            sPendingMask = 0;
             // The role passed on (0 = the initial announcement).
             if (prevHost != 0 && id != prevHost) {
                 if (id == sLocalId) {
@@ -511,7 +537,6 @@ static void handle_line(char *line) {
         if (sscanf(line + 1, "%u %d %d %d %llx %d %d %d", &seed, &delta,
                    &mode, &unlock, &mask, &claimVis, &where,
                    &timeoutMin) == 8) {
-            s32 i;
             sSharedSeed = seed;
             sSeedValid = 1;
             // The room creator's bingo options apply to the whole room;
@@ -523,9 +548,7 @@ static void handle_line(char *line) {
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
             gBingoFullGameUnlocked = (u8) (unlock != 0);
-            for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
-                gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
-            }
+            apply_objective_mask(mask);
             // delta is negative when the race already started (late join /
             // reconnect); unsigned wrap keeps the shared clock correct.
             sGoFrame = gGlobalTimer + (u32) delta;
@@ -660,14 +683,17 @@ static void handle_line(char *line) {
         }
     } else if (cmd == 'O') {
         // The host changed the room options while we sat in the lobby.
-        s32 mode, claimVis = 0, where = 1, timeoutMin = 0;
-        if (sscanf(line + 1, "%d %d %d %d", &mode, &claimVis, &where,
-                   &timeoutMin) == 4
+        s32 mode, claimVis = 0, where = 1, timeoutMin = 0, unlock = 0;
+        unsigned long long mask = 0;
+        if (sscanf(line + 1, "%d %d %d %d %d %llx", &mode, &claimVis,
+                   &where, &timeoutMin, &unlock, &mask) == 6
             && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
+            gBingoFullGameUnlocked = (u8) (unlock != 0);
+            apply_objective_mask(mask);
         }
     } else if (cmd == 'F') {
         s32 id, place, frames;
@@ -903,6 +929,8 @@ static void reset_session_state(void) {
     sPendingRoomMode = -1;
     sPendingClaimVis = -1;
     sPendingWhereabouts = -1;
+    sPendingUnlock = -1;
+    sPendingMask = 0;
     sGoFlag = 0;
     sLobbyReturnFlag = 0;
     // gNetClaimVis/gNetShowWhereabouts deliberately survive: they are the

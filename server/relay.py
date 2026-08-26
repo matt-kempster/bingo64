@@ -168,7 +168,7 @@ print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.
-PROTOCOL_VERSION = 7
+PROTOCOL_VERSION = 8
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
@@ -870,11 +870,15 @@ class Relay:
                 room.tokens[client.id] = random.randrange(1, 2 ** 32)
             client.room = room
             self.stat_joins += 1
-            client.send("W %d %d %d %d %d %d %d"
+            # v8: unlock and the objective mask ride along so a joiner's
+            # options screen mirrors the room immediately, not at start.
+            # (The seed proposal stays host-only until S: a guest who knows
+            # the seed early could pre-generate the board.)
+            client.send("W %d %d %d %d %d %d %d %d %x"
                         % (client.id, 1 if room.public else 0,
                            room.mode, room.tokens[client.id],
                            room.claimvis, room.whereabouts,
-                           room.timeout_min))
+                           room.timeout_min, room.unlock, room.mask))
             self.send_room_snapshot(room, client)
             # Announce the (re)arrival to everyone else.
             room.broadcast(room.roster_line(client.id, client.name,
@@ -960,9 +964,12 @@ class Relay:
                 t = clamped_int(parts[7], 0, 60)
                 room.timeout_min = t if t in TIMEOUT_CHOICES else 0
             room.claimvis = coerce_claimvis(room.claimvis, room.mode)
-            room.broadcast("O %d %d %d %d" % (room.mode, room.claimvis,
-                                              room.whereabouts,
-                                              room.timeout_min),
+            # v8: rebroadcast the full option set (minus the seed proposal)
+            # so guests track the host's edits live.
+            room.broadcast("O %d %d %d %d %d %x" % (room.mode, room.claimvis,
+                                                    room.whereabouts,
+                                                    room.timeout_min,
+                                                    room.unlock, room.mask),
                            skip=client.id)
         elif cmd == "X" and client.room:
             room = client.room
