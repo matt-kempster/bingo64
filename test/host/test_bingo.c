@@ -232,6 +232,253 @@ static void test_golden_boards(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Weighting expect test: an aggregate fingerprint of the board generator.
+//
+// Generates WEIGHTING_BOARDS boards and tabulates (a) how often each
+// objective type appears, split by class, with the range of its target
+// numbers, and (b) how often each course is the pinned target of a cell.
+// The table is compared against golden/weighting.txt like the golden
+// boards: any change to the weight tables, class grid, target ranges, or
+// course selection shows up as a reviewable diff. Bless on purpose with
+// UPDATE_GOLDENS=1 make test.
+//
+// Names are spelled out so diffs stay readable when the enum shifts; a
+// type without a name prints as type_NN — add the name when adding the
+// objective.
+
+#define WEIGHTING_BOARDS 2000
+
+extern char *courseAbbreviations[24];
+
+static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
+    [BINGO_OBJECTIVE_STAR] = "STAR",
+    [BINGO_OBJECTIVE_STAR_TIMED] = "STAR_TIMED",
+    [BINGO_OBJECTIVE_STAR_TTC_RANDOM] = "STAR_TTC_RANDOM",
+    [BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE] = "STAR_A_BUTTON_CHALLENGE",
+    [BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE] = "STAR_B_BUTTON_CHALLENGE",
+    [BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE] = "STAR_Z_BUTTON_CHALLENGE",
+    [BINGO_OBJECTIVE_STAR_CLICK_GAME] = "STAR_CLICK_GAME",
+    [BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK] = "STAR_REVERSE_JOYSTICK",
+    [BINGO_OBJECTIVE_STAR_GREEN_DEMON] = "STAR_GREEN_DEMON",
+    [BINGO_OBJECTIVE_STAR_DAREDEVIL] = "STAR_DAREDEVIL",
+    [BINGO_OBJECTIVE_COIN] = "COIN",
+    [BINGO_OBJECTIVE_1UPS_IN_LEVEL] = "1UPS_IN_LEVEL",
+    [BINGO_OBJECTIVE_STARS_IN_LEVEL] = "STARS_IN_LEVEL",
+    [BINGO_OBJECTIVE_RANDOM_RED_COINS] = "RANDOM_RED_COINS",
+    [BINGO_OBJECTIVE_SPLATOON] = "SPLATOON",
+    [BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS] = "DANGEROUS_WALL_KICKS",
+    [BINGO_OBJECTIVE_BOWSER] = "BOWSER",
+    [BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON] = "ROOF_WITHOUT_CANNON",
+    [BINGO_OBJECTIVE_RACING_STARS] = "RACING_STARS",
+    [BINGO_OBJECTIVE_SECRETS_STARS] = "SECRETS_STARS",
+    [BINGO_OBJECTIVE_LIVES] = "LIVES",
+    [BINGO_OBJECTIVE_MULTICOIN] = "MULTICOIN",
+    [BINGO_OBJECTIVE_MULTISTAR] = "MULTISTAR",
+    [BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS] = "STARS_MULTIPLE_LEVELS",
+    [BINGO_OBJECTIVE_BLJ] = "BLJ",
+    [BINGO_OBJECTIVE_LOSE_MARIO_HAT] = "LOSE_MARIO_HAT",
+    [BINGO_OBJECTIVE_SIGNPOST] = "SIGNPOST",
+    [BINGO_OBJECTIVE_POLES] = "POLES",
+    [BINGO_OBJECTIVE_SHOOT_CANNONS] = "SHOOT_CANNONS",
+    [BINGO_OBJECTIVE_RED_COIN] = "RED_COIN",
+    [BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX] = "EXCLAMATION_MARK_BOX",
+    [BINGO_OBJECTIVE_WING_CAP_BOX] = "WING_CAP_BOX",
+    [BINGO_OBJECTIVE_VANISH_CAP_BOX] = "VANISH_CAP_BOX",
+    [BINGO_OBJECTIVE_METAL_CAP_BOX] = "METAL_CAP_BOX",
+    [BINGO_OBJECTIVE_AMPS] = "AMPS",
+    [BINGO_OBJECTIVE_KILL_GOOMBAS] = "KILL_GOOMBAS",
+    [BINGO_OBJECTIVE_KILL_BOBOMBS] = "KILL_BOBOMBS",
+    [BINGO_OBJECTIVE_KILL_SPINDRIFTS] = "KILL_SPINDRIFTS",
+    [BINGO_OBJECTIVE_KILL_MR_IS] = "KILL_MR_IS",
+    [BINGO_OBJECTIVE_KILL_SCUTTLEBUGS] = "KILL_SCUTTLEBUGS",
+    [BINGO_OBJECTIVE_KILL_BULLIES] = "KILL_BULLIES",
+    [BINGO_OBJECTIVE_KILL_CHUCKYAS] = "KILL_CHUCKYAS",
+    [BINGO_OBJECTIVE_KILL_WHOMPS] = "KILL_WHOMPS",
+    [BINGO_OBJECTIVE_KILL_BOOS] = "KILL_BOOS",
+    [BINGO_OBJECTIVE_KILL_SNUFITS] = "KILL_SNUFITS",
+    [BINGO_OBJECTIVE_HURT_BY_CLAMS] = "HURT_BY_CLAMS",
+    [BINGO_OBJECTIVE_KILL_FLY_GUYS] = "KILL_FLY_GUYS",
+    [BINGO_OBJECTIVE_KILL_MR_BLIZZARDS] = "KILL_MR_BLIZZARDS",
+    [BINGO_OBJECTIVE_KILL_SKEETERS] = "KILL_SKEETERS",
+    [BINGO_OBJECTIVE_KILL_KOOPAS] = "KILL_KOOPAS",
+    [BINGO_OBJECTIVE_CRUSHED] = "CRUSHED",
+    [BINGO_OBJECTIVE_UNIQUE_DEATHS] = "UNIQUE_DEATHS",
+};
+
+// The course a cell is pinned to, or 0 if the objective is not
+// course-pinned (global counters, multi-course goals, Bowser levels).
+static s32 cell_pinned_course(struct BingoObjective *o) {
+    switch (o->type) {
+        case BINGO_OBJECTIVE_STAR:
+        case BINGO_OBJECTIVE_STAR_TTC_RANDOM:
+        case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
+        case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
+        case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+            return o->data.starObjective.course;
+        case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+            return o->data.abcStarObjective.course;
+        case BINGO_OBJECTIVE_STAR_TIMED:
+            return o->data.starTimerObjective.course;
+        case BINGO_OBJECTIVE_STAR_CLICK_GAME:
+            return o->data.starClicksObjective.course;
+        case BINGO_OBJECTIVE_COIN:
+        case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
+        case BINGO_OBJECTIVE_STARS_IN_LEVEL:
+        case BINGO_OBJECTIVE_RANDOM_RED_COINS:
+        case BINGO_OBJECTIVE_SPLATOON:
+            return o->data.courseCollectableData.course;
+        default:
+            return 0;
+    }
+}
+
+// The headline target number of a cell, for range tracking; -1 if the
+// objective has no meaningful count (plain stars, Bowser, roof).
+static s32 cell_target(struct BingoObjective *o) {
+    if (is_star_type(o->type)) {
+        return -1;
+    }
+    switch (o->type) {
+        case BINGO_OBJECTIVE_COIN:
+        case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
+        case BINGO_OBJECTIVE_STARS_IN_LEVEL:
+        case BINGO_OBJECTIVE_RANDOM_RED_COINS:
+        case BINGO_OBJECTIVE_SPLATOON:
+            return o->data.courseCollectableData.toGet;
+        case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+            return o->data.multiCourseCollectableData.toGetTotal;
+        case BINGO_OBJECTIVE_BOWSER:
+        case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
+            return -1;
+        default:
+            return o->data.collectableData.toGet;
+    }
+}
+
+static void check_golden_text(const char *path, const char *generated) {
+    char stored[32768];
+    size_t n;
+    FILE *f;
+
+    if (getenv("UPDATE_GOLDENS")) {
+        f = fopen(path, "w");
+        fputs(generated, f);
+        fclose(f);
+        printf("  wrote %s\n", path);
+        return;
+    }
+
+    f = fopen(path, "r");
+    if (f == NULL) {
+        printf("  missing %s (run UPDATE_GOLDENS=1 make test)\n", path);
+        gCurrentTestFailed = 1;
+        return;
+    }
+    n = fread(stored, 1, sizeof(stored) - 1, f);
+    stored[n] = '\0';
+    fclose(f);
+
+    if (strcmp(generated, stored) != 0) {
+        printf("  weighting fingerprint does not match %s\n", path);
+        printf("  if the change is on purpose: UPDATE_GOLDENS=1 make test\n");
+        gCurrentTestFailed = 1;
+    }
+}
+
+static void test_weighting_expect(void) {
+    static s32 typeTotal[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+    static s32 typeByClass[BINGO_OBJECTIVE_TOTAL_AMOUNT][4];
+    static s32 targetLo[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+    static s32 targetHi[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+    static s32 courseCounts[25];  // 1..24
+    static char generated[32768];
+    s32 cells = WEIGHTING_BOARDS * 25;
+    u32 seed;
+    int i, t;
+    size_t off = 0;
+
+    memset(typeTotal, 0, sizeof(typeTotal));
+    memset(typeByClass, 0, sizeof(typeByClass));
+    memset(courseCounts, 0, sizeof(courseCounts));
+    for (t = 0; t < BINGO_OBJECTIVE_TOTAL_AMOUNT; t++) {
+        targetLo[t] = -1;
+        targetHi[t] = -1;
+    }
+
+    for (seed = 1; seed <= WEIGHTING_BOARDS; seed++) {
+        generate_board(seed);
+        for (i = 0; i < 25; i++) {
+            struct BingoObjective *o = &gBingoObjectives[i];
+            s32 course = cell_pinned_course(o);
+            s32 target = cell_target(o);
+            int cls = (int) o->class;
+            typeTotal[o->type]++;
+            if (cls >= 0 && cls < 4) {
+                typeByClass[o->type][cls]++;
+            }
+            if (course >= 1 && course <= 24) {
+                courseCounts[course]++;
+            }
+            if (target >= 0) {
+                if (targetLo[o->type] == -1 || target < targetLo[o->type]) {
+                    targetLo[o->type] = target;
+                }
+                if (target > targetHi[o->type]) {
+                    targetHi[o->type] = target;
+                }
+            }
+        }
+    }
+
+#define EMIT(...) off += snprintf(generated + off, sizeof(generated) - off, __VA_ARGS__)
+
+    EMIT("Board generator fingerprint over %d boards (%d cells).\n",
+         WEIGHTING_BOARDS, cells);
+    EMIT("permille = cells per 1000 across all boards.\n");
+    EMIT("\n[objective types]  count  permille  easy  med  hard  cent  target\n");
+    for (t = 0; t < BINGO_OBJECTIVE_TOTAL_AMOUNT; t++) {
+        char name[40];
+        if (typeTotal[t] == 0) {
+            continue;
+        }
+        if (kTypeNames[t] != NULL) {
+            snprintf(name, sizeof(name), "%s", kTypeNames[t]);
+        } else {
+            snprintf(name, sizeof(name), "type_%02d", t);
+        }
+        EMIT("%-24s %6d %8d %5d %4d %5d %5d",
+             name, typeTotal[t], (typeTotal[t] * 1000) / cells,
+             typeByClass[t][BINGO_CLASS_EASY], typeByClass[t][BINGO_CLASS_MEDIUM],
+             typeByClass[t][BINGO_CLASS_HARD], typeByClass[t][BINGO_CLASS_CENTER]);
+        if (targetLo[t] >= 0) {
+            EMIT("  %d..%d", targetLo[t], targetHi[t]);
+        } else {
+            EMIT("  -");
+        }
+        EMIT("\n");
+    }
+
+    EMIT("\n[course pins]  count  permille-of-pinned\n");
+    {
+        s32 pinned = 0;
+        for (i = 1; i <= 24; i++) {
+            pinned += courseCounts[i];
+        }
+        for (i = 1; i <= 24; i++) {
+            EMIT("%-6s %6d %6d\n", courseAbbreviations[i - 1], courseCounts[i],
+                 pinned > 0 ? (courseCounts[i] * 1000) / pinned : 0);
+        }
+        EMIT("unpinned cells: %d of %d\n", cells - pinned, cells);
+    }
+#undef EMIT
+
+    check_golden_text("golden/weighting.txt", generated);
+}
+
+// ---------------------------------------------------------------------------
 // Invariant sweep: things that must hold for every board on any seed.
 
 #define SWEEP_SEEDS 10000
@@ -925,6 +1172,7 @@ int main(void) {
     RUN_TEST(test_same_seed_same_board);
     RUN_TEST(test_different_seed_different_board);
     RUN_TEST(test_golden_boards);
+    RUN_TEST(test_weighting_expect);
     RUN_TEST(test_invariant_sweep);
     RUN_TEST(test_weight_budget);
     RUN_TEST(test_repeated_generation_resets_budgets);
