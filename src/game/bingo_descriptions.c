@@ -534,6 +534,12 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_AMPS:
             strcpy(verb, "Get zapped by");
             break;
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+            strcpy(verb, "Get bitten by");
+            break;
+        case BINGO_OBJECTIVE_CRUSHED:
+            strcpy(verb, "Get crushed by");
+            break;
         case BINGO_OBJECTIVE_BLJ:
             strcpy(verb, "Perform");
             break;
@@ -610,6 +616,36 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             break;
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
             strcpy(collectName, "Chuckyas");
+            break;
+        case BINGO_OBJECTIVE_KILL_WHOMPS:
+            strcpy(collectName, "Whomps or the Whomp King");
+            break;
+        case BINGO_OBJECTIVE_KILL_BOOS:
+            strcpy(collectName, "Boos or Big Boos");
+            break;
+        case BINGO_OBJECTIVE_KILL_SNUFITS:
+            strcpy(collectName, "Snufits");
+            break;
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+            strcpy(collectName, "Clams");
+            break;
+        case BINGO_OBJECTIVE_KILL_FLY_GUYS:
+            strcpy(collectName, "Fly Guys");
+            break;
+        case BINGO_OBJECTIVE_KILL_MR_BLIZZARDS:
+            strcpy(collectName, "Mr. Blizzards");
+            break;
+        case BINGO_OBJECTIVE_KILL_SKEETERS:
+            strcpy(collectName, "Skeeters");
+            break;
+        case BINGO_OBJECTIVE_KILL_KOOPAS:
+            strcpy(collectName, "Koopas");
+            break;
+        case BINGO_OBJECTIVE_CRUSHED:
+            // "unique" is printed by the shared formatter, so this reads
+            // "Get crushed by 4 unique Crushers" -- distinct crushers, not
+            // four squishes under the same thwomp.
+            strcpy(collectName, "Crushers");
             break;
     }
 
@@ -743,6 +779,15 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_KILL_SCUTTLEBUGS:
         case BINGO_OBJECTIVE_KILL_BULLIES:
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
+        case BINGO_OBJECTIVE_KILL_WHOMPS:
+        case BINGO_OBJECTIVE_KILL_BOOS:
+        case BINGO_OBJECTIVE_KILL_SNUFITS:
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+        case BINGO_OBJECTIVE_KILL_FLY_GUYS:
+        case BINGO_OBJECTIVE_KILL_MR_BLIZZARDS:
+        case BINGO_OBJECTIVE_KILL_SKEETERS:
+        case BINGO_OBJECTIVE_KILL_KOOPAS:
+        case BINGO_OBJECTIVE_CRUSHED:
             get_collectable_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:

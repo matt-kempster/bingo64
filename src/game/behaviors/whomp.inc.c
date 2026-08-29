@@ -1,4 +1,7 @@
 // whomp.inc.c
+#include "game/bingo.h"
+#include "game/bingo_crushers.h"
+#include "game/bingo_tracking_collectables.h"
 
 void whomp_play_sfx_from_pound_animation(void) {
     UNUSED s32 animFrame = o->header.gfx.animInfo.animFrame;
@@ -17,7 +20,26 @@ void whomp_play_sfx_from_pound_animation(void) {
     }
 }
 
+// Both the small whomps and the Whomp King die through whomp_die, so one
+// update covers them all. Whomps patrol away from home, so key on home.
+static void whomp_bingo_register(void) {
+    if (o->oBingoId == 0) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_WHOMP, o->oHomeX, o->oHomeY, o->oHomeZ);
+    }
+    // Whomps are also crushers, and the two objectives have separate UID
+    // ranges, so they need separate id fields -- oBingoId is already spent on
+    // "kill whomps" above. Both key on the same never-moving home.
+    bingo_register_crusher(o, o->oHomeX, o->oHomeY, o->oHomeZ);
+}
+
+static void whomp_bingo_died(void) {
+    if (is_new_kill(BINGO_UPDATE_KILLED_WHOMP, o->oBingoId)) {
+        bingo_update(BINGO_UPDATE_KILLED_WHOMP);
+    }
+}
+
 void whomp_init(void) {
+    whomp_bingo_register();
     cur_obj_init_animation_with_accel_and_sound(0, 1.0f);
     cur_obj_set_pos_to_home();
 
@@ -258,9 +280,11 @@ void whomp_die(void) {
             spawn_default_star(180.0f, 3880.0f, 340.0f);
             #endif
             cur_obj_play_sound_2(SOUND_OBJ_KING_WHOMP_DEATH);
+            whomp_bingo_died();
             o->oAction = 9;
         }
     } else {
+        whomp_bingo_died();
         spawn_mist_particles_variable(0, 0, 100.0f);
         spawn_triangle_break_particles(20, MODEL_DIRT_ANIMATION, 3.0f, 4);
         cur_obj_shake_screen(SHAKE_POS_SMALL);

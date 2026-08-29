@@ -129,7 +129,10 @@
 #define /*0x1A8*/ oUnusedBhvParams            OBJECT_FIELD_U32(0x48)
 // 0x1AC-0x1B2 (0x48-0x4A) are object specific and defined below the common fields.
 #define /*0x1B4*/ oWallAngle                  OBJECT_FIELD_S32(0x4B)
-// 0x1B8-0x1BA (0x4C) were oFloorType and oFloorRoom, but their use was redundant so it was freed
+// 0x1B8-0x1BA (0x4C) were oFloorType and oFloorRoom, but their use was redundant so it was freed.
+// Bingo reclaimed the freed word: crushers need a UID slot of their own because
+// whomps already spend oBingoId (0x04) on the "kill whomps" objective.
+#define /*0x1B8*/ oBingoCrushId               OBJECT_FIELD_U32(0x4C)
 #define /*0x1BC*/ oAngleToHome                OBJECT_FIELD_S32(0x4D)
 #define /*0x1C0*/ oFloor                      OBJECT_FIELD_SURFACE(0x4E)
 #define /*0x1C4*/ oDeathSound                 OBJECT_FIELD_S32(0x4F)

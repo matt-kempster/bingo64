@@ -1,4 +1,6 @@
 // skeeter.inc.c
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 struct Struct80331C38 {
     s16 unk00;
@@ -154,7 +156,16 @@ void bhv_skeeter_update(void) {
             break;
     }
 
-    obj_check_attacks(&sSkeeterHitbox, o->oAction);
+    // Skeeters skate all over the pond, so key the UID on home.
+    if (o->oBingoId == 0) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_SKEETER, o->oHomeX, o->oHomeY, o->oHomeZ);
+    }
+    // Skeeter health is 0: one connecting attack kills it.
+    if (obj_check_attacks(&sSkeeterHitbox, o->oAction) != 0) {
+        if (is_new_kill(BINGO_UPDATE_KILLED_SKEETER, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_KILLED_SKEETER);
+        }
+    }
     cur_obj_move_standard(-78);
 }
 

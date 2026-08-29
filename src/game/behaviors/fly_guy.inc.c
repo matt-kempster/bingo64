@@ -1,3 +1,5 @@
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 /**
  * Behavior for bhvFlyGuy.
@@ -212,6 +214,16 @@ void bhv_fly_guy_update(void) {
         }
 
         cur_obj_move_standard(78);
-        obj_check_attacks(&sFlyGuyHitbox, o->oAction);
+        // Fly guys chase Mario far from where they spawned, so key on home.
+        if (o->oBingoId == 0) {
+            o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_FLY_GUY, o->oHomeX, o->oHomeY, o->oHomeZ);
+        }
+        // Fly guy health is 0: any attack that connects kills it, and
+        // obj_check_attacks returns the attack type on that frame.
+        if (obj_check_attacks(&sFlyGuyHitbox, o->oAction) != 0) {
+            if (is_new_kill(BINGO_UPDATE_KILLED_FLY_GUY, o->oBingoId)) {
+                bingo_update(BINGO_UPDATE_KILLED_FLY_GUY);
+            }
+        }
     }
 }

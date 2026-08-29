@@ -8,6 +8,7 @@
 #include "audio/external.h"
 #include "interaction.h"
 #include "engine/math_util.h"
+#include "bingo_crushers.h"
 #include "rumble_init.h"
 
 /**
@@ -445,6 +446,7 @@ s32 check_common_object_cancels(struct MarioState *m) {
     }
 
     if (m->input & INPUT_SQUISHED) {
+        bingo_track_crushed(m);
         return drop_and_set_mario_action(m, ACT_SQUISHED, 0);
     }
 

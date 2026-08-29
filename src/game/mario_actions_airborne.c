@@ -15,6 +15,7 @@
 #include "audio/external.h"
 #include "engine/graph_node.h"
 #include "bingo.h"
+#include "bingo_crushers.h"
 #include "rumble_init.h"
 #include "save_file.h"
 #ifdef CHEATS_ACTIONS
@@ -2171,6 +2172,7 @@ s32 check_common_airborne_cancels(struct MarioState *m) {
     }
 
     if (m->input & INPUT_SQUISHED) {
+        bingo_track_crushed(m);
         return drop_and_set_mario_action(m, ACT_SQUISHED, 0);
     }
 

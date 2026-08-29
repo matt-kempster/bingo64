@@ -177,6 +177,42 @@ ALIGNED8 static const u8 seg2_texture_skull[] = {
 #include "textures/segment2/custom/segment2.skull.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_whomp[] = {
+#include "textures/segment2/custom/segment2.whomp.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_boo_enemy[] = {
+#include "textures/segment2/custom/segment2.boo_enemy.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_snufit[] = {
+#include "textures/segment2/custom/segment2.snufit.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_clam[] = {
+#include "textures/segment2/custom/segment2.clam.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_flyguy[] = {
+#include "textures/segment2/custom/segment2.flyguy.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_blizzard[] = {
+#include "textures/segment2/custom/segment2.blizzard.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_skeeter[] = {
+#include "textures/segment2/custom/segment2.skeeter.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_koopa[] = {
+#include "textures/segment2/custom/segment2.koopa.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_thwomp[] = {
+#include "textures/segment2/custom/segment2.thwomp.rgba16.inc.c"
+};
+
 struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STAR, BINGO_ICON_STAR, { TEXT_SINGLE_STAR }, texture_hud_char_star },
     { BINGO_OBJECTIVE_STAR_TIMED, BINGO_ICON_STAR_TIMED, { TEXT_TIMED_STAR }, seg2_texture_timer },
@@ -220,6 +256,24 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_KILL_SCUTTLEBUGS, BINGO_ICON_KILL_SCUTTLEBUGS, { TEXT_KILL_SCUTTLEBUGS }, seg2_texture_scuttlebug },
     { BINGO_OBJECTIVE_KILL_BULLIES, BINGO_ICON_KILL_BULLIES, { TEXT_KILL_BULLIES }, seg2_texture_bully },
     { BINGO_OBJECTIVE_KILL_CHUCKYAS, BINGO_ICON_KILL_CHUCKYAS, { TEXT_KILL_CHUCKYAS }, seg2_texture_chuckya },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_WHOMPS, BINGO_ICON_KILL_WHOMPS, { TEXT_KILL_WHOMPS }, seg2_texture_whomp },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_BOOS, BINGO_ICON_KILL_BOOS, { TEXT_KILL_BOOS }, seg2_texture_boo_enemy },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_SNUFITS, BINGO_ICON_KILL_SNUFITS, { TEXT_KILL_SNUFITS }, seg2_texture_snufit },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_HURT_BY_CLAMS, BINGO_ICON_HURT_BY_CLAMS, { TEXT_HURT_BY_CLAMS }, seg2_texture_clam },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_FLY_GUYS, BINGO_ICON_KILL_FLY_GUYS, { TEXT_KILL_FLY_GUYS }, seg2_texture_flyguy },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_MR_BLIZZARDS, BINGO_ICON_KILL_MR_BLIZZARDS, { TEXT_KILL_MR_BLIZZARDS }, seg2_texture_blizzard },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_SKEETERS, BINGO_ICON_KILL_SKEETERS, { TEXT_KILL_SKEETERS }, seg2_texture_skeeter },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_KILL_KOOPAS, BINGO_ICON_KILL_KOOPAS, { TEXT_KILL_KOOPAS }, seg2_texture_koopa },
+    // icon from STROOP sprite, may be replaced by hand art
+    { BINGO_OBJECTIVE_CRUSHED, BINGO_ICON_CRUSHED, { TEXT_CRUSHED }, seg2_texture_thwomp },
     { BINGO_OBJECTIVE_UNIQUE_DEATHS, BINGO_ICON_UNIQUE_DEATHS, { TEXT_UNIQUE_DEATHS }, seg2_texture_skull }
 };
 

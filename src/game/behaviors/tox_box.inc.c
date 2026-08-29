@@ -146,6 +146,14 @@ void tox_box_act_unused_idle(void) {
 
 void tox_box_act_init(void) {
     s8 *actionTable = sToxBoxActionTables[o->oBhvParams2ndByte];
+
+    // bhvToxBox has no init native, so register from action 0 -- it runs on the
+    // first frame and immediately hands off to the movement table. SET_HOME
+    // already ran in the script (after the +256 Y nudge), and nothing ever
+    // writes oHome again: the box rolls away from it but keeps reading oHomeY
+    // as its resting height.
+    bingo_register_crusher(o, o->oHomeX, o->oHomeY, o->oHomeZ);
+
     o->oAction = cur_obj_set_action_table(actionTable);
 }
 

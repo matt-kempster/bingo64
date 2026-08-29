@@ -166,6 +166,15 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_KILL_SCUTTLEBUGS:
         case BINGO_OBJECTIVE_KILL_BULLIES:
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
+        case BINGO_OBJECTIVE_KILL_WHOMPS:
+        case BINGO_OBJECTIVE_KILL_BOOS:
+        case BINGO_OBJECTIVE_KILL_SNUFITS:
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+        case BINGO_OBJECTIVE_KILL_FLY_GUYS:
+        case BINGO_OBJECTIVE_KILL_MR_BLIZZARDS:
+        case BINGO_OBJECTIVE_KILL_SKEETERS:
+        case BINGO_OBJECTIVE_KILL_KOOPAS:
+        case BINGO_OBJECTIVE_CRUSHED:
             get_collectable_objective_title(objective);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:

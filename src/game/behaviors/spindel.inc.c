@@ -1,6 +1,16 @@
 // spindel.inc.c
+#include "game/bingo_crushers.h"
 
 void bhv_spindel_init(void) {
+    // bhvSpindel's script has no SET_HOME, and this init only fills oHomeY --
+    // oHomeX/oHomeZ stay at the zero allocate_object left them, so oHome is not
+    // a usable key. Key on the spawn position instead: oPosX never changes,
+    // oPosY oscillates around oHomeY but is the script value right now, and
+    // oPosZ (which the roll does move) is still untouched at init. The script
+    // has no DROP_TO_FLOOR or Y nudge either, so this is exactly the level
+    // script's position and it re-derives identically on every reload.
+    bingo_register_crusher(o, o->oPosX, o->oPosY, o->oPosZ);
+
     o->oHomeY = o->oPosY;
     o->oSpindelUnkF4 = 0;
     o->oSpindelUnkF8 = 0;

@@ -53,6 +53,30 @@ struct UID {
 #define MAX_POLES 50
 // There are 17
 #define MAX_CANNONS 20
+// 4: WF 2 small + Whomp King, BitS 1 small
+#define MAX_WHOMPS 6
+// 24 distinct spots: BBH 14 (5 shared by the act-1 ghost-hunt boos and the
+// act-2+ plain boos, 1 more plain boo, ghost hunt big boo, balcony big boo,
+// 5 merry-go-round boos + their big boo), courtyard 10 (3 triplets + caged).
+// bhvBooInCastle is unkillable and never registers.
+#define MAX_BOOS 40
+// 8: HMC 4, CotMC 4
+#define MAX_SNUFITS 12
+// 9: JRB 5, DDD 4
+#define MAX_CLAMS 12
+// 9 (plain and fire fly guys alike): THI 3, SSL 3, TTM 1, SL 1, RR 1
+#define MAX_FLY_GUYS 12
+// 7: SL 4, CCM 3
+#define MAX_MR_BLIZZARDS 12
+// 4: WDW 4
+#define MAX_SKEETERS 8
+// 5 placed: BOB 2, THI 3 -- but one of each is Koopa the Quick, so 3 killable
+#define MAX_KOOPAS 8
+// 14 whitelisted crushers: WF 5 (2 thwomps, 2 small whomps, Whomp King),
+// TTC 1 (thwomp), SSL 7 (grindel, 2 horizontal grindels, spindel, 3 tox boxes),
+// BitS 1 (small whomp). Keyed on oBingoCrushId, not oBingoId -- whomps spend
+// oBingoId on MAX_WHOMPS above.
+#define MAX_CRUSHERS 16
 
 #define TOTAL_UIDS ( \
         MAX_GOOMBAS \
@@ -73,6 +97,15 @@ struct UID {
         + MAX_AMPS \
         + MAX_POLES \
         + MAX_CANNONS \
+        + MAX_WHOMPS \
+        + MAX_BOOS \
+        + MAX_SNUFITS \
+        + MAX_CLAMS \
+        + MAX_FLY_GUYS \
+        + MAX_MR_BLIZZARDS \
+        + MAX_SKEETERS \
+        + MAX_KOOPAS \
+        + MAX_CRUSHERS \
     ) + 2
 
 // I really hope nothing is actually at (0, 0, 0)....
@@ -151,6 +184,33 @@ void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) 
                 break;
             case BINGO_UPDATE_CANNON_COLLECTABLE:
                 rangeLength = MAX_CANNONS;
+                break;
+            case BINGO_UPDATE_KILLED_WHOMP:
+                rangeLength = MAX_WHOMPS;
+                break;
+            case BINGO_UPDATE_KILLED_BOO:
+                rangeLength = MAX_BOOS;
+                break;
+            case BINGO_UPDATE_KILLED_SNUFIT:
+                rangeLength = MAX_SNUFITS;
+                break;
+            case BINGO_UPDATE_BITTEN_BY_CLAM:
+                rangeLength = MAX_CLAMS;
+                break;
+            case BINGO_UPDATE_KILLED_FLY_GUY:
+                rangeLength = MAX_FLY_GUYS;
+                break;
+            case BINGO_UPDATE_KILLED_MR_BLIZZARD:
+                rangeLength = MAX_MR_BLIZZARDS;
+                break;
+            case BINGO_UPDATE_KILLED_SKEETER:
+                rangeLength = MAX_SKEETERS;
+                break;
+            case BINGO_UPDATE_KILLED_KOOPA:
+                rangeLength = MAX_KOOPAS;
+                break;
+            case BINGO_UPDATE_CRUSHED_BY_CRUSHER:
+                rangeLength = MAX_CRUSHERS;
                 break;
         }
         *start += prevRangeLength;

@@ -15,6 +15,7 @@
 #include "save_file.h"
 #include "sound_init.h"
 #include "surface_terrains.h"
+#include "bingo_crushers.h"
 #include "rumble_init.h"
 
 s32 check_common_idle_cancels(struct MarioState *m) {
@@ -1105,6 +1106,7 @@ s32 check_common_stationary_cancels(struct MarioState *m) {
 
     if (m->input & INPUT_SQUISHED) {
         update_mario_sound_and_camera(m);
+        bingo_track_crushed(m);
         return drop_and_set_mario_action(m, ACT_SQUISHED, 0);
     }
 

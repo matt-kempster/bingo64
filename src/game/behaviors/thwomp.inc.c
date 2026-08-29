@@ -1,4 +1,14 @@
 // thwomp.inc.c
+#include "game/bingo_crushers.h"
+
+// Shared by bhvThwomp, bhvThwomp2 and bhvGrindel, none of which had an init
+// native before. All three run SET_HOME in their scripts (behavior_data.c),
+// after DROP_TO_FLOOR and the +1 Y nudge, so oHome is the settled resting
+// position and never moves again -- grindel_thwomp_act_lower even uses oHomeY
+// as the floor it slams back down to.
+void bhv_grindel_thwomp_init(void) {
+    bingo_register_crusher(o, o->oHomeX, o->oHomeY, o->oHomeZ);
+}
 
 void grindel_thwomp_act_idle_at_bottom(void) {
     if (o->oTimer == 0) {

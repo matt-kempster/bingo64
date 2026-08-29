@@ -19,6 +19,7 @@ void cur_obj_spawn_strong_wind_particles(s32 windSpread, f32 scale, f32 relPosX,
 
 void bhv_cap_switch_loop(void);
 void bhv_tiny_star_particles_init(void);
+void bhv_grindel_thwomp_init(void);
 void bhv_grindel_thwomp_loop(void);
 void bhv_koopa_shell_underwater_loop(void);
 void bhv_door_init(void);

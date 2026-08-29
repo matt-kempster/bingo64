@@ -1,6 +1,12 @@
 // horizontal_grindel.inc.c
+#include "game/bingo_crushers.h"
 
 void bhv_horizontal_grindel_init(void) {
+    // SET_HOME runs in the script (after DROP_TO_FLOOR) and nothing writes
+    // oHome afterwards -- the grindel hops out to 300 units and back, measuring
+    // against oHome the whole time.
+    bingo_register_crusher(o, o->oHomeX, o->oHomeY, o->oHomeZ);
+
     o->oHorizontalGrindelTargetYaw = o->oMoveAngleYaw;
 }
 

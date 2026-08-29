@@ -941,6 +941,75 @@ s32 bingo_objective_kill_chuckyas_init(enum BingoObjectiveClass class) {
     }
 }
 
+s32 bingo_objective_kill_whomps_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(2, 3);
+    }
+}
+
+s32 bingo_objective_kill_boos_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(4, 8);
+        case BINGO_CLASS_HARD:
+        case BINGO_CLASS_CENTER:
+            return random_range_inclusive(8, 12);
+    }
+}
+
+s32 bingo_objective_kill_snufits_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 6);
+    }
+}
+
+s32 bingo_objective_hurt_by_clams_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 6);
+    }
+}
+
+s32 bingo_objective_kill_fly_guys_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 6);
+    }
+}
+
+s32 bingo_objective_kill_mr_blizzards_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 5);
+    }
+}
+
+s32 bingo_objective_kill_skeeters_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(2, 4);
+    }
+}
+
+s32 bingo_objective_kill_koopas_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(2, 3);
+    }
+}
+
+s32 bingo_objective_crushed_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 5);
+        case BINGO_CLASS_HARD:
+        case BINGO_CLASS_CENTER:
+            return random_range_inclusive(6, 8);
+    }
+}
+
 s32 bingo_objective_collectable_init(struct BingoObjective *obj, s32 toGet) {
     obj->data.collectableData.toGet = toGet;
     obj->data.collectableData.gotten = 0;
@@ -994,6 +1063,24 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_kill_bullies_init(class);
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
             return bingo_objective_kill_chuckyas_init(class);
+        case BINGO_OBJECTIVE_KILL_WHOMPS:
+            return bingo_objective_kill_whomps_init(class);
+        case BINGO_OBJECTIVE_KILL_BOOS:
+            return bingo_objective_kill_boos_init(class);
+        case BINGO_OBJECTIVE_KILL_SNUFITS:
+            return bingo_objective_kill_snufits_init(class);
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+            return bingo_objective_hurt_by_clams_init(class);
+        case BINGO_OBJECTIVE_KILL_FLY_GUYS:
+            return bingo_objective_kill_fly_guys_init(class);
+        case BINGO_OBJECTIVE_KILL_MR_BLIZZARDS:
+            return bingo_objective_kill_mr_blizzards_init(class);
+        case BINGO_OBJECTIVE_KILL_SKEETERS:
+            return bingo_objective_kill_skeeters_init(class);
+        case BINGO_OBJECTIVE_KILL_KOOPAS:
+            return bingo_objective_kill_koopas_init(class);
+        case BINGO_OBJECTIVE_CRUSHED:
+            return bingo_objective_crushed_init(class);
     }
 }
 

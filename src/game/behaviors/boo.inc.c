@@ -1,5 +1,6 @@
 // boo.inc.c
 #include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 #define SPAWN_CASTLE_BOO_STAR_REQUIREMENT 12
 
@@ -28,8 +29,34 @@ static void boo_stop(void) {
     o->oGravity = 0.0f;
 }
 
+/**
+ * Boos wander far from where they spawned, so their bingo UID keys on home
+ * (SET_HOME runs in every boo behavior script before this).
+ *
+ * The exception is the merry-go-round boos: the manager spawns all five of
+ * them, plus the merry-go-round big boo, at its own position, so SET_HOME
+ * gives all six the same home and they would collapse onto one UID. Those get
+ * a synthetic key handed to them at spawn time by
+ * bhv_merry_go_round_boo_manager_loop instead - see boo_bingo_register.
+ */
+static void boo_bingo_register(void) {
+    if (cur_obj_has_behavior(bhvMerryGoRoundBoo)) {
+        return;
+    }
+    if (o->oBingoId == 0) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_BOO, o->oHomeX, o->oHomeY, o->oHomeZ);
+    }
+}
+
+static void boo_bingo_died(void) {
+    if (is_new_kill(BINGO_UPDATE_KILLED_BOO, o->oBingoId)) {
+        bingo_update(BINGO_UPDATE_KILLED_BOO);
+    }
+}
+
 void bhv_boo_init(void) {
     o->oBooInitialMoveYaw = o->oMoveAngleYaw;
+    boo_bingo_register();
 }
 
 static s32 boo_should_be_stopped(void) {
@@ -439,6 +466,7 @@ static void boo_act_2(void) {
 
 static void boo_act_3(void) {
     if (boo_update_during_death()) {
+        boo_bingo_died();
         if (o->oBhvParams2ndByte != BOO_BP_GHOST_HUNT) {
             obj_mark_for_deletion(o);
         } else {
@@ -617,6 +645,7 @@ static void big_boo_act_3(void) {
 
     if (o->oHealth == 0) {
         if (boo_update_during_death()) {
+            boo_bingo_died();
             cur_obj_disable();
 
             o->oAction = 4;
@@ -730,6 +759,7 @@ static void boo_with_cage_act_2(void) {
 
 static void boo_with_cage_act_3(void) {
     if (boo_update_during_death()) {
+        boo_bingo_died();
         obj_mark_for_deletion(o);
     }
 }
@@ -742,6 +772,7 @@ void bhv_boo_with_cage_init(void) {
     } else {
         struct Object *cage = spawn_object(o, MODEL_HAUNTED_CAGE, bhvBooCage);
         cage->oBhvParams = o->oBhvParams;
+        boo_bingo_register();
     }
 }
 
@@ -772,7 +803,19 @@ void bhv_merry_go_round_boo_manager_loop(void) {
                     if (o->oMerryGoRoundBooManagerNumBoosSpawned != 5) {
                         if (o->oMerryGoRoundBooManagerNumBoosSpawned
                                 - o->oMerryGoRoundBooManagerNumBoosKilled < 2) {
-                            spawn_object(o, MODEL_BOO, bhvMerryGoRoundBoo);
+                            struct Object *boo =
+                                spawn_object(o, MODEL_BOO, bhvMerryGoRoundBoo);
+                            // All five spawn at the manager, so their homes are
+                            // identical. Hand each one a synthetic UID key,
+                            // separated on Y, so the five stay distinct (and so
+                            // that a boo respawned after Mario left the area
+                            // reuses its own slot instead of earning a
+                            // second credit).
+                            boo->oBingoId = get_unique_id(
+                                BINGO_UPDATE_KILLED_BOO, o->oPosX,
+                                o->oPosY + 1000.0f
+                                    * (o->oMerryGoRoundBooManagerNumBoosSpawned + 1),
+                                o->oPosZ);
                             o->oMerryGoRoundBooManagerNumBoosSpawned++;
                         }
                     }

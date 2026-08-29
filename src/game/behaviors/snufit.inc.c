@@ -1,3 +1,5 @@
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 /**
  * Behavior file for bhvSnufit and bhvSnufitBalls.
@@ -161,7 +163,17 @@ void bhv_snufit_loop(void) {
         }
 
         cur_obj_scale(o->oSnufitScale);
-        obj_check_attacks(&sSnufitHitbox, o->oAction);
+        // Snufits orbit around their home, so key the UID on home, not pos.
+        if (o->oBingoId == 0) {
+            o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_SNUFIT, o->oHomeX, o->oHomeY, o->oHomeZ);
+        }
+        // Snufit health is 0, so any attack that lands kills it outright and
+        // obj_check_attacks returns the attack type.
+        if (obj_check_attacks(&sSnufitHitbox, o->oAction) != 0) {
+            if (is_new_kill(BINGO_UPDATE_KILLED_SNUFIT, o->oBingoId)) {
+                bingo_update(BINGO_UPDATE_KILLED_SNUFIT);
+            }
+        }
     }
 }
 

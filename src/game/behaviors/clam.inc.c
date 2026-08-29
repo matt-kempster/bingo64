@@ -1,4 +1,6 @@
 // clam.inc.c
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 struct ObjectHitbox sClamShellHitbox = {
     /* interactType:      */ INTERACT_CLAM_OR_BUBBA,
@@ -57,6 +59,12 @@ void clam_act_1(void) {
 void bhv_clam_loop(void) {
     o->header.gfx.scale[1] = 1.5f;
 
+    // bhvClamShell has no SET_HOME, and clam_act_0 shakes oPosY, so latch the
+    // UID from the clam's very first position and keep it.
+    if (o->oBingoId == 0) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_BITTEN_BY_CLAM, o->oPosX, o->oPosY, o->oPosZ);
+    }
+
     switch (o->oAction) {
         case 0:
             clam_act_0();
@@ -64,6 +72,14 @@ void bhv_clam_loop(void) {
         case 1:
             clam_act_1();
             break;
+    }
+
+    // Same shape as the amp's "hurt by" credit: take_damage_and_knock_back
+    // sets INT_STATUS_ATTACKED_MARIO when the shell actually bites Mario.
+    if (o->oInteractStatus & INT_STATUS_ATTACKED_MARIO) {
+        if (is_new_kill(BINGO_UPDATE_BITTEN_BY_CLAM, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_BITTEN_BY_CLAM);
+        }
     }
 
     obj_check_attacks(&sClamShellHitbox, o->oAction);

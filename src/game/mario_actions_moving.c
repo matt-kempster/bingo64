@@ -12,6 +12,7 @@
 #include "memory.h"
 #include "object_helpers.h"
 #include "behavior_data.h"
+#include "bingo_crushers.h"
 #include "rumble_init.h"
 #include "pc/configfile.h"
 #ifdef CHEATS_ACTIONS
@@ -2086,6 +2087,7 @@ s32 check_common_moving_cancels(struct MarioState *m) {
     }
 
     if (m->input & INPUT_SQUISHED) {
+        bingo_track_crushed(m);
         return drop_and_set_mario_action(m, ACT_SQUISHED, 0);
     }
 

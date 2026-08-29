@@ -1,3 +1,5 @@
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 /**
  * Behavior for bhvKoopa and bhvKoopaRaceEndpoint.
@@ -91,6 +93,28 @@ void bhv_koopa_init(void) {
         cur_obj_scale(3.0f);
     } else {
         o->oKoopaAgility = 1.0f;
+    }
+
+    // Koopa the Quick is a race NPC and can never be killed, so it never gets
+    // a bingo UID. Note KOOPA_BP_TINY (4) also reads >= the KtQ base, which is
+    // why this check runs after the movement type has been normalized above.
+    if (o->oKoopaMovementType < KOOPA_BP_KOOPA_THE_QUICK_BASE) {
+        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_KOOPA, o->oHomeX, o->oHomeY, o->oHomeZ);
+    }
+}
+
+/**
+ * Every koopa death (tiny koopa squashed, unshelled koopa knocked back or
+ * stomped) ends in obj_die_if_health_non_positive, which is a shared static
+ * helper. Rather than hook it, each koopa-owned update checks whether the
+ * koopa was deleted during its own attack handling.
+ */
+static void koopa_bingo_check_death(void) {
+    if (o->activeFlags == ACTIVE_FLAG_DEACTIVATED
+        && o->oKoopaMovementType < KOOPA_BP_KOOPA_THE_QUICK_BASE) {
+        if (is_new_kill(BINGO_UPDATE_KILLED_KOOPA, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_KILLED_KOOPA);
+        }
     }
 }
 
@@ -326,6 +350,7 @@ static void koopa_shelled_update(void) {
         }
     }
 
+    koopa_bingo_check_death();
     cur_obj_move_standard(-78);
 }
 
@@ -470,6 +495,7 @@ static void koopa_unshelled_update(void) {
     }
 
     obj_handle_attacks(&sKoopaHitbox, o->oAction, sKoopaUnshelledAttackHandlers);
+    koopa_bingo_check_death();
     cur_obj_move_standard(-78);
 }
 
@@ -821,7 +847,9 @@ void bhv_koopa_update(void) {
                 break;
         }
     } else {
+        // Knockback/squished: the koopa dies inside obj_update_standard_actions.
         o->oAnimState = 1;
+        koopa_bingo_check_death();
     }
 
     obj_face_yaw_approach(o->oMoveAngleYaw, 0x600);

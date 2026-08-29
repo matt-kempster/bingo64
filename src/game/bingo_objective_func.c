@@ -531,5 +531,23 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_BULLY);
         case BINGO_OBJECTIVE_KILL_CHUCKYAS:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_CHUCKYA);
+        case BINGO_OBJECTIVE_KILL_WHOMPS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_WHOMP);
+        case BINGO_OBJECTIVE_KILL_BOOS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_BOO);
+        case BINGO_OBJECTIVE_KILL_SNUFITS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_SNUFIT);
+        case BINGO_OBJECTIVE_HURT_BY_CLAMS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_BITTEN_BY_CLAM);
+        case BINGO_OBJECTIVE_KILL_FLY_GUYS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_FLY_GUY);
+        case BINGO_OBJECTIVE_KILL_MR_BLIZZARDS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_MR_BLIZZARD);
+        case BINGO_OBJECTIVE_KILL_SKEETERS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_SKEETER);
+        case BINGO_OBJECTIVE_KILL_KOOPAS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KILLED_KOOPA);
+        case BINGO_OBJECTIVE_CRUSHED:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_CRUSHED_BY_CRUSHER);
     }
 }

@@ -1,4 +1,6 @@
 // mr_blizzard.inc.c
+#include "game/bingo.h"
+#include "game/bingo_tracking_collectables.h"
 
 // Mr. Blizzard hitbox
 struct ObjectHitbox sMrBlizzardHitbox = {
@@ -44,6 +46,10 @@ void mr_blizzard_spawn_white_particles(s8 count, s8 offsetY, s8 forwardVelBase, 
  * Mr. Blizzard initialization function.
  */
 void bhv_mr_blizzard_init(void) {
+    // Mr. Blizzards respawn out of their hole once Mario walks away, so the
+    // UID has to key on the hole (home), not on where the body happens to be.
+    o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_MR_BLIZZARD, o->oHomeX, o->oHomeY, o->oHomeZ);
+
     if (o->oBhvParams2ndByte == MR_BLIZZARD_STYPE_JUMPING) {
         // Jumping Mr. Blizzard.
         o->oAction = MR_BLIZZARD_ACT_JUMP;
@@ -176,6 +182,9 @@ static void mr_blizzard_act_rotate(void) {
         // 67.5 degrees move to death action, delete the snowball, and make Mr. Blizzard intangible.
         if (o->oMrBlizzardDizziness != 0.0f) {
             if (absi(o->oFaceAngleRoll) > 0x3000) {
+                if (is_new_kill(BINGO_UPDATE_KILLED_MR_BLIZZARD, o->oBingoId)) {
+                    bingo_update(BINGO_UPDATE_KILLED_MR_BLIZZARD);
+                }
                 o->oAction = MR_BLIZZARD_ACT_DEATH;
                 o->prevObj = o->oMrBlizzardHeldObj = NULL;
                 cur_obj_become_intangible();
