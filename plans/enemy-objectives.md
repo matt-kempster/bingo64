@@ -79,6 +79,53 @@ KILL_WHOMPS objective (slam vs ground-pound-kill).
   their equalization must come from course-pinned objective weights
   (coins, reds, 1-ups, poles, secrets), not the enemy roster.
 
+## Idea mine: SM64 Video Quiz (researched 2026-08-29)
+
+The "Super Mario 64 Video Quiz" (2006-c.2010, sequel after) was
+mr_roberts_z's GameFAQs competition: ~163 performed-on-video tasks
+(~10 per main course), points by speed/completion, TAS banned.
+Brightguy (Curtis Bright, sm64.com) archived every task and ranking:
+https://www.sm64.com/videoquiz/ (all tasks:
+tasksd52c.xhtml?course=all). Leaderboard names are the early-ABC crowd
+(BikdipOnABus's entry videos are still on YouTube).
+
+Objective ideas mined from the task corpus, deduped against our roster
+("VQ" = source task; all judged code-hookable unless noted):
+
+New kill classes: Monty Moles (HMC/TTM, VQ HMC 1/9), Swoops (HMC/BBH,
+VQ HMC 5), enemy Lakitu (RR/TTC, VQ RR 5/6), Bookends — bounce-kill
+variant (BBH, VQ BBH 5), Moneybag chase-down (SL, VQ SL 3), Piranha
+Plants (WF/THI, VQ WF 5, THI 8), Eyerok hands (SSL, VQ SSL 8 — grants
+a star, check overlap).
+
+Odd interactions (the Quiz's specialty): ground-pound Dorrie's head
+(HMC, VQ Misc 6); aggro the Mad Piano and escape unhurt (BBH); catch
+and hold a Ukiki (TTM, VQ TTM 2); spawn the butterfly 1-up (TTM, VQ
+TTM 5; evil variant: survive the butterfly bomb); carry the cork box
+up BoB's mountain (VQ BoB 5); ride the rolling log a full revolution
+(LLL/TTM, VQ LLL 5); Crazy Box full-height bounce (SSL/LLL/TTM, VQ SSL
+1); kill an enemy by swatting with your own lost cap in hand (SL/SSL/
+TTM, VQ SL 5); reactivate WDW downtown's dormant fire spitters and get
+burned (VQ WDW 15, their most obscure task); full-heal at a spinning
+heart in one pass (WF/TTC/CotMC/BitFS, VQ WF 3).
+
+Places/traversal: under the BBH merry-go-round (VQ BBH 10); swim under
+the CCM mother penguin (VQ CCM 9); lava-boost up the volcano lavafall
+(LLL, VQ LLL 9); use a hidden warp (warp-trigger id hook, several
+courses); stand on both TTC clock hands (VQ TTC 3); star with the
+clock stopped at 12 (TTC); ride a flying carpet's full route (RR).
+
+Meta/constraint twists: their "Click Game" formats predate ours —
+close-cam-only star or fixed-cam star with N recenters (VQ WF 9 etc.);
+capless "cap stars" (Jet Stream / Wings to the Sky / Red Hot Log
+Rolling without the cap — star id + no-cap-flag hook, VQ JRB 1, BoB 9,
+LLL 2, SSL 9).
+
+Brush-against-existing (harder flavors only): homing-1-up outrun (BoB,
+VQ BoB 3), cannon-to-cannon chain (VQ BoB 6), carry Chuckya into the
+WDW pipe (VQ WDW 6), all-141-coins WF (VQ WF 1), KtQ 0'00" timer
+glitch (VQ BoB 1).
+
 ## Next steps
 
 1. Crusher proof verdict -> implement or amend whitelist.
