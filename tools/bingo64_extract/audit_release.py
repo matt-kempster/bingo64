@@ -28,7 +28,11 @@ Documented exemptions:
   names, camera/save tables -- are in the public decomp sources that
   every port compiles in. assets/demo_data.o and the rest of assets/
   are deliberately NOT exempt: that is where literal ROM bytes would
-  enter the exe.
+  enter the exe. Caveat: generated texture includes under actors/ and
+  levels/ are covered by this exemption too, so pixel data that leaked
+  into an external-data build through a stale include is NOT caught
+  here -- audit_texture_names.py exists for that and make_release.sh
+  runs it first.
 
 Usage: audit_release.py <baserom.us.z64> <release_dir> [builddir]
 Exit 0 = clean, 1 = leaks found.

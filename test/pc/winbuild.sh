@@ -16,7 +16,7 @@ rsync -a "$WT/include/" "$BW/include/"
 # packs server/relay.py and builds the extractor from tools/).
 rsync -a "$WT/tools/" "$BW/tools/"
 rsync -a "$WT/server/" "$BW/server/"
-rsync -a "$WT/Makefile" "$WT/defines.mk" "$BW/"
+rsync -a "$WT/Makefile" "$WT/Makefile.split" "$WT/defines.mk" "$BW/"
 export PATH=$HOME/opt/llvm-mingw-20240221-ucrt-ubuntu-20.04-x86_64/bin:$HOME/opt/cross-bin:$PATH
 cd "$BW"
 make WINDOWS_BUILD=1 CROSS=x86_64-w64-mingw32- CC=x86_64-w64-mingw32-gcc \
@@ -24,3 +24,7 @@ make WINDOWS_BUILD=1 CROSS=x86_64-w64-mingw32- CC=x86_64-w64-mingw32-gcc \
   RENDER_API=D3D11 WINDOW_API=DXGI SDLCROSS=x86_64-w64-mingw32- \
   VERSION=us EXTERNAL_DATA=1 NO_ROM_DEMOS=1 -j8 2>&1 | tail -15
 ls -l "$BW/build/us_pc/sm64.us.f3dex2e.exe"
+# A stray embedded-mode make in $BW leaves pixel-data texture includes
+# behind (beta.6.1 shipped that way); the Makefile stamp now prevents it
+# and this proves it for the exe we are about to stage.
+python3 tools/bingo64_extract/audit_texture_names.py build/us_pc build/us_pc/sm64.us.f3dex2e.exe

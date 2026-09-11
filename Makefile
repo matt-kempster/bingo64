@@ -634,6 +634,17 @@ endif
 # Whether to colorize build messages
 COLOR ?= 1
 
+# Texture includes are generated in two incompatible forms at the SAME build
+# path: raw pixels (embedded) or the res/ filename (EXTERNAL_DATA=1). A build
+# dir reused across modes would keep the other mode's files as "up to date",
+# and a stray embedded-mode make once left nine pixel-data includes for the
+# external-data release link (v1.0-beta.6.1: those textures rendered as the
+# pink/black missing-texture checkerboard for everyone). The stamp changes
+# only when the mode changes; every texture rule depends on it.
+TEXMODE := $(if $(filter 1,$(EXTERNAL_DATA)),external,embedded)
+TEXMODE_STAMP := $(BUILD_DIR)/.texture_mode
+DUMMY != mkdir -p $(BUILD_DIR); [ "$$(cat $(TEXMODE_STAMP) 2>/dev/null)" = "$(TEXMODE)" ] || echo $(TEXMODE) > $(TEXMODE_STAMP)
+
 # File dependencies and variables for specific files
 include Makefile.split
 
@@ -1456,29 +1467,29 @@ TEXTURE_ENCODING := u8
 
 # Convert PNGs to RGBA32, RGBA16, IA16, IA8, IA4, IA1, I8, I4 binary files
 ifeq ($(EXTERNAL_DATA),1)
-$(BUILD_DIR)/%: %.png
+$(BUILD_DIR)/%: %.png $(TEXMODE_STAMP)
 	$(call print,Converting:,$<,$@)
-	$(V)$(ZEROTERM) "$(patsubst %.png,%,$^)" > $@
+	$(V)$(ZEROTERM) "$(patsubst %.png,%,$<)" > $@
 
-$(BUILD_DIR)/%.inc.c: $(BUILD_DIR)/% %.png
+$(BUILD_DIR)/%.inc.c: $(BUILD_DIR)/% %.png $(TEXMODE_STAMP)
 	$(call print,Converting:,$<,$@)
 	$(V)hexdump -v -e '1/1 "0x%X,"' $< > $@
 else
-$(BUILD_DIR)/%: %.png
+$(BUILD_DIR)/%: %.png $(TEXMODE_STAMP)
 	$(call print,Converting:,$<,$@)
 	$(V)$(N64GRAPHICS) -s raw -i $@ -g $< -f $(lastword $(subst ., ,$@))
 
-$(BUILD_DIR)/%.inc.c: %.png
+$(BUILD_DIR)/%.inc.c: %.png $(TEXMODE_STAMP)
 	$(call print,Converting:,$<,$@)
 	$(V)$(N64GRAPHICS) -s $(TEXTURE_ENCODING) -i $@ -g $< -f $(lastword ,$(subst ., ,$(basename $<)))
 
 # Color Index CI8
-$(BUILD_DIR)/%.ci8.inc.c: %.ci8.png
+$(BUILD_DIR)/%.ci8.inc.c: %.ci8.png $(TEXMODE_STAMP)
 	$(call print,Converting CI:,$<,$@)
 	$(PYTHON) $(BINPNG) $< $@ 8
 
 # Color Index CI4
-$(BUILD_DIR)/%.ci4.inc.c: %.ci4.png
+$(BUILD_DIR)/%.ci4.inc.c: %.ci4.png $(TEXMODE_STAMP)
 	$(call print,Converting CI:,$<,$@)
 	$(PYTHON) $(BINPNG) $< $@ 4
 endif

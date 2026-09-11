@@ -43,5 +43,8 @@ rm -f "$LST"
 echo "release assembled in $OUT:"
 find "$OUT" -type f | sort
 echo
+echo "auditing texture names in the exe ..."
+python3 "$EXTDIR/audit_texture_names.py" "$BUILD" "$EXE"
+echo
 echo "auditing for ROM bytes ..."
 python3 "$EXTDIR/audit_release.py" baserom.us.z64 "$OUT" "$BUILD"
