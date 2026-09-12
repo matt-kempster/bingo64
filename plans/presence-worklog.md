@@ -309,6 +309,31 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   will likely be past 8 by then — the draft's number must follow), and
   the draft's target/zip must be rebuilt from that commit.
 
+- RELEASE v1.0-beta.8, take two (2026-09-12; Matt back: "release tip
+  as version 8"). Tip = 65ef57f27 + the fixes below; protocol still 8
+  (nothing bumped it since the aborted attempt), so the draft's number
+  holds. New since the Aug 26 draft: nine enemy objectives (Aug 29),
+  the TTM cannon-reticle fix (alo `||` typo in set_camera_mode's TTM
+  guard, d2e6b59c2), and the 6.1 checkerboard-texture root cause: the
+  shipped 6.1 exe carried RAW PIXELS for nine textures (wing/vanish cap
+  box sides, water_wave_0-3, bbh_textures.00800, king bob-omb eyes/
+  hand) because a stray embedded-mode make in ~/b64-win regenerated
+  their .inc.c and the EXTERNAL_DATA link reused them; every player got
+  the pink/black checkerboard regardless of res/. Fixed for good with a
+  build-dir mode stamp + tools/bingo64_extract/audit_texture_names.py
+  (65ef57f27; make_release.sh and winbuild.sh run it). Sweep: relay
+  29/29, host 23/23, web check, Windows build + both audits clean
+  (zero stale ELF objects this time), Linux build, N64 build, emu suite
+  green after two test-infra fixes: board golden re-blessed (Aug 29
+  enemy objectives changed generation; host goldens had been
+  re-blessed, the emu one not) and test-ram now rebuilds the host
+  generator from scratch (a stale run_tests in the build copy made the
+  RAM board "differ" — no real parity problem). Scripts also marked +x
+  in git (git-archive build copies lost the bit and smoke_test EACCES'd).
+  Exe staged as bingo64-v8.exe in AppData. Release left as DRAFT with
+  the new zip + notes for Matt to publish; relay deploy and the Pages
+  rollback remain classifier-blocked (Matt runs them).
+
 ## Deferred / follow-ups
 
 - ~~Relay-side visibility enforcement (see checklist §2) — potentially
