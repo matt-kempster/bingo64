@@ -7,7 +7,7 @@
 M64P_SRC ?= $(HOME)/opt/m64p/mupen64plus-core/src/api
 BUILD := build
 
-.PHONY: test test-smoke test-ram test-warp test-splat test-starui test-diff plugin clean
+.PHONY: test host-gen test-smoke test-ram test-warp test-splat test-starui test-diff plugin clean
 
 test: test-smoke test-ram test-warp test-splat test-starui
 
@@ -22,8 +22,15 @@ $(BUILD)/input_script.so: input_script.c | $(BUILD)
 test-smoke: plugin
 	python3 smoke_test.py
 
+# The host board generator ram_test.py diffs against. Always rebuilt from
+# scratch: test/host tracks no header deps, and a stale run_tests (old enum
+# numbering, old weights) makes the RAM board "differ" for no real reason.
+host-gen:
+	$(MAKE) -s -C ../host clean
+	$(MAKE) -s -C ../host build/run_tests
+
 # Needs the core built with DEBUGGER=1 for RAM reads.
-test-ram: plugin
+test-ram: plugin host-gen
 	xvfb-run -a python3 ram_test.py
 
 test-warp: plugin
