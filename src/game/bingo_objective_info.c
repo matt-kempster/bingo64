@@ -72,6 +72,10 @@ ALIGNED8 static const u8 seg2_texture_secrets[] = {
 #include "textures/segment2/custom/segment2.secret.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_cannonstars[] = {
+#include "textures/segment2/custom/segment2.cannonstars.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -196,6 +200,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_BLJ, BINGO_ICON_BLJ, { TEXT_BLJ }, seg2_texture_blj },
     { BINGO_OBJECTIVE_RACING_STARS, BINGO_ICON_RACING_STARS, { TEXT_RACING }, seg2_texture_racing },
     { BINGO_OBJECTIVE_SECRETS_STARS, BINGO_ICON_SECRETS_STARS, { TEXT_SECRETS }, seg2_texture_secrets },
+    { BINGO_OBJECTIVE_CANNON_STARS, BINGO_ICON_CANNON_STARS, { TEXT_CANNON_STARS }, seg2_texture_cannonstars },
     { BINGO_OBJECTIVE_BOWSER, BINGO_ICON_BOWSER, { TEXT_BOWSER }, seg2_texture_bowser },
     { BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, BINGO_ICON_ROOF_WITHOUT_CANNON, { TEXT_ROOF_WITHOUT_CANNON }, seg2_texture_roofwithoutcannon },
     { BINGO_OBJECTIVE_SHOOT_CANNONS, BINGO_ICON_CANNON, { TEXT_CANNONS }, seg2_texture_cannon },

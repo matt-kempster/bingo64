@@ -145,6 +145,7 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_BLJ:
         case BINGO_OBJECTIVE_RACING_STARS:
         case BINGO_OBJECTIVE_SECRETS_STARS:
+        case BINGO_OBJECTIVE_CANNON_STARS:
         case BINGO_OBJECTIVE_MULTISTAR:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:

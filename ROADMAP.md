@@ -52,6 +52,7 @@ Items marked done are implemented but may not be in a release yet.
 - [ ] Collect N stars in 1 course
 - [ ] Collect N 100c stars
 - [ ] Collect N red coin stars
+- [x] Collect N stars straight out of a cannon shot (cannon stars)
 
 ### Coins
 

@@ -293,8 +293,8 @@ static void test_invariant_sweep(void) {
 // usesRemaining is already 0 (when the random want_sum is 0), and the
 // counter then drops to -1, which means "no limit". This test pins down
 // exactly how many boards go over budget, out of the 2000 seeds below.
-// The bug is still unfixed, but since the splatoon weights joined the
-// tables, none of these 2000 seeds happen to trigger it (was 1 before).
+// The bug is still unfixed; which seeds trigger it shifts whenever the
+// weight tables change, and currently none of these 2000 seeds do.
 #define KNOWN_OVER_BUDGET_BOARDS 0
 
 static void test_weight_budget(void) {
@@ -358,6 +358,7 @@ static void reset_sim(void) {
     gCurrCourseNum = 0;
     gbStarIndex = 0;
     gbCoinsJustGotten = 0;
+    gbStarFromCannon = 0;
     // Give every unused cell a type that ignores most updates, so the cell
     // under test is the only interesting one.
     {
@@ -425,6 +426,50 @@ static void test_sim_coin_objective(void) {
     // Completion is sticky: a course change no longer resets it.
     bingo_update(BINGO_UPDATE_COURSE_CHANGED);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+static void test_sim_cannon_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_CANNON_STARS;
+    o->data.collectableData.toGet = 2;
+
+    // An ordinary star grab (not from a cannon) does nothing.
+    gCurrCourseNum = 1;
+    gbStarIndex = 3;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // A star hit mid-cannon-shot counts, in any course, and updates the HUD.
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 1);
+
+    // Leaving the course keeps the progress (it is a cross-course total).
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // Other events with the flag stale-set must not count.
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_COIN);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // The second cannon star completes it.
+    gCurrCourseNum = 6;
+    gbStarIndex = 5;
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
 }
 
 static void test_sim_splatoon_objective(void) {
@@ -666,6 +711,7 @@ int main(void) {
     RUN_TEST(test_weight_budget);
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
+    RUN_TEST(test_sim_cannon_stars_objective);
     RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_random_stars_objective);
     RUN_TEST(test_sim_kill_collectable);

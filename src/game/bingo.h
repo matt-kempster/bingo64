@@ -17,6 +17,9 @@ extern s32 gbBingoShowTimer;
 extern u32 gBingoSeed;
 
 extern s16 gbStarIndex;
+// Set for the duration of a star's BINGO_UPDATE_STAR when Mario touched it
+// mid-flight from a cannon shot (see interact_star_or_key).
+extern u8 gbStarFromCannon;
 extern s32 gbCoinsJustGotten;
 extern u8 gBingoFullGameUnlocked;
 extern s32 gBingoReverseJoystickActive;
@@ -97,6 +100,7 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON,
     BINGO_OBJECTIVE_RACING_STARS,
     BINGO_OBJECTIVE_SECRETS_STARS,
+    BINGO_OBJECTIVE_CANNON_STARS,
     // Collectables:
     BINGO_OBJECTIVE_COLLECTABLE_MIN,
     BINGO_OBJECTIVE_MULTICOIN = BINGO_OBJECTIVE_COLLECTABLE_MIN,
@@ -159,6 +163,7 @@ enum BingoObjectiveIcon {
     BINGO_ICON_ROOF_WITHOUT_CANNON,
     BINGO_ICON_RACING_STARS,
     BINGO_ICON_SECRETS_STARS,
+    BINGO_ICON_CANNON_STARS,
     BINGO_ICON_CANNON,
     BINGO_ICON_SIGNPOST,
     BINGO_ICON_RED_COIN,

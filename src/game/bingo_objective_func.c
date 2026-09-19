@@ -280,6 +280,19 @@ s32 objective_secrets_stars(struct BingoObjective *objective, enum BingoObjectiv
     }
 }
 
+s32 objective_cannon_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+
+    if (update == BINGO_UPDATE_STAR && gbStarFromCannon) {
+        data->gotten++;
+        if (data->gotten >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else {
+            bingo_hud_update_number(objective->icon, data->gotten);
+        }
+    }
+}
+
 s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     s32 count = 0;
     s32 old_count = 0;
@@ -464,6 +477,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_racing_stars(objective, update);
         case BINGO_OBJECTIVE_SECRETS_STARS:
             return objective_secrets_stars(objective, update);
+        case BINGO_OBJECTIVE_CANNON_STARS:
+            return objective_cannon_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_BOWSER:

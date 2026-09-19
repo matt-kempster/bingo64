@@ -1,25 +1,25 @@
-00 type=25 class=0 icon=21 title="x3" toGet=3
-01 type=15 class=1 icon=43 title="SSL 370" course=8 toGet=370
-02 type=33 class=1 icon=33 title="x6" toGet=6
-03 type=28 class=1 icon=27 title="x8" toGet=8
-04 type=34 class=2 icon=35 title="x13" toGet=13
-05 type=00 class=1 icon=02 title="VCutMú" course=22 star=0
-06 type=12 class=2 icon=17 title="THI 7" course=13 toGet=7
-07 type=29 class=1 icon=29 title="x16" toGet=16
-08 type=24 class=0 icon=22 title="x6" toGet=6
-09 type=11 class=1 icon=13 title="JRB 77" course=3 toGet=77
-10 type=15 class=1 icon=43 title="THI 190" course=13 toGet=190
-11 type=14 class=1 icon=19 title="TTMú3" course=12 toGet=2
-12 type=28 class=3 icon=27 title="x14" toGet=14
-13 type=32 class=1 icon=32 title="x6" toGet=6
-14 type=05 class=1 icon=07 title="BBHú1" course=5 star=0 hint=""
-15 type=07 class=1 icon=09 title="JRBú4" course=3 star=3
-16 type=00 class=0 icon=02 title="RRú7" course=15 star=6
-17 type=22 class=1 icon=15 title="x8" toGet=8
-18 type=07 class=2 icon=09 title="JRBú3" course=3 star=2
-19 type=33 class=1 icon=33 title="x5" toGet=5
-20 type=26 class=2 icon=28 title="x18" toGet=18
-21 type=22 class=1 icon=15 title="x7" toGet=7
-22 type=07 class=1 icon=09 title="SAú" course=24 star=0
-23 type=14 class=1 icon=19 title="WDWú5" course=11 toGet=4
-24 type=00 class=0 icon=02 title="TTMú5" course=12 star=4
+00 type=00 class=0 icon=02 title="BBHú4" course=5 star=3
+01 type=16 class=1 icon=20 title="7x 4c" toGetTotal=4 toGetEachCourse=7
+02 type=19 class=1 icon=25 title="x3" toGet=3
+03 type=09 class=1 icon=12 title="HMCú3" course=6 star=2
+04 type=30 class=2 icon=30 title="x22" toGet=22
+05 type=37 class=1 icon=38 title="x12" toGet=12
+06 type=15 class=2 icon=44 title="TTM 600" course=12 toGet=600
+07 type=06 class=1 icon=08 title="WDWú6" course=11 star=5 maxClicks=0
+08 type=26 class=0 icon=21 title="x4" toGet=4
+09 type=00 class=1 icon=02 title="THIú7" course=13 star=6
+10 type=27 class=1 icon=29 title="x8" toGet=8
+11 type=29 class=1 icon=28 title="x8" toGet=8
+12 type=24 class=3 icon=16 title="x15" toGet=15
+13 type=39 class=1 icon=40 title="x5" toGet=5
+14 type=32 class=1 icon=32 title="x6" toGet=6
+15 type=07 class=1 icon=09 title="SSLú1" course=8 star=0
+16 type=19 class=0 icon=25 title="x3" toGet=3
+17 type=10 class=1 icon=11 title="CotMC" course=20 toGet=3
+18 type=27 class=2 icon=29 title="x15" toGet=15
+19 type=00 class=1 icon=02 title="RRú7" course=15 star=6
+20 type=03 class=2 icon=05 title="THIú2" course=13 star=1 hint="Enter Huge Island and use the shell."
+21 type=31 class=1 icon=31 title="x10" toGet=10
+22 type=33 class=1 icon=33 title="x4" toGet=4
+23 type=15 class=1 icon=44 title="SSL 370" course=8 toGet=370
+24 type=23 class=0 icon=15 title="x4" toGet=4

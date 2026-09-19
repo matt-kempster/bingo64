@@ -462,6 +462,17 @@ void get_secrets_objective_desc(struct BingoObjective *obj, char *desc) {
     sprintf(desc, "Collect all four stars where you collect 5 secrets (Hint: BOB, SSL, WDW, THI)%s", suffix);
 }
 
+void get_cannon_stars_objective_desc(struct BingoObjective *obj, char *desc) {
+    char suffix[20];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Remaining: %d", obj->data.collectableData.toGet - obj->data.collectableData.gotten);
+    }
+    sprintf(desc, "Collect %d star%s by hitting them mid-flight, straight out of a cannon (no landing first, no wing cap)%s",
+            obj->data.collectableData.toGet, obj->data.collectableData.toGet == 1 ? "" : "s", suffix);
+}
+
 void get_bowser_objective_desc(struct BingoObjective *obj, char *desc) {
     char revEncLevelName[60];
     char suffix[20];
@@ -702,6 +713,9 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_SECRETS_STARS:
             get_secrets_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_CANNON_STARS:
+            get_cannon_stars_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
         case BINGO_OBJECTIVE_BLJ:

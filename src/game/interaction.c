@@ -793,7 +793,16 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
             // has already been called.
             bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
         } else {
+            // Tell bingo whether this star was hit mid-flight from a cannon.
+            // Landing or bonking a wall first changes the action, and the wing
+            // cap turns the shot into flying, so neither can sneak through.
+            // Only a star not yet collected counts, so re-grabs can't farm it.
+            gbStarFromCannon = m->action == ACT_SHOT_FROM_CANNON
+                && !(m->flags & MARIO_WING_CAP)
+                && COURSE_IS_MAIN_COURSE(gCurrCourseNum)
+                && !(bingo_get_course_flags(gCurrCourseNum - 1) & (1 << starIndex));
             save_file_collect_star_or_key(m->numCoins, starIndex);
+            gbStarFromCannon = 0;
 
             m->numStars = bingo_get_star_count();
             // OLD:

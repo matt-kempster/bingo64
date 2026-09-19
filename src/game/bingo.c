@@ -35,6 +35,7 @@ s32 gbBingoShowTimer = 1;
 u32 gBingoSeed = 0;
 
 s16 gbStarIndex = 0;
+u8 gbStarFromCannon = 0;
 
 s32 gbCoinsJustGotten = 0;
 
