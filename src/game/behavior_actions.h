@@ -378,6 +378,7 @@ void bhv_normal_cap_init(void);
 void bhv_normal_cap_loop(void);
 void bhv_vanish_cap_init(void);
 void bhv_collect_star_init(void);
+void bhv_rando_star_init(void);
 void bhv_collect_star_loop(void);
 void bhv_star_spawn_init(void);
 void bhv_star_spawn_loop(void);

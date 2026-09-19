@@ -7,9 +7,9 @@
 M64P_SRC ?= $(HOME)/opt/m64p/mupen64plus-core/src/api
 BUILD := build
 
-.PHONY: test host-gen test-smoke test-ram test-warp test-splat test-starui test-diff plugin clean
+.PHONY: test host-gen test-smoke test-ram test-warp test-splat test-starui test-rando test-diff plugin clean
 
-test: test-smoke test-ram test-warp test-splat test-starui
+test: test-smoke test-ram test-warp test-splat test-starui test-rando
 
 plugin: $(BUILD)/input_script.so
 
@@ -61,6 +61,9 @@ test-diff: plugin
 	    --rom-a $(DIFF_ROM_A) --map-a $(DIFF_MAP_A) \
 	    --rom-b $(DIFF_ROM_B) --map-b $(DIFF_MAP_B) \
 	    --script scripts/diff_move_bob.txt --warp 9 --sync-level 9 --frames 650
+
+test-rando: plugin
+	xvfb-run -a python3 rando_test.py
 
 clean:
 	rm -rf $(BUILD)

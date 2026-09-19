@@ -137,6 +137,17 @@ s32 objective_obtain_star_daredevil(struct BingoObjective *objective, enum Bingo
     }
 }
 
+s32 objective_obtain_random_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CourseCollectableData *data = &objective->data.courseCollectableData;
+
+    if (gBingoRandomStarsActive && update == BINGO_UPDATE_GOT_RANDOM_STAR) {
+        data->gotten = bingo_get_rando_star_count_course(data->course);
+        if (data->gotten >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        }
+    }
+}
+
 s32 objective_obtain_coins(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct CourseCollectableData *data = &objective->data.courseCollectableData;
 
@@ -273,6 +284,19 @@ s32 objective_secrets_stars(struct BingoObjective *objective, enum BingoObjectiv
             set_objective_state(objective, BINGO_STATE_COMPLETE);
         } else if (count > old_count) {
             bingo_hud_update_number(objective->icon, count);
+        }
+    }
+}
+
+s32 objective_cannon_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+
+    if (update == BINGO_UPDATE_STAR && gbStarFromCannon) {
+        data->gotten++;
+        if (data->gotten >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else {
+            bingo_hud_update_number(objective->icon, data->gotten);
         }
     }
 }
@@ -461,6 +485,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_obtain_star_click_game(objective, update);
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
             return objective_obtain_star_daredevil(objective, update);
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+            return objective_obtain_random_stars(objective, update);
         case BINGO_OBJECTIVE_COIN:
             return objective_obtain_coins(objective, update);
         case BINGO_OBJECTIVE_SPLATOON:
@@ -491,6 +517,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_racing_stars(objective, update);
         case BINGO_OBJECTIVE_SECRETS_STARS:
             return objective_secrets_stars(objective, update);
+        case BINGO_OBJECTIVE_CANNON_STARS:
+            return objective_cannon_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_LIVES:

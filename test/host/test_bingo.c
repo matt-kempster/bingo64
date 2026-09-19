@@ -115,6 +115,7 @@ static void dump_cell(FILE *out, int i) {
                     o->data.starClicksObjective.course, o->data.starClicksObjective.starIndex,
                     o->data.starClicksObjective.maxClicks);
             break;
+        case BINGO_OBJECTIVE_RANDOM_STARS:
         case BINGO_OBJECTIVE_COIN:
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
@@ -266,12 +267,14 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_STARS_IN_LEVEL] = "STARS_IN_LEVEL",
     [BINGO_OBJECTIVE_RANDOM_RED_COINS] = "RANDOM_RED_COINS",
     [BINGO_OBJECTIVE_SPLATOON] = "SPLATOON",
+    [BINGO_OBJECTIVE_RANDOM_STARS] = "RANDOM_STARS",
     [BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS] = "DANGEROUS_WALL_KICKS",
     [BINGO_OBJECTIVE_BOWSER] = "BOWSER",
     [BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON] = "ROOF_WITHOUT_CANNON",
     [BINGO_OBJECTIVE_RACING_STARS] = "RACING_STARS",
     [BINGO_OBJECTIVE_SECRETS_STARS] = "SECRETS_STARS",
     [BINGO_OBJECTIVE_LIVES] = "LIVES",
+    [BINGO_OBJECTIVE_CANNON_STARS] = "CANNON_STARS",
     [BINGO_OBJECTIVE_MULTICOIN] = "MULTICOIN",
     [BINGO_OBJECTIVE_MULTISTAR] = "MULTISTAR",
     [BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS] = "STARS_MULTIPLE_LEVELS",
@@ -555,8 +558,8 @@ static void test_invariant_sweep(void) {
 // usesRemaining is already 0 (when the random want_sum is 0), and the
 // counter then drops to -1, which means "no limit". This test pins down
 // exactly how many boards go over budget, out of the 2000 seeds below.
-// The bug is still unfixed, but since the splatoon weights joined the
-// tables, none of these 2000 seeds happen to trigger it (was 1 before).
+// The bug is still unfixed; which seeds trigger it shifts whenever the
+// weight tables change, and currently none of these 2000 seeds do.
 #define KNOWN_OVER_BUDGET_BOARDS 0
 
 static void test_weight_budget(void) {
@@ -642,6 +645,7 @@ static void reset_sim(void) {
     gCurrCourseNum = 0;
     gbStarIndex = 0;
     gbCoinsJustGotten = 0;
+    gbStarFromCannon = 0;
     // Give every unused cell a type that ignores most updates, so the cell
     // under test is the only interesting one.
     {
@@ -709,6 +713,50 @@ static void test_sim_coin_objective(void) {
     // Completion is sticky: a course change no longer resets it.
     bingo_update(BINGO_UPDATE_COURSE_CHANGED);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+static void test_sim_cannon_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_CANNON_STARS;
+    o->data.collectableData.toGet = 2;
+
+    // An ordinary star grab (not from a cannon) does nothing.
+    gCurrCourseNum = 1;
+    gbStarIndex = 3;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // A star hit mid-cannon-shot counts, in any course, and updates the HUD.
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 1);
+
+    // Leaving the course keeps the progress (it is a cross-course total).
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // Other events with the flag stale-set must not count.
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_COIN);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // The second cannon star completes it.
+    gCurrCourseNum = 6;
+    gbStarIndex = 5;
+    gbStarFromCannon = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
 }
 
 static void test_sim_splatoon_objective(void) {
@@ -787,6 +835,48 @@ static void test_sim_unique_deaths(void) {
     bingo_track_death(ACT_LAVA_BOOST);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
     CHECK_EQ_INT(gGlueHudNumberCalls, 2);
+}
+
+static void test_sim_random_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_RANDOM_STARS;
+    o->data.courseCollectableData.course = 7;
+    o->data.courseCollectableData.toGet = 3;
+
+    // Without the modifier active, collections do nothing.
+    gCurrCourseNum = 7;
+    bingo_set_rando_star(7, 0);
+    bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 0);
+
+    // With the modifier active, the count tracks the per-course flags.
+    gBingoRandomStarsActive = 1;
+    bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 1);
+
+    // Stars in another course do not help this objective.
+    bingo_set_rando_star(8, 1);
+    bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 1);
+
+    // Collecting the same star again is idempotent (bitflag semantics).
+    bingo_set_rando_star(7, 0);
+    bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+    CHECK_EQ_INT(o->data.courseCollectableData.gotten, 1);
+
+    // All three stars complete the objective.
+    bingo_set_rando_star(7, 1);
+    bingo_set_rando_star(7, 2);
+    bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // Completion is sticky across course changes.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    gBingoRandomStarsActive = 0;
 }
 
 static void test_sim_kill_collectable(void) {
@@ -1178,8 +1268,10 @@ int main(void) {
     RUN_TEST(test_repeated_generation_resets_budgets);
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
+    RUN_TEST(test_sim_cannon_stars_objective);
     RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_unique_deaths);
+    RUN_TEST(test_sim_random_stars_objective);
     RUN_TEST(test_sim_kill_collectable);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);

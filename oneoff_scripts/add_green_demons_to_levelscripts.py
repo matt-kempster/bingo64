@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import argparse
+
 
 def get_mario_pos(line):
     if "/*pos*/" not in line:
@@ -22,17 +24,29 @@ def green_demon_object(mario_pos):
     )
 
 
-for script in Path("./levels").glob("**/script.c"):
+def already_done(lines, marker) -> bool:
+    for line in lines:
+        if marker in line:
+            return True
+    return False
+
+
+def get_first_return_line(lines):
+    inside_script_func_local = False
+    for line in lines:
+        if "script_func_local_1[]" in line:
+            inside_script_func_local = True
+        elif inside_script_func_local and "RETURN()" in line:
+            return line
+    return None
+
+
+def ensure_demon(script: Path) -> None:
     lines = script.read_text().splitlines()
 
-    already_done = False
-    for line in lines:
-        if "bhv1upGreenDemon" in line:
-            print(f"{script} already has a green demon")
-            already_done = True
-    if already_done:
-        continue
-
+    if already_done(lines, "bhv1upGreenDemon"):
+        print(f"{script} already has a green demon")
+        return
 
     mario_pos = None
     for line in lines:
@@ -41,23 +55,16 @@ for script in Path("./levels").glob("**/script.c"):
             break
     if not mario_pos:
         print(f"could not find mario_pos in {script}")
-        continue
+        return
 
-    inside_script_func_local = False
-    the_return_line = None
-    for line in lines:
-        if "script_func_local_1[]" in line:
-            inside_script_func_local = True
-        elif inside_script_func_local and "RETURN()" in line:
-            the_return_line = line
-            break
+    the_return_line = get_first_return_line(lines)
     if not the_return_line:
         print(f"could not find return line in {script}")
-        continue
+        return
 
     response = input(f"should I do {script}?: ")
     if response.lower() != "y":
-        continue
+        return
 
     object = green_demon_object(mario_pos)
 
@@ -68,3 +75,53 @@ for script in Path("./levels").glob("**/script.c"):
 
     lines.insert(lines.index(the_return_line), object)
     script.write_text("\n".join(lines) + "\n")
+
+
+def rando_star(i: int) -> str:
+    return (
+        "    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR, "
+        "                 "
+        "/*pos*/     0,    0,     0, "
+        "/*angle*/ 0, 0, 0,    "
+        f"/*behParam*/ 0x0{i}000000, "
+        "/*beh*/ bhvStarRandomized,        "
+        "/*acts*/ ALL_ACTS),"
+    )
+
+
+def ensure_randstars(script: Path) -> None:
+    lines = script.read_text().splitlines()
+
+    if already_done(lines, "bhvStarRandomized"):
+        print(f"{script} already has a rando star")
+        return
+
+    the_return_line = get_first_return_line(lines)
+    if not the_return_line:
+        print(f"could not find return line in {script}")
+        return
+
+    response = input(f"should I do {script}?: ")
+    if response.lower() != "y":
+        return
+
+    for i in range(3):
+        object = rando_star(i)
+        lines.insert(lines.index(the_return_line), object)
+
+    script.write_text("\n".join(lines) + "\n")
+
+
+def main(mode: str):
+    for script in Path("./levels").glob("**/script.c"):
+        if mode == "demon":
+            ensure_demon(script)
+        elif mode == "randstars":
+            ensure_randstars(script)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mode", choices=("demon", "randstars"))
+    args = parser.parse_args()
+    main(args.mode)

@@ -15,6 +15,16 @@
 #include "make_const_nonconst.h"
 #include "levels/wdw/header.h"
 
+// The three random bingo stars are linked from every AREA block: each star
+// belongs to one seed-chosen area and deletes itself in the others (see
+// bhv_rando_star_init).
+static const LevelScript script_func_rando_stars[] = {
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    RETURN(),
+};
+
 static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_WDW_SQUARE_FLOATING_PLATFORM,      /*pos*/  3390,    0,   384, /*angle*/ 0, 180, 0, /*bhvParam*/ 0, /*bhv*/ bhvWDWSquareFloatingPlatform),
     OBJECT(/*model*/ MODEL_WDW_SQUARE_FLOATING_PLATFORM,      /*pos*/  -767,  384,  3584, /*angle*/ 0,   0, 0, /*bhvParam*/ 0, /*bhv*/ bhvWDWSquareFloatingPlatform),
@@ -100,6 +110,7 @@ const LevelScript level_wdw_entry[] = {
         WARP_NODE(/*id*/ WARP_NODE_0A, /*destLevel*/ LEVEL_WDW, /*destArea*/ 1, /*destNode*/ WARP_NODE_0A, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ WARP_NODE_0B, /*destLevel*/ LEVEL_WDW, /*destArea*/ 1, /*destNode*/ WARP_NODE_0C, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ WARP_NODE_0C, /*destLevel*/ LEVEL_WDW, /*destArea*/ 1, /*destNode*/ WARP_NODE_0B, /*flags*/ WARP_NO_CHECKPOINT),
+        JUMP_LINK(script_func_rando_stars),
         JUMP_LINK(script_func_local_3),
         JUMP_LINK(script_func_local_1),
         WARP_NODE(/*id*/ WARP_NODE_SUCCESS, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_32, /*flags*/ WARP_NO_CHECKPOINT),
@@ -112,6 +123,7 @@ const LevelScript level_wdw_entry[] = {
     END_AREA(),
 
     AREA(/*index*/ 2, wdw_geo_000724),
+        JUMP_LINK(script_func_rando_stars),
         JUMP_LINK(script_func_local_4),
         JUMP_LINK(script_func_local_2),
         WARP_NODE(/*id*/ WARP_NODE_SUCCESS, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 2, /*destNode*/ WARP_NODE_32, /*flags*/ WARP_NO_CHECKPOINT),

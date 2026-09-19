@@ -71,6 +71,7 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK, 8, 2 },
     { BINGO_OBJECTIVE_STAR_CLICK_GAME, 8, 2 },
     { BINGO_OBJECTIVE_RANDOM_RED_COINS, 12, 3 },
+    { BINGO_OBJECTIVE_RANDOM_STARS, 8, NO_LIMIT },
     { BINGO_OBJECTIVE_1UPS_IN_LEVEL, 12, NO_LIMIT },
     { BINGO_OBJECTIVE_STARS_IN_LEVEL, 8, 2 },
     { BINGO_OBJECTIVE_LIVES, 8, 1 },
@@ -80,6 +81,7 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_RED_COIN, 12, 2 },
     { BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX, 8, 2 },
     { BINGO_OBJECTIVE_SECRETS_STARS, 8, 2 },
+    { BINGO_OBJECTIVE_CANNON_STARS, 6, 1 },
     { BINGO_OBJECTIVE_RACING_STARS, 4, 1 },
     { BINGO_OBJECTIVE_WING_CAP_BOX, 4, 2 },
     { BINGO_OBJECTIVE_VANISH_CAP_BOX, 4, 2 },
@@ -105,6 +107,7 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_STAR_GREEN_DEMON, 12, NO_LIMIT },
     { BINGO_OBJECTIVE_STAR_DAREDEVIL, 8, 3 },
     { BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS, 12, 1 },
+    { BINGO_OBJECTIVE_CANNON_STARS, 4, 1 },
     { BINGO_OBJECTIVE_POLES, 12, 2 },
     { BINGO_OBJECTIVE_SHOOT_CANNONS, 12, 1 },
     { BINGO_OBJECTIVE_RED_COIN, 12, 1 },
@@ -365,6 +368,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
             || type1 == BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON
             || type1 == BINGO_OBJECTIVE_RACING_STARS
             || type1 == BINGO_OBJECTIVE_SECRETS_STARS
+            || type1 == BINGO_OBJECTIVE_CANNON_STARS
         ) {
             return 1;
         }
@@ -377,6 +381,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
                 || type1 == BINGO_OBJECTIVE_STARS_IN_LEVEL
                 || type1 == BINGO_OBJECTIVE_RANDOM_RED_COINS
                 || type1 == BINGO_OBJECTIVE_SPLATOON
+                || type1 == BINGO_OBJECTIVE_RANDOM_STARS
             )
             && (
                 obj1->data.courseCollectableData.course

@@ -38,11 +38,13 @@ s32 gbBingoShowTimer = 1;
 u32 gBingoSeed = 0;
 
 s16 gbStarIndex = 0;
+u8 gbStarFromCannon = 0;
 
 s32 gbCoinsJustGotten = 0;
 
 u8 gBingoFullGameUnlocked = 1;
 s32 gBingoReverseJoystickActive = 0;
+s32 gBingoRandomStarsActive = 0;
 s32 gBingoClickGameActive = 0;
 s32 gBingoClickCounter = 0;
 s16 gBingoClickGamePrevCameraSettings = 0;
@@ -137,6 +139,7 @@ void disable_bingo_modifiers() {
         obj_mark_for_deletion(cur_obj_nearest_object_with_behavior(bhv1upGreenDemon));
     }
     gBingoReverseJoystickActive = 0;
+    gBingoRandomStarsActive = 0;
     gBingoDaredevilActive = 0;
     gBingoClickGameActive = 0;
     gBingoClickCounter = -1;

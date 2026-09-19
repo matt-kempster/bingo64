@@ -15,6 +15,16 @@
 #include "make_const_nonconst.h"
 #include "levels/ddd/header.h"
 
+// The three random bingo stars are linked from every AREA block: each star
+// belongs to one seed-chosen area and deletes itself in the others (see
+// bhv_rando_star_init).
+static const LevelScript script_func_rando_stars[] = {
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    RETURN(),
+};
+
 static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_SUSHI,        /*pos*/ -3071,  -270,   0, /*angle*/ 0, 0, 0, /*bhvParam*/ 0, /*bhv*/ bhvSushiShark),
     OBJECT(/*model*/ MODEL_SUSHI,        /*pos*/ -3071, -4270,   0, /*angle*/ 0, 0, 0, /*bhvParam*/ 0, /*bhv*/ bhvSushiShark),
@@ -88,6 +98,7 @@ const LevelScript level_ddd_entry[] = {
         WARP_NODE(/*id*/ WARP_NODE_SUCCESS, /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 3, /*destNode*/ WARP_NODE_35, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ WARP_NODE_DEATH,   /*destLevel*/ LEVEL_CASTLE, /*destArea*/ 3, /*destNode*/ WARP_NODE_67, /*flags*/ WARP_NO_CHECKPOINT),
         WHIRLPOOL(/*index*/ 0, /*acts*/ ALL_ACTS, /*pos*/ -3174, -4915, 102, /*strength*/ 20),
+        JUMP_LINK(script_func_rando_stars),
         JUMP_LINK(script_func_local_1),
         JUMP_LINK(script_func_local_2),
         INSTANT_WARP(/*index*/ 3, /*destArea*/ 2, /*displace*/ -8192, 0, 0),
@@ -103,6 +114,7 @@ const LevelScript level_ddd_entry[] = {
         WARP_NODE(/*id*/ WARP_NODE_SUCCESS,    /*destLevel*/ LEVEL_CASTLE,         /*destArea*/ 3, /*destNode*/ WARP_NODE_35, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ WARP_NODE_DEATH,      /*destLevel*/ LEVEL_CASTLE,         /*destArea*/ 3, /*destNode*/ WARP_NODE_67, /*flags*/ WARP_NO_CHECKPOINT),
         WARP_NODE(/*id*/ WARP_NODE_WARP_FLOOR, /*destLevel*/ LEVEL_CASTLE_GROUNDS, /*destArea*/ 1, /*destNode*/ WARP_NODE_1E, /*flags*/ WARP_NO_CHECKPOINT),
+        JUMP_LINK(script_func_rando_stars),
         JUMP_LINK(script_func_local_3),
         JUMP_LINK(script_func_local_4),
         JUMP_LINK(script_func_local_5),

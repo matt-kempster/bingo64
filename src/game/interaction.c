@@ -807,6 +807,7 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
     u32 starGrabAction = ACT_STAR_DANCE_EXIT;
     u32 noExit = (o->oInteractionSubtype & INT_SUBTYPE_NO_EXIT) != 0;
     u32 grandStar = (o->oInteractionSubtype & INT_SUBTYPE_GRAND_STAR) != 0;
+    u32 randoStar = (o->oInteractionSubtype & INT_SUBTYPE_RANDO_STAR) != 0;
 
     if (m->health >= 0x100) {
         mario_stop_riding_and_holding(m);
@@ -855,12 +856,30 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
         m->usedObj = o;
 
         starIndex = (o->oBhvParams >> 24) & 0x1F;
-        save_file_collect_star_or_key(m->numCoins, starIndex);
+        if (randoStar) {
+            gLastCompletedStarNum = 7;
+            bingo_set_rando_star(gCurrCourseNum, starIndex);
+            // Order matters here! The above line has to go above the below line.
+            // This is because bingo_objective_func assumes bingo_set_rando_star()
+            // has already been called.
+            bingo_update(BINGO_UPDATE_GOT_RANDOM_STAR);
+        } else {
+            // Tell bingo whether this star was hit mid-flight from a cannon.
+            // Landing or bonking a wall first changes the action, and the wing
+            // cap turns the shot into flying, so neither can sneak through.
+            // Only a star not yet collected counts, so re-grabs can't farm it.
+            gbStarFromCannon = m->action == ACT_SHOT_FROM_CANNON
+                && !(m->flags & MARIO_WING_CAP)
+                && COURSE_IS_MAIN_COURSE(gCurrCourseNum)
+                && !(bingo_get_course_flags(gCurrCourseNum - 1) & (1 << starIndex));
+            save_file_collect_star_or_key(m->numCoins, starIndex);
+            gbStarFromCannon = 0;
 
-        m->numStars = bingo_get_star_count();
-        // OLD:
-        // m->numStars = save_file_get_total_star_count(
-        //     gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1);
+            m->numStars = bingo_get_star_count();
+            // OLD:
+            // m->numStars = save_file_get_total_star_count(
+            //     gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1);
+        }
 
         if (!noExit) {
             drop_queued_background_music();
@@ -876,7 +895,11 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
             return set_mario_action(m, ACT_JUMBO_STAR_CUTSCENE, 0);
         }
 
-        return set_mario_action(m, starGrabAction, noExit + 2 * grandStar);
+        if (randoStar) {
+            return set_mario_action(m, starGrabAction, 3);
+        } else {
+            return set_mario_action(m, starGrabAction, noExit + 2 * grandStar);
+        }
     }
 
     return FALSE;

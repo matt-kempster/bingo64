@@ -24,6 +24,9 @@ static const LevelScript script_func_local_1[] = {
     OBJECT(/*model*/ MODEL_NONE,                  /*pos*/  1459, -1594, -6256, /*angle*/ 0,  90, 0, /*bhvParam*/ BPARAM1(1) | BPARAM2(75), /*bhv*/ bhvCheckerboardElevatorGroup),
     OBJECT(/*model*/ MODEL_NONE,                  /*pos*/ -1151, -2413, -6256, /*angle*/ 0, 270, 0, /*bhvParam*/ BPARAM1(1) | BPARAM2(75), /*bhv*/ bhvCheckerboardElevatorGroup),
     OBJECT(/*model*/ MODEL_1UP, /*pos*/ -6143, 6734, -6143, /*angle*/ 0, 0, 0, /*behParam*/ 0x00000000, /*beh*/ bhv1upGreenDemon),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x00000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x01000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
+    OBJECT_WITH_ACTS(/*model*/ MODEL_STAR,                  /*pos*/     0,    0,     0, /*angle*/ 0, 0, 0,    /*behParam*/ 0x02000000, /*beh*/ bhvStarRandomized,        /*acts*/ ALL_ACTS),
     RETURN(),
 };
 

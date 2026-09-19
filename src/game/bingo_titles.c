@@ -73,6 +73,13 @@ void get_in_level_objective_title(struct BingoObjective *objective) {
     sprintf(objective->title, "%s %d", abbrev, objective->data.courseCollectableData.toGet);
 }
 
+void get_in_level_no_number_objective_title(struct BingoObjective *objective) {
+    char abbrev[9];
+    get_course_abbreviation(objective->data.courseCollectableData.course, &abbrev);
+
+    sprintf(objective->title, "%s", abbrev);
+}
+
 void get_bowser_objective_title(struct BingoObjective *objective) {
     char abbrev[9] = { 0xFF };
     enum LevelNum level = objective->data.levelData.level;
@@ -139,6 +146,9 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
             get_in_level_objective_title(objective);
             break;
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+            get_in_level_no_number_objective_title(objective);
+            break;
         case BINGO_OBJECTIVE_BOWSER:
             get_bowser_objective_title(objective);
             break;
@@ -148,6 +158,7 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_BLJ:
         case BINGO_OBJECTIVE_RACING_STARS:
         case BINGO_OBJECTIVE_SECRETS_STARS:
+        case BINGO_OBJECTIVE_CANNON_STARS:
         case BINGO_OBJECTIVE_MULTISTAR:
         case BINGO_OBJECTIVE_LIVES:
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:

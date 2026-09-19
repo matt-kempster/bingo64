@@ -39,9 +39,13 @@ extern s32 gbBingoShowTimer;
 extern u32 gBingoSeed;
 
 extern s16 gbStarIndex;
+// Set for the duration of a star's BINGO_UPDATE_STAR when Mario touched it
+// mid-flight from a cannon shot (see interact_star_or_key).
+extern u8 gbStarFromCannon;
 extern s32 gbCoinsJustGotten;
 extern u8 gBingoFullGameUnlocked;
 extern s32 gBingoReverseJoystickActive;
+extern s32 gBingoRandomStarsActive;
 extern s32 gBingoClickGameActive;
 extern s32 gBingoClickCounter;
 extern s16 gBingoClickGamePrevCameraSettings;
@@ -56,6 +60,7 @@ enum BingoModifier {
     BINGO_MODIFIER_REVERSE_JOYSTICK,
     BINGO_MODIFIER_ORDERED_RED_COINS,
     BINGO_MODIFIER_CLICK_GAME,
+    BINGO_MODIFIER_RANDOM_STARS,
     BINGO_MODIFIER_DAREDEVIL,
     BINGO_MODIFIER_SPLATOON,
     BINGO_MODIFIER_MAX = BINGO_MODIFIER_SPLATOON,
@@ -104,6 +109,8 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_STAR_GREEN_DEMON,
     BINGO_OBJECTIVE_STAR_DAREDEVIL,
     BINGO_OBJECTIVE_STAR_MAX = BINGO_OBJECTIVE_STAR_DAREDEVIL,
+    // Game-modifying, but not single stars:
+    BINGO_OBJECTIVE_RANDOM_STARS,
     // Per level:
     BINGO_OBJECTIVE_COIN,
     BINGO_OBJECTIVE_1UPS_IN_LEVEL,
@@ -118,6 +125,7 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_RACING_STARS,
     BINGO_OBJECTIVE_SECRETS_STARS,
     BINGO_OBJECTIVE_LIVES,
+    BINGO_OBJECTIVE_CANNON_STARS,
     // Collectables:
     BINGO_OBJECTIVE_COLLECTABLE_MIN,
     BINGO_OBJECTIVE_MULTICOIN = BINGO_OBJECTIVE_COLLECTABLE_MIN,
@@ -174,6 +182,7 @@ enum BingoObjectiveIcon {
     BINGO_ICON_STAR_CLICK_GAME,
     BINGO_ICON_STAR_REVERSE_JOYSTICK,
     BINGO_ICON_STAR_GREEN_DEMON,
+    BINGO_ICON_RANDOM_STARS,
     BINGO_ICON_STAR_DAREDEVIL,
     BINGO_ICON_COIN,
     BINGO_ICON_MULTICOIN,
@@ -189,6 +198,7 @@ enum BingoObjectiveIcon {
     BINGO_ICON_ROOF_WITHOUT_CANNON,
     BINGO_ICON_RACING_STARS,
     BINGO_ICON_SECRETS_STARS,
+    BINGO_ICON_CANNON_STARS,
     BINGO_ICON_CANNON,
     BINGO_ICON_SIGNPOST,
     BINGO_ICON_RED_COIN,
@@ -258,6 +268,8 @@ enum BingoObjectiveUpdate
 
     BINGO_COLLECTABLES_MAX = BINGO_UPDATE_DANGEROUS_WALL_KICK,
     // End collectables (TODO: migrate away from Update enum?)
+
+    BINGO_UPDATE_GOT_RANDOM_STAR,
 
     BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN,
     BINGO_UPDATE_LOST_HAT_KLEPTO = BINGO_UPDATE_LOST_HAT_FLAGS_BEGIN,

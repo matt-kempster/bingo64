@@ -22,6 +22,8 @@ void bingo_tracking_star_reset(void) {
     gbSecretStarFlags = 0;
 }
 
+u8 sRandoStarFlags[COURSE_MAX] = { 0 };
+
 void bingo_set_star(s16 course, s16 star) {
     if (course == -1) {
         gbSecretStarFlags |= (1 << star);
@@ -70,4 +72,23 @@ s32 bingo_get_star_count(void) {
 u8 bingo_get_course_flags(s16 course) {
     // TODO(kempster): if course is -1, return secret star count
     return gbCourseStars[course];
+}
+
+void bingo_set_rando_star(enum CourseNum course, u8 starIndex) {
+    sRandoStarFlags[course] |= (1 << starIndex);
+}
+
+u8 bingo_get_rando_star_status(enum CourseNum course, u8 starIndex) {
+    return sRandoStarFlags[course] & (1 << starIndex);
+}
+
+u8 bingo_get_rando_star_count_course(enum CourseNum course) {
+    u32 flag;
+    u8 count = 0;
+    for (flag = 1; flag != (1 << 8); flag <<= 1) {
+        if (sRandoStarFlags[course] & flag) {
+            count++;
+        }
+    }
+    return count;
 }

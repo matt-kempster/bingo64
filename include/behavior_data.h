@@ -341,6 +341,7 @@ extern const BehaviorScript bhvBetaBowserAnchor[];
 extern const BehaviorScript bhvStaticCheckeredPlatform[];
 extern const BehaviorScript bhvUnused2A10[];
 extern const BehaviorScript bhvStar[];
+extern const BehaviorScript bhvStarRandomized[];
 extern const BehaviorScript bhvStaticObject[];
 extern const BehaviorScript bhvUnused2A54[];
 extern const BehaviorScript bhvCastleFloorTrap[];

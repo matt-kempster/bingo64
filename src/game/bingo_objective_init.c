@@ -439,6 +439,22 @@ s32 bingo_objective_star_random_reds_init(
     objective->data.starObjective.starIndex = star;
 }
 
+s32 bingo_objective_random_stars_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    enum CourseNum course;
+    switch (class) {
+        // TODO: Pick courses more intelligently. Many special courses
+        // and some main courses are simply too easy.
+        default:
+            course = random_range_inclusive(COURSE_MIN, COURSE_SA);
+            break;
+    }
+    objective->data.courseCollectableData.course = course;
+    objective->data.courseCollectableData.toGet = 3;
+    objective->data.courseCollectableData.gotten = 0;
+}
+
 void random_main_course_coins(enum BingoObjectiveClass class, enum CourseNum *course, s32 *coins) {
     switch (class) {
         default:
@@ -672,6 +688,22 @@ s32 bingo_objective_secrets_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
     objective->data.collectableData.toGet = 4;
+    objective->data.collectableData.gotten = 0;
+}
+
+s32 bingo_objective_cannon_stars_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_MEDIUM:
+            toGet = random_range_inclusive(1, 2);
+            break;
+        default:
+            toGet = random_range_inclusive(2, 4);
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
     objective->data.collectableData.gotten = 0;
 }
 
@@ -1113,6 +1145,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_star_daredevil_init(objective, class);
         case BINGO_OBJECTIVE_RANDOM_RED_COINS:
             return bingo_objective_star_random_reds_init(objective, class);
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+            return bingo_objective_random_stars_init(objective, class);
         case BINGO_OBJECTIVE_COIN:
             return bingo_objective_coin_init(objective, class);
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
@@ -1131,6 +1165,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_racing_init(objective, class);
         case BINGO_OBJECTIVE_SECRETS_STARS:
             return bingo_objective_secrets_init(objective, class);
+        case BINGO_OBJECTIVE_CANNON_STARS:
+            return bingo_objective_cannon_stars_init(objective, class);
         case BINGO_OBJECTIVE_BOWSER:
             return bingo_objective_bowser_init(objective, class);
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:

@@ -238,6 +238,7 @@
 #define TEXT_CLICK_GAME _("The Click Game!")
 #define TEXT_DAREDEVIL _("Daredevil")
 #define TEXT_RANDOM_REDS _("Random Route Reds")
+#define TEXT_RANDOM_STARS _("3 Random Stars")
 #define TEXT_COIN_LEVEL _("Coins in Level")
 #define TEXT_TOTAL_COIN _("Total Coins")
 #define TEXT_TOTAL_LIVES _("Total Lives")
@@ -250,6 +251,7 @@
 #define TEXT_BLJ _("Perform BLJs")
 #define TEXT_RACING _("Racing Stars")
 #define TEXT_SECRETS _("5 Secrets Stars")
+#define TEXT_CANNON_STARS _("Cannon Shot Stars")
 #define TEXT_BOWSER _("Defeat Bowser")
 #define TEXT_ROOF_WITHOUT_CANNON _("Roof, No Cannon")
 #define TEXT_EXCLAM_BOXES _("Yellow ! Boxes")
@@ -371,6 +373,7 @@
 #define BINGO_RANDOM_ROUTE_RED_COINS _("RANDOM ROUTE RED COINS")
 #define BINGO_SPLATOON _("SPLATOON")
 #define TEXT_SPLATOON_LEVEL _("Splatoon Mode")
+#define BINGO_RANDOM_STARS _("3 RANDOM PURPLE STARS")
 
 // Camera Options
 #define TEXT_LAKITU_MARIO _("LAKITU + MARIO")

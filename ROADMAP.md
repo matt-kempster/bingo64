@@ -12,7 +12,7 @@ checked off in one place.
 - [ ] Bully count fix *(likely fixed by PR #4 — confirm and check off)*
 - [x] Redraw the unique-deaths skull icon (current one is a placeholder)
 - [ ] Different game modes (easy, medium, hard, blind, classic bingo)
-- [ ] Rando stars bingo
+- [x] Rando stars bingo
 - [ ] On option select screen, use [R], [B], etc.
 - [x] More objective types
 - [x] Fix SA not counting towards star total bug
@@ -57,6 +57,7 @@ Items marked done are implemented but may not be in a release yet.
 - [ ] Collect N stars in 1 course
 - [ ] Collect N 100c stars
 - [ ] Collect N red coin stars
+- [x] Collect N stars straight out of a cannon shot (cannon stars)
 
 ### Coins
 
@@ -110,7 +111,7 @@ Items marked done are implemented but may not be in a release yet.
 - [ ] Render Mario several units away from where he actually is
 - [ ] Stripe updating mode
 - [ ] Nonstop mode
-- [ ] Splatoon mode (paint triangles you land on, paint N% of the
+- [x] Splatoon mode (paint triangles you land on, paint N% of the
       level) (actually I think this is impossible)
 - [x] Random Route Red Coins
 

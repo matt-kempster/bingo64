@@ -72,6 +72,10 @@ ALIGNED8 static const u8 seg2_texture_secrets[] = {
 #include "textures/segment2/custom/segment2.secret.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_cannonstars[] = {
+#include "textures/segment2/custom/segment2.cannonstars.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -160,6 +164,11 @@ ALIGNED8 static const u8 seg2_texture_cannon[] = {
 #include "textures/segment2/custom/segment2.cannon.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_randostars[] = {
+#include "textures/segment2/custom/segment2.randostars.rgba16.inc.c"
+};
+
+
 ALIGNED8 static const u8 texture_hud_char_coin[] = {
 #include "textures/segment2/segment2.05800.rgba16.inc.c"
 };
@@ -223,6 +232,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STAR_CLICK_GAME, BINGO_ICON_STAR_CLICK_GAME, { TEXT_CLICK_GAME }, seg2_texture_rbutton },
     { BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK, BINGO_ICON_STAR_REVERSE_JOYSTICK, { TEXT_REVERSE_JOYSTICK }, seg2_texture_joystick },
     { BINGO_OBJECTIVE_STAR_GREEN_DEMON, BINGO_ICON_STAR_GREEN_DEMON, { TEXT_GREEN_DEMON }, seg2_texture_greendemon },
+    { BINGO_OBJECTIVE_RANDOM_STARS, BINGO_ICON_RANDOM_STARS, { TEXT_RANDOM_STARS }, seg2_texture_randostars },
     { BINGO_OBJECTIVE_STAR_DAREDEVIL, BINGO_ICON_STAR_DAREDEVIL, { TEXT_DAREDEVIL }, seg2_texture_daredevil },
     { BINGO_OBJECTIVE_RANDOM_RED_COINS, BINGO_ICON_RANDOM_RED_COINS, { TEXT_RANDOM_REDS }, seg2_texture_randomreds },
     { BINGO_OBJECTIVE_COIN, BINGO_ICON_COIN, { TEXT_COIN_LEVEL }, texture_hud_char_coin },
@@ -235,6 +245,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_BLJ, BINGO_ICON_BLJ, { TEXT_BLJ }, seg2_texture_blj },
     { BINGO_OBJECTIVE_RACING_STARS, BINGO_ICON_RACING_STARS, { TEXT_RACING }, seg2_texture_racing },
     { BINGO_OBJECTIVE_SECRETS_STARS, BINGO_ICON_SECRETS_STARS, { TEXT_SECRETS }, seg2_texture_secrets },
+    { BINGO_OBJECTIVE_CANNON_STARS, BINGO_ICON_CANNON_STARS, { TEXT_CANNON_STARS }, seg2_texture_cannonstars },
     { BINGO_OBJECTIVE_BOWSER, BINGO_ICON_BOWSER, { TEXT_BOWSER }, seg2_texture_bowser },
     { BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, BINGO_ICON_ROOF_WITHOUT_CANNON, { TEXT_ROOF_WITHOUT_CANNON }, seg2_texture_roofwithoutcannon },
     { BINGO_OBJECTIVE_SHOOT_CANNONS, BINGO_ICON_CANNON, { TEXT_CANNONS }, seg2_texture_cannon },

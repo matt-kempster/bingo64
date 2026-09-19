@@ -24,10 +24,10 @@ ROM = os.path.join(REPO, "build", "us", "sm64.us.f3dzex.z64")
 MAP = os.path.join(REPO, "build", "us", "sm64.us.map")
 
 LEVEL_BOB = 9
-BINGO_MODIFIER_SPLATOON = 6
+BINGO_MODIFIER_SPLATOON = 7
 
 # Left-to-right star colors, matching enum BingoModifier order.
-STAR_ORDER = ["yellow", "green", "blue", "orange", "gray", "red", "pink"]
+STAR_ORDER = ["yellow", "green", "blue", "orange", "gray", "purple", "red", "pink"]
 
 failures = []
 
@@ -45,6 +45,8 @@ def classify(r, g, b):
         return "yellow"
     if g - r > 40 and g - b > 40 and g > 120:
         return "green"
+    if b > 180 and r - g > 20 and 80 < r < 180:
+        return "purple"
     if b - r > 60 and b - g > 40 and b > 120:
         return "blue"
     if r > 200 and 100 < g < 190 and b < 100:

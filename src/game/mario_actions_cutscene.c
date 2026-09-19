@@ -692,6 +692,8 @@ void general_star_dance_handler(struct MarioState *m, s32 isInWater) {
             case 80:
                 if (!(m->actionArg & 1)) {
                     level_trigger_warp(m, WARP_OP_STAR_EXIT);
+                } else if (m->actionArg == 3) {
+                    m->actionState = 2;
                 } else {
                     enable_time_stop();
                     create_dialog_box_with_response(gLastCompletedStarNum == 7 ? DIALOG_013 : DIALOG_014);

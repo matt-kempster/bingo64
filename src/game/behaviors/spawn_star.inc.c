@@ -15,6 +15,68 @@ static struct ObjectHitbox sCollectStarHitbox = {
     /* hurtboxHeight:     */ 0,
 };
 
+#include "game/bingo_rando_spawn.h"
+#include "game/bingo.h"
+#include "engine/rand.h"
+void bhv_rando_star_init(void) {
+    Vec3s pos;
+    u16 seedCopy = gBingoInitialSeed;
+
+    s8 sp1F;
+    u8 sp1E;
+    u32 areaHash;
+
+    if (!gBingoRandomStarsActive) {
+        obj_mark_for_deletion(o);
+        return;
+    }
+
+    sp1F = (o->oBhvParams >> 24) & 0xFF;
+
+    // The star objects are placed in every AREA block of multi-area levels
+    // so that each one initializes with its own area's collision loaded.
+    // Each star belongs to exactly one area, chosen deterministically from
+    // the bingo seed; every copy of it in another area deletes itself.
+    areaHash = ((u32) seedCopy << 8) + (u32) gCurrCourseNum * 3 + sp1F;
+    areaHash = (areaHash ^ (areaHash >> 16)) * 0x45d9f3b;
+    areaHash = (areaHash ^ (areaHash >> 16)) * 0x45d9f3b;
+    areaHash ^= areaHash >> 16;
+    if (1 + (s32) (areaHash % bingo_rando_area_count(gCurrLevelNum)) != gCurrAreaIndex) {
+        obj_mark_for_deletion(o);
+        return;
+    }
+
+    sp1E = bingo_get_rando_star_status(gCurrCourseNum, sp1F);
+    if (sp1E) {
+        o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_TRANSPARENT_STAR];
+    } else {
+        o->header.gfx.sharedChild = gLoadedGraphNodes[MODEL_STAR_PURPLE];
+    }
+    // Twist the seed per course and per star so no two courses (and no two
+    // stars) share positions players could memorize across games.
+    seedCopy ^= (u16) (gCurrCourseNum * 7919 + sp1F * 104729);
+    o->oInteractionSubtype |= (INT_SUBTYPE_RANDO_STAR | INT_SUBTYPE_NO_EXIT);
+
+    obj_set_hitbox(o, &sCollectStarHitbox);
+    get_safe_position(
+        o,
+        pos,
+        400.f,
+        700.f,
+        &seedCopy,
+        FLOOR_SAFE_HOVERING,
+        (
+            RAND_POSITION_FLAG_CAN_BE_UNDERWATER
+            | RAND_POSITION_FLAG_THI_A3_ABOVE_MESH
+            | RAND_POSITION_FLAG_SPAWN_BOTTOM_OF_SLIDE
+            | RAND_POSITION_FLAG_BBH_HMC_LIMITED_ROOMS
+        )
+    );
+    o->oPosX = pos[0];
+    o->oPosY = pos[1];
+    o->oPosZ = pos[2];
+}
+
 void bhv_collect_star_init(void) {
     s8 starId = (o->oBhvParams >> 24) & 0xFF;
     // Bingo64 uses its own per-course star flags, not the save file's.
