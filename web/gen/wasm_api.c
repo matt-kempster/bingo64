@@ -227,6 +227,7 @@ static void emit_cell_json(int i) {
                   o->data.starClicksObjective.course, o->data.starClicksObjective.starIndex,
                   o->data.starClicksObjective.maxClicks);
             break;
+        case BINGO_OBJECTIVE_RANDOM_STARS:
         case BINGO_OBJECTIVE_COIN:
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
@@ -306,6 +307,7 @@ static void emit_cell_dump(int i) {
                   o->data.starClicksObjective.course, o->data.starClicksObjective.starIndex,
                   o->data.starClicksObjective.maxClicks);
             break;
+        case BINGO_OBJECTIVE_RANDOM_STARS:
         case BINGO_OBJECTIVE_COIN:
         case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
         case BINGO_OBJECTIVE_STARS_IN_LEVEL:
