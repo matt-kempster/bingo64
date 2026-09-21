@@ -18,6 +18,8 @@
 #include "level_misc_macros.h"
 #include "level_table.h"
 #include "level_update.h"
+#include "bingo.h"
+#include "bingo_tracking_star.h"
 #include "levels/bob/header.h"
 #include "levels/ttm/header.h"
 #include "mario.h"
