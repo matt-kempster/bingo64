@@ -12,6 +12,11 @@ rsync -a "$WT/src/" "$BW/src/"
 rsync -a "$WT/bin/" "$BW/bin/"
 rsync -a "$WT/data/" "$BW/data/"
 rsync -a "$WT/include/" "$BW/include/"
+# Committed art (custom icons etc.) must reach the build checkout too: it is
+# a stale clone, so anything committed since it was cloned only exists here.
+git -C "$WT" ls-files actors levels textures | grep '\.png$' | \
+    rsync -a --files-from=- "$WT" "$BW"
+echo "$WT" > "$BW/.bingo64_src"  # make_release.sh reads the art list from here
 # tools/ + server/ ride along for release assembly (make_release.sh
 # packs server/relay.py and builds the extractor from tools/).
 rsync -a "$WT/tools/" "$BW/tools/"

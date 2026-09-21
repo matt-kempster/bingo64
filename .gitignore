@@ -98,3 +98,4 @@ platform/android/android/lib/*/libc++_shared.so
 
 # Python
 __pycache__/
+.bingo64_src

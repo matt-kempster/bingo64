@@ -33,9 +33,17 @@ cp "$EXTDIR/README.release.txt" "$OUT/README.txt"
 
 # bingo64.custom.zip: committed bingo64 art (gfx/ paths) + the structural
 # sound_data.ctl (generated from committed jsons; no ROM waveforms inside).
+# The art list comes from the SOURCE worktree's git index: the build
+# checkout (~/b64-win) is a stale clone that winbuild.sh rsyncs sources
+# into, so its own `git ls-files` misses any PNG committed since it was
+# cloned (beta.8 shipped without the nine enemy-objective icons that way).
+# winbuild.sh records the source worktree in .bingo64_src; BINGO64_SRC
+# overrides it.
+SRC="${BINGO64_SRC:-$(cat .bingo64_src 2>/dev/null || echo .)}"
+echo "custom art list from $SRC"
 LST=$(mktemp)
-git ls-files actors levels textures | grep '\.png$' | \
-    while read -r p; do echo "$p gfx/$p"; done > "$LST"
+git -C "$SRC" ls-files actors levels textures | grep '\.png$' | \
+    while read -r p; do echo "$SRC/$p gfx/$p"; done > "$LST"
 echo "$BUILD/sound/sound_data.ctl sound/sound_data.ctl" >> "$LST"
 python3 tools/mkzip.py "$LST" "$OUT/res/bingo64.custom.zip"
 rm -f "$LST"
@@ -45,6 +53,9 @@ find "$OUT" -type f | sort
 echo
 echo "auditing texture names in the exe ..."
 python3 "$EXTDIR/audit_texture_names.py" "$BUILD" "$EXE"
+echo
+echo "auditing that every texture the exe names is shipped or extracted ..."
+python3 "$EXTDIR/audit_custom_zip.py" "$EXE" "$OUT/res/bingo64.custom.zip" "$EXTDIR/manifest.inc"
 echo
 echo "auditing for ROM bytes ..."
 python3 "$EXTDIR/audit_release.py" baserom.us.z64 "$OUT" "$BUILD"
