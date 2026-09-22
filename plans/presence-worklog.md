@@ -334,6 +334,25 @@ windowmove <id> 0 0` first; capture the game window id, not root.
   the new zip + notes for Matt to publish; relay deploy and the Pages
   rollback remain classifier-blocked (Matt runs them).
 
+- 2026-09-21 — **v1.0-beta.8.1 hotfix** (branch hotfix-8.1 off the
+  beta.8 tag, tag pushed, release DRAFT with win64 zip + n64 bps).
+  Root cause of the beta.8 checkerboard tiles: ~/b64-win is a stale
+  clone; winbuild.sh rsyncs sources in but the nine enemy-icon PNGs were
+  untracked there, so make_release.sh's `git ls-files` left them out of
+  bingo64.custom.zip. Fix: art list from the source worktree
+  (.bingo64_src), build scripts rsync committed PNGs, and
+  audit_custom_zip.py fails the release on any exe texture name neither
+  the zip nor the extractor supplies (flags exactly the nine on beta.8).
+  Also: Yoshi off the roof (full-game unlock = 120 save-file stars; now
+  bingo_get_star_count when unlocked). NOT included: random-stars and
+  cannon-stars — same seed gives different boards vs beta.8, and the
+  patch number is display-only, so mixed 8/8.1 rooms would desync;
+  those ship as beta.9 with a protocol bump + relay deploy. Web-check
+  CI fix (wasm dump missing the RANDOM_STARS case) is on misc-fixes.
+  Gotcha: a freshly created worktree gives every rsynced file a new
+  mtime, so make in ~/b64-win tried to rebuild tools/ with the mingw
+  compiler (armips fails); `make -C tools` natively first, then winbuild.
+
 ## Deferred / follow-ups
 
 - ~~Relay-side visibility enforcement (see checklist §2) — potentially
