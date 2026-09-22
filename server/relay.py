@@ -168,7 +168,7 @@ print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.
-PROTOCOL_VERSION = 8
+PROTOCOL_VERSION = 9
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
