@@ -25,7 +25,7 @@
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.
-#define NET_VERSION_PATCH 0
+#define NET_VERSION_PATCH 1
 
 #define NET_MAX_GHOSTS  15
 #define NET_MAX_PLAYERS 16
