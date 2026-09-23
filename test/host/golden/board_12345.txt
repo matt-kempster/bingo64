@@ -1,25 +1,25 @@
-00 type=45 class=2 icon=45 title="x9" toGet=9
-01 type=31 class=1 icon=30 title="x16" toGet=16
-02 type=28 class=1 icon=29 title="x13" toGet=13
-03 type=06 class=1 icon=08 title="RRú6" course=15 star=5 maxClicks=3
-04 type=00 class=0 icon=02 title="LLLú2" course=7 star=1
-05 type=32 class=1 icon=31 title="x10" toGet=10
-06 type=27 class=0 icon=21 title="x4" toGet=4
-07 type=06 class=1 icon=08 title="JRBú2" course=3 star=1 maxClicks=2
-08 type=07 class=2 icon=09 title="HMCú3" course=6 star=2
-09 type=10 class=1 icon=11 title="BBH" course=5 toGet=3
-10 type=15 class=1 icon=53 title="THI 210" course=13 toGet=210
-11 type=00 class=1 icon=02 title="WFú6" course=2 star=5
-12 type=37 class=3 icon=37 title="x19" toGet=19
-13 type=38 class=1 icon=38 title="x11" toGet=11
-14 type=12 class=1 icon=17 title="SSL 8" course=8 toGet=8
-15 type=46 class=1 icon=46 title="x4" toGet=4
-16 type=03 class=2 icon=05 title="THIú3" course=13 star=2 hint="Enter Huge Island and use the shell."
-17 type=04 class=1 icon=06 title="TTCú3" course=14 star=2 hint=""
-18 type=26 class=0 icon=22 title="x4" toGet=4
-19 type=31 class=1 icon=30 title="x16" toGet=16
-20 type=15 class=0 icon=53 title="TTM 160" course=12 toGet=160
-21 type=11 class=1 icon=13 title="BBH 97" course=5 toGet=97
-22 type=09 class=1 icon=12 title="WFú4" course=2 star=3
-23 type=50 class=1 icon=50 title="x2" toGet=2
-24 type=54 class=2 icon=56 title="x26" toGet=26
+00 type=47 class=2 icon=47 title="x4" toGet=4
+01 type=40 class=1 icon=40 title="x6" toGet=6
+02 type=33 class=1 icon=32 title="x9" toGet=9
+03 type=28 class=1 icon=29 title="x13" toGet=13
+04 type=00 class=0 icon=02 title="JRBú6" course=3 star=5
+05 type=22 class=1 icon=27 title="x1" toGet=1
+06 type=24 class=0 icon=15 title="x3" toGet=3
+07 type=37 class=1 icon=37 title="x13" toGet=13
+08 type=25 class=2 icon=16 title="x7" toGetTotal=7 toGetEachCourse=1
+09 type=12 class=1 icon=17 title="VCutM 3" course=22 toGet=3
+10 type=10 class=1 icon=11 title="LLL" course=7 toGet=3
+11 type=07 class=1 icon=09 title="TTCú4" course=14 star=3
+12 type=11 class=3 icon=13 title="SL 89" course=10 toGet=89
+13 type=47 class=1 icon=47 title="x6" toGet=6
+14 type=28 class=1 icon=29 title="x12" toGet=12
+15 type=17 class=1 icon=23 title="BitFS" level=33
+16 type=16 class=2 icon=20 title="7x 3c" toGetTotal=3 toGetEachCourse=7
+17 type=39 class=1 icon=39 title="x13" toGet=13
+18 type=26 class=0 icon=22 title="x6" toGet=6
+19 type=00 class=1 icon=02 title="TTCú7" course=14 star=6
+20 type=15 class=0 icon=53 title="WF 20" course=2 toGet=20
+21 type=53 class=1 icon=54 title="x5" toGet=5
+22 type=12 class=1 icon=17 title="TTM 8" course=12 toGet=8
+23 type=20 class=1 icon=26 title="x4" toGet=4
+24 type=45 class=2 icon=45 title="x10" toGet=10

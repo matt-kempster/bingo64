@@ -164,8 +164,12 @@ enum BingoObjectiveType
     // test/emu/ram_test.py decodes board dumps by number.
     BINGO_OBJECTIVE_BLUE_COIN,
     BINGO_OBJECTIVE_COLLECTABLE_MAX = BINGO_OBJECTIVE_BLUE_COIN,
+    // Specials appended after the collectables (again so type numbers stay
+    // put). Not a generic collectable: it counts specific (course, star)
+    // pairs, like CANNON_STARS / SECRETS_STARS.
+    BINGO_OBJECTIVE_RED_COIN_STARS,
     // End
-    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_COLLECTABLE_MAX,
+    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_RED_COIN_STARS,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
 };
 
@@ -231,6 +235,7 @@ enum BingoObjectiveIcon {
     BINGO_ICON_UNIQUE_DEATHS,
     BINGO_ICON_LIVES,
     BINGO_ICON_BLUE_COIN,
+    BINGO_ICON_RED_COIN_STARS
 };
 
 enum BingoObjectiveUpdate

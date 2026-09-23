@@ -307,6 +307,7 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_CRUSHED] = "CRUSHED",
     [BINGO_OBJECTIVE_UNIQUE_DEATHS] = "UNIQUE_DEATHS",
     [BINGO_OBJECTIVE_BLUE_COIN] = "BLUE_COIN",
+    [BINGO_OBJECTIVE_RED_COIN_STARS] = "RED_COIN_STARS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -756,6 +757,54 @@ static void test_sim_cannon_stars_objective(void) {
     gbStarFromCannon = 1;
     bingo_update(BINGO_UPDATE_STAR);
     gbStarFromCannon = 0;
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+}
+
+static void test_sim_red_coin_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_RED_COIN_STARS;
+    o->data.collectableData.toGet = 2;
+
+    // A star that isn't a red coin star (BOB act 1) does nothing.
+    // (bingo_set_star indexes courses from 0, stars by STAR_INDEX_ACT_n.)
+    gCurrCourseNum = COURSE_BOB;
+    gbStarIndex = 0;
+    bingo_set_star(COURSE_BOB - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // BOB's red coin star (act 4) counts and updates the HUD.
+    gbStarIndex = 3;
+    bingo_set_star(COURSE_BOB - 1, 3);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 1);
+
+    // Re-collecting the same red coin star doesn't count twice.
+    bingo_set_star(COURSE_BOB - 1, 3);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+
+    // Leaving the course keeps the progress; other events don't count.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    bingo_update(BINGO_UPDATE_RED_COIN);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // BITDW's red coin star (a Bowser course, act 1) completes it.
+    gCurrCourseNum = COURSE_BITDW;
+    gbStarIndex = 0;
+    bingo_set_star(COURSE_BITDW - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
     CHECK_EQ_INT(o->data.collectableData.gotten, 2);
 }
@@ -1321,6 +1370,7 @@ int main(void) {
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);
     RUN_TEST(test_sim_cannon_stars_objective);
+    RUN_TEST(test_sim_red_coin_stars_objective);
     RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_unique_deaths);
     RUN_TEST(test_sim_random_stars_objective);

@@ -2,85 +2,86 @@ Board generator fingerprint over 2000 boards (50000 cells).
 permille = cells per 1000 across all boards.
 
 [objective types]  count  permille  easy  med  hard  cent  target
-STAR                       4011       80  1610 1794   607     0  -
-STAR_TIMED                 1519       30     0 1118   401     0  -
-STAR_TTC_RANDOM             748       14     0  748     0     0  -
-STAR_A_BUTTON_CHALLENGE     431        8     0    0   431     0  -
-STAR_B_BUTTON_CHALLENGE     238        4     0  238     0     0  -
-STAR_Z_BUTTON_CHALLENGE     265        5     0  265     0     0  -
-STAR_CLICK_GAME             990       19     0  690   300     0  -
-STAR_REVERSE_JOYSTICK      1309       26     0  755   554     0  -
-STAR_GREEN_DEMON            438        8     0    0   438     0  -
-STAR_DAREDEVIL             1441       28     0 1130   311     0  -
-RANDOM_STARS                726       14     0  726     0     0  1..24
-COIN                       2623       52  1280  949     0   394  22..99
-1UPS_IN_LEVEL              1553       31     0 1148   405     0  2..10
-STARS_IN_LEVEL             1109       22     0  659   450     0  3..7
-RANDOM_RED_COINS           1089       21     0 1089     0     0  0..5
-SPLATOON                   1838       36   834  711   293     0  20..820
-DANGEROUS_WALL_KICKS       1177       23     0  832   345     0  2..4
-BOWSER                      558       11     0  470     0    88  -
-ROOF_WITHOUT_CANNON         262        5     0  262     0     0  -
-RACING_STARS                985       19   703  282     0     0  3..3
-SECRETS_STARS               700       14     0  700     0     0  4..4
-LIVES                       810       16     0  571   239     0  8..15
-CANNON_STARS                600       12     0  459   141     0  1..4
-MULTICOIN                   756       15     0    0   250   506  200..350
-MULTISTAR                  1281       25   429  472   169   211  3..12
-STARS_MULTIPLE_LEVELS       969       19   349  300    98   222  2..15
-BLJ                        1159       23  1159    0     0     0  3..6
-LOSE_MARIO_HAT             1140       22  1140    0     0     0  3..4
-SIGNPOST                   1277       25     0  942   335     0  7..20
-POLES                       549       10     0    0   415   134  10..27
-SHOOT_CANNONS              1476       29     0 1007   346   123  6..20
-RED_COIN                   1288       25     0  933   355     0  12..29
-EXCLAMATION_MARK_BOX        701       14     0  701     0     0  6..14
-WING_CAP_BOX                386        7     0  386     0     0  5..9
-VANISH_CAP_BOX              381        7     0  381     0     0  4..7
-METAL_CAP_BOX               382        7     0  382     0     0  5..9
-AMPS                        773       15     0  468   183   122  5..16
-KILL_GOOMBAS                801       16     0  523     0   278  5..19
-KILL_BOBOMBS                738       14     0  470     0   268  5..19
-KILL_SPINDRIFTS             439        8     0  439     0     0  9..16
-KILL_MR_IS                  491        9     0  491     0     0  3..6
-KILL_SCUTTLEBUGS            469        9     0  469     0     0  4..9
-KILL_BULLIES                670       13     0  464   206     0  6..16
-KILL_CHUCKYAS               694       13     0  502   192     0  2..5
-KILL_WHOMPS                 500       10     0  500     0     0  2..3
-KILL_BOOS                   891       17     0  726   165     0  4..12
-KILL_SNUFITS                495        9     0  495     0     0  3..6
-HURT_BY_CLAMS               793       15     0  607   186     0  3..6
-KILL_FLY_GUYS               497        9     0  497     0     0  3..6
-KILL_MR_BLIZZARDS           530       10     0  530     0     0  3..5
-KILL_SKEETERS               344        6     0  344     0     0  2..4
-KILL_KOOPAS                 355        7     0  355     0     0  2..3
-CRUSHED                     691       13     0  478   213     0  3..8
-UNIQUE_DEATHS              1351       27   822  529     0     0  4..6
-BLUE_COIN                  1313       26     0  981   332     0  14..32
+STAR                       3953       79  1570 1784   599     0  -
+STAR_TIMED                 1466       29     0 1074   392     0  -
+STAR_TTC_RANDOM             693       13     0  693     0     0  -
+STAR_A_BUTTON_CHALLENGE     423        8     0    0   423     0  -
+STAR_B_BUTTON_CHALLENGE     285        5     0  285     0     0  -
+STAR_Z_BUTTON_CHALLENGE     251        5     0  251     0     0  -
+STAR_CLICK_GAME             997       19     0  715   282     0  -
+STAR_REVERSE_JOYSTICK      1237       24     0  690   547     0  -
+STAR_GREEN_DEMON            398        7     0    0   398     0  -
+STAR_DAREDEVIL             1352       27     0 1083   269     0  -
+RANDOM_STARS                732       14     0  732     0     0  1..24
+COIN                       2615       52  1282  906     0   427  22..99
+1UPS_IN_LEVEL              1508       30     0 1118   390     0  2..10
+STARS_IN_LEVEL             1112       22     0  681   431     0  3..7
+RANDOM_RED_COINS           1025       20     0 1025     0     0  0..5
+SPLATOON                   1823       36   847  684   292     0  20..820
+DANGEROUS_WALL_KICKS       1164       23     0  820   344     0  2..4
+BOWSER                      538       10     0  454     0    84  -
+ROOF_WITHOUT_CANNON         276        5     0  276     0     0  -
+RACING_STARS               1027       20   704  323     0     0  3..3
+SECRETS_STARS               678       13     0  678     0     0  4..4
+LIVES                       810       16     0  581   229     0  8..15
+CANNON_STARS                599       11     0  481   118     0  1..4
+MULTICOIN                   749       14     0    0   240   509  200..350
+MULTISTAR                  1236       24   485  385   160   206  3..12
+STARS_MULTIPLE_LEVELS      1008       20   349  302   121   236  2..15
+BLJ                        1129       22  1129    0     0     0  3..6
+LOSE_MARIO_HAT             1165       23  1165    0     0     0  3..4
+SIGNPOST                   1322       26     0  943   379     0  7..20
+POLES                       503       10     0    0   384   119  10..27
+SHOOT_CANNONS              1387       27     0  930   345   112  6..20
+RED_COIN                   1344       26     0  984   360     0  12..29
+EXCLAMATION_MARK_BOX        724       14     0  724     0     0  6..14
+WING_CAP_BOX                376        7     0  376     0     0  5..9
+VANISH_CAP_BOX              333        6     0  333     0     0  4..7
+METAL_CAP_BOX               376        7     0  376     0     0  5..9
+AMPS                        806       16     0  500   179   127  5..16
+KILL_GOOMBAS                758       15     0  504     0   254  5..19
+KILL_BOBOMBS                766       15     0  494     0   272  5..19
+KILL_SPINDRIFTS             456        9     0  456     0     0  9..16
+KILL_MR_IS                  538       10     0  538     0     0  3..6
+KILL_SCUTTLEBUGS            486        9     0  486     0     0  4..9
+KILL_BULLIES                682       13     0  481   201     0  6..16
+KILL_CHUCKYAS               681       13     0  498   183     0  2..5
+KILL_WHOMPS                 475        9     0  475     0     0  2..3
+KILL_BOOS                   887       17     0  673   214     0  4..12
+KILL_SNUFITS                506       10     0  506     0     0  3..6
+HURT_BY_CLAMS               812       16     0  611   201     0  3..6
+KILL_FLY_GUYS               478        9     0  478     0     0  3..6
+KILL_MR_BLIZZARDS           487        9     0  487     0     0  3..5
+KILL_SKEETERS               321        6     0  321     0     0  2..4
+KILL_KOOPAS                 333        6     0  333     0     0  2..3
+CRUSHED                     660       13     0  467   193     0  3..8
+UNIQUE_DEATHS              1324       26   795  529     0     0  4..6
+BLUE_COIN                  1332       26     0  987   345     0  14..32
+RED_COIN_STARS              598       11     0  457   141     0  3..7
 
 [course pins]  count  permille-of-pinned
-BOB      1144     58
-WF       1095     55
-JRB      1061     54
-CCM      1176     59
-BBH       971     49
-HMC      1083     55
-LLL      1280     65
-SSL      1137     58
-DDD       930     47
-SL       1169     59
-WDW      1121     57
-TTM      1178     60
-THI      1180     60
-TTC      1844     94
-RR       1174     59
-BitDW     289     14
-BitFS     295     15
-BitS      273     13
-PSS       215     10
-CotMC     185      9
-TotWC     189      9
-VCutM     228     11
-WMotR     217     11
-SA        168      8
-unpinned cells: 30398 of 50000
+BOB      1124     58
+WF       1080     56
+JRB      1007     52
+CCM      1094     57
+BBH      1000     52
+HMC      1123     58
+LLL      1298     67
+SSL      1169     61
+DDD       897     46
+SL       1083     56
+WDW      1134     59
+TTM      1116     58
+THI      1172     61
+TTC      1743     91
+RR       1151     60
+BitDW     258     13
+BitFS     288     15
+BitS      271     14
+PSS       169      8
+CotMC     194     10
+TotWC     195     10
+VCutM     216     11
+WMotR     196     10
+SA        160      8
+unpinned cells: 30862 of 50000

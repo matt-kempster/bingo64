@@ -301,6 +301,44 @@ s32 objective_cannon_stars(struct BingoObjective *objective, enum BingoObjective
     }
 }
 
+// Every star awarded for collecting a course's 8 red coins, as (course,
+// 0-based star index) -- the STAR_INDEX_ACT_n in each level script.
+static const struct {
+    u8 course;
+    u8 starIndex;
+} sRedCoinStars[] = {
+    { COURSE_BOB, 3 },   { COURSE_WF, 3 },    { COURSE_JRB, 3 },   { COURSE_CCM, 3 },
+    { COURSE_BBH, 3 },   { COURSE_HMC, 1 },   { COURSE_LLL, 2 },   { COURSE_SSL, 4 },
+    { COURSE_DDD, 2 },   { COURSE_SL, 4 },    { COURSE_WDW, 4 },   { COURSE_TTM, 2 },
+    { COURSE_THI, 4 },   { COURSE_TTC, 5 },   { COURSE_RR, 2 },
+    { COURSE_BITDW, 0 }, { COURSE_BITFS, 0 }, { COURSE_BITS, 0 },  { COURSE_COTMC, 0 },
+    { COURSE_VCUTM, 0 }, { COURSE_TOTWC, 0 }, { COURSE_WMOTR, 0 }, { COURSE_SA, 0 },
+};
+
+// Recounted from the bingo star flags (like the secrets tile), so a
+// re-collected red coin star can't count twice.
+s32 objective_red_coin_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+    s32 count = 0;
+    s32 old_count;
+    u32 i;
+
+    if (update == BINGO_UPDATE_STAR) {
+        for (i = 0; i < sizeof(sRedCoinStars) / sizeof(sRedCoinStars[0]); i++) {
+            if (bingo_get_course_flags(sRedCoinStars[i].course - 1) & (1 << sRedCoinStars[i].starIndex)) {
+                count++;
+            }
+        }
+        old_count = data->gotten;
+        data->gotten = count;
+        if (count >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (count > old_count) {
+            bingo_hud_update_number(objective->icon, count);
+        }
+    }
+}
+
 s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
     s32 count = 0;
@@ -519,6 +557,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_secrets_stars(objective, update);
         case BINGO_OBJECTIVE_CANNON_STARS:
             return objective_cannon_stars(objective, update);
+        case BINGO_OBJECTIVE_RED_COIN_STARS:
+            return objective_red_coin_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_LIVES:

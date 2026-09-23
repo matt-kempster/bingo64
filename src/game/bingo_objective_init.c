@@ -707,6 +707,24 @@ s32 bingo_objective_cannon_stars_init(
     objective->data.collectableData.gotten = 0;
 }
 
+// 23 red coin stars exist (15 main courses + 8 secret courses), and each
+// is a full 8-red-coin sweep, roughly 1-3 minutes.
+s32 bingo_objective_red_coin_stars_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_MEDIUM:
+            toGet = random_range_inclusive(3, 4);
+            break;
+        default:
+            toGet = random_range_inclusive(5, 7);
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
 s32 bingo_objective_bowser_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
@@ -1182,6 +1200,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_secrets_init(objective, class);
         case BINGO_OBJECTIVE_CANNON_STARS:
             return bingo_objective_cannon_stars_init(objective, class);
+        case BINGO_OBJECTIVE_RED_COIN_STARS:
+            return bingo_objective_red_coin_stars_init(objective, class);
         case BINGO_OBJECTIVE_BOWSER:
             return bingo_objective_bowser_init(objective, class);
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
