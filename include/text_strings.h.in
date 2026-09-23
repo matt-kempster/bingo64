@@ -285,8 +285,6 @@
 #define TEXT_DPAD _("Use C or D-Pad to select")
 #define TEXT_PRESS_A _("Press A to toggle")
 #define TEXT_PRESS_RL_1 _("Page 1. Press R or L...")
-#define TEXT_PRESS_RL_2 _("Page 2. Press R or L...")
-#define TEXT_PRESS_RL_3 _("Page 3. Press R or L...")
 
 // Bingo Credits
 #define TEXT_BINGO64 _("Bingo64 (v0.11a)")

@@ -28,6 +28,7 @@
 #include "game/bingo.h"
 #include "game/bingo_board_setup.h"
 #include "game/bingo_ui.h"
+#include "game/bingo_objective_info.h"
 #include "game/strcpy.h"
 #include "engine/rand.h"
 #include "game/save_file.h"
@@ -192,28 +193,30 @@ s32 gBingoSeedIsSet = 0;
 u8 gBingoSeedRandomText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 
+// Options pages (L/R cycles): 0 = settings rows, 1..G = objective icon
+// grid pages (G is data-driven, see grid_band_layout), G+1 = credits. sBingoOptionSelection is the settings page's row;
+// the grid keeps its own cursor (sGridBand/sGridCol) so paging back and
+// forth never lands on a stale index from the other layout.
 s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
 // mean something in an online room; solo shows mode/unlock/timeout/
 // toggle-all. All uses are runtime expressions, so the count may vary
-// per frame — the objective list below the configs reflows with it.
+// per frame.
 #define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 7 : 5)
 #else
 #define BINGO_CONFIGS_IN_LEFT_COL 5 // not more than 10, hopefully
 #endif
-#define BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE (BINGO_ENTRIES_PER_COL - BINGO_CONFIGS_IN_LEFT_COL)
-#define BINGO_INSTRUCTIONS_IN_RIGHT_COL 3
-#define BINGO_OPTIONS_IN_RIGHT_COL (BINGO_ENTRIES_PER_COL - BINGO_INSTRUCTIONS_IN_RIGHT_COL)
-#define BINGO_OPTIONS_IN_FIRST_PAGE (BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE + BINGO_OPTIONS_IN_RIGHT_COL)
-#define BINGO_OPTIONS_IN_SECONDARY_PAGES (BINGO_ENTRIES_PER_COL + BINGO_OPTIONS_IN_RIGHT_COL)
-#define BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE (BINGO_ENTRIES_PER_COL * 2)
 s32 sBingoOptionSelectTimer = 0;
 #define BINGO_OPTION_TIMER_FRAMES 3
 s32 sToggleCurrentOption = 0;
 s32 sBingoOptionCurrentPage = 0;
-#define BINGO_MAX_PAGE_INDEX 3
+#define BINGO_PAGE_SETTINGS   0
+#define BINGO_PAGE_OBJECTIVES 1   // the first grid page
+static s32 grid_page_count(void);
+#define BINGO_PAGE_CREDITS    (BINGO_PAGE_OBJECTIVES + grid_page_count())
+#define BINGO_MAX_PAGE_INDEX  BINGO_PAGE_CREDITS
 
 // Where leaving the options screen lands: the main screen normally, or
 // the 1P setup screen / online lobby when it was opened from there
@@ -1222,70 +1225,459 @@ static s32 options_back_tag_hovered(void) {
 }
 #endif
 
+// ---------------------------------------------------------------------------
+// Objectives grid (options pages 1..G): every objective type as a 16x16
+// icon, grouped into labelled bands. A toggles the icon under the cursor;
+// A on a band label flips the whole band. Bands wrap onto extra icon rows
+// and flow onto further grid pages when they don't fit (see
+// grid_band_layout), so the page count is data-driven.
+
+#define GRID_BAND_COUNT 5
+
+static const u8 sGridStars[] = {
+    BINGO_OBJECTIVE_STAR, BINGO_OBJECTIVE_STAR_TIMED,
+    BINGO_OBJECTIVE_STAR_TTC_RANDOM, BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE,
+    BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE, BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
+    BINGO_OBJECTIVE_RACING_STARS, BINGO_OBJECTIVE_SECRETS_STARS,
+    BINGO_OBJECTIVE_CANNON_STARS, BINGO_OBJECTIVE_RED_COIN_STARS,
+    BINGO_OBJECTIVE_BOWSER, BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON,
+    BINGO_OBJECTIVE_STARS_IN_LEVEL, BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS,
+};
+// The game's first-class modifiers, in enum BingoModifier order.
+static const u8 sGridModifiers[] = {
+    BINGO_OBJECTIVE_STAR_GREEN_DEMON, BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK,
+    BINGO_OBJECTIVE_RANDOM_RED_COINS, BINGO_OBJECTIVE_STAR_CLICK_GAME,
+    BINGO_OBJECTIVE_RANDOM_STARS, BINGO_OBJECTIVE_STAR_DAREDEVIL,
+    BINGO_OBJECTIVE_SPLATOON,
+};
+static const u8 sGridCollect[] = {
+    BINGO_OBJECTIVE_COIN, BINGO_OBJECTIVE_1UPS_IN_LEVEL,
+    BINGO_OBJECTIVE_MULTICOIN, BINGO_OBJECTIVE_MULTISTAR,
+    BINGO_OBJECTIVE_RED_COIN, BINGO_OBJECTIVE_BLUE_COIN,
+    BINGO_OBJECTIVE_SIGNPOST, BINGO_OBJECTIVE_POLES,
+    BINGO_OBJECTIVE_SHOOT_CANNONS, BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX,
+    BINGO_OBJECTIVE_WING_CAP_BOX, BINGO_OBJECTIVE_VANISH_CAP_BOX,
+    BINGO_OBJECTIVE_METAL_CAP_BOX,
+};
+static const u8 sGridFeats[] = {
+    BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS, BINGO_OBJECTIVE_BLJ,
+    BINGO_OBJECTIVE_LOSE_MARIO_HAT, BINGO_OBJECTIVE_LIVES,
+    BINGO_OBJECTIVE_CRUSHED, BINGO_OBJECTIVE_UNIQUE_DEATHS,
+    BINGO_OBJECTIVE_HURT_BY_CLAMS, BINGO_OBJECTIVE_AMPS,
+};
+static const u8 sGridEnemies[] = {
+    BINGO_OBJECTIVE_KILL_GOOMBAS, BINGO_OBJECTIVE_KILL_BOBOMBS,
+    BINGO_OBJECTIVE_KILL_SPINDRIFTS, BINGO_OBJECTIVE_KILL_MR_IS,
+    BINGO_OBJECTIVE_KILL_SCUTTLEBUGS, BINGO_OBJECTIVE_KILL_BULLIES,
+    BINGO_OBJECTIVE_KILL_CHUCKYAS, BINGO_OBJECTIVE_KILL_WHOMPS,
+    BINGO_OBJECTIVE_KILL_BOOS, BINGO_OBJECTIVE_KILL_SNUFITS,
+    BINGO_OBJECTIVE_KILL_FLY_GUYS, BINGO_OBJECTIVE_KILL_MR_BLIZZARDS,
+    BINGO_OBJECTIVE_KILL_SKEETERS, BINGO_OBJECTIVE_KILL_KOOPAS,
+};
+
+struct ObjectiveGridBand {
+    const char *label;
+    const u8 *types;
+    u8 count;
+};
+
+static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
+    { "STARS",     sGridStars,     ARRAY_COUNT(sGridStars) },
+    { "MODIFIERS", sGridModifiers, ARRAY_COUNT(sGridModifiers) },
+    { "COLLECT",   sGridCollect,   ARRAY_COUNT(sGridCollect) },
+    { "FEATS",     sGridFeats,     ARRAY_COUNT(sGridFeats) },
+    { "ENEMIES",   sGridEnemies,   ARRAY_COUNT(sGridEnemies) },
+};
+
+// Every objective must be reachable (the old paged list silently dropped
+// the last few): a new BingoObjectiveType fails this until it is placed in
+// a band. Uniqueness isn't checkable at compile time; keep the tables in
+// sync with the enum by hand.
+typedef char grid_bands_cover_every_objective[
+    (ARRAY_COUNT(sGridStars) + ARRAY_COUNT(sGridModifiers)
+     + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridFeats)
+     + ARRAY_COUNT(sGridEnemies) == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
+
+// Cursor: band index is global across the grid pages (always one on the
+// visible page); col -1 = the band's label, else a linear icon index.
+static s32 sGridBand = 0;
+static s32 sGridCol = 0;
+
+// Layout, in the menu's bottom-up print coordinates. Each band is a label
+// line with its first icon row 14 units below and further rows 20 below
+// that; 30-unit single-row bands leave a 1-unit gap between one band's
+// highlight box and the next band's label.
+#define GRID_LEFT_X      22
+#define GRID_PITCH       20
+#define GRID_MAX_PER_ROW 14
+#define GRID_FIRST_Y     196   // first band's label on every grid page
+#define GRID_BAND_H      30
+#define GRID_ICON_DROP   14
+#define GRID_MIN_ICON_Y  46    // footer glyphs occupy y 32..41
+#define GRID_FOOTER_Y    28
+#define GRID_LABEL_X     24
+#define GRID_RIGHT_X     296
+#define GRID_FOOTER_NAME_X 44
+
+static s32 grid_band_rows(s32 band) {
+    return (sGridBands[band].count + GRID_MAX_PER_ROW - 1) / GRID_MAX_PER_ROW;
+}
+
+// Flow the bands top to bottom; a band whose lowest icon row would drop
+// below GRID_MIN_ICON_Y starts the next grid page (bands never split; one
+// too tall for any page still gets a page of its own). Cheap enough to
+// recompute on every call.
+static void grid_band_layout(s32 band, s32 *page, s32 *labelY) {
+    s32 b, p = 0, y = GRID_FIRST_Y;
+    for (b = 0;; b++) {
+        s32 rows = grid_band_rows(b);
+        if (y != GRID_FIRST_Y
+            && y - GRID_ICON_DROP - GRID_PITCH * (rows - 1) < GRID_MIN_ICON_Y) {
+            p++;
+            y = GRID_FIRST_Y;
+        }
+        if (b == band) {
+            *page = p;
+            *labelY = y;
+            return;
+        }
+        y -= GRID_BAND_H + GRID_PITCH * (rows - 1);
+    }
+}
+
+static s32 grid_band_page(s32 band) {
+    s32 page, y;
+    grid_band_layout(band, &page, &y);
+    return page;
+}
+
+static s32 grid_label_y(s32 band) {
+    s32 page, y;
+    grid_band_layout(band, &page, &y);
+    return y;
+}
+
+static s32 grid_page_count(void) {
+    return grid_band_page(GRID_BAND_COUNT - 1) + 1;
+}
+
+// Which grid page is showing (-1 when the settings or credits page is).
+static s32 grid_current_page(void) {
+    s32 gp = sBingoOptionCurrentPage - BINGO_PAGE_OBJECTIVES;
+    return gp >= 0 && gp < grid_page_count() ? gp : -1;
+}
+
+static s32 grid_page_first_band(s32 page) {
+    s32 b;
+    for (b = 0; b < GRID_BAND_COUNT - 1 && grid_band_page(b) < page; b++) {
+    }
+    return b;
+}
+
+static s32 grid_page_last_band(s32 page) {
+    s32 b;
+    for (b = GRID_BAND_COUNT - 1; b > 0 && grid_band_page(b) > page; b--) {
+    }
+    return b;
+}
+
+// Icon i of a band: row i / GRID_MAX_PER_ROW, column i % GRID_MAX_PER_ROW.
+static s32 grid_icon_x(s32 i) {
+    return GRID_LEFT_X + GRID_PITCH * (i % GRID_MAX_PER_ROW);
+}
+
+static s32 grid_icon_y(s32 band, s32 i) {
+    return grid_label_y(band) - GRID_ICON_DROP - GRID_PITCH * (i / GRID_MAX_PER_ROW);
+}
+
+// Keep the cursor on the visible grid page (entering a page, or paging
+// with L/R, lands on that page's first band).
+static void grid_clamp_cursor_to_page(void) {
+    s32 gp = grid_current_page();
+    if (gp < 0) {
+        return;
+    }
+    if (sGridBand < 0 || sGridBand >= GRID_BAND_COUNT || grid_band_page(sGridBand) != gp) {
+        sGridBand = grid_page_first_band(gp);
+        sGridCol = 0;
+    }
+    if (sGridCol >= sGridBands[sGridBand].count) {
+        sGridCol = sGridBands[sGridBand].count - 1;
+    }
+}
+
+static s32 grid_band_enabled(s32 band) {
+    s32 i, n = 0;
+    for (i = 0; i < sGridBands[band].count; i++) {
+        n += !gBingoObjectivesDisabled[sGridBands[band].types[i]];
+    }
+    return n;
+}
+
+// Tiny formatter for the grid's runtime strings (no sprintf on N64).
+static char *grid_append(char *dst, const char *src) {
+    while (*src != '\0') {
+        *dst++ = *src++;
+    }
+    *dst = '\0';
+    return dst;
+}
+
+static char *grid_append_num(char *dst, s32 n) {
+    char tmp[8];
+    s32 len = 0;
+    do {
+        tmp[len++] = '0' + n % 10;
+        n /= 10;
+    } while (n > 0);
+    while (len > 0) {
+        *dst++ = tmp[--len];
+    }
+    *dst = '\0';
+    return dst;
+}
+
+// "12 of 14". ("of", not "/": the US generic font has no slash glyph.)
+static void grid_count_text(char *out, s32 n, s32 total) {
+    grid_append_num(grid_append(grid_append_num(out, n), " of "), total);
+}
+
+// ASCII -> generic-font charmap, for the grid's computed strings (counts
+// can't live in _() literals). Unmapped characters become spaces.
+static void grid_ascii_to_menu(u8 *dst, const char *src, s32 dstSize) {
+    s32 i;
+    for (i = 0; src[i] != '\0' && i < dstSize - 1; i++) {
+        char c = src[i];
+        u8 out = 0x9E;  // space
+        if (c >= '0' && c <= '9') {
+            out = c - '0';
+        } else if (c >= 'A' && c <= 'Z') {
+            out = 0x0A + (c - 'A');
+        } else if (c >= 'a' && c <= 'z') {
+            out = 0x24 + (c - 'a');
+        } else if (c == ':') {
+            out = 0xE6;
+        } else if (c == '.') {
+            out = 0x3F;
+        }
+        dst[i] = out;
+    }
+    dst[i] = 0xFF;
+}
+
+static s32 grid_ascii_width(const char *str) {
+    u8 buf[40];
+    grid_ascii_to_menu(buf, str, sizeof(buf));
+    return get_string_width(buf);
+}
+
+static void grid_print_ascii(s32 x, s32 y, const char *str) {
+    u8 buf[40];
+    grid_ascii_to_menu(buf, str, sizeof(buf));
+    print_generic_string(x, y, buf);
+}
+
+static s32 grid_band_label_width(s32 band) {
+    return grid_ascii_width(sGridBands[band].label);
+}
+
+// Presets stamp a named loadout; the current one is recomputed from state,
+// so Custom (after hand edits) cycles to the first preset.
+static void bingo_preset_cycle(void) {
+    bingo_preset_apply((bingo_preset_current() + 1) % BINGO_PRESET_COUNT);
+}
+
+#ifdef MOUSE_ACTIONS
+// What's under the pointer on the visible grid page (menu coords,
+// bottom-up). Returns 0 on empty space.
+static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
+    s32 b, r, c, gp = grid_current_page();
+    for (b = 0; b < GRID_BAND_COUNT; b++) {
+        s32 ly = grid_label_y(b);
+        if (grid_band_page(b) != gp) {
+            continue;
+        }
+        if (y >= ly + 2 && y < ly + 16 && x >= GRID_LEFT_X
+            && x < GRID_LABEL_X + grid_band_label_width(b) + 2) {
+            *band = b;
+            *col = -1;
+            return 1;
+        }
+        for (r = 0; r < grid_band_rows(b); r++) {
+            s32 iy = ly - GRID_ICON_DROP - GRID_PITCH * r;
+            if (y >= iy - 2 && y < iy + 18 && x >= GRID_LEFT_X - 2) {
+                c = ((s32) x - (GRID_LEFT_X - 2)) / GRID_PITCH;
+                if (c < GRID_MAX_PER_ROW
+                    && r * GRID_MAX_PER_ROW + c < sGridBands[b].count) {
+                    *band = b;
+                    *col = r * GRID_MAX_PER_ROW + c;
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+#endif
+
+static void grid_toggle_band(s32 band) {
+    s32 i;
+    // Mixed or all-off turns everything on; only a fully-on band clears.
+    u8 disable = grid_band_enabled(band) == sGridBands[band].count;
+    for (i = 0; i < sGridBands[band].count; i++) {
+        gBingoObjectivesDisabled[sGridBands[band].types[i]] = disable;
+    }
+}
+
+// A on the grid. Applied here in the (once-per-logic-frame) input handler,
+// not in the printer, which can run twice per frame on PC.
+static void grid_activate(void) {
+#ifdef MOUSE_ACTIONS
+    // A mouse click acts on what's under the pointer; a click on empty
+    // space must not toggle whatever the keyboard cursor last selected.
+    if (mouse_window_buttons & 1) {
+        s32 band, col;
+        if (!grid_hit_test(sCursorPos[0] + 160.0f, sCursorPos[1] + 120.0f,
+                           &band, &col)) {
+            return;
+        }
+        sGridBand = band;
+        sGridCol = col;
+    }
+#endif
+#ifndef TARGET_N64
+    if (bingo_options_locked()) {
+        play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+        return;
+    }
+#endif
+    if (sGridCol < 0) {
+        grid_toggle_band(sGridBand);
+    } else {
+        gBingoObjectivesDisabled[sGridBands[sGridBand].types[sGridCol]] ^= 1;
+    }
+}
+
+// D-pad / C navigation; returns 1 when the cursor moved (starts the
+// repeat debounce). Up/down wrap within the visible grid page; left/right
+// walk the band's icons linearly (across its wrapped rows) and the label.
+static s32 grid_navigate(u16 pressed) {
+    s32 gp = grid_current_page();
+    s32 first = grid_page_first_band(gp);
+    s32 last = grid_page_last_band(gp);
+    if (pressed & (D_JPAD | D_CBUTTONS)) {
+        sGridBand = sGridBand >= last ? first : sGridBand + 1;
+    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+        sGridBand = sGridBand <= first ? last : sGridBand - 1;
+    } else if (pressed & (R_JPAD | R_CBUTTONS)) {
+        sGridCol = sGridCol + 1 >= sGridBands[sGridBand].count ? -1 : sGridCol + 1;
+    } else if (pressed & (L_JPAD | L_CBUTTONS)) {
+        sGridCol = sGridCol <= -1 ? sGridBands[sGridBand].count - 1 : sGridCol - 1;
+    } else {
+        return 0;
+    }
+    if (sGridCol >= sGridBands[sGridBand].count) {
+        sGridCol = sGridBands[sGridBand].count - 1;
+    }
+    return 1;
+}
+
+#ifdef MOUSE_ACTIONS
+// Hover selects, but only when the pointer actually moved: a resting
+// pointer must not snap the selection back after d-pad moves.
+static void grid_mouse_hover(void) {
+    static f32 lastX = -10000.0f, lastY = -10000.0f;
+    s32 band, col;
+    if (sCursorPos[0] == lastX && sCursorPos[1] == lastY) {
+        return;
+    }
+    lastX = sCursorPos[0];
+    lastY = sCursorPos[1];
+    if (grid_hit_test(lastX + 160.0f, lastY + 120.0f, &band, &col)) {
+        sGridBand = band;
+        sGridCol = col;
+    }
+}
+#endif
+
+// The settings page: up/down over the config rows, with wrap.
+static s32 settings_navigate(u16 pressed) {
+    s32 rows = BINGO_CONFIGS_IN_LEFT_COL;
+    if (pressed & (D_JPAD | D_CBUTTONS)) {
+        sBingoOptionSelection = (sBingoOptionSelection + 1) % rows;
+    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+        sBingoOptionSelection = (sBingoOptionSelection + rows - 1) % rows;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 /**
  * Cursor function that handles button inputs.
  * If the cursor is clicked, sClickPos uses the same value as sCursorPos.
  */
 static void handle_cursor_button_input(void) {
     if (sSelectedButtonID == MENU_BUTTON_SEED_OPTION) {
-        if (gPlayer3Controller->buttonPressed & (B_BUTTON | START_BUTTON)) {
+        u16 pressed = gPlayer3Controller->buttonPressed;
+        if (pressed & (B_BUTTON | START_BUTTON)) {
             options_screen_exit();
         } else {
+            // The online Opp. rows can vanish under the cursor.
+            if (sBingoOptionSelection >= BINGO_CONFIGS_IN_LEFT_COL) {
+                sBingoOptionSelection = 0;
+            }
+#ifdef MOUSE_ACTIONS
+            if (grid_current_page() >= 0) {
+                grid_clamp_cursor_to_page();
+                grid_mouse_hover();
+            }
+#endif
             if (sBingoOptionSelectTimer > 0) {
                 sBingoOptionSelectTimer--;
-            } else if (gPlayer3Controller->buttonPressed & (D_JPAD | D_CBUTTONS)) {
-                if (sBingoOptionSelection < BINGO_ENTRIES_PER_COL) {
-                    sBingoOptionSelection = (sBingoOptionSelection + 1) % BINGO_ENTRIES_PER_COL;
-                } else {
-                    sBingoOptionSelection =
-                        (sBingoOptionSelection - BINGO_ENTRIES_PER_COL + 1)
-                        % BINGO_ENTRIES_PER_COL
-                        + BINGO_ENTRIES_PER_COL;
-                }
-                sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
-            } else if (gPlayer3Controller->buttonPressed & (U_JPAD | U_CBUTTONS)) {
-                if (sBingoOptionSelection < BINGO_ENTRIES_PER_COL) {
-                    sBingoOptionSelection =
-                        (sBingoOptionSelection + BINGO_ENTRIES_PER_COL - 1) % BINGO_ENTRIES_PER_COL;
-                } else {
-                    sBingoOptionSelection =
-                        (
-                            (sBingoOptionSelection - BINGO_ENTRIES_PER_COL)
-                            + (BINGO_ENTRIES_PER_COL - 1)
-                        ) % BINGO_ENTRIES_PER_COL
-                        + BINGO_ENTRIES_PER_COL;
-                }
-                sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
-            } else if (gPlayer3Controller->buttonPressed & (L_JPAD | R_JPAD | L_CBUTTONS | R_CBUTTONS)) {
-                sBingoOptionSelection += BINGO_ENTRIES_PER_COL;
-                sBingoOptionSelection %= (BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE);
-                sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
-            } else if (gPlayer3Controller->buttonPressed & L_TRIG) {
+            } else if (pressed & L_TRIG) {
                 if (sBingoOptionCurrentPage == 0) {
                     sBingoOptionCurrentPage = BINGO_MAX_PAGE_INDEX;
                 } else {
                     sBingoOptionCurrentPage--;
                 }
-            } else if (gPlayer3Controller->buttonPressed & R_TRIG) {
+                grid_clamp_cursor_to_page();
+            } else if (pressed & R_TRIG) {
                 if (sBingoOptionCurrentPage == BINGO_MAX_PAGE_INDEX) {
                     sBingoOptionCurrentPage = 0;
                 } else {
                     sBingoOptionCurrentPage++;
                 }
+                grid_clamp_cursor_to_page();
+            } else if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
+                if (settings_navigate(pressed)) {
+                    sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
+                }
+            } else if (grid_current_page() >= 0) {
+                if (grid_navigate(pressed)) {
+                    sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
+                }
             }
-            if (gPlayer3Controller->buttonPressed & A_BUTTON) {
+            if (pressed & A_BUTTON) {
 #ifndef TARGET_N64
                 if (options_back_tag_hovered()) {
                     // Clicked the BACK tag: same as pressing B.
                     options_screen_exit();
-                } else if (bingo_options_locked()) {
-                    play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
-                } else {
-                    sToggleCurrentOption = 1;
-                }
-#else
-                sToggleCurrentOption = 1;
+                } else
 #endif
+                if (grid_current_page() >= 0) {
+                    grid_activate();
+                } else if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
+#ifndef TARGET_N64
+                    if (bingo_options_locked()) {
+                        play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+                    } else
+#endif
+                    {
+                        // Applied by the row's printer on the next draw.
+                        sToggleCurrentOption = 1;
+                    }
+                }
             }
         }
 #ifndef TARGET_N64
@@ -1603,8 +1995,6 @@ static unsigned char textClaimVisHidden[] = { TEXT_CLAIMVIS_HIDDEN };
 static unsigned char textDPad[] = { TEXT_DPAD };
 static unsigned char textPressA[] = { TEXT_PRESS_A };
 static unsigned char textPressRL_1[] = { TEXT_PRESS_RL_1 };
-static unsigned char textPressRL_2[] = { TEXT_PRESS_RL_2 };
-static unsigned char textPressRL_3[] = { TEXT_PRESS_RL_3 };
 
 static unsigned char textBingo64[] = { TEXT_BINGO64 };
 static unsigned char textCreatedBy[] = { TEXT_CREATED_BY };
@@ -1631,144 +2021,25 @@ static unsigned char textSpecialThanks14[] = { TEXT_SPECIAL_THANKS_14 };
 #define TOP_Y      12
 #define ROW_HEIGHT 17
 
+// The settings page's selected row (left column only).
 static void print_bingo_selection_highlight(void) {
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
     gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, MIN(sTextBaseAlpha, 150));
-    if (sBingoOptionSelection < BINGO_ENTRIES_PER_COL) {
-        gDPFillRectangle(
-            gDisplayListHead++,
-            LEFT_X,
-            TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 1),
-            RIGHT_X,
-            TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 2) - 1
-        );
-    } else {
-        gDPFillRectangle(
-            gDisplayListHead++,
-            RIGHT_X,
-            TOP_Y - 2 + ROW_HEIGHT * ((sBingoOptionSelection % BINGO_ENTRIES_PER_COL) + 1),
-            RIGHT_X + (RIGHT_X - LEFT_X),
-            TOP_Y - 2 + ROW_HEIGHT * ((sBingoOptionSelection % BINGO_ENTRIES_PER_COL) + 2) - 1
-        );
-    }
+    gDPFillRectangle(
+        gDisplayListHead++,
+        LEFT_X,
+        TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 1),
+        RIGHT_X,
+        TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 2) - 1
+    );
 }
 
-void print_option_nav_instructions(s32 pageNo) {
-    s32 i;
-    unsigned char *option;
-    s32 optionLeftX;
-    s32 offsetY;
-    for (i = BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE - 3; i < BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE; i++) {
-        offsetY = ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - (i % BINGO_ENTRIES_PER_COL)) - 2;
-        option = NULL;
-        switch (i) {
-            case BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE - 3:
-                option = textDPad;
-                optionLeftX = RIGHT_X + 8;
-                break;
-            case BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE - 2:
-                option = textPressA;
-                optionLeftX = RIGHT_X + 46;
-                break;
-            case BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE - 1:
-                switch (pageNo) {
-                    case 0:
-                        option = textPressRL_1;
-                        break;
-                    case 1:
-                        option = textPressRL_2;
-                        break;
-                    case 2:
-                        option = textPressRL_3;
-                        break;
-                }
-                optionLeftX = RIGHT_X + 15;
-                break;
-        }
-        if (option != NULL) {
-            print_generic_string(optionLeftX, TOP_Y + offsetY, option);
-        }
-    }
-}
-#include "game/bingo_objective_info.h"
-static void print_objective(enum BingoObjectiveType type, s32 pageNo) {
-    enum BingoObjectiveIcon obj_icon;
-    unsigned char *option;
-    s32 optionLeftX;
-    s32 onOrOffLeftX;
-    s32 offsetY;
-    s32 leftColAmount;
-    s32 page_index;
-    s32 objectives_on_prior_pages;
-    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
-
-    if (pageNo == 0) {
-        objectives_on_prior_pages = 0;
-    } else {
-        objectives_on_prior_pages = (
-            BINGO_OPTIONS_IN_FIRST_PAGE
-            + BINGO_OPTIONS_IN_SECONDARY_PAGES * (pageNo - 1)
-        );
-    }
-
-    if (
-        (
-            (pageNo == 0 && type == (sBingoOptionSelection - BINGO_CONFIGS_IN_LEFT_COL))
-            || (
-                pageNo != 0
-                && sBingoOptionSelection == (
-                    (type - objectives_on_prior_pages) % BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE
-                )
-            )
-        )
-        && sToggleCurrentOption
-    ) {
-        sToggleCurrentOption = 0;
-        gBingoObjectivesDisabled[type] ^= 1;
-    }
-
-    option = get_objective_info(type)->optionText;
-    obj_icon = get_objective_info(type)->icon;
-    page_index = type - objectives_on_prior_pages;
-
-    if (pageNo == 0) {
-        leftColAmount = BINGO_OPTIONS_IN_LEFT_COL_FIRST_PAGE;
-    } else {
-        leftColAmount = BINGO_ENTRIES_PER_COL;
-    }
-    if (page_index < leftColAmount) {
-        optionLeftX = LEFT_X + 1;
-        onOrOffLeftX = RIGHT_X - 19;
-        offsetY = ROW_HEIGHT * (
-            leftColAmount - page_index
-        ) - 2;
-    } else {
-        optionLeftX = RIGHT_X;
-        onOrOffLeftX = RIGHT_X + (RIGHT_X - LEFT_X) - 19;
-        offsetY = ROW_HEIGHT * (
-            BINGO_OPTIONS_TOTAL_ENTRIES_PER_PAGE
-            - page_index
-            - (pageNo == 0 ? BINGO_CONFIGS_IN_LEFT_COL : 0)
-        ) - 2;
-    }
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-    print_generic_string(optionLeftX + 19, TOP_Y + offsetY, option);
-
-    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
-    gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
-    print_bingo_icon(optionLeftX, TOP_Y + offsetY, obj_icon);
-    gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
-    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-
-    if (gBingoObjectivesDisabled[type]) {
-        gDPSetEnvColor(gDisplayListHead++, 255, 80, 80, sTextBaseAlpha);
-        print_generic_string(onOrOffLeftX, TOP_Y + offsetY, textOff);
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-    } else {
-        print_generic_string(onOrOffLeftX, TOP_Y + offsetY, textOn);
-    }
+// The settings page's hints, bottom three rows of the right column.
+static void print_option_nav_instructions(void) {
+    print_generic_string(RIGHT_X + 8, TOP_Y + ROW_HEIGHT * 3 - 2, textDPad);
+    print_generic_string(RIGHT_X + 46, TOP_Y + ROW_HEIGHT * 2 - 2, textPressA);
+    print_generic_string(RIGHT_X + 15, TOP_Y + ROW_HEIGHT * 1 - 2, textPressRL_1);
 }
 
 // The config rows' value column: every value's RIGHT edge sits here.
@@ -1836,18 +2107,21 @@ static s32 bingo_config_timeout(s32 i, u8 **target) {
 // The Preset row: stamp a named objective/unlock loadout. The shown value
 // is computed by matching the current state, so hand-editing any toggle
 // afterwards reads back as Custom (which cycles to the first preset).
+static u8 *bingo_preset_name(void) {
+    switch (bingo_preset_current()) {
+        case BINGO_PRESET_SRL:     return textPresetSrl;
+        case BINGO_PRESET_VANILLA: return textPresetVanilla;
+        case BINGO_PRESET_CASUAL:  return textPresetCasual;
+        default:                   return textPresetCustom;
+    }
+}
+
 static s32 bingo_config_preset(s32 i, u8 **target) {
     if (sToggleCurrentOption && sBingoOptionSelection == i) {
-        s32 cur = bingo_preset_current();
         sToggleCurrentOption = 0;
-        bingo_preset_apply((cur + 1) % BINGO_PRESET_COUNT);
+        bingo_preset_cycle();
     }
-    switch (bingo_preset_current()) {
-        case BINGO_PRESET_SRL:     *target = textPresetSrl;     break;
-        case BINGO_PRESET_VANILLA: *target = textPresetVanilla; break;
-        case BINGO_PRESET_CASUAL:  *target = textPresetCasual;  break;
-        default:                   *target = textPresetCustom;  break;
-    }
+    *target = bingo_preset_name();
     return bingo_config_value_x(*target);
 }
 
@@ -1960,46 +2234,190 @@ static void print_bingo_configs() {
 }
 
 static void print_bingo_page_0() {
-    s32 i;
     s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
 
     print_bingo_selection_highlight();
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-
     print_bingo_configs();
-
-    for (i = 0; i < MIN(BINGO_OBJECTIVE_TOTAL_AMOUNT, BINGO_OPTIONS_IN_FIRST_PAGE); i++) {
-        print_objective(i, 0);
-    }
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-    print_option_nav_instructions(0);
+    print_option_nav_instructions();
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
+// Yellow-with-shadow text, the config rows' look.
+static void print_grid_config_ascii(s32 x, s32 y, const char *str) {
+    gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));
+    grid_print_ascii(x + 1, y, str);
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
+    grid_print_ascii(x, y, str);
+}
 
-static void print_bingo_middle_page(s32 pageNo) {
-    s32 i;
-    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
+// Bottom-up menu rect [x0,x1) x [y0,y1) -> FillRectangle's top-down coords.
+static void grid_fill_rect(s32 x0, s32 y0, s32 x1, s32 y1) {
+    gDPFillRectangle(gDisplayListHead++, x0, SCREEN_HEIGHT - y1, x1,
+                     SCREEN_HEIGHT - y0);
+}
 
-    print_bingo_selection_highlight();
-    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-
-    // Print configs here (TODO)
-
-    // Print objectives
-
-    for (
-        i = BINGO_OPTIONS_IN_FIRST_PAGE + (pageNo - 1) * BINGO_OPTIONS_IN_SECONDARY_PAGES;
-        i < MIN(BINGO_OBJECTIVE_TOTAL_AMOUNT, BINGO_OPTIONS_IN_FIRST_PAGE + pageNo * BINGO_OPTIONS_IN_SECONDARY_PAGES);
-        i++
-    ) {
-        print_objective(i, pageNo);
+// The selection: a translucent box plus a 1-unit pulsing yellow frame on
+// its edge. The icon box is 19 tall, not 20, so the frame's top line stays
+// one unit clear of the band's leader rule (label_y + 4).
+static void print_grid_highlight(void) {
+    s32 x0, x1, y0, y1, pulse;
+    if (sGridCol < 0) {
+        x0 = GRID_LEFT_X;
+        x1 = GRID_LABEL_X + grid_band_label_width(sGridBand) + 3;
+        y0 = grid_label_y(sGridBand) + 2;
+        y1 = grid_label_y(sGridBand) + 16;
+    } else {
+        x0 = grid_icon_x(sGridCol) - 2;
+        x1 = x0 + 20;
+        y0 = grid_icon_y(sGridBand, sGridCol) - 2;
+        y1 = y0 + 19;
     }
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-    print_option_nav_instructions(pageNo);
+    gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, MIN(sTextBaseAlpha, 150));
+    grid_fill_rect(x0, y0, x1, y1);
+
+    pulse = 150 + (s32) (100.0f * (0.5f + 0.5f * sins(gGlobalTimer * 0x600)));
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 140, MIN(sTextBaseAlpha, pulse));
+    grid_fill_rect(x0, y1 - 1, x1, y1);              // top
+    grid_fill_rect(x0, y0, x1, y0 + 1);              // bottom
+    grid_fill_rect(x0, y0 + 1, x0 + 1, y1 - 1);      // left
+    grid_fill_rect(x1 - 1, y0 + 1, x1, y1 - 1);      // right
+}
+
+// Leader rules between each visible band's label and its count, so the
+// headers read as a table.
+static void print_grid_band_rules(s32 gp) {
+    s32 b;
+    char text[16];
+    gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, MIN(sTextBaseAlpha, 60));
+    for (b = 0; b < GRID_BAND_COUNT; b++) {
+        s32 ly, x0, x1;
+        if (grid_band_page(b) != gp) {
+            continue;
+        }
+        ly = grid_label_y(b);
+        grid_count_text(text, grid_band_enabled(b), sGridBands[b].count);
+        x0 = GRID_LABEL_X + grid_band_label_width(b) + 6;
+        x1 = GRID_RIGHT_X - grid_ascii_width(text) - 6;
+        if (x1 > x0) {
+            grid_fill_rect(x0, ly + 4, x1, ly + 5);
+        }
+    }
+}
+
+// The footer names what A would act on (the selected objective, shown
+// with its icon and state, or the band's all-on/all-off action), with the
+// pool's enabled total right-aligned.
+static void print_grid_footer(s32 whiteTextAlpha) {
+    char text[40];
+    s32 i, total = 0;
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
+    if (sGridCol < 0) {
+        char *p = grid_append(text, sGridBands[sGridBand].label);
+        grid_append(p, grid_band_enabled(sGridBand) == sGridBands[sGridBand].count
+                           ? ": A turns all OFF"
+                           : ": A turns all ON");
+        grid_print_ascii(GRID_LABEL_X, GRID_FOOTER_Y, text);
+    } else {
+        u8 type = sGridBands[sGridBand].types[sGridCol];
+        u8 *name = get_objective_info(type)->optionText;
+        s32 x = GRID_FOOTER_NAME_X;
+        print_generic_string(x, GRID_FOOTER_Y, name);
+        x += get_string_width(name) + 8;
+        if (gBingoObjectivesDisabled[type]) {
+            gDPSetEnvColor(gDisplayListHead++, 255, 80, 80, whiteTextAlpha);
+            print_generic_string(x, GRID_FOOTER_Y, textOff);
+            gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
+        } else {
+            print_generic_string(x, GRID_FOOTER_Y, textOn);
+        }
+    }
+    for (i = 0; i < GRID_BAND_COUNT; i++) {
+        total += grid_band_enabled(i);
+    }
+    grid_count_text(text, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
+    grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
+}
+
+static void print_objective_grid(void) {
+    s32 b, c, gp;
+    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
+    char text[16];
+
+    grid_clamp_cursor_to_page();
+    gp = grid_current_page();
+
+    print_grid_band_rules(gp);
+    print_grid_highlight();
+
+    // Icons: OFF ones stay visible but dimmed, so the whole pool reads at
+    // a glance.
+    gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+    for (b = 0; b < GRID_BAND_COUNT; b++) {
+        if (grid_band_page(b) != gp) {
+            continue;
+        }
+        for (c = 0; c < sGridBands[b].count; c++) {
+            u8 type = sGridBands[b].types[c];
+            print_bingo_icon_alpha(grid_icon_x(c), grid_icon_y(b, c),
+                                   get_objective_info(type)->icon,
+                                   gBingoObjectivesDisabled[type]
+                                       ? MIN(gOptionSelectIconOpacity, 70)
+                                       : gOptionSelectIconOpacity);
+        }
+    }
+    if (sGridCol >= 0) {
+        // The selected objective again, beside its name in the footer.
+        print_bingo_icon_alpha(GRID_LABEL_X, GRID_FOOTER_Y,
+                               get_objective_info(sGridBands[sGridBand].types[sGridCol])->icon,
+                               gOptionSelectIconOpacity);
+    }
+    gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+
+    // Band headers: label left, "n of m" right-aligned into one column,
+    // coloured all on (white) / some (yellow) / none (red).
+    for (b = 0; b < GRID_BAND_COUNT; b++) {
+        s32 ly, n, alpha = MIN(sTextBaseAlpha, 200);
+        if (grid_band_page(b) != gp) {
+            continue;
+        }
+        ly = grid_label_y(b);
+        print_grid_config_ascii(GRID_LABEL_X, ly, sGridBands[b].label);
+        n = grid_band_enabled(b);
+        grid_count_text(text, n, sGridBands[b].count);
+        if (n == sGridBands[b].count) {
+            gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, alpha);
+        } else if (n > 0) {
+            gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, alpha);
+        } else {
+            gDPSetEnvColor(gDisplayListHead++, 255, 80, 80, alpha);
+        }
+        grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), ly, text);
+    }
+
+    print_grid_footer(whiteTextAlpha);
+
+    // Only once the bands have flowed onto more than one page: nothing else
+    // on screen says a page 2 exists. Top centre, clear of BACK and the
+    // LOCKED banner.
+    if (grid_page_count() > 1) {
+        char page[32];
+        char *p = grid_append(page, "Page ");
+        p = grid_append_num(p, grid_current_page() + 1);
+        p = grid_append(p, " of ");
+        p = grid_append_num(p, grid_page_count());
+        grid_append(p, ": R or L");
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
+        grid_print_ascii(160 - grid_ascii_width(page) / 2, 212, page);
+    }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
@@ -2124,19 +2542,12 @@ static void print_bingo_options(void) {
         gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
     }
 #endif
-    switch (sBingoOptionCurrentPage) {
-        case 0:
-            print_bingo_page_0();
-            break;
-        case 1:
-            print_bingo_middle_page(1);
-            break;
-        case 2:
-            print_bingo_middle_page(2);
-            break;
-        case 3:
-            print_bingo_page_2();
-            break;
+    if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
+        print_bingo_page_0();
+    } else if (grid_current_page() >= 0) {
+        print_objective_grid();
+    } else {
+        print_bingo_page_2();
     }
 #ifndef TARGET_N64
     // Clickable BACK tag, top right; mouse users had no visible way out
