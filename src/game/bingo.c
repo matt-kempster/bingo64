@@ -73,7 +73,7 @@ u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
     (OBJ_BIT(STAR) | OBJ_BIT(COIN) | OBJ_BIT(STARS_IN_LEVEL) | OBJ_BIT(BOWSER) \
      | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(RACING_STARS) | OBJ_BIT(SECRETS_STARS) \
      | OBJ_BIT(MULTICOIN) | OBJ_BIT(MULTISTAR) | OBJ_BIT(STARS_MULTIPLE_LEVELS) \
-     | OBJ_BIT(RED_COIN))
+     | OBJ_BIT(RED_COIN) | OBJ_BIT(BLUE_COIN))
 
 // Everything that couldn't happen under vanilla rules: the game-modifying
 // stars, splatoon, ordered reds, and forced-timer stars. (TTC Random stays:

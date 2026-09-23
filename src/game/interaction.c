@@ -778,6 +778,12 @@ u32 interact_coin(struct MarioState *m, UNUSED u32 interactType, struct Object *
     // Tell Bingo we got a coin
     gbCoinsJustGotten = o->oDamageOrCoinValue;
     bingo_update(BINGO_UPDATE_COIN);
+    // Blue coins are the 5-value ones. Tagged coins count once per source
+    // (see bingo_tag_blue_coin); an untagged one counts every time.
+    if (o->oDamageOrCoinValue == 5
+        && (o->oBingoId == 0 || is_new_kill(BINGO_UPDATE_BLUE_COIN, o->oBingoId))) {
+        bingo_update(BINGO_UPDATE_BLUE_COIN);
+    }
 
     m->healCounter += 4 * o->oDamageOrCoinValue;
 

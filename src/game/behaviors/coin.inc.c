@@ -334,6 +334,7 @@ void coin_inside_boo_act_0(void) {
     if (o->oTimer == 0 && gCurrLevelNum == LEVEL_BBH) {
         cur_obj_set_model(MODEL_BLUE_COIN);
         cur_obj_scale(0.7f);
+        bingo_tag_blue_coin(o, parent);
     }
 
     obj_copy_pos(o, parent);

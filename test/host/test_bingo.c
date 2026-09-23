@@ -306,6 +306,7 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_KILL_KOOPAS] = "KILL_KOOPAS",
     [BINGO_OBJECTIVE_CRUSHED] = "CRUSHED",
     [BINGO_OBJECTIVE_UNIQUE_DEATHS] = "UNIQUE_DEATHS",
+    [BINGO_OBJECTIVE_BLUE_COIN] = "BLUE_COIN",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -900,6 +901,57 @@ static void test_sim_kill_collectable(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
 
+static void test_sim_blue_coin_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    u32 uidA, uidB;
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_BLUE_COIN;
+    o->data.collectableData.toGet = 3;
+
+    // Yellow coins (and a blue coin's own BINGO_UPDATE_COIN, worth 5)
+    // feed the coin counters, not this objective.
+    gCurrCourseNum = 1;
+    gbCoinsJustGotten = 1;
+    bingo_update(BINGO_UPDATE_COIN);
+    gbCoinsJustGotten = 5;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // Red coins are a different collectable.
+    bingo_update(BINGO_UPDATE_RED_COIN);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    bingo_update(BINGO_UPDATE_BLUE_COIN);
+    bingo_update(BINGO_UPDATE_BLUE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+
+    // It is a cross-course total: leaving the course keeps the progress.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+
+    gCurrCourseNum = 7;
+    bingo_update(BINGO_UPDATE_BLUE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // interact_coin only fires the event for a source's first coin: the
+    // blue coin UID range exists and dedupes by course + position.
+    gCurrCourseNum = 7;
+    uidA = get_unique_id(BINGO_UPDATE_BLUE_COIN, 100.0f, 200.0f, 300.0f);
+    uidB = get_unique_id(BINGO_UPDATE_BLUE_COIN, 100.0f, 200.0f, 301.0f);
+    CHECK(uidA != (u32) -1);
+    CHECK(uidA != uidB);
+    CHECK_EQ_INT(get_unique_id(BINGO_UPDATE_BLUE_COIN, 100.0f, 200.0f, 300.0f), uidA);
+    CHECK_EQ_INT(is_new_kill(BINGO_UPDATE_BLUE_COIN, uidA), 1);
+    CHECK_EQ_INT(is_new_kill(BINGO_UPDATE_BLUE_COIN, uidA), 0);
+    CHECK_EQ_INT(is_new_kill(BINGO_UPDATE_BLUE_COIN, uidB), 1);
+    // The same spot in another course is a different coin.
+    gCurrCourseNum = 8;
+    CHECK(get_unique_id(BINGO_UPDATE_BLUE_COIN, 100.0f, 200.0f, 300.0f) != uidA);
+    bingo_tracking_collectables_reset();
+}
+
 static void test_sim_abz_fail_and_reset(void) {
     struct BingoObjective *o = &gBingoObjectives[0];
     reset_sim();
@@ -1273,6 +1325,7 @@ int main(void) {
     RUN_TEST(test_sim_unique_deaths);
     RUN_TEST(test_sim_random_stars_objective);
     RUN_TEST(test_sim_kill_collectable);
+    RUN_TEST(test_sim_blue_coin_objective);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);
     RUN_TEST(test_sim_stars_in_level_k);

@@ -906,6 +906,19 @@ s32 bingo_objective_red_coin_init(enum BingoObjectiveClass class) {
     }
 }
 
+// Blue coins: 12 switches (59 coins), 4 moving coins, Mr. I / piranha /
+// pokey / boo drops, and ground-pounded goombas. Each source counts once.
+s32 bingo_objective_blue_coin_init(enum BingoObjectiveClass class) {
+    // ~160 sources in all; a BOB goomba sweep alone is 11, so the brackets
+    // sit a notch above red coins' (12-18 / 20-29).
+    switch (class) {
+        default:
+            return random_range_inclusive(14, 20);
+        case BINGO_CLASS_HARD:
+            return random_range_inclusive(24, 32);
+    }
+}
+
 s32 bingo_objective_amps_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -1079,6 +1092,8 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_cannons_init(class);
         case BINGO_OBJECTIVE_RED_COIN:
             return bingo_objective_red_coin_init(class);
+        case BINGO_OBJECTIVE_BLUE_COIN:
+            return bingo_objective_blue_coin_init(class);
         case BINGO_OBJECTIVE_AMPS:
             return bingo_objective_amps_init(class);
         case BINGO_OBJECTIVE_KILL_GOOMBAS:

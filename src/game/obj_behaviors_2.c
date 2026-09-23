@@ -659,7 +659,7 @@ static void obj_die_if_health_non_positive(void) {
         }
 
         if (o->oNumLootCoins < 0) {
-            spawn_object(o, MODEL_BLUE_COIN, bhvSpawnedBlueCoin);
+            bingo_tag_blue_coin(spawn_object(o, MODEL_BLUE_COIN, bhvSpawnedBlueCoin), o);
         } else {
             obj_spawn_loot_yellow_coins(o, o->oNumLootCoins, 20.0f);
         }

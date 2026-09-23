@@ -160,7 +160,10 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_KILL_KOOPAS,
     BINGO_OBJECTIVE_CRUSHED,
     BINGO_OBJECTIVE_UNIQUE_DEATHS,
-    BINGO_OBJECTIVE_COLLECTABLE_MAX = BINGO_OBJECTIVE_UNIQUE_DEATHS,
+    // Appended (not grouped with RED_COIN) so existing type numbers stay put:
+    // test/emu/ram_test.py decodes board dumps by number.
+    BINGO_OBJECTIVE_BLUE_COIN,
+    BINGO_OBJECTIVE_COLLECTABLE_MAX = BINGO_OBJECTIVE_BLUE_COIN,
     // End
     BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_COLLECTABLE_MAX,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
@@ -226,7 +229,8 @@ enum BingoObjectiveIcon {
     BINGO_ICON_CRUSHED,
     BINGO_ICON_SPLATOON,
     BINGO_ICON_UNIQUE_DEATHS,
-    BINGO_ICON_LIVES
+    BINGO_ICON_LIVES,
+    BINGO_ICON_BLUE_COIN,
 };
 
 enum BingoObjectiveUpdate
@@ -261,6 +265,9 @@ enum BingoObjectiveUpdate
     BINGO_UPDATE_VANISH_CAP_BOX,
     BINGO_UPDATE_METAL_CAP_BOX,
     BINGO_UPDATE_CANNON_COLLECTABLE,
+    // Any 5-value coin (switch coins, moving coins, enemy/boo drops, ground-
+    // pounded goombas), fired from interact_coin once per unique source.
+    BINGO_UPDATE_BLUE_COIN,
 
     BINGO_UPDATE_BLJ,
     BINGO_UPDATE_DANGEROUS_WALL_KICK,

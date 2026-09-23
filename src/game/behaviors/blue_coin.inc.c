@@ -1,3 +1,4 @@
+#include "game/bingo_tracking_collectables.h"
 
 /**
  * Behavior for bhvHiddenBlueCoin and bhvBlueCoinSwitch.
@@ -13,6 +14,15 @@ void bhv_hidden_blue_coin_loop(void) {
 
     switch (o->oAction) {
         case HIDDEN_BLUE_COIN_ACT_INACTIVE:
+            // Switch coins never move, so their own position is a stable
+            // key for the blue coin objective.
+            if (o->oBingoId == 0) {
+                o->oBingoId = get_unique_id(BINGO_UPDATE_BLUE_COIN, o->oPosX, o->oPosY, o->oPosZ);
+                if (o->oBingoId == (u32) -1) {
+                    o->oBingoId = 0;
+                }
+            }
+
             // Become invisible and intangible
             cur_obj_disable_rendering();
             cur_obj_become_intangible();

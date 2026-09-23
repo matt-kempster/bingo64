@@ -275,6 +275,7 @@ void cur_obj_unused_play_footstep_sound(s32 animFrame1, s32 animFrame2, s32 soun
 void enable_time_stop_including_mario(void);
 void disable_time_stop_including_mario(void);
 s32 cur_obj_check_interacted(void);
+void bingo_tag_blue_coin(struct Object *coin, struct Object *source);
 void cur_obj_spawn_loot_blue_coin(void);
 
 #ifdef VERSION_JP

@@ -77,6 +77,10 @@ struct UID {
 // BitS 1 (small whomp). Keyed on oBingoCrushId, not oBingoId -- whomps spend
 // oBingoId on MAX_WHOMPS above.
 #define MAX_CRUSHERS 16
+// Keyed per source, not per coin: 59 switch coins + 4 moving coins, then one
+// slot per dropping enemy (7 Mr. Is, 3 piranhas, 4 pokeys, BBH boos) and per
+// ground-poundable goomba (~80). See bingo_tag_blue_coin in object_helpers.c.
+#define MAX_BLUE_COINS 200
 
 #define TOTAL_UIDS ( \
         MAX_GOOMBAS \
@@ -106,6 +110,7 @@ struct UID {
         + MAX_SKEETERS \
         + MAX_KOOPAS \
         + MAX_CRUSHERS \
+        + MAX_BLUE_COINS \
     ) + 2
 
 // I really hope nothing is actually at (0, 0, 0)....
@@ -211,6 +216,9 @@ void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) 
                 break;
             case BINGO_UPDATE_CRUSHED_BY_CRUSHER:
                 rangeLength = MAX_CRUSHERS;
+                break;
+            case BINGO_UPDATE_BLUE_COIN:
+                rangeLength = MAX_BLUE_COINS;
                 break;
         }
         *start += prevRangeLength;

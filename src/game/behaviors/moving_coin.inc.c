@@ -1,3 +1,5 @@
+#include "game/bingo_tracking_collectables.h"
+
 // moving_coin.inc.c
 
 static struct ObjectHitbox sMovingYellowCoinHitbox = {
@@ -111,6 +113,12 @@ void bhv_moving_blue_coin_init(void) {
     o->oBuoyancy = 1.5f;
 
     obj_set_hitbox(o, &sMovingBlueCoinHitbox);
+
+    // Keyed on the spawn point: the coin slides around afterwards.
+    o->oBingoId = get_unique_id(BINGO_UPDATE_BLUE_COIN, o->oPosX, o->oPosY, o->oPosZ);
+    if (o->oBingoId == (u32) -1) {
+        o->oBingoId = 0;
+    }
 }
 
 void bhv_moving_blue_coin_loop(void) {

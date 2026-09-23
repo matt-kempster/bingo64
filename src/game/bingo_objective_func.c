@@ -535,6 +535,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_generic_collectable(objective, update, BINGO_UPDATE_CANNON_COLLECTABLE);
         case BINGO_OBJECTIVE_RED_COIN:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_RED_COIN);
+        case BINGO_OBJECTIVE_BLUE_COIN:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_BLUE_COIN);
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_EXCLAMATION_MARK_BOX);
         case BINGO_OBJECTIVE_WING_CAP_BOX:

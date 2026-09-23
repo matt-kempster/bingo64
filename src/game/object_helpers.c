@@ -2812,9 +2812,38 @@ s32 cur_obj_check_interacted(void) {
     }
 }
 
+/**
+ * Give a dropped blue coin a collectable UID keyed on the object that dropped
+ * it, so each source counts once toward the blue coin objective however many
+ * times the course is re-entered. The key is the dropper's home (its spawn
+ * point), else its parent's home (pokey body parts hang off the pokey), else
+ * the dropper's current position.
+ */
+void bingo_tag_blue_coin(struct Object *coin, struct Object *source) {
+    struct Object *key = source;
+    u32 uid;
+
+    if (key->oHomeX == 0.0f && key->oHomeY == 0.0f && key->oHomeZ == 0.0f
+        && key->parentObj != NULL && key->parentObj != key) {
+        key = key->parentObj;
+    }
+
+    if (key->oHomeX != 0.0f || key->oHomeY != 0.0f || key->oHomeZ != 0.0f) {
+        uid = get_unique_id(BINGO_UPDATE_BLUE_COIN, key->oHomeX, key->oHomeY, key->oHomeZ);
+    } else {
+        uid = get_unique_id(BINGO_UPDATE_BLUE_COIN, source->oPosX, source->oPosY, source->oPosZ);
+    }
+
+    // 0 means untagged; interact_coin then counts the coin every time.
+    coin->oBingoId = (uid == (u32) -1) ? 0 : uid;
+}
+
 void cur_obj_spawn_loot_blue_coin(void) {
+    struct Object *coin;
+
     if (o->oNumLootCoins >= 5) {
-        spawn_object(o, MODEL_BLUE_COIN, bhvSpawnedBlueCoin);
+        coin = spawn_object(o, MODEL_BLUE_COIN, bhvSpawnedBlueCoin);
+        bingo_tag_blue_coin(coin, o);
         o->oNumLootCoins -= 5;
     }
 }
