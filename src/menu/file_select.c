@@ -225,7 +225,15 @@ static s32 sOptionsScrollTarget = 0;
 static s32 sOptionsScrollPx = 0;
 
 // Every entry into the options screen starts at the top of the document.
+#ifdef MOUSE_ACTIONS
+static f32 sOptionsHoverLastX = -10000.0f, sOptionsHoverLastY = -10000.0f;
+static s32 sOptionsHoverArmed = 0;
+#endif
+
 static void options_reset(void) {
+#ifdef MOUSE_ACTIONS
+    sOptionsHoverArmed = 0;
+#endif
     sOptionsFocus = OPTIONS_FOCUS_SETTINGS;
     sBingoOptionSelection = 0;
     sOptionsScroll = 0.0f;
@@ -1751,7 +1759,13 @@ static void options_scroll_to_focus(void) {
         rowBot = options_settings_doc(sBingoOptionSelection) + 2;
     } else {
         if (sGridBand < 0) {
-            // The sticky control row is visible whenever the section is.
+            // The sticky control row is visible whenever the section is;
+            // only when the section has scrolled away entirely (the row is
+            // pushed off above the window, e.g. L from the credits) bring
+            // the section's top back.
+            if (grid_ctrl_y() > OPT_DOC_TOP_Y) {
+                options_reveal(grid_ctrl_doc() - 16, grid_ctrl_doc() + 2);
+            }
             return;
         }
         // Keep the focused band row clear of the sticky header's 20 units.
@@ -1975,23 +1989,42 @@ static s32 grid_navigate(u16 pressed) {
         }
         return 1;
     }
+    // Up/down step through a band's icon rows before leaving it; the
+    // column is kept, clamped to a shorter row's last icon. The label
+    // (col -1) moves label to label.
     if (pressed & (D_JPAD | D_CBUTTONS)) {
-        if (sGridBand >= last) {
-            sOptionsFocus = OPTIONS_FOCUS_CREDITS;
-            return 1;
-        }
-        sGridBand++;
-    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
-        if (sGridBand <= 0) {
-            if (grid_controls_visible()) {
-                sGridBand = -1;
-                sGridCol = 0;
-            } else {
-                options_focus_settings_row(BINGO_CONFIGS_IN_LEFT_COL - 1);
+        if (sGridCol >= 0 && sGridCol + GRID_MAX_PER_ROW
+                                 < grid_band_rows(sGridBand) * GRID_MAX_PER_ROW) {
+            sGridCol += GRID_MAX_PER_ROW;
+        } else {
+            if (sGridBand >= last) {
+                sOptionsFocus = OPTIONS_FOCUS_CREDITS;
+                return 1;
             }
-            return 1;
+            sGridBand++;
+            if (sGridCol >= 0) {
+                sGridCol %= GRID_MAX_PER_ROW;
+            }
         }
-        sGridBand--;
+    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+        if (sGridCol >= GRID_MAX_PER_ROW) {
+            sGridCol -= GRID_MAX_PER_ROW;
+        } else {
+            if (sGridBand <= 0) {
+                if (grid_controls_visible()) {
+                    sGridBand = -1;
+                    sGridCol = 0;
+                } else {
+                    options_focus_settings_row(BINGO_CONFIGS_IN_LEFT_COL - 1);
+                }
+                return 1;
+            }
+            sGridBand--;
+            if (sGridCol >= 0) {
+                sGridCol = (grid_band_rows(sGridBand) - 1) * GRID_MAX_PER_ROW
+                           + sGridCol % GRID_MAX_PER_ROW;
+            }
+        }
     } else if (pressed & (R_JPAD | R_CBUTTONS)) {
         sGridCol = sGridCol + 1 >= sGridBands[sGridBand].count ? -1 : sGridCol + 1;
     } else if (pressed & (L_JPAD | L_CBUTTONS)) {
@@ -2040,14 +2073,25 @@ static s32 credits_navigate(u16 pressed) {
 // Hover selects, but only when the pointer actually moved: a resting
 // pointer must not snap the selection back after d-pad moves (or when the
 // document scrolls under it).
+// Hover only follows pointer movement made on this screen: the hand is
+// still parked over the OPTIONS button when the screen opens, and that
+// spot lies over the grid, so the first frame must not steal the focus
+// from Game mode.
+
 static void options_mouse_hover(void) {
-    static f32 lastX = -10000.0f, lastY = -10000.0f;
     s32 band, col, row;
-    if (sCursorPos[0] == lastX && sCursorPos[1] == lastY) {
+    if (!sOptionsHoverArmed) {
+        sOptionsHoverArmed = 1;
+        sOptionsHoverLastX = sCursorPos[0];
+        sOptionsHoverLastY = sCursorPos[1];
         return;
     }
-    lastX = sCursorPos[0];
-    lastY = sCursorPos[1];
+    if (sCursorPos[0] == sOptionsHoverLastX && sCursorPos[1] == sOptionsHoverLastY) {
+        return;
+    }
+    sOptionsHoverLastX = sCursorPos[0];
+    sOptionsHoverLastY = sCursorPos[1];
+    f32 lastX = sOptionsHoverLastX, lastY = sOptionsHoverLastY;
     if (grid_hit_test(lastX + 160.0f, lastY + 120.0f, &band, &col)) {
         sOptionsFocus = OPTIONS_FOCUS_GRID;
         sGridBand = band;
