@@ -210,6 +210,7 @@ static void emit_cell_json(int i) {
         // Only A inits abcStarObjective.hint; for B/Z it is stale union bytes.
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
             emitf(",\"course\":%d,\"star\":%d",
                   o->data.starObjective.course, o->data.starObjective.starIndex);
             break;
@@ -290,6 +291,7 @@ static void emit_cell_dump(int i) {
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
             emitf(" course=%d star=%d",
                   o->data.starObjective.course, o->data.starObjective.starIndex);
             break;

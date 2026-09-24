@@ -35,6 +35,7 @@ struct ObjectiveWeight sWeightsEasy[] = {
     { BINGO_OBJECTIVE_RACING_STARS, 6, 1 },
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
 };
 s32 sWeightsSizeEasy = sizeof(sWeightsEasy) / sizeof(struct ObjectiveWeight);
 
@@ -93,6 +94,11 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_BOWSER, 6, 1 },
     { BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, 4, 1 },
+    // weights provisional, pre-balance-solve
+    { BINGO_OBJECTIVE_STAR_COINLESS, 4, 1 },
+    { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
+    { BINGO_OBJECTIVE_KOOPA_SHELLS, 4, 1 },
+    { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
 };
 s32 sWeightsSizeMedium = sizeof(sWeightsMedium) / sizeof(struct ObjectiveWeight);
 
@@ -126,6 +132,10 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_LIVES, 8, 1 },
+    // weights provisional, pre-balance-solve
+    { BINGO_OBJECTIVE_STAR_COINLESS, 4, 1 },
+    { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
+    { BINGO_OBJECTIVE_KOOPA_SHELLS, 3, 1 },
 };
 s32 sWeightsSizeHard = sizeof(sWeightsHard) / sizeof(struct ObjectiveWeight);
 

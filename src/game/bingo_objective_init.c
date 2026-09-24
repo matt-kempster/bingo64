@@ -142,6 +142,70 @@ retry:
     // although ofc you can use PU speed lol
 }
 
+// Main-course stars for the coinless challenge. Every 100-coin star (index 6)
+// and every red-coin star (8 red coins are coins) is out, plus the stars whose
+// usual route runs through coins the player can barely steer around:
+void random_coinless_star(enum CourseNum *course, s32 *star) {
+retry:
+    random_star_main_course_except_100c(course, star);
+    switch (*course) {
+        case COURSE_BOB:
+            // 8 red coins; Mario Wings to the Sky is flown through the
+            // coin rings, which is the whole point of that star.
+            if (*star == 3 || *star == 4) {
+                goto retry;
+            }
+            break;
+        case COURSE_CCM:
+            // 8 red coins; Slip Slidin' Away and the Big Penguin Race run
+            // down the slide, which has coin lines along the racing line.
+            if (*star == 3 || *star == 0 || *star == 2) {
+                goto retry;
+            }
+            break;
+        case COURSE_TTM:
+            // Scary 'Shrooms, Red Coins; Mysterious Mountainside is the
+            // slide, same coin lines as CCM's.
+            if (*star == 2 || *star == 3) {
+                goto retry;
+            }
+            break;
+        // The red coin star of every other main course (index as in
+        // sRedCoinStars, bingo_objective_func.c):
+        case COURSE_WF:
+        case COURSE_JRB:
+        case COURSE_BBH:
+            if (*star == 3) {
+                goto retry;
+            }
+            break;
+        case COURSE_HMC:
+            if (*star == 1) {
+                goto retry;
+            }
+            break;
+        case COURSE_LLL:
+        case COURSE_DDD:
+        case COURSE_RR:
+            if (*star == 2) {
+                goto retry;
+            }
+            break;
+        case COURSE_SSL:
+        case COURSE_SL:
+        case COURSE_WDW:
+        case COURSE_THI:
+            if (*star == 4) {
+                goto retry;
+            }
+            break;
+        case COURSE_TTC:
+            if (*star == 5) {
+                goto retry;
+            }
+            break;
+    }
+}
 
 s32 random_range_inclusive(s32 low, s32 high) {
     return low + (random_u16() % (high - low + 1));
@@ -208,6 +272,17 @@ s32 bingo_objective_star_z_button_challenge_init(
             break;
     }
 
+    objective->data.starObjective.course = course;
+    objective->data.starObjective.starIndex = star;
+}
+
+s32 bingo_objective_star_coinless_init(
+    struct BingoObjective *objective, UNUSED enum BingoObjectiveClass class
+) {
+    enum CourseNum course;
+    s32 star;
+
+    random_coinless_star(&course, &star);
     objective->data.starObjective.course = course;
     objective->data.starObjective.starIndex = star;
 }
@@ -937,6 +1012,39 @@ s32 bingo_objective_blue_coin_init(enum BingoObjectiveClass class) {
     }
 }
 
+// 24 fading warps = 12 pairs: BOB 2, SSL 2 (one outside, one in the
+// pyramid), and one each in WF, CCM, LLL, WDW, TTM, THI, SL, RR.
+s32 bingo_objective_warp_pads_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return random_range_inclusive(3, 4);
+        case BINGO_CLASS_HARD:
+            return random_range_inclusive(5, 6);
+    }
+}
+
+// Rideable shells: ! boxes in LLL, SSL, SL; underwater shells in JRB and DDD;
+// plus the shells knocked off the ordinary Koopas in BOB and THI.
+s32 bingo_objective_koopa_shells_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        default:
+            return 2;
+        case BINGO_CLASS_HARD:
+            return random_range_inclusive(3, 4);
+    }
+}
+
+// 13 spinning hearts: BitFS 2, BitS 2, RR 2, TTC 2, and one each in BOB,
+// CCM, HMC, LLL, SSL.
+s32 bingo_objective_spin_hearts_init(enum BingoObjectiveClass class) {
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            return random_range_inclusive(2, 3);
+        default:
+            return random_range_inclusive(4, 6);
+    }
+}
+
 s32 bingo_objective_amps_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -1112,6 +1220,12 @@ s32 bingo_objective_collectable_init_dispatch(
             return bingo_objective_red_coin_init(class);
         case BINGO_OBJECTIVE_BLUE_COIN:
             return bingo_objective_blue_coin_init(class);
+        case BINGO_OBJECTIVE_WARP_PADS:
+            return bingo_objective_warp_pads_init(class);
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+            return bingo_objective_koopa_shells_init(class);
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
+            return bingo_objective_spin_hearts_init(class);
         case BINGO_OBJECTIVE_AMPS:
             return bingo_objective_amps_init(class);
         case BINGO_OBJECTIVE_KILL_GOOMBAS:
@@ -1164,6 +1278,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_star_b_button_challenge_init(objective, class);
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             return bingo_objective_star_z_button_challenge_init(objective, class);
+        case BINGO_OBJECTIVE_STAR_COINLESS:
+            return bingo_objective_star_coinless_init(objective, class);
         case BINGO_OBJECTIVE_STAR_TIMED:
             return bingo_objective_star_timed_init(objective, class);
         case BINGO_OBJECTIVE_STAR_TTC_RANDOM:

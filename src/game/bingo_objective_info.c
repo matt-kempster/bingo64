@@ -92,6 +92,26 @@ ALIGNED8 static const u8 seg2_texture_blue_coin[] = {
 #include "textures/segment2/custom/segment2.bluecoin.rgba16.inc.c"
 };
 
+// The red-coin-star icon with the coin turned gold and struck through.
+ALIGNED8 static const u8 seg2_texture_coinless[] = {
+#include "textures/segment2/custom/segment2.coinless.rgba16.inc.c"
+};
+
+// icon from STROOP sprite (warp swirl), may be replaced by hand art
+ALIGNED8 static const u8 seg2_texture_warppad[] = {
+#include "textures/segment2/custom/segment2.warppad.rgba16.inc.c"
+};
+
+// icon from STROOP sprite, may be replaced by hand art
+ALIGNED8 static const u8 seg2_texture_koopashell[] = {
+#include "textures/segment2/custom/segment2.koopashell.rgba16.inc.c"
+};
+
+// icon from STROOP sprite, may be replaced by hand art
+ALIGNED8 static const u8 seg2_texture_heart[] = {
+#include "textures/segment2/custom/segment2.heart.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_signpost[] = {
 #include "textures/segment2/custom/segment2.signpost.rgba16.inc.c"
 };
@@ -295,7 +315,11 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_CRUSHED, BINGO_ICON_CRUSHED, { TEXT_CRUSHED }, seg2_texture_thwomp },
     { BINGO_OBJECTIVE_UNIQUE_DEATHS, BINGO_ICON_UNIQUE_DEATHS, { TEXT_UNIQUE_DEATHS }, seg2_texture_skull },
     { BINGO_OBJECTIVE_BLUE_COIN, BINGO_ICON_BLUE_COIN, { TEXT_BLUE_COINS }, seg2_texture_blue_coin },
-    { BINGO_OBJECTIVE_RED_COIN_STARS, BINGO_ICON_RED_COIN_STARS, { TEXT_RED_COIN_STARS }, seg2_texture_redcoinstar }
+    { BINGO_OBJECTIVE_RED_COIN_STARS, BINGO_ICON_RED_COIN_STARS, { TEXT_RED_COIN_STARS }, seg2_texture_redcoinstar },
+    { BINGO_OBJECTIVE_STAR_COINLESS, BINGO_ICON_STAR_COINLESS, { TEXT_COINLESS_STAR }, seg2_texture_coinless },
+    { BINGO_OBJECTIVE_WARP_PADS, BINGO_ICON_WARP_PADS, { TEXT_WARP_PADS }, seg2_texture_warppad },
+    { BINGO_OBJECTIVE_KOOPA_SHELLS, BINGO_ICON_KOOPA_SHELLS, { TEXT_KOOPA_SHELLS }, seg2_texture_koopashell },
+    { BINGO_OBJECTIVE_SPIN_HEARTS, BINGO_ICON_SPIN_HEARTS, { TEXT_SPIN_HEARTS }, seg2_texture_heart },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

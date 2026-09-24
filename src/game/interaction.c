@@ -1550,6 +1550,11 @@ u32 interact_koopa_shell(struct MarioState *m, UNUSED u32 interactType, struct O
             m->usedObj = o;
             m->riddenObj = o;
 
+            // Bingo: tagged shells (! box, Koopa drop) count once per source.
+            if (o->oBingoId != 0 && is_new_kill(BINGO_UPDATE_KOOPA_SHELL, o->oBingoId)) {
+                bingo_update(BINGO_UPDATE_KOOPA_SHELL);
+            }
+
             attack_object(o, interaction);
             update_mario_sound_and_camera(m);
             play_shell_music();

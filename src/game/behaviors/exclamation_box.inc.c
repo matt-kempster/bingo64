@@ -170,6 +170,11 @@ void exclamation_box_spawn_contents(struct ExclamationBoxContents *contentsList,
         contentsObj->oSubAction = 1;
     }
 #endif
+    // Bingo: shell boxes respawn their shell; keying it on the box's home
+    // makes every shell from one box the same shell.
+    if (contents->model == MODEL_KOOPA_SHELL) {
+        bingo_tag_koopa_shell(contentsObj, o);
+    }
 }
 
 void exclamation_box_act_4(void) {

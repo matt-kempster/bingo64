@@ -1,3 +1,5 @@
+#include "game/bingo_tracking_collectables.h"
+
 // recovery_heart.inc.c
 
 struct ObjectHitbox sRecoveryHeartHitbox = {
@@ -18,6 +20,9 @@ void bhv_recovery_heart_loop(void) {
         if (o->oSpinningHeartPlayedSound == 0) {
             cur_obj_play_sound_2(SOUND_GENERAL_HEART_SPIN);
             o->oSpinningHeartPlayedSound++;
+            // Bingo: Mario just set it spinning. Hearts never move, so the
+            // spot keys it; only the first spin of each heart counts.
+            bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, o->oPosX, o->oPosY, o->oPosZ);
         }
 
         o->oAngleVelYaw = (s32)(200.0f * gMarioStates[0].forwardVel) + 1000;

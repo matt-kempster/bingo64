@@ -1,25 +1,25 @@
-00 type=27 class=0 icon=21 title="x3" toGet=3
-01 type=48 class=1 icon=48 title="x3" toGet=3
-02 type=25 class=1 icon=16 title="x4" toGetTotal=4 toGetEachCourse=1
-03 type=12 class=1 icon=17 title="SL 3" course=10 toGet=3
-04 type=15 class=2 icon=53 title="JRB 290" course=3 toGet=290
-05 type=06 class=1 icon=08 title="RRú5" course=15 star=4 maxClicks=3
-06 type=47 class=2 icon=47 title="x3" toGet=3
-07 type=42 class=1 icon=42 title="x12" toGet=12
-08 type=00 class=0 icon=02 title="WFú3" course=2 star=2
-09 type=31 class=1 icon=30 title="x17" toGet=17
-10 type=40 class=1 icon=40 title="x6" toGet=6
-11 type=01 class=1 icon=03 title="THIú5" course=13 star=4 maxTime=1980
-12 type=11 class=3 icon=13 title="CotMC47" course=20 toGet=47
-13 type=34 class=1 icon=33 title="x7" toGet=7
-14 type=30 class=1 icon=28 title="x8" toGet=8
-15 type=00 class=1 icon=02 title="TTMú7" course=12 star=6
-16 type=11 class=0 icon=13 title="TotWC38" course=21 toGet=38
-17 type=32 class=1 icon=31 title="x12" toGet=12
-18 type=30 class=2 icon=28 title="x6" toGet=6
-19 type=45 class=1 icon=45 title="x6" toGet=6
-20 type=21 class=2 icon=55 title="x13" toGet=13
-21 type=28 class=1 icon=29 title="x8" toGet=8
-22 type=30 class=1 icon=28 title="x7" toGet=7
-23 type=15 class=1 icon=53 title="THI 180" course=13 toGet=180
-24 type=24 class=0 icon=15 title="x3" toGet=3
+00 type=00 class=0 icon=02 title="THIú1" course=13 star=0
+01 type=59 class=1 icon=57 title="x4" toGet=4
+02 type=23 class=1 icon=27 title="x1" toGet=1
+03 type=32 class=1 icon=30 title="x17" toGet=17
+04 type=01 class=2 icon=03 title="JRBú6" course=3 star=5 maxTime=1290
+05 type=00 class=1 icon=02 title="BitDWú" course=16 star=0
+06 type=31 class=2 icon=28 title="x8" toGet=8
+07 type=50 class=1 icon=49 title="x5" toGet=5
+08 type=12 class=0 icon=13 title="HMC 46" course=6 toGet=46
+09 type=42 class=1 icon=41 title="x5" toGet=5
+10 type=46 class=1 icon=45 title="x4" toGet=4
+11 type=56 class=1 icon=59 title="x3" toGet=3
+12 type=12 class=3 icon=13 title="CotMC47" course=20 toGet=47
+13 type=33 class=1 icon=31 title="x7" toGet=7
+14 type=34 class=1 icon=32 title="x5" toGet=5
+15 type=39 class=1 icon=38 title="x11" toGet=11
+16 type=26 class=0 icon=16 title="x3" toGetTotal=3 toGetEachCourse=1
+17 type=13 class=1 icon=17 title="BitFS 3" course=17 toGet=3
+18 type=00 class=2 icon=02 title="HMCú6" course=6 star=5
+19 type=53 class=1 icon=52 title="x4" toGet=4
+20 type=03 class=2 icon=05 title="WFú3" course=2 star=2 hint="Don't forget the warp."
+21 type=10 class=1 icon=12 title="TTCú4" course=14 star=3
+22 type=01 class=1 icon=03 title="BOBú1" course=1 star=0 maxTime=2700
+23 type=13 class=1 icon=17 title="HMC 3" course=6 toGet=3
+24 type=20 class=0 icon=25 title="x3" toGet=3

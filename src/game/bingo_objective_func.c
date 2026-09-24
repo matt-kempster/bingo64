@@ -509,6 +509,11 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_obtain_abz_button_challenges(objective, update, BINGO_UPDATE_B_PRESSED);
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             return objective_obtain_abz_button_challenges(objective, update, BINGO_UPDATE_Z_PRESSED);
+        case BINGO_OBJECTIVE_STAR_COINLESS:
+            // interact_coin fires BINGO_UPDATE_COIN for every coin (yellow,
+            // red, blue, dropped), so the button-challenge shape fits as is:
+            // any coin in the course fails the visit, re-entry resets it.
+            return objective_obtain_abz_button_challenges(objective, update, BINGO_UPDATE_COIN);
         case BINGO_OBJECTIVE_RANDOM_RED_COINS:
             return objective_obtain_star_random_reds(objective, update);
         case BINGO_OBJECTIVE_STAR_TIMED:
@@ -577,6 +582,12 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_generic_collectable(objective, update, BINGO_UPDATE_RED_COIN);
         case BINGO_OBJECTIVE_BLUE_COIN:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_BLUE_COIN);
+        case BINGO_OBJECTIVE_WARP_PADS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_WARP_PAD);
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_KOOPA_SHELL);
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_SPIN_HEART);
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_EXCLAMATION_MARK_BOX);
         case BINGO_OBJECTIVE_WING_CAP_BOX:

@@ -126,6 +126,7 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
         case BINGO_OBJECTIVE_STAR_TIMED:
         case BINGO_OBJECTIVE_STAR_TTC_RANDOM:
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
@@ -171,6 +172,9 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_SHOOT_CANNONS:
         case BINGO_OBJECTIVE_RED_COIN:
         case BINGO_OBJECTIVE_BLUE_COIN:
+        case BINGO_OBJECTIVE_WARP_PADS:
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
         case BINGO_OBJECTIVE_AMPS:
         case BINGO_OBJECTIVE_KILL_GOOMBAS:
         case BINGO_OBJECTIVE_KILL_BOBOMBS:

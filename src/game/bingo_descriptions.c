@@ -223,6 +223,9 @@ void get_star_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             strcpy(noTouchButtonText, " without touching the Z trigger");
             break;
+        case BINGO_OBJECTIVE_STAR_COINLESS:
+            strcpy(noTouchButtonText, " without touching a single coin");
+            break;
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
             strcpy(noTouchButtonText, " with the joystick reversed");
             break;
@@ -575,6 +578,15 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_BLUE_COIN:
             strcpy(verb, "Collect");
             break;
+        case BINGO_OBJECTIVE_WARP_PADS:
+            strcpy(verb, "Teleport between");
+            break;
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+            strcpy(verb, "Ride");
+            break;
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
+            strcpy(verb, "Spin");
+            break;
         case BINGO_OBJECTIVE_AMPS:
             strcpy(verb, "Get zapped by");
             break;
@@ -639,6 +651,16 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             break;
         case BINGO_OBJECTIVE_BLUE_COIN:
             strcpy(collectName, "Blue Coins");
+            break;
+        case BINGO_OBJECTIVE_WARP_PADS:
+            // A pair counts once, whichever way (and however often) you go.
+            strcpy(collectName, "pairs of Warp Pads");
+            break;
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+            strcpy(collectName, "Koopa Shells");
+            break;
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
+            strcpy(collectName, "Spinning Hearts");
             break;
         case BINGO_OBJECTIVE_AMPS:
             strcpy(collectName, "Amps");
@@ -770,6 +792,7 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
         case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
         case BINGO_OBJECTIVE_STAR_CLICK_GAME:
@@ -824,6 +847,9 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_SHOOT_CANNONS:
         case BINGO_OBJECTIVE_RED_COIN:
         case BINGO_OBJECTIVE_BLUE_COIN:
+        case BINGO_OBJECTIVE_WARP_PADS:
+        case BINGO_OBJECTIVE_KOOPA_SHELLS:
+        case BINGO_OBJECTIVE_SPIN_HEARTS:
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
         case BINGO_OBJECTIVE_WING_CAP_BOX:
         case BINGO_OBJECTIVE_VANISH_CAP_BOX:

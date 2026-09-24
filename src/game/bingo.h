@@ -102,7 +102,9 @@ enum BingoObjectiveType
     BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE,
     BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE,
     BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
-    BINGO_OBJECTIVE_STAR_NO_DUPLICATES_MAX = BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
+    // Collect the star without touching any coin this course visit.
+    BINGO_OBJECTIVE_STAR_COINLESS,
+    BINGO_OBJECTIVE_STAR_NO_DUPLICATES_MAX = BINGO_OBJECTIVE_STAR_COINLESS,
     // Single stars, game-modifying:
     BINGO_OBJECTIVE_STAR_CLICK_GAME,
     BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK,
@@ -163,7 +165,12 @@ enum BingoObjectiveType
     // Appended (not grouped with RED_COIN) so existing type numbers stay put:
     // test/emu/ram_test.py decodes board dumps by number.
     BINGO_OBJECTIVE_BLUE_COIN,
-    BINGO_OBJECTIVE_COLLECTABLE_MAX = BINGO_OBJECTIVE_BLUE_COIN,
+    // Unique sources, counted once each through the collectables UID table:
+    // fading-warp pairs, rideable Koopa shells, spinning (recovery) hearts.
+    BINGO_OBJECTIVE_WARP_PADS,
+    BINGO_OBJECTIVE_KOOPA_SHELLS,
+    BINGO_OBJECTIVE_SPIN_HEARTS,
+    BINGO_OBJECTIVE_COLLECTABLE_MAX = BINGO_OBJECTIVE_SPIN_HEARTS,
     // Specials appended after the collectables (again so type numbers stay
     // put). Not a generic collectable: it counts specific (course, star)
     // pairs, like CANNON_STARS / SECRETS_STARS.
@@ -235,7 +242,11 @@ enum BingoObjectiveIcon {
     BINGO_ICON_UNIQUE_DEATHS,
     BINGO_ICON_LIVES,
     BINGO_ICON_BLUE_COIN,
-    BINGO_ICON_RED_COIN_STARS
+    BINGO_ICON_RED_COIN_STARS,
+    BINGO_ICON_STAR_COINLESS,
+    BINGO_ICON_WARP_PADS,
+    BINGO_ICON_KOOPA_SHELLS,
+    BINGO_ICON_SPIN_HEARTS
 };
 
 enum BingoObjectiveUpdate
@@ -273,6 +284,14 @@ enum BingoObjectiveUpdate
     // Any 5-value coin (switch coins, moving coins, enemy/boo drops, ground-
     // pounded goombas), fired from interact_coin once per unique source.
     BINGO_UPDATE_BLUE_COIN,
+    // A fading-warp teleport, once per (course, area, pad pair); see
+    // bingo_track_warp_pad.
+    BINGO_UPDATE_WARP_PAD,
+    // Mario starts riding a Koopa shell (land or underwater), once per
+    // shell source (the ! box, the Koopa, or the underwater shell's spot).
+    BINGO_UPDATE_KOOPA_SHELL,
+    // Mario first makes a recovery heart spin, once per heart.
+    BINGO_UPDATE_SPIN_HEART,
 
     BINGO_UPDATE_BLJ,
     BINGO_UPDATE_DANGEROUS_WALL_KICK,

@@ -25,6 +25,7 @@
 #include "bingo.h"
 #include "bingo_net.h"
 #include "bingo_tracking_star.h"
+#include "bingo_tracking_collectables.h"
 #ifdef EXT_OPTIONS_MENU
 #include "extras/options_menu.h"
 #endif
@@ -841,6 +842,14 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
             case WARP_OP_TELEPORT:
                 sDelayedWarpTimer = 20;
                 sSourceWarpNodeId = (m->usedObj->oBhvParams & 0x00FF0000) >> 16;
+                // Bingo: only act_teleport_fade_out gets here, once per
+                // fading-warp teleport. Count the pad pair.
+                {
+                    struct ObjectWarpNode *padNode = area_get_warp_node(sSourceWarpNodeId);
+                    if (padNode != NULL) {
+                        bingo_track_warp_pad(gCurrAreaIndex, sSourceWarpNodeId, padNode->node.destNode);
+                    }
+                }
                 fadeMusic = !music_unchanged_through_warp(sSourceWarpNodeId);
                 play_transition(WARP_TRANSITION_FADE_INTO_COLOR, 0x14, 0xFF, 0xFF, 0xFF);
                 break;

@@ -99,6 +99,7 @@ static void dump_cell(FILE *out, int i) {
         // union bytes for them (BOARD_SEED=1302 used to segfault here).
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
             fprintf(out, " course=%d star=%d",
                     o->data.starObjective.course, o->data.starObjective.starIndex);
             break;
@@ -310,6 +311,10 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_UNIQUE_DEATHS] = "UNIQUE_DEATHS",
     [BINGO_OBJECTIVE_BLUE_COIN] = "BLUE_COIN",
     [BINGO_OBJECTIVE_RED_COIN_STARS] = "RED_COIN_STARS",
+    [BINGO_OBJECTIVE_STAR_COINLESS] = "STAR_COINLESS",
+    [BINGO_OBJECTIVE_WARP_PADS] = "WARP_PADS",
+    [BINGO_OBJECTIVE_KOOPA_SHELLS] = "KOOPA_SHELLS",
+    [BINGO_OBJECTIVE_SPIN_HEARTS] = "SPIN_HEARTS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -325,6 +330,7 @@ static s32 cell_pinned_course(struct BingoObjective *o) {
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
         case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
             return o->data.abcStarObjective.course;
         case BINGO_OBJECTIVE_STAR_TIMED:
             return o->data.starTimerObjective.course;
@@ -1003,6 +1009,185 @@ static void test_sim_blue_coin_objective(void) {
     bingo_tracking_collectables_reset();
 }
 
+// Warp pads: the pair counts once, whichever pad you leave from, and the
+// same node ids in another area or course are a different pair.
+static void test_sim_warp_pads_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_WARP_PADS;
+    o->data.collectableData.toGet = 3;
+
+    gCurrCourseNum = COURSE_BOB;
+    CHECK_EQ_INT(bingo_track_warp_pad(1, 0x0B, 0x0C), 1);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    // Back through the partner pad, and again the first way: same pair.
+    CHECK_EQ_INT(bingo_track_warp_pad(1, 0x0C, 0x0B), 0);
+    CHECK_EQ_INT(bingo_track_warp_pad(1, 0x0B, 0x0C), 0);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // Leaving and re-entering the course doesn't reset it.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(bingo_track_warp_pad(1, 0x0C, 0x0B), 0);
+
+    // BOB's other pair.
+    CHECK_EQ_INT(bingo_track_warp_pad(1, 0x0D, 0x0E), 1);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    // Same node ids in a different area / course are different pads.
+    gCurrCourseNum = COURSE_SSL;
+    CHECK_EQ_INT(bingo_track_warp_pad(2, 0x0B, 0x0C), 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+// Koopa shells: a shell counts once per source; the respawned shell from
+// the same ! box carries the same UID and doesn't count again.
+static void test_sim_koopa_shells_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    u32 boxShell, boxShellAgain, waterShell;
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_KOOPA_SHELLS;
+    o->data.collectableData.toGet = 2;
+
+    // interact_koopa_shell: fire only for a new UID.
+    gCurrCourseNum = COURSE_LLL;
+    boxShell = get_unique_id(BINGO_UPDATE_KOOPA_SHELL, -1000.0f, 300.0f, 2000.0f);
+    CHECK(boxShell != (u32) -1);
+    if (is_new_kill(BINGO_UPDATE_KOOPA_SHELL, boxShell)) {
+        bingo_update(BINGO_UPDATE_KOOPA_SHELL);
+    }
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // The box respawns the shell on a later visit: same key, no count.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    boxShellAgain = get_unique_id(BINGO_UPDATE_KOOPA_SHELL, -1000.0f, 300.0f, 2000.0f);
+    CHECK_EQ_INT(boxShellAgain, boxShell);
+    CHECK_EQ_INT(is_new_kill(BINGO_UPDATE_KOOPA_SHELL, boxShellAgain), 0);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // Other collectables' events don't count.
+    bingo_update(BINGO_UPDATE_BLUE_COIN);
+    bingo_update(BINGO_UPDATE_EXCLAMATION_MARK_BOX);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // The JRB underwater shell is a second source.
+    gCurrCourseNum = COURSE_JRB;
+    waterShell = get_unique_id(BINGO_UPDATE_KOOPA_SHELL, -1480.0f, -1000.0f, 4820.0f);
+    CHECK(waterShell != boxShell);
+    if (is_new_kill(BINGO_UPDATE_KOOPA_SHELL, waterShell)) {
+        bingo_update(BINGO_UPDATE_KOOPA_SHELL);
+    }
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+// Spinning hearts: first spin of each heart counts, re-spinning doesn't.
+static void test_sim_spin_hearts_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_SPIN_HEARTS;
+    o->data.collectableData.toGet = 3;
+
+    gCurrCourseNum = COURSE_RR;
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, -550.0f, -1050.0f, -50.0f), 1);
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, -550.0f, -1050.0f, -50.0f), 0);
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, -7071.0f, -1705.0f, -31.0f), 1);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+
+    // Coming back later: still the same heart.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, -550.0f, -1050.0f, -50.0f), 0);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    gCurrCourseNum = COURSE_BOB;
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_SPIN_HEART, 3603.0f, 3659.0f, -7070.0f), 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+// Coinless star: any coin in the target course fails the visit; coins
+// elsewhere don't; re-entering resets; a clean visit completes it.
+static void test_sim_coinless_star(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_STAR_COINLESS;
+    o->data.starObjective.course = COURSE_WF;
+    o->data.starObjective.starIndex = 1;
+
+    // A coin in the castle or another course is fine.
+    gCurrCourseNum = COURSE_BOB;
+    gbCoinsJustGotten = 1;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    // Any coin (a blue one here) in WF fails the visit.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    gCurrCourseNum = COURSE_WF;
+    gbCoinsJustGotten = 5;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_FAILED_IN_THIS_COURSE);
+    gbStarIndex = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_FAILED_IN_THIS_COURSE);
+
+    // Re-entering resets it; the wrong star doesn't complete it.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    gbStarIndex = 2;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    // Pressing buttons is fine; the right star with no coin completes it.
+    bingo_update(BINGO_UPDATE_A_PRESSED);
+    gbStarIndex = 1;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // Complete is final: a later coin doesn't undo it.
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+// The coinless pool never picks a 100-coin or red-coin star, nor the
+// coin-line routes excluded in random_coinless_star.
+static void test_coinless_star_pool(void) {
+    u32 seed;
+    int i;
+    int seen = 0;
+    for (seed = 1; seed <= 2000; seed++) {
+        generate_board(seed);
+        for (i = 0; i < 25; i++) {
+            struct BingoObjective *o = &gBingoObjectives[i];
+            s32 c, s;
+            if (o->type != BINGO_OBJECTIVE_STAR_COINLESS) {
+                continue;
+            }
+            seen++;
+            c = o->data.starObjective.course;
+            s = o->data.starObjective.starIndex;
+            CHECK(c >= COURSE_BOB && c <= COURSE_RR);
+            CHECK(s >= 0 && s <= 5);
+            CHECK(!(c == COURSE_BOB && (s == 3 || s == 4)));
+            CHECK(!(c == COURSE_CCM && (s == 0 || s == 2 || s == 3)));
+            CHECK(!(c == COURSE_TTM && (s == 2 || s == 3)));
+            CHECK(!((c == COURSE_WF || c == COURSE_JRB || c == COURSE_BBH) && s == 3));
+            CHECK(!(c == COURSE_HMC && s == 1));
+            CHECK(!((c == COURSE_LLL || c == COURSE_DDD || c == COURSE_RR) && s == 2));
+            CHECK(!((c == COURSE_SSL || c == COURSE_SL || c == COURSE_WDW || c == COURSE_THI) && s == 4));
+            CHECK(!(c == COURSE_TTC && s == 5));
+            if (gCurrentTestFailed) {
+                printf("  (seed %u, cell %d, course %d, star %d)\n", seed, i, c, s);
+                return;
+            }
+        }
+    }
+    CHECK(seen > 0);
+}
+
 static void test_sim_abz_fail_and_reset(void) {
     struct BingoObjective *o = &gBingoObjectives[0];
     reset_sim();
@@ -1378,6 +1563,11 @@ int main(void) {
     RUN_TEST(test_sim_random_stars_objective);
     RUN_TEST(test_sim_kill_collectable);
     RUN_TEST(test_sim_blue_coin_objective);
+    RUN_TEST(test_sim_warp_pads_objective);
+    RUN_TEST(test_sim_koopa_shells_objective);
+    RUN_TEST(test_sim_spin_hearts_objective);
+    RUN_TEST(test_sim_coinless_star);
+    RUN_TEST(test_coinless_star_pool);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);
     RUN_TEST(test_sim_stars_in_level_k);

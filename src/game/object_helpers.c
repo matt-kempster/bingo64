@@ -2838,6 +2838,20 @@ void bingo_tag_blue_coin(struct Object *coin, struct Object *source) {
     coin->oBingoId = (uid == (u32) -1) ? 0 : uid;
 }
 
+/**
+ * Key a rideable Koopa shell on the home of whatever produced it (its ! box
+ * or its Koopa) for the Koopa shells objective. 0 = untagged, never counts.
+ */
+void bingo_tag_koopa_shell(struct Object *shell, struct Object *source) {
+    u32 uid;
+
+    if (shell == NULL) {
+        return;
+    }
+    uid = get_unique_id(BINGO_UPDATE_KOOPA_SHELL, source->oHomeX, source->oHomeY, source->oHomeZ);
+    shell->oBingoId = (uid == (u32) -1) ? 0 : uid;
+}
+
 void cur_obj_spawn_loot_blue_coin(void) {
     struct Object *coin;
 

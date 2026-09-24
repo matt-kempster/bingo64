@@ -81,6 +81,14 @@ struct UID {
 // slot per dropping enemy (7 Mr. Is, 3 piranhas, 4 pokeys, BBH boos) and per
 // ground-poundable goomba (~80). See bingo_tag_blue_coin in object_helpers.c.
 #define MAX_BLUE_COINS 200
+// 12 fading-warp pairs (BOB 2, SSL 2, WF/CCM/LLL/WDW/TTM/THI/SL/RR 1 each),
+// keyed (area, lower node id, higher node id) -- see bingo_track_warp_pad.
+#define MAX_WARP_PADS 16
+// 5 placed shell sources (! boxes in LLL, SSL, SL; underwater in JRB, DDD)
+// plus the ordinary Koopas that drop one (BOB 1, THI 2).
+#define MAX_KOOPA_SHELLS 12
+// 13: BitFS 2, BitS 2, RR 2, TTC 2, BOB/CCM/HMC/LLL/SSL 1 each
+#define MAX_SPIN_HEARTS 16
 
 #define TOTAL_UIDS ( \
         MAX_GOOMBAS \
@@ -111,6 +119,9 @@ struct UID {
         + MAX_KOOPAS \
         + MAX_CRUSHERS \
         + MAX_BLUE_COINS \
+        + MAX_WARP_PADS \
+        + MAX_KOOPA_SHELLS \
+        + MAX_SPIN_HEARTS \
     ) + 2
 
 // I really hope nothing is actually at (0, 0, 0)....
@@ -220,6 +231,15 @@ void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) 
             case BINGO_UPDATE_BLUE_COIN:
                 rangeLength = MAX_BLUE_COINS;
                 break;
+            case BINGO_UPDATE_WARP_PAD:
+                rangeLength = MAX_WARP_PADS;
+                break;
+            case BINGO_UPDATE_KOOPA_SHELL:
+                rangeLength = MAX_KOOPA_SHELLS;
+                break;
+            case BINGO_UPDATE_SPIN_HEART:
+                rangeLength = MAX_SPIN_HEARTS;
+                break;
         }
         *start += prevRangeLength;
         if (i == update) {
@@ -297,4 +317,31 @@ s32 peek_would_be_new_kill(enum BingoObjectiveUpdate type, u32 uid) {
         return 1;
     }
 
+}
+
+/**
+ * Fire `update` the first time the source at (x, y, z) in the current course
+ * is seen; later calls for the same source do nothing. Returns 1 if it fired.
+ */
+s32 bingo_count_unique_source(enum BingoObjectiveUpdate update, f32 x, f32 y, f32 z) {
+    u32 uid = get_unique_id(update, x, y, z);
+
+    if (uid == (u32) -1 || !is_new_kill(update, uid)) {
+        return 0;
+    }
+    bingo_update(update);
+    return 1;
+}
+
+/**
+ * Mario teleported through a fading warp. The pads come in pairs that point
+ * at each other's warp nodes, so the pair is (area, lower node, higher node):
+ * going back through the partner pad is the same pair. Area indices start at
+ * 1, so the key is never the (0, 0, 0) "empty slot" marker.
+ */
+s32 bingo_track_warp_pad(s32 area, s32 nodeA, s32 nodeB) {
+    s32 lo = nodeA < nodeB ? nodeA : nodeB;
+    s32 hi = nodeA < nodeB ? nodeB : nodeA;
+
+    return bingo_count_unique_source(BINGO_UPDATE_WARP_PAD, (f32) area, (f32) lo, (f32) hi);
 }

@@ -84,10 +84,12 @@ u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
      | OBJ_BIT(STAR_DAREDEVIL) | OBJ_BIT(RANDOM_RED_COINS) | OBJ_BIT(SPLATOON))
 
 // Casual keeps the fun modifiers (daredevil, splatoon) but drops anything
-// timed or execution-heavy.
+// timed or execution-heavy (the coinless star rides with the button
+// challenges: same restriction-star family).
 #define PRESET_CASUAL_DISABLED \
     (OBJ_BIT(STAR_TIMED) | OBJ_BIT(STAR_A_BUTTON_CHALLENGE) \
      | OBJ_BIT(STAR_B_BUTTON_CHALLENGE) | OBJ_BIT(STAR_Z_BUTTON_CHALLENGE) \
+     | OBJ_BIT(STAR_COINLESS) \
      | OBJ_BIT(STAR_CLICK_GAME) | OBJ_BIT(STAR_REVERSE_JOYSTICK) \
      | OBJ_BIT(STAR_GREEN_DEMON) | OBJ_BIT(DANGEROUS_WALL_KICKS) \
      | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(BLJ))

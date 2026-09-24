@@ -302,7 +302,9 @@ void shelled_koopa_attack_handler(s32 attackType) {
         }
 
         cur_obj_set_model(MODEL_KOOPA_WITHOUT_SHELL);
-        spawn_object(o, MODEL_KOOPA_SHELL, bhvKoopaShell);
+        // Bingo: key the knocked-off shell on its Koopa's home, so re-entering
+        // the course and knocking the same Koopa again is the same shell.
+        bingo_tag_koopa_shell(spawn_object(o, MODEL_KOOPA_SHELL, bhvKoopaShell), o);
 
         //! Because bob-ombs/corkboxes come after koopa in processing order,
         //  they can interact with the koopa on the same frame that this

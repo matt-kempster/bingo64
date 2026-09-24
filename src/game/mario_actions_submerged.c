@@ -16,6 +16,8 @@
 #include "behavior_data.h"
 #include "level_table.h"
 #include "rumble_init.h"
+#include "bingo.h"
+#include "bingo_tracking_collectables.h"
 
 #define MIN_SWIM_STRENGTH 160
 #define MIN_SWIM_SPEED 16.0f
@@ -855,6 +857,12 @@ static s32 act_water_punch(struct MarioState *m) {
             set_mario_animation(m, MARIO_ANIM_WATER_PICK_UP_OBJ);
             if (is_anim_at_end(m)) {
                 if (m->heldObj->behavior == segmented_to_virtual(bhvKoopaShellUnderwater)) {
+                    // Bingo: the shell tagged itself with its spot (see
+                    // bhv_koopa_shell_underwater_loop).
+                    if (m->heldObj->oBingoId != 0
+                        && is_new_kill(BINGO_UPDATE_KOOPA_SHELL, m->heldObj->oBingoId)) {
+                        bingo_update(BINGO_UPDATE_KOOPA_SHELL);
+                    }
                     play_shell_music();
                     set_mario_action(m, ACT_WATER_SHELL_SWIMMING, 0);
                 } else {
