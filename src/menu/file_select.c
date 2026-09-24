@@ -1404,7 +1404,7 @@ static s32 sGridCol = 0;
 #define GRID_PITCH       20
 #define GRID_MAX_PER_ROW 14
 #define GRID_FIRST_DY    16    // control row baseline -> first band label
-#define GRID_BAND_H      28
+#define GRID_BAND_H      30    // label row + icon row + breathing room
 #define GRID_ICON_DROP   14
 #define GRID_FOOTER_Y    28
 #define GRID_LABEL_X     24
