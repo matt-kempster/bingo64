@@ -201,12 +201,12 @@ s32 sBingoOptionSelection = 0;
 #define BINGO_ENTRIES_PER_COL 11
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
-// mean something in an online room; solo shows mode/unlock/timeout/
-// toggle-all. All uses are runtime expressions, so the count may vary
-// per frame.
-#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 7 : 5)
+// mean something in an online room; solo shows mode/unlock/timeout.
+// (Preset and Toggle all live on the grid pages' control row.) All uses
+// are runtime expressions, so the count may vary per frame.
+#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 5 : 3)
 #else
-#define BINGO_CONFIGS_IN_LEFT_COL 5 // not more than 10, hopefully
+#define BINGO_CONFIGS_IN_LEFT_COL 3 // not more than 10, hopefully
 #endif
 s32 sBingoOptionSelectTimer = 0;
 #define BINGO_OPTION_TIMER_FRAMES 3
@@ -1228,7 +1228,8 @@ static s32 options_back_tag_hovered(void) {
 // ---------------------------------------------------------------------------
 // Objectives grid (options pages 1..G): every objective type as a 16x16
 // icon, grouped into labelled bands. A toggles the icon under the cursor;
-// A on a band label flips the whole band. Bands wrap onto extra icon rows
+// A on a band label flips the whole band. A control row above the bands
+// (PRESET, TOGGLE ALL) is on every grid page. Bands wrap onto extra icon rows
 // and flow onto further grid pages when they don't fit (see
 // grid_band_layout), so the page count is data-driven.
 
@@ -1259,7 +1260,7 @@ static const u8 sGridCollect[] = {
     BINGO_OBJECTIVE_WING_CAP_BOX, BINGO_OBJECTIVE_VANISH_CAP_BOX,
     BINGO_OBJECTIVE_METAL_CAP_BOX,
 };
-static const u8 sGridFeats[] = {
+static const u8 sGridAntics[] = {
     BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS, BINGO_OBJECTIVE_BLJ,
     BINGO_OBJECTIVE_LOSE_MARIO_HAT, BINGO_OBJECTIVE_LIVES,
     BINGO_OBJECTIVE_CRUSHED, BINGO_OBJECTIVE_UNIQUE_DEATHS,
@@ -1285,7 +1286,7 @@ static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
     { "STARS",     sGridStars,     ARRAY_COUNT(sGridStars) },
     { "MODIFIERS", sGridModifiers, ARRAY_COUNT(sGridModifiers) },
     { "COLLECT",   sGridCollect,   ARRAY_COUNT(sGridCollect) },
-    { "FEATS",     sGridFeats,     ARRAY_COUNT(sGridFeats) },
+    { "ANTICS",    sGridAntics,    ARRAY_COUNT(sGridAntics) },
     { "ENEMIES",   sGridEnemies,   ARRAY_COUNT(sGridEnemies) },
 };
 
@@ -1295,11 +1296,13 @@ static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
 // sync with the enum by hand.
 typedef char grid_bands_cover_every_objective[
     (ARRAY_COUNT(sGridStars) + ARRAY_COUNT(sGridModifiers)
-     + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridFeats)
+     + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridAntics)
      + ARRAY_COUNT(sGridEnemies) == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
 
 // Cursor: band index is global across the grid pages (always one on the
 // visible page); col -1 = the band's label, else a linear icon index.
+// Band -1 is the control row above the bands (on every grid page): col 0
+// = PRESET, col 1 = TOGGLE ALL.
 static s32 sGridBand = 0;
 static s32 sGridCol = 0;
 
@@ -1318,6 +1321,19 @@ static s32 sGridCol = 0;
 #define GRID_LABEL_X     24
 #define GRID_RIGHT_X     296
 #define GRID_FOOTER_NAME_X 44
+#define GRID_CTRL_Y      212   // control row: PRESET / TOGGLE ALL, BACK's baseline
+#define GRID_CTRL_TOGGLE_X 150
+#define GRID_CTRL_GAP    6     // PRESET label -> value
+
+// The control row shares BACK's strip with the LOCKED banner, so it hides
+// (and can't be selected) while the room's options are locked.
+static s32 grid_controls_visible(void) {
+#ifndef TARGET_N64
+    return !bingo_options_locked();
+#else
+    return 1;
+#endif
+}
 
 static s32 grid_band_rows(s32 band) {
     return (sGridBands[band].count + GRID_MAX_PER_ROW - 1) / GRID_MAX_PER_ROW;
@@ -1397,6 +1413,14 @@ static void grid_clamp_cursor_to_page(void) {
     if (gp < 0) {
         return;
     }
+    if (sGridBand == -1 && grid_controls_visible()) {
+        if (sGridCol < 0) {
+            sGridCol = 0;
+        } else if (sGridCol > 1) {
+            sGridCol = 1;
+        }
+        return;
+    }
     if (sGridBand < 0 || sGridBand >= GRID_BAND_COUNT || grid_band_page(sGridBand) != gp) {
         sGridBand = grid_page_first_band(gp);
         sGridCol = 0;
@@ -1437,16 +1461,56 @@ static char *grid_append_num(char *dst, s32 n) {
     return dst;
 }
 
-// "12 of 14". ("of", not "/": the US generic font has no slash glyph.)
+// "12/14".
 static void grid_count_text(char *out, s32 n, s32 total) {
-    grid_append_num(grid_append(grid_append_num(out, n), " of "), total);
+    grid_append_num(grid_append(grid_append_num(out, n), "/"), total);
+}
+
+// Bottom-up menu rect [x0,x1) x [y0,y1) -> FillRectangle's top-down coords.
+static void grid_fill_rect(s32 x0, s32 y0, s32 x1, s32 y1) {
+    gDPFillRectangle(gDisplayListHead++, x0, SCREEN_HEIGHT - y1, x1,
+                     SCREEN_HEIGHT - y0);
+}
+
+// The US generic font has no slash: main_font_lut's "slash" (0x9F) is
+// really the hyphen, and print_generic_string prints 0xD0 as a blank
+// double space. So grid strings draw '/' themselves, as a 1-unit
+// stair-step over the digits' height (glyph rows 3..12) in the current
+// text colour, which matches the font's 1-texel strokes. Set that colour
+// with grid_text_color (the rects can't read back the env colour).
+#define GRID_SLASH_W 7
+static u8 sGridTextColor[4] = { 255, 255, 255, 255 };
+
+static void grid_text_color(u8 r, u8 g, u8 b, u8 a) {
+    sGridTextColor[0] = r;
+    sGridTextColor[1] = g;
+    sGridTextColor[2] = b;
+    sGridTextColor[3] = a;
+    gDPSetEnvColor(gDisplayListHead++, r, g, b, a);
+}
+
+static void grid_print_slash(s32 x, s32 y) {
+    s32 row;
+    gDPPipeSync(gDisplayListHead++);
+    gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, sGridTextColor[0], sGridTextColor[1],
+                    sGridTextColor[2], sGridTextColor[3]);
+    for (row = 3; row <= 12; row++) {
+        s32 px = x + (row - 3) * 6 / 10;
+        grid_fill_rect(px, y + row, px + 1, y + row + 1);
+    }
+    // Back to text mode (dl_ia_text_begin resets the env colour).
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, sGridTextColor[0], sGridTextColor[1],
+                   sGridTextColor[2], sGridTextColor[3]);
 }
 
 // ASCII -> generic-font charmap, for the grid's computed strings (counts
-// can't live in _() literals). Unmapped characters become spaces.
-static void grid_ascii_to_menu(u8 *dst, const char *src, s32 dstSize) {
+// can't live in _() literals), up to the next '/' or the end. Unmapped
+// characters become spaces. Returns the ASCII characters consumed.
+static s32 grid_ascii_to_menu(u8 *dst, const char *src, s32 dstSize) {
     s32 i;
-    for (i = 0; src[i] != '\0' && i < dstSize - 1; i++) {
+    for (i = 0; src[i] != '\0' && src[i] != '/' && i < dstSize - 1; i++) {
         char c = src[i];
         u8 out = 0x9E;  // space
         if (c >= '0' && c <= '9') {
@@ -1459,22 +1523,43 @@ static void grid_ascii_to_menu(u8 *dst, const char *src, s32 dstSize) {
             out = 0xE6;
         } else if (c == '.') {
             out = 0x3F;
+        } else if (c == ',') {
+            out = 0x6F;
         }
         dst[i] = out;
     }
     dst[i] = 0xFF;
+    return i;
 }
 
 static s32 grid_ascii_width(const char *str) {
-    u8 buf[40];
-    grid_ascii_to_menu(buf, str, sizeof(buf));
-    return get_string_width(buf);
+    u8 buf[48];
+    s32 w = 0;
+    while (*str != '\0') {
+        if (*str == '/') {
+            w += GRID_SLASH_W;
+            str++;
+        } else {
+            str += grid_ascii_to_menu(buf, str, sizeof(buf));
+            w += get_string_width(buf);
+        }
+    }
+    return w;
 }
 
 static void grid_print_ascii(s32 x, s32 y, const char *str) {
-    u8 buf[40];
-    grid_ascii_to_menu(buf, str, sizeof(buf));
-    print_generic_string(x, y, buf);
+    u8 buf[48];
+    while (*str != '\0') {
+        if (*str == '/') {
+            grid_print_slash(x, y);
+            x += GRID_SLASH_W;
+            str++;
+        } else {
+            str += grid_ascii_to_menu(buf, str, sizeof(buf));
+            print_generic_string(x, y, buf);
+            x += get_string_width(buf);
+        }
+    }
 }
 
 static s32 grid_band_label_width(s32 band) {
@@ -1487,11 +1572,60 @@ static void bingo_preset_cycle(void) {
     bingo_preset_apply((bingo_preset_current() + 1) % BINGO_PRESET_COUNT);
 }
 
+// The PRESET control's value, matched from the current state.
+static const char *grid_preset_name(void) {
+    switch (bingo_preset_current()) {
+        case BINGO_PRESET_SRL:     return "SRL";
+        case BINGO_PRESET_VANILLA: return "Vanilla";
+        case BINGO_PRESET_CASUAL:  return "Casual";
+        default:                   return "Custom";
+    }
+}
+
+// Control-row geometry: col 0 = PRESET (label + value), col 1 = TOGGLE
+// ALL. The label's x, and where the control's text ends.
+static s32 grid_control_x(s32 col) {
+    return col == 0 ? GRID_LABEL_X : GRID_CTRL_TOGGLE_X;
+}
+
+static s32 grid_control_end_x(s32 col) {
+    if (col == 0) {
+        return GRID_LABEL_X + grid_ascii_width("PRESET") + GRID_CTRL_GAP
+               + grid_ascii_width(grid_preset_name());
+    }
+    return GRID_CTRL_TOGGLE_X + grid_ascii_width("TOGGLE ALL");
+}
+
+// Mixed or all-off turns everything on; only a fully-on pool clears
+// (the band labels' rule, pool-wide).
+static void grid_toggle_all(void) {
+    s32 i;
+    u8 disable = 1;
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        if (gBingoObjectivesDisabled[i]) {
+            disable = 0;
+        }
+    }
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        gBingoObjectivesDisabled[i] = disable;
+    }
+}
+
 #ifdef MOUSE_ACTIONS
 // What's under the pointer on the visible grid page (menu coords,
 // bottom-up). Returns 0 on empty space.
 static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
     s32 b, r, c, gp = grid_current_page();
+    // The control row: same box as a band label's.
+    if (grid_controls_visible() && y >= GRID_CTRL_Y + 2 && y < GRID_CTRL_Y + 16) {
+        for (c = 0; c < 2; c++) {
+            if (x >= grid_control_x(c) - 2 && x < grid_control_end_x(c) + 2) {
+                *band = -1;
+                *col = c;
+                return 1;
+            }
+        }
+    }
     for (b = 0; b < GRID_BAND_COUNT; b++) {
         s32 ly = grid_label_y(b);
         if (grid_band_page(b) != gp) {
@@ -1551,7 +1685,13 @@ static void grid_activate(void) {
         return;
     }
 #endif
-    if (sGridCol < 0) {
+    if (sGridBand < 0) {
+        if (sGridCol == 0) {
+            bingo_preset_cycle();
+        } else {
+            grid_toggle_all();
+        }
+    } else if (sGridCol < 0) {
         grid_toggle_band(sGridBand);
     } else {
         gBingoObjectivesDisabled[sGridBands[sGridBand].types[sGridCol]] ^= 1;
@@ -1561,13 +1701,40 @@ static void grid_activate(void) {
 // D-pad / C navigation; returns 1 when the cursor moved (starts the
 // repeat debounce). Up/down wrap within the visible grid page; left/right
 // walk the band's icons linearly (across its wrapped rows) and the label.
+// The control row sits above the first band in the vertical cycle, and
+// left/right flip between its two controls.
 static s32 grid_navigate(u16 pressed) {
     s32 gp = grid_current_page();
     s32 first = grid_page_first_band(gp);
     s32 last = grid_page_last_band(gp);
+    s32 ctrl = grid_controls_visible();
+    if (sGridBand < 0) {
+        if (pressed & (D_JPAD | D_CBUTTONS)) {
+            sGridBand = first;
+            sGridCol = 0;
+        } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+            sGridBand = last;
+            sGridCol = 0;
+        } else if (pressed & (R_JPAD | R_CBUTTONS | L_JPAD | L_CBUTTONS)) {
+            sGridCol = !sGridCol;
+        } else {
+            return 0;
+        }
+        return 1;
+    }
     if (pressed & (D_JPAD | D_CBUTTONS)) {
+        if (sGridBand >= last && ctrl) {
+            sGridBand = -1;
+            sGridCol = 0;
+            return 1;
+        }
         sGridBand = sGridBand >= last ? first : sGridBand + 1;
     } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+        if (sGridBand <= first && ctrl) {
+            sGridBand = -1;
+            sGridCol = 0;
+            return 1;
+        }
         sGridBand = sGridBand <= first ? last : sGridBand - 1;
     } else if (pressed & (R_JPAD | R_CBUTTONS)) {
         sGridCol = sGridCol + 1 >= sGridBands[sGridBand].count ? -1 : sGridCol + 1;
@@ -1975,12 +2142,6 @@ static unsigned char textTimeout15[] = { TEXT_TIMEOUT_15 };
 static unsigned char textTimeout30[] = { TEXT_TIMEOUT_30 };
 static unsigned char textTimeout45[] = { TEXT_TIMEOUT_45 };
 static unsigned char textTimeout60[] = { TEXT_TIMEOUT_60 };
-static unsigned char textToggleAll[] = { TEXT_TOGGLE_ALL };
-static unsigned char textPreset[] = { TEXT_PRESET };
-static unsigned char textPresetSrl[] = { TEXT_PRESET_SRL };
-static unsigned char textPresetVanilla[] = { TEXT_PRESET_VANILLA };
-static unsigned char textPresetCasual[] = { TEXT_PRESET_CASUAL };
-static unsigned char textPresetCustom[] = { TEXT_PRESET_CUSTOM };
 static unsigned char textEmpty[] = { 0xFF };
 
 #ifndef TARGET_N64
@@ -2104,27 +2265,6 @@ static s32 bingo_config_timeout(s32 i, u8 **target) {
     return bingo_config_value_x(*target);
 }
 
-// The Preset row: stamp a named objective/unlock loadout. The shown value
-// is computed by matching the current state, so hand-editing any toggle
-// afterwards reads back as Custom (which cycles to the first preset).
-static u8 *bingo_preset_name(void) {
-    switch (bingo_preset_current()) {
-        case BINGO_PRESET_SRL:     return textPresetSrl;
-        case BINGO_PRESET_VANILLA: return textPresetVanilla;
-        case BINGO_PRESET_CASUAL:  return textPresetCasual;
-        default:                   return textPresetCustom;
-    }
-}
-
-static s32 bingo_config_preset(s32 i, u8 **target) {
-    if (sToggleCurrentOption && sBingoOptionSelection == i) {
-        sToggleCurrentOption = 0;
-        bingo_preset_cycle();
-    }
-    *target = bingo_preset_name();
-    return bingo_config_value_x(*target);
-}
-
 #ifndef TARGET_N64
 // The Claims row's value text and its right-ish x offset, tier-aware.
 static s32 bingo_config_claimvis(s32 i, u8 **target) {
@@ -2151,20 +2291,20 @@ static s32 bingo_config_claimvis(s32 i, u8 **target) {
 #endif
 
 static void print_bingo_configs() {
-    s32 i, j;
+    s32 i;
     s32 offsetX;
     u8 *label;
     u8 *target;
 
     s32 cfgs = BINGO_CONFIGS_IN_LEFT_COL;
     for (i = 0; i < cfgs; i++) {
+        label = textEmpty;
+        target = textEmpty;
+        offsetX = 0;
         if (i == 0) {
-            label = textPreset;
-            offsetX = bingo_config_preset(i, &target);
-        } else if (i == 1) {
             label = textGameMode;
             offsetX = bingo_config_target(i, &target);
-        } else if (i == 2) {
+        } else if (i == 1) {
             label = textUnlockGame;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
@@ -2176,14 +2316,14 @@ static void print_bingo_configs() {
                 target = textOn;
             }
             offsetX = bingo_config_value_x(target);
-        } else if (i == 3) {
+        } else if (i == 2) {
             label = textTimeout;
             offsetX = bingo_config_timeout(i, &target);
 #ifndef TARGET_N64
-        } else if (i == 4 && cfgs == 7) {
+        } else if (i == 3) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 5 && cfgs == 7) {
+        } else if (i == 4) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
@@ -2192,18 +2332,6 @@ static void print_bingo_configs() {
             target = gNetShowWhereabouts ? textOn : textOff;
             offsetX = bingo_config_value_x(target);
 #endif
-        } else {
-            label = textToggleAll;
-            if (sToggleCurrentOption && sBingoOptionSelection == i) {
-                sToggleCurrentOption = 0;
-                // j, not i: clobbering the loop index skipped this row's
-                // own label print for a frame (old bug).
-                for (j = 0; j < BINGO_OBJECTIVE_TOTAL_AMOUNT; j++) {
-                    gBingoObjectivesDisabled[j] ^= 1;
-                }
-            }
-            target = textEmpty;
-            offsetX = 0;
         }
 
         gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));
@@ -2253,18 +2381,18 @@ static void print_grid_config_ascii(s32 x, s32 y, const char *str) {
     grid_print_ascii(x, y, str);
 }
 
-// Bottom-up menu rect [x0,x1) x [y0,y1) -> FillRectangle's top-down coords.
-static void grid_fill_rect(s32 x0, s32 y0, s32 x1, s32 y1) {
-    gDPFillRectangle(gDisplayListHead++, x0, SCREEN_HEIGHT - y1, x1,
-                     SCREEN_HEIGHT - y0);
-}
-
 // The selection: a translucent box plus a 1-unit pulsing yellow frame on
 // its edge. The icon box is 19 tall, not 20, so the frame's top line stays
 // one unit clear of the band's leader rule (label_y + 4).
 static void print_grid_highlight(void) {
     s32 x0, x1, y0, y1, pulse;
-    if (sGridCol < 0) {
+    if (sGridBand < 0) {
+        // A control: the band-label box, around the control's text.
+        x0 = grid_control_x(sGridCol) - 2;
+        x1 = grid_control_end_x(sGridCol) + 3;
+        y0 = GRID_CTRL_Y + 2;
+        y1 = GRID_CTRL_Y + 16;
+    } else if (sGridCol < 0) {
         x0 = GRID_LEFT_X;
         x1 = GRID_LABEL_X + grid_band_label_width(sGridBand) + 3;
         y0 = grid_label_y(sGridBand) + 2;
@@ -2316,10 +2444,15 @@ static void print_grid_band_rules(s32 gp) {
 // pool's enabled total right-aligned.
 static void print_grid_footer(s32 whiteTextAlpha) {
     char text[40];
+    char *p;
     s32 i, total = 0;
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
-    if (sGridCol < 0) {
-        char *p = grid_append(text, sGridBands[sGridBand].label);
+    if (sGridBand < 0) {
+        grid_print_ascii(GRID_LABEL_X, GRID_FOOTER_Y,
+                         sGridCol == 0 ? "Named loadout: objectives, mode, unlock"
+                                       : "Turn every objective on or off");
+    } else if (sGridCol < 0) {
+        p = grid_append(text, sGridBands[sGridBand].label);
         grid_append(p, grid_band_enabled(sGridBand) == sGridBands[sGridBand].count
                            ? ": A turns all OFF"
                            : ": A turns all ON");
@@ -2341,8 +2474,29 @@ static void print_grid_footer(s32 whiteTextAlpha) {
     for (i = 0; i < GRID_BAND_COUNT; i++) {
         total += grid_band_enabled(i);
     }
-    grid_count_text(text, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
+    // Once the bands have flowed onto more than one page, nothing else on
+    // screen says a page 2 exists: prefix the total with the page.
+    p = text;
+    if (grid_page_count() > 1) {
+        p = grid_append(p, "Page ");
+        p = grid_append_num(p, grid_current_page() + 1);
+        p = grid_append(p, "/");
+        p = grid_append_num(p, grid_page_count());
+        p = grid_append(p, "   ");
+    }
+    grid_count_text(p, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
+    grid_text_color(255, 255, 255, whiteTextAlpha);
     grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
+}
+
+// The control row above the bands, band-header style: yellow labels,
+// white value.
+static void print_grid_controls(void) {
+    s32 x = GRID_LABEL_X + grid_ascii_width("PRESET") + GRID_CTRL_GAP;
+    print_grid_config_ascii(GRID_LABEL_X, GRID_CTRL_Y, "PRESET");
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 200));
+    grid_print_ascii(x, GRID_CTRL_Y, grid_preset_name());
+    print_grid_config_ascii(GRID_CTRL_TOGGLE_X, GRID_CTRL_Y, "TOGGLE ALL");
 }
 
 static void print_objective_grid(void) {
@@ -2372,7 +2526,7 @@ static void print_objective_grid(void) {
                                        : gOptionSelectIconOpacity);
         }
     }
-    if (sGridCol >= 0) {
+    if (sGridBand >= 0 && sGridCol >= 0) {
         // The selected objective again, beside its name in the footer.
         print_bingo_icon_alpha(GRID_LABEL_X, GRID_FOOTER_Y,
                                get_objective_info(sGridBands[sGridBand].types[sGridCol])->icon,
@@ -2382,7 +2536,7 @@ static void print_objective_grid(void) {
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
 
-    // Band headers: label left, "n of m" right-aligned into one column,
+    // Band headers: label left, "n/m" right-aligned into one column,
     // coloured all on (white) / some (yellow) / none (red).
     for (b = 0; b < GRID_BAND_COUNT; b++) {
         s32 ly, n, alpha = MIN(sTextBaseAlpha, 200);
@@ -2394,29 +2548,19 @@ static void print_objective_grid(void) {
         n = grid_band_enabled(b);
         grid_count_text(text, n, sGridBands[b].count);
         if (n == sGridBands[b].count) {
-            gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, alpha);
+            grid_text_color(255, 255, 255, alpha);
         } else if (n > 0) {
-            gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, alpha);
+            grid_text_color(255, 255, 140, alpha);
         } else {
-            gDPSetEnvColor(gDisplayListHead++, 255, 80, 80, alpha);
+            grid_text_color(255, 80, 80, alpha);
         }
         grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), ly, text);
     }
 
     print_grid_footer(whiteTextAlpha);
 
-    // Only once the bands have flowed onto more than one page: nothing else
-    // on screen says a page 2 exists. Top centre, clear of BACK and the
-    // LOCKED banner.
-    if (grid_page_count() > 1) {
-        char page[32];
-        char *p = grid_append(page, "Page ");
-        p = grid_append_num(p, grid_current_page() + 1);
-        p = grid_append(p, " of ");
-        p = grid_append_num(p, grid_page_count());
-        grid_append(p, ": R or L");
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-        grid_print_ascii(160 - grid_ascii_width(page) / 2, 212, page);
+    if (grid_controls_visible()) {
+        print_grid_controls();
     }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
