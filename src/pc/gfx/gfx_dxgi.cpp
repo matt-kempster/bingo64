@@ -400,12 +400,14 @@ static void gfx_dxgi_init(const char *window_title) {
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = nullptr;
-    wcex.hIcon          = nullptr;
+    // The exe's icon (platform/win/info.rc, IDI_ICON1): without this the
+    // taskbar and title bar show Windows' generic app icon while running.
+    wcex.hIcon          = LoadIconW(GetModuleHandleW(nullptr), L"IDI_ICON1");
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wcex.lpszMenuName   = nullptr;
     wcex.lpszClassName  = WINCLASS_NAME;
-    wcex.hIconSm        = nullptr;
+    wcex.hIconSm        = wcex.hIcon;
 
     ATOM winclass = RegisterClassExW(&wcex);
 

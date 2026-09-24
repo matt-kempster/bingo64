@@ -12,6 +12,7 @@ rsync -a "$WT/src/" "$BW/src/"
 rsync -a "$WT/bin/" "$BW/bin/"
 rsync -a "$WT/data/" "$BW/data/"
 rsync -a "$WT/include/" "$BW/include/"
+rsync -a "$WT/platform/" "$BW/platform/"  # icon.ico + info.rc
 # Committed art (custom icons etc.) must reach the build checkout too: it is
 # a stale clone, so anything committed since it was cloned only exists here.
 git -C "$WT" ls-files actors levels textures | grep '\.png$' | \
