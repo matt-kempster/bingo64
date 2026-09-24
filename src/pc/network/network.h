@@ -19,9 +19,11 @@
 // T broadcast (winner by tiebreak) at expiry.
 // 8: unlock + objective mask ride W and the O rebroadcast so guests see
 // the room's options live in the lobby (the seed still only rides S).
+// 10: board generation changed (coinless star, warp pads, Koopa shells,
+// spinning hearts; enum renumbered): seed-shared boards must match.
 // During active development the version bumps on every wire change — the
 // old side is refused outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 9
+#define NET_PROTOCOL_VERSION 10
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.
