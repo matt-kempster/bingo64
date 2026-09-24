@@ -95,12 +95,14 @@ static void dump_cell(FILE *out, int i) {
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
         case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+        // B and Z init only starObjective: abcStarObjective.hint is stale
+        // union bytes for them (BOARD_SEED=1302 used to segfault here).
+        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             fprintf(out, " course=%d star=%d",
                     o->data.starObjective.course, o->data.starObjective.starIndex);
             break;
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             fprintf(out, " course=%d star=%d hint=\"%s\"",
                     o->data.abcStarObjective.course, o->data.abcStarObjective.starIndex,
                     o->data.abcStarObjective.hint ? o->data.abcStarObjective.hint : "");

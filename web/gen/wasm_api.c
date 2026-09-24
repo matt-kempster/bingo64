@@ -207,12 +207,13 @@ static void emit_cell_json(int i) {
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
         case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+        // Only A inits abcStarObjective.hint; for B/Z it is stale union bytes.
+        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             emitf(",\"course\":%d,\"star\":%d",
                   o->data.starObjective.course, o->data.starObjective.starIndex);
             break;
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             emitf(",\"course\":%d,\"star\":%d,",
                   o->data.abcStarObjective.course, o->data.abcStarObjective.starIndex);
             emit_json_str("hint", o->data.abcStarObjective.hint ? o->data.abcStarObjective.hint : "");
@@ -287,12 +288,12 @@ static void emit_cell_dump(int i) {
         case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
         case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
         case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             emitf(" course=%d star=%d",
                   o->data.starObjective.course, o->data.starObjective.starIndex);
             break;
         case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
-        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
             emitf(" course=%d star=%d hint=\"%s\"",
                   o->data.abcStarObjective.course, o->data.abcStarObjective.starIndex,
                   o->data.abcStarObjective.hint ? o->data.abcStarObjective.hint : "");

@@ -39,9 +39,10 @@ CELL_SIZE = 68
 OFF_TYPE, OFF_STATE, OFF_ICON, OFF_CLASS, OFF_TITLE, OFF_DATA = 4, 8, 12, 16, 20, 52
 
 # Objective type numbers, matching enum BingoObjectiveType.
-STAR_PLAIN = (0, 2, 7, 8, 9)
+# B (4) and Z (5) print like plain stars: only A (3) carries a hint.
+STAR_PLAIN = (0, 2, 4, 5, 7, 8, 9)
 STAR_TIMED = 1
-STAR_ABC = (3, 4, 5)
+STAR_ABC = (3,)
 STAR_CLICK = 6
 COURSE_COLLECT = (10, 11, 12, 13, 14, 15)  # 10 = random stars, 15 = splatoon
 WALL_KICKS = 16

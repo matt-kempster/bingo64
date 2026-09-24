@@ -11,7 +11,7 @@
 10 type=19 class=1 icon=25 title="x3" toGet=3
 11 type=10 class=1 icon=11 title="CotMC" course=20 toGet=3
 12 type=23 class=3 icon=14 title="224" toGet=224
-13 type=04 class=1 icon=06 title="BBHú1" course=5 star=0 hint=""
+13 type=04 class=1 icon=06 title="BBHú1" course=5 star=0
 14 type=21 class=1 icon=55 title="x9" toGet=9
 15 type=54 class=1 icon=56 title="x20" toGet=20
 16 type=15 class=0 icon=53 title="THI 100" course=13 toGet=100
