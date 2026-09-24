@@ -193,12 +193,13 @@ s32 gBingoSeedIsSet = 0;
 u8 gBingoSeedRandomText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 
-// Options pages (L/R cycles): 0 = settings rows, 1..G = objective icon
-// grid pages (G is data-driven, see grid_band_layout), G+1 = credits. sBingoOptionSelection is the settings page's row;
-// the grid keeps its own cursor (sGridBand/sGridCol) so paging back and
-// forth never lands on a stale index from the other layout.
+// The options screen is ONE vertically scrolling document (see the
+// "Options document" section below): settings rows, then the objectives
+// (control row + icon bands), then the credits and key hints. The focus
+// is in one section at a time: sBingoOptionSelection is the settings row,
+// the grid keeps its own cursor (sGridBand/sGridCol), and the credits
+// have nothing selectable. L/R jump between the sections' starts.
 s32 sBingoOptionSelection = 0;
-#define BINGO_ENTRIES_PER_COL 11
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
 // mean something in an online room; solo shows mode/unlock/timeout.
@@ -211,12 +212,26 @@ s32 sBingoOptionSelection = 0;
 s32 sBingoOptionSelectTimer = 0;
 #define BINGO_OPTION_TIMER_FRAMES 3
 s32 sToggleCurrentOption = 0;
-s32 sBingoOptionCurrentPage = 0;
-#define BINGO_PAGE_SETTINGS   0
-#define BINGO_PAGE_OBJECTIVES 1   // the first grid page
-static s32 grid_page_count(void);
-#define BINGO_PAGE_CREDITS    (BINGO_PAGE_OBJECTIVES + grid_page_count())
-#define BINGO_MAX_PAGE_INDEX  BINGO_PAGE_CREDITS
+#define OPTIONS_FOCUS_SETTINGS 0
+#define OPTIONS_FOCUS_GRID     1
+#define OPTIONS_FOCUS_CREDITS  2
+static s32 sOptionsFocus = OPTIONS_FOCUS_SETTINGS;
+// Document scroll, in units (0 = top). The target is set when the focus
+// moves or an arrow is clicked; sOptionsScroll eases toward it once per
+// logic frame, and sOptionsScrollPx is its rounded value, which every
+// draw and hit test uses (so the draw paths stay integer).
+static f32 sOptionsScroll = 0.0f;
+static s32 sOptionsScrollTarget = 0;
+static s32 sOptionsScrollPx = 0;
+
+// Every entry into the options screen starts at the top of the document.
+static void options_reset(void) {
+    sOptionsFocus = OPTIONS_FOCUS_SETTINGS;
+    sBingoOptionSelection = 0;
+    sOptionsScroll = 0.0f;
+    sOptionsScrollTarget = 0;
+    sOptionsScrollPx = 0;
+}
 
 // Where leaving the options screen lands: the main screen normally, or
 // the 1P setup screen / online lobby when it was opened from there
@@ -611,6 +626,7 @@ static void open_options_screen(s8 returnTarget, struct Object *sourceBtn) {
     sCurrentMenuLevel = MENU_LAYER_SUBMENU;
     sSelectedButtonID = MENU_BUTTON_SEED_OPTION;
     sOptionsReturnTarget = returnTarget;
+    options_reset();
 }
 #endif
 
@@ -879,6 +895,7 @@ static void seed_menu_check_clicked_buttons() {
                     gOptionSelectIconOpacity = 0;
                     sMainMenuButtons[buttonId]->oMenuButtonState = MENU_BUTTON_STATE_GROWING;
                     sSelectedButtonID = buttonId;
+                    options_reset();
                     break;
                 case MENU_BUTTON_SEED_NUM_1:
                 case MENU_BUTTON_SEED_NUM_2:
@@ -1218,20 +1235,62 @@ static void options_screen_exit(void) {
 #endif
 }
 
-#ifndef TARGET_N64
-// The clickable BACK tag in the options screen's top-right corner.
-static s32 options_back_tag_hovered(void) {
-    return sCursorPos[0] > 96.0f && sCursorPos[1] > 84.0f;
+// ---------------------------------------------------------------------------
+// Options document. Items are placed at document y (units DOWN from the
+// document's top, at text baselines / icon bottoms) and drawn at
+// options_screen_y(), the menu's bottom-up print coordinate, inside the
+// content window [OPT_CONTENT_BOTTOM, OPT_CONTENT_TOP] (scissored). The
+// frame's inner top shadow sits above the window, the footer strip below.
+#define OPT_CONTENT_TOP    214
+#define OPT_CONTENT_BOTTOM 46
+#define OPT_DOC_TOP_Y      (OPT_CONTENT_TOP - 14)  // doc y 0's baseline at scroll 0
+#define OPT_EDGE_FADE      14
+// Document y range fully inside the window at scroll s: [s - ABOVE, s + BELOW].
+#define OPT_VIEW_ABOVE     (OPT_CONTENT_TOP - OPT_DOC_TOP_Y)
+#define OPT_VIEW_BELOW     (OPT_DOC_TOP_Y - OPT_CONTENT_BOTTOM)
+#define OPT_ROW_H          17   // settings row pitch
+#define OPT_SETTINGS_GAP   28   // last settings row -> control row
+#define OPT_CREDITS_GAP    30   // last icon row -> first credits line
+#define OPT_CREDITS_PITCH  14   // 11 credits lines = 154: the section fits the window
+#define OPT_DOC_END_MARGIN 6    // last credits line -> document end
+#define OPT_FOCUS_MARGIN   10   // row-follow margin when a section can't fit
+#define OPT_ARROW_STEP     60   // one scroll-arrow click
+
+static s32 options_screen_y(s32 docY) {
+    return OPT_DOC_TOP_Y - docY + sOptionsScrollPx;
+}
+
+// Items sliding out of the window fade with the part that is clipped:
+// full alpha while a 14-unit item (baseline/bottom at screen y) is fully
+// inside, 0 once it is fully outside.
+static s32 options_edge_alpha(s32 y, s32 baseAlpha) {
+    s32 in = OPT_CONTENT_TOP - y;
+    s32 inBottom = y + OPT_EDGE_FADE - OPT_CONTENT_BOTTOM;
+    if (inBottom < in) {
+        in = inBottom;
+    }
+    if (in >= OPT_EDGE_FADE) {
+        return baseAlpha;
+    }
+    if (in <= 0) {
+        return 0;
+    }
+    return baseAlpha * in / OPT_EDGE_FADE;
+}
+
+#ifdef MOUSE_ACTIONS
+// Pointer hits on document items only count inside the window.
+static s32 options_in_window(f32 y) {
+    return y >= OPT_CONTENT_BOTTOM && y < OPT_CONTENT_TOP;
 }
 #endif
 
 // ---------------------------------------------------------------------------
-// Objectives grid (options pages 1..G): every objective type as a 16x16
-// icon, grouped into labelled bands. A toggles the icon under the cursor;
-// A on a band label flips the whole band. A control row above the bands
-// (PRESET, TOGGLE ALL) is on every grid page. Bands wrap onto extra icon rows
-// and flow onto further grid pages when they don't fit (see
-// grid_band_layout), so the page count is data-driven.
+// Objectives grid (the document's middle section): every objective type as
+// a 16x16 icon, grouped into labelled bands. A toggles the icon under the
+// cursor; A on a band label flips the whole band. A control row above the
+// bands (PRESET, TOGGLE ALL). Bands wrap onto extra icon rows when they
+// don't fit one (see grid_label_doc).
 
 #define GRID_BAND_COUNT 5
 
@@ -1299,34 +1358,33 @@ typedef char grid_bands_cover_every_objective[
      + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridAntics)
      + ARRAY_COUNT(sGridEnemies) == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
 
-// Cursor: band index is global across the grid pages (always one on the
-// visible page); col -1 = the band's label, else a linear icon index.
-// Band -1 is the control row above the bands (on every grid page): col 0
-// = PRESET, col 1 = TOGGLE ALL.
+// Cursor: band index 0..GRID_BAND_COUNT-1; col -1 = the band's label,
+// else a linear icon index. Band -1 is the control row above the bands:
+// col 0 = PRESET, col 1 = TOGGLE ALL.
 static s32 sGridBand = 0;
 static s32 sGridCol = 0;
 
-// Layout, in the menu's bottom-up print coordinates. Each band is a label
-// line with its first icon row 14 units below and further rows 20 below
-// that; 30-unit single-row bands leave a 1-unit gap between one band's
-// highlight box and the next band's label.
+// Layout. x in the menu's units; y as document offsets (units down from
+// the control row's baseline). Each band is a label line with its first
+// icon row 14 units below and further rows 20 below that; 28-unit
+// single-row bands keep the whole section (control row + 5 bands, 160
+// units) inside the 168-unit content window.
 #define GRID_LEFT_X      22
 #define GRID_PITCH       20
 #define GRID_MAX_PER_ROW 14
-#define GRID_FIRST_Y     196   // first band's label on every grid page
-#define GRID_BAND_H      30
+#define GRID_FIRST_DY    16    // control row baseline -> first band label
+#define GRID_BAND_H      28
 #define GRID_ICON_DROP   14
-#define GRID_MIN_ICON_Y  46    // footer glyphs occupy y 32..41
 #define GRID_FOOTER_Y    28
 #define GRID_LABEL_X     24
 #define GRID_RIGHT_X     296
 #define GRID_FOOTER_NAME_X 44
-#define GRID_CTRL_Y      212   // control row: PRESET / TOGGLE ALL, BACK's baseline
+#define GRID_FOOTER_TOTAL_RIGHT_X 238  // clear of the scroll arrows and BACK
 #define GRID_CTRL_TOGGLE_X 150
 #define GRID_CTRL_GAP    6     // PRESET label -> value
 
-// The control row shares BACK's strip with the LOCKED banner, so it hides
-// (and can't be selected) while the room's options are locked.
+// The control row hides (and can't be selected) while the room's options
+// are locked; its space stays, so the layout doesn't jump.
 static s32 grid_controls_visible(void) {
 #ifndef TARGET_N64
     return !bingo_options_locked();
@@ -1339,62 +1397,38 @@ static s32 grid_band_rows(s32 band) {
     return (sGridBands[band].count + GRID_MAX_PER_ROW - 1) / GRID_MAX_PER_ROW;
 }
 
-// Flow the bands top to bottom; a band whose lowest icon row would drop
-// below GRID_MIN_ICON_Y starts the next grid page (bands never split; one
-// too tall for any page still gets a page of its own). Cheap enough to
-// recompute on every call.
-static void grid_band_layout(s32 band, s32 *page, s32 *labelY) {
-    s32 b, p = 0, y = GRID_FIRST_Y;
-    for (b = 0;; b++) {
-        s32 rows = grid_band_rows(b);
-        if (y != GRID_FIRST_Y
-            && y - GRID_ICON_DROP - GRID_PITCH * (rows - 1) < GRID_MIN_ICON_Y) {
-            p++;
-            y = GRID_FIRST_Y;
-        }
-        if (b == band) {
-            *page = p;
-            *labelY = y;
-            return;
-        }
-        y -= GRID_BAND_H + GRID_PITCH * (rows - 1);
+// Document y of the settings rows, the control row and the credits (the
+// settings row count varies with the online rows, so all of these are
+// computed on use; they're cheap).
+static s32 options_settings_doc(s32 row) {
+    return OPT_ROW_H * row;
+}
+
+static s32 grid_ctrl_doc(void) {
+    return options_settings_doc(BINGO_CONFIGS_IN_LEFT_COL - 1) + OPT_SETTINGS_GAP;
+}
+
+// Bands flow top to bottom, taller by 20 per extra icon row.
+static s32 grid_label_doc(s32 band) {
+    s32 b, y = grid_ctrl_doc() + GRID_FIRST_DY;
+    for (b = 0; b < band; b++) {
+        y += GRID_BAND_H + GRID_PITCH * (grid_band_rows(b) - 1);
     }
-}
-
-static s32 grid_band_page(s32 band) {
-    s32 page, y;
-    grid_band_layout(band, &page, &y);
-    return page;
-}
-
-static s32 grid_label_y(s32 band) {
-    s32 page, y;
-    grid_band_layout(band, &page, &y);
     return y;
 }
 
-static s32 grid_page_count(void) {
-    return grid_band_page(GRID_BAND_COUNT - 1) + 1;
+// The bottom of the last icon row's highlight box.
+static s32 grid_bottom_doc(void) {
+    s32 last = GRID_BAND_COUNT - 1;
+    return grid_label_doc(last) + GRID_ICON_DROP + GRID_PITCH * (grid_band_rows(last) - 1) + 2;
 }
 
-// Which grid page is showing (-1 when the settings or credits page is).
-static s32 grid_current_page(void) {
-    s32 gp = sBingoOptionCurrentPage - BINGO_PAGE_OBJECTIVES;
-    return gp >= 0 && gp < grid_page_count() ? gp : -1;
+static s32 grid_ctrl_y(void) {
+    return options_screen_y(grid_ctrl_doc());
 }
 
-static s32 grid_page_first_band(s32 page) {
-    s32 b;
-    for (b = 0; b < GRID_BAND_COUNT - 1 && grid_band_page(b) < page; b++) {
-    }
-    return b;
-}
-
-static s32 grid_page_last_band(s32 page) {
-    s32 b;
-    for (b = GRID_BAND_COUNT - 1; b > 0 && grid_band_page(b) > page; b--) {
-    }
-    return b;
+static s32 grid_label_y(s32 band) {
+    return options_screen_y(grid_label_doc(band));
 }
 
 // Icon i of a band: row i / GRID_MAX_PER_ROW, column i % GRID_MAX_PER_ROW.
@@ -1406,13 +1440,8 @@ static s32 grid_icon_y(s32 band, s32 i) {
     return grid_label_y(band) - GRID_ICON_DROP - GRID_PITCH * (i / GRID_MAX_PER_ROW);
 }
 
-// Keep the cursor on the visible grid page (entering a page, or paging
-// with L/R, lands on that page's first band).
-static void grid_clamp_cursor_to_page(void) {
-    s32 gp = grid_current_page();
-    if (gp < 0) {
-        return;
-    }
+// Keep the grid cursor valid (the control row can hide under it).
+static void grid_clamp_cursor(void) {
     if (sGridBand == -1 && grid_controls_visible()) {
         if (sGridCol < 0) {
             sGridCol = 0;
@@ -1421,8 +1450,8 @@ static void grid_clamp_cursor_to_page(void) {
         }
         return;
     }
-    if (sGridBand < 0 || sGridBand >= GRID_BAND_COUNT || grid_band_page(sGridBand) != gp) {
-        sGridBand = grid_page_first_band(gp);
+    if (sGridBand < 0 || sGridBand >= GRID_BAND_COUNT) {
+        sGridBand = 0;
         sGridCol = 0;
     }
     if (sGridCol >= sGridBands[sGridBand].count) {
@@ -1611,13 +1640,140 @@ static void grid_toggle_all(void) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Document extent, focus-driven scrolling and the pinned footer chrome.
+
+#define OPT_CREDITS_LINES 11
+// Settings rows' highlight / hit box, x (the printer's LEFT_X..RIGHT_X).
+#define OPT_SETTINGS_X0   24
+#define OPT_SETTINGS_X1   160
+// Footer strip chrome: BACK right-aligned at the strip's end, and the
+// scroll arrows (pointing up above down) between the grid total and BACK.
+#define OPT_BACK_RIGHT_X  296
+#define OPT_ARROW_X       252   // the arrows' centre column
+#define OPT_ARROW_UP_Y    37    // up arrow: rows 37..41
+#define OPT_ARROW_DOWN_Y  29    // down arrow: rows 29..33
+
+static s32 options_credits_doc(void) {
+    return grid_bottom_doc() + OPT_CREDITS_GAP;
+}
+
+// The last credits line's baseline.
+static s32 options_credits_last_doc(void) {
+    return options_credits_doc() + OPT_CREDITS_PITCH * (OPT_CREDITS_LINES - 1);
+}
+
+static s32 options_max_scroll(void) {
+    s32 bottom = options_credits_last_doc() + OPT_DOC_END_MARGIN;
+    s32 m = bottom - OPT_VIEW_BELOW;
+    return m > 0 ? m : 0;
+}
+
+static s32 options_clamp_scroll(s32 s) {
+    s32 max = options_max_scroll();
+    return s < 0 ? 0 : (s > max ? max : s);
+}
+
+// Move the scroll target the least that shows document rows [top, bot].
+static void options_reveal(s32 top, s32 bot) {
+    s32 t = sOptionsScrollTarget;
+    if (bot > t + OPT_VIEW_BELOW) {
+        t = bot - OPT_VIEW_BELOW;
+    }
+    if (top < t - OPT_VIEW_ABOVE) {
+        t = top + OPT_VIEW_ABOVE;
+    }
+    sOptionsScrollTarget = options_clamp_scroll(t);
+}
+
+// The view follows the focus: the focused item's whole section when it
+// fits the window, else the focused row plus a margin. The credits (which
+// fit) are shown from their top, at the window's top (clamped).
+static void options_scroll_to_focus(void) {
+    s32 top, bot, rowBot;
+    if (sOptionsFocus == OPTIONS_FOCUS_CREDITS) {
+        sOptionsScrollTarget =
+            options_clamp_scroll(options_credits_doc() - 16 + OPT_VIEW_ABOVE);
+        options_reveal(options_credits_doc() - 16, options_credits_last_doc() + 2);
+        return;
+    }
+    if (sOptionsFocus == OPTIONS_FOCUS_SETTINGS) {
+        top = options_settings_doc(0) - 16;
+        bot = options_settings_doc(BINGO_CONFIGS_IN_LEFT_COL - 1) + 2;
+        rowBot = options_settings_doc(sBingoOptionSelection) + 2;
+    } else {
+        top = grid_ctrl_doc() - 16;
+        bot = grid_bottom_doc();
+        if (sGridBand < 0) {
+            rowBot = grid_ctrl_doc() + 2;
+        } else if (sGridCol < 0) {
+            rowBot = grid_label_doc(sGridBand) + 2;
+        } else {
+            rowBot = grid_label_doc(sGridBand) + GRID_ICON_DROP
+                     + GRID_PITCH * (sGridCol / GRID_MAX_PER_ROW) + 2;
+        }
+    }
+    if (bot - top <= OPT_VIEW_ABOVE + OPT_VIEW_BELOW) {
+        options_reveal(top, bot);
+    } else {
+        options_reveal(rowBot - 18 - OPT_FOCUS_MARGIN, rowBot + OPT_FOCUS_MARGIN);
+    }
+}
+
+// Ease toward the target; once per logic frame (the PC port can draw
+// twice per frame, so this lives in the input path, gated on the timer).
+static void options_update_scroll(void) {
+    static u32 lastTimer = 0xFFFFFFFF;
+    f32 d;
+    sOptionsScrollTarget = options_clamp_scroll(sOptionsScrollTarget);
+    if (gGlobalTimer != lastTimer) {
+        lastTimer = gGlobalTimer;
+        d = (f32) sOptionsScrollTarget - sOptionsScroll;
+        if (d < 0.5f && d > -0.5f) {
+            sOptionsScroll = (f32) sOptionsScrollTarget;
+        } else {
+            sOptionsScroll += d * 0.35f;
+        }
+    }
+    sOptionsScrollPx = (s32) (sOptionsScroll + 0.5f);
+}
+
+#ifndef TARGET_N64
+static s32 options_back_x(void) {
+    return OPT_BACK_RIGHT_X - grid_ascii_width("BACK");
+}
+
+// The clickable BACK tag, right end of the footer strip (the hand can't
+// reach above row 210, where it used to sit).
+static s32 options_back_tag_hovered(void) {
+    f32 x = sCursorPos[0] + 160.0f;
+    f32 y = sCursorPos[1] + 120.0f;
+    return x >= options_back_x() - 3 && x < OPT_BACK_RIGHT_X + 3
+           && y >= GRID_FOOTER_Y && y < GRID_FOOTER_Y + 17;
+}
+#endif
+
+static void options_focus_grid_start(void) {
+    sOptionsFocus = OPTIONS_FOCUS_GRID;
+    sGridBand = grid_controls_visible() ? -1 : 0;
+    sGridCol = 0;
+}
+
+static void options_focus_settings_row(s32 row) {
+    sOptionsFocus = OPTIONS_FOCUS_SETTINGS;
+    sBingoOptionSelection = row;
+}
+
 #ifdef MOUSE_ACTIONS
-// What's under the pointer on the visible grid page (menu coords,
-// bottom-up). Returns 0 on empty space.
+// What's under the pointer in the grid section (menu coords, bottom-up).
+// Returns 0 on empty space or outside the content window.
 static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
-    s32 b, r, c, gp = grid_current_page();
+    s32 b, r, c, cy = grid_ctrl_y();
+    if (!options_in_window(y)) {
+        return 0;
+    }
     // The control row: same box as a band label's.
-    if (grid_controls_visible() && y >= GRID_CTRL_Y + 2 && y < GRID_CTRL_Y + 16) {
+    if (grid_controls_visible() && y >= cy + 2 && y < cy + 16) {
         for (c = 0; c < 2; c++) {
             if (x >= grid_control_x(c) - 2 && x < grid_control_end_x(c) + 2) {
                 *band = -1;
@@ -1628,9 +1784,6 @@ static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
     }
     for (b = 0; b < GRID_BAND_COUNT; b++) {
         s32 ly = grid_label_y(b);
-        if (grid_band_page(b) != gp) {
-            continue;
-        }
         if (y >= ly + 2 && y < ly + 16 && x >= GRID_LEFT_X
             && x < GRID_LABEL_X + grid_band_label_width(b) + 2) {
             *band = b;
@@ -1649,6 +1802,37 @@ static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
                 }
             }
         }
+    }
+    return 0;
+}
+
+// The settings row under the pointer (its highlight box).
+static s32 settings_hit_test(f32 x, f32 y, s32 *row) {
+    s32 i;
+    if (!options_in_window(y) || x < OPT_SETTINGS_X0 || x >= OPT_SETTINGS_X1) {
+        return 0;
+    }
+    for (i = 0; i < BINGO_CONFIGS_IN_LEFT_COL; i++) {
+        s32 ry = options_screen_y(options_settings_doc(i));
+        if (y >= ry && y < ry + 16) {
+            *row = i;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// +1 = the up arrow (scroll toward the top), -1 = the down arrow, 0 = none.
+// Boxes are 14 x 8, wider and taller than the 9 x 5 glyphs.
+static s32 options_arrow_hit(f32 x, f32 y) {
+    if (x < OPT_ARROW_X - 7 || x >= OPT_ARROW_X + 7) {
+        return 0;
+    }
+    if (y >= OPT_ARROW_UP_Y - 1 && y < OPT_ARROW_UP_Y + 7) {
+        return 1;
+    }
+    if (y >= OPT_ARROW_DOWN_Y - 1 && y < OPT_ARROW_DOWN_Y + 7) {
+        return -1;
     }
     return 0;
 }
@@ -1698,23 +1882,31 @@ static void grid_activate(void) {
     }
 }
 
-// D-pad / C navigation; returns 1 when the cursor moved (starts the
-// repeat debounce). Up/down wrap within the visible grid page; left/right
-// walk the band's icons linearly (across its wrapped rows) and the label.
-// The control row sits above the first band in the vertical cycle, and
-// left/right flip between its two controls.
+// A on a settings row.
+static void settings_activate(void) {
+#ifndef TARGET_N64
+    if (bingo_options_locked()) {
+        play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
+        return;
+    }
+#endif
+    // Applied by the row's printer on the next draw.
+    sToggleCurrentOption = 1;
+}
+
+// D-pad / C navigation in the grid; returns 1 when the focus moved.
+// Left/right walk the band's icons linearly (across its wrapped rows) and
+// the label, or flip between the control row's two controls. Up from the
+// control row leaves for the settings rows; down from the last band for
+// the credits.
 static s32 grid_navigate(u16 pressed) {
-    s32 gp = grid_current_page();
-    s32 first = grid_page_first_band(gp);
-    s32 last = grid_page_last_band(gp);
-    s32 ctrl = grid_controls_visible();
+    s32 last = GRID_BAND_COUNT - 1;
     if (sGridBand < 0) {
         if (pressed & (D_JPAD | D_CBUTTONS)) {
-            sGridBand = first;
+            sGridBand = 0;
             sGridCol = 0;
         } else if (pressed & (U_JPAD | U_CBUTTONS)) {
-            sGridBand = last;
-            sGridCol = 0;
+            options_focus_settings_row(BINGO_CONFIGS_IN_LEFT_COL - 1);
         } else if (pressed & (R_JPAD | R_CBUTTONS | L_JPAD | L_CBUTTONS)) {
             sGridCol = !sGridCol;
         } else {
@@ -1723,19 +1915,22 @@ static s32 grid_navigate(u16 pressed) {
         return 1;
     }
     if (pressed & (D_JPAD | D_CBUTTONS)) {
-        if (sGridBand >= last && ctrl) {
-            sGridBand = -1;
-            sGridCol = 0;
+        if (sGridBand >= last) {
+            sOptionsFocus = OPTIONS_FOCUS_CREDITS;
             return 1;
         }
-        sGridBand = sGridBand >= last ? first : sGridBand + 1;
+        sGridBand++;
     } else if (pressed & (U_JPAD | U_CBUTTONS)) {
-        if (sGridBand <= first && ctrl) {
-            sGridBand = -1;
-            sGridCol = 0;
+        if (sGridBand <= 0) {
+            if (grid_controls_visible()) {
+                sGridBand = -1;
+                sGridCol = 0;
+            } else {
+                options_focus_settings_row(BINGO_CONFIGS_IN_LEFT_COL - 1);
+            }
             return 1;
         }
-        sGridBand = sGridBand <= first ? last : sGridBand - 1;
+        sGridBand--;
     } else if (pressed & (R_JPAD | R_CBUTTONS)) {
         sGridCol = sGridCol + 1 >= sGridBands[sGridBand].count ? -1 : sGridCol + 1;
     } else if (pressed & (L_JPAD | L_CBUTTONS)) {
@@ -1749,35 +1944,86 @@ static s32 grid_navigate(u16 pressed) {
     return 1;
 }
 
+// The settings rows: up/down, no wrap; down from the last row enters the
+// grid at its control row.
+static s32 settings_navigate(u16 pressed) {
+    if (pressed & (D_JPAD | D_CBUTTONS)) {
+        if (sBingoOptionSelection + 1 >= BINGO_CONFIGS_IN_LEFT_COL) {
+            options_focus_grid_start();
+        } else {
+            sBingoOptionSelection++;
+        }
+    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
+        if (sBingoOptionSelection <= 0) {
+            return 0;
+        }
+        sBingoOptionSelection--;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
+// The credits: nothing to select; up returns to the last band.
+static s32 credits_navigate(u16 pressed) {
+    if (pressed & (U_JPAD | U_CBUTTONS)) {
+        sOptionsFocus = OPTIONS_FOCUS_GRID;
+        sGridBand = GRID_BAND_COUNT - 1;
+        grid_clamp_cursor();
+        return 1;
+    }
+    return 0;
+}
+
 #ifdef MOUSE_ACTIONS
 // Hover selects, but only when the pointer actually moved: a resting
-// pointer must not snap the selection back after d-pad moves.
-static void grid_mouse_hover(void) {
+// pointer must not snap the selection back after d-pad moves (or when the
+// document scrolls under it).
+static void options_mouse_hover(void) {
     static f32 lastX = -10000.0f, lastY = -10000.0f;
-    s32 band, col;
+    s32 band, col, row;
     if (sCursorPos[0] == lastX && sCursorPos[1] == lastY) {
         return;
     }
     lastX = sCursorPos[0];
     lastY = sCursorPos[1];
     if (grid_hit_test(lastX + 160.0f, lastY + 120.0f, &band, &col)) {
+        sOptionsFocus = OPTIONS_FOCUS_GRID;
         sGridBand = band;
         sGridCol = col;
+    } else if (settings_hit_test(lastX + 160.0f, lastY + 120.0f, &row)) {
+        options_focus_settings_row(row);
     }
 }
 #endif
 
-// The settings page: up/down over the config rows, with wrap.
-static s32 settings_navigate(u16 pressed) {
-    s32 rows = BINGO_CONFIGS_IN_LEFT_COL;
-    if (pressed & (D_JPAD | D_CBUTTONS)) {
-        sBingoOptionSelection = (sBingoOptionSelection + 1) % rows;
-    } else if (pressed & (U_JPAD | U_CBUTTONS)) {
-        sBingoOptionSelection = (sBingoOptionSelection + rows - 1) % rows;
-    } else {
-        return 0;
+// A: a mouse click acts on what's under the pointer (a scroll arrow
+// scrolls without moving the focus; empty space does nothing); a button
+// press acts on the focus.
+static void options_activate(void) {
+#ifdef MOUSE_ACTIONS
+    if (mouse_window_buttons & 1) {
+        f32 x = sCursorPos[0] + 160.0f;
+        f32 y = sCursorPos[1] + 120.0f;
+        s32 band, col, row, arrow = options_arrow_hit(x, y);
+        if (arrow != 0) {
+            sOptionsScrollTarget =
+                options_clamp_scroll(sOptionsScrollTarget - arrow * OPT_ARROW_STEP);
+        } else if (settings_hit_test(x, y, &row)) {
+            options_focus_settings_row(row);
+            settings_activate();
+        } else if (grid_hit_test(x, y, &band, &col)) {
+            sOptionsFocus = OPTIONS_FOCUS_GRID;
+            grid_activate();
+        }
+        return;
     }
-    return 1;
+#endif
+    if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+        grid_activate();
+    } else if (sOptionsFocus == OPTIONS_FOCUS_SETTINGS) {
+        settings_activate();
+    }
 }
 
 /**
@@ -1787,43 +2033,48 @@ static s32 settings_navigate(u16 pressed) {
 static void handle_cursor_button_input(void) {
     if (sSelectedButtonID == MENU_BUTTON_SEED_OPTION) {
         u16 pressed = gPlayer3Controller->buttonPressed;
+        options_update_scroll();
         if (pressed & (B_BUTTON | START_BUTTON)) {
             options_screen_exit();
         } else {
+            s32 moved = 0;
             // The online Opp. rows can vanish under the cursor.
             if (sBingoOptionSelection >= BINGO_CONFIGS_IN_LEFT_COL) {
-                sBingoOptionSelection = 0;
+                sBingoOptionSelection = BINGO_CONFIGS_IN_LEFT_COL - 1;
             }
+            grid_clamp_cursor();
 #ifdef MOUSE_ACTIONS
-            if (grid_current_page() >= 0) {
-                grid_clamp_cursor_to_page();
-                grid_mouse_hover();
-            }
+            options_mouse_hover();
 #endif
             if (sBingoOptionSelectTimer > 0) {
                 sBingoOptionSelectTimer--;
-            } else if (pressed & L_TRIG) {
-                if (sBingoOptionCurrentPage == 0) {
-                    sBingoOptionCurrentPage = BINGO_MAX_PAGE_INDEX;
-                } else {
-                    sBingoOptionCurrentPage--;
-                }
-                grid_clamp_cursor_to_page();
             } else if (pressed & R_TRIG) {
-                if (sBingoOptionCurrentPage == BINGO_MAX_PAGE_INDEX) {
-                    sBingoOptionCurrentPage = 0;
-                } else {
-                    sBingoOptionCurrentPage++;
+                // Jump to the next section's start (no wrap).
+                if (sOptionsFocus == OPTIONS_FOCUS_SETTINGS) {
+                    options_focus_grid_start();
+                    moved = 1;
+                } else if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+                    sOptionsFocus = OPTIONS_FOCUS_CREDITS;
+                    moved = 1;
                 }
-                grid_clamp_cursor_to_page();
-            } else if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
-                if (settings_navigate(pressed)) {
-                    sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
+            } else if (pressed & L_TRIG) {
+                if (sOptionsFocus == OPTIONS_FOCUS_CREDITS) {
+                    options_focus_grid_start();
+                    moved = 1;
+                } else if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+                    options_focus_settings_row(0);
+                    moved = 1;
                 }
-            } else if (grid_current_page() >= 0) {
-                if (grid_navigate(pressed)) {
-                    sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
-                }
+            } else if (sOptionsFocus == OPTIONS_FOCUS_SETTINGS) {
+                moved = settings_navigate(pressed);
+            } else if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+                moved = grid_navigate(pressed);
+            } else {
+                moved = credits_navigate(pressed);
+            }
+            if (moved) {
+                sBingoOptionSelectTimer = BINGO_OPTION_TIMER_FRAMES;
+                options_scroll_to_focus();
             }
             if (pressed & A_BUTTON) {
 #ifndef TARGET_N64
@@ -1832,18 +2083,8 @@ static void handle_cursor_button_input(void) {
                     options_screen_exit();
                 } else
 #endif
-                if (grid_current_page() >= 0) {
-                    grid_activate();
-                } else if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
-#ifndef TARGET_N64
-                    if (bingo_options_locked()) {
-                        play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
-                    } else
-#endif
-                    {
-                        // Applied by the row's printer on the next draw.
-                        sToggleCurrentOption = 1;
-                    }
+                {
+                    options_activate();
                 }
             }
         }
@@ -2155,7 +2396,6 @@ static unsigned char textClaimVisHidden[] = { TEXT_CLAIMVIS_HIDDEN };
 
 static unsigned char textDPad[] = { TEXT_DPAD };
 static unsigned char textPressA[] = { TEXT_PRESS_A };
-static unsigned char textPressRL_1[] = { TEXT_PRESS_RL_1 };
 
 static unsigned char textBingo64[] = { TEXT_BINGO64 };
 static unsigned char textCreatedBy[] = { TEXT_CREATED_BY };
@@ -2178,30 +2418,6 @@ static unsigned char textSpecialThanks14[] = { TEXT_SPECIAL_THANKS_14 };
 
 
 #define LEFT_X     24
-#define RIGHT_X    160
-#define TOP_Y      12
-#define ROW_HEIGHT 17
-
-// The settings page's selected row (left column only).
-static void print_bingo_selection_highlight(void) {
-    gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
-    gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, MIN(sTextBaseAlpha, 150));
-    gDPFillRectangle(
-        gDisplayListHead++,
-        LEFT_X,
-        TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 1),
-        RIGHT_X,
-        TOP_Y - 2 + ROW_HEIGHT * (sBingoOptionSelection + 2) - 1
-    );
-}
-
-// The settings page's hints, bottom three rows of the right column.
-static void print_option_nav_instructions(void) {
-    print_generic_string(RIGHT_X + 8, TOP_Y + ROW_HEIGHT * 3 - 2, textDPad);
-    print_generic_string(RIGHT_X + 46, TOP_Y + ROW_HEIGHT * 2 - 2, textPressA);
-    print_generic_string(RIGHT_X + 15, TOP_Y + ROW_HEIGHT * 1 - 2, textPressRL_1);
-}
 
 // The config rows' value column: every value's RIGHT edge sits here.
 // (Hand-tuned per-string x offsets drifted — "Lockout" and "Visible"
@@ -2290,7 +2506,7 @@ static s32 bingo_config_claimvis(s32 i, u8 **target) {
 }
 #endif
 
-static void print_bingo_configs() {
+static void print_bingo_configs(void) {
     s32 i;
     s32 offsetX;
     u8 *label;
@@ -2298,9 +2514,12 @@ static void print_bingo_configs() {
 
     s32 cfgs = BINGO_CONFIGS_IN_LEFT_COL;
     for (i = 0; i < cfgs; i++) {
+        s32 y, shadowAlpha, textAlpha;
         label = textEmpty;
         target = textEmpty;
         offsetX = 0;
+        // Every row runs (even scrolled out of view): the value helpers
+        // also apply a pending toggle.
         if (i == 0) {
             label = textGameMode;
             offsetX = bingo_config_target(i, &target);
@@ -2334,50 +2553,58 @@ static void print_bingo_configs() {
 #endif
         }
 
-        gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));
-        print_generic_string(
-            LEFT_X + 2,
-            TOP_Y + ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2,
-            label
-        );
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
-        print_generic_string(
-            LEFT_X + 1,
-            TOP_Y + ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2,
-            label
-        );
-        gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));
-        print_generic_string(
-            LEFT_X + offsetX + 1,
-            TOP_Y + ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2,
-            target
-        );
-        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
-        print_generic_string(
-            LEFT_X + offsetX,
-            TOP_Y + ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2,
-            target
-        );
+        y = options_screen_y(options_settings_doc(i));
+        shadowAlpha = options_edge_alpha(y, MIN(sTextBaseAlpha, 170));
+        textAlpha = options_edge_alpha(y, MIN(sTextBaseAlpha, 200));
+        if (textAlpha <= 0) {
+            continue;
+        }
+        gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, shadowAlpha);
+        print_generic_string(LEFT_X + 2, y, label);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, textAlpha);
+        print_generic_string(LEFT_X + 1, y, label);
+        gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, shadowAlpha);
+        print_generic_string(LEFT_X + offsetX + 1, y, target);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, textAlpha);
+        print_generic_string(LEFT_X + offsetX, y, target);
     }
 }
 
-static void print_bingo_page_0() {
-    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
-
-    print_bingo_selection_highlight();
-
+// The settings section: the focused row's box, then the rows.
+static void print_options_settings(void) {
+    s32 i;
+    if (sOptionsFocus == OPTIONS_FOCUS_SETTINGS) {
+        s32 y = options_screen_y(options_settings_doc(sBingoOptionSelection));
+        gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+        gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+        gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38,
+                        options_edge_alpha(y, MIN(sTextBaseAlpha, 150)));
+        grid_fill_rect(OPT_SETTINGS_X0, y, OPT_SETTINGS_X1, y + 16);
+    }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     print_bingo_configs();
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-    print_option_nav_instructions();
+    // The key hints fill the rows' empty right column, right-aligned,
+    // scrolling with the rows.
+    for (i = 0; i < 2; i++) {
+        u8 *hint = i == 0 ? textDPad : textPressA;
+        s32 y = options_screen_y(options_settings_doc(0) + 14 * i);
+        s32 alpha = options_edge_alpha(y, MIN(sTextBaseAlpha, 200) * 7 / 10);
+        if (alpha > 0) {
+            gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, alpha);
+            print_generic_string(GRID_RIGHT_X - get_string_width(hint), y, hint);
+        }
+    }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
-// Yellow-with-shadow text, the config rows' look.
+// Yellow-with-shadow text, the config rows' look (edge-faded: document
+// text only).
 static void print_grid_config_ascii(s32 x, s32 y, const char *str) {
-    gDPSetEnvColor(gDisplayListHead++, 120, 120, 90, MIN(sTextBaseAlpha, 170));
+    gDPSetEnvColor(gDisplayListHead++, 120, 120, 90,
+                   options_edge_alpha(y, MIN(sTextBaseAlpha, 170)));
     grid_print_ascii(x + 1, y, str);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 140,
+                   options_edge_alpha(y, MIN(sTextBaseAlpha, 200)));
     grid_print_ascii(x, y, str);
 }
 
@@ -2390,13 +2617,13 @@ static void print_grid_highlight(void) {
         // A control: the band-label box, around the control's text.
         x0 = grid_control_x(sGridCol) - 2;
         x1 = grid_control_end_x(sGridCol) + 3;
-        y0 = GRID_CTRL_Y + 2;
-        y1 = GRID_CTRL_Y + 16;
+        y0 = grid_ctrl_y() + 2;
+        y1 = y0 + 14;
     } else if (sGridCol < 0) {
         x0 = GRID_LEFT_X;
         x1 = GRID_LABEL_X + grid_band_label_width(sGridBand) + 3;
         y0 = grid_label_y(sGridBand) + 2;
-        y1 = grid_label_y(sGridBand) + 16;
+        y1 = y0 + 14;
     } else {
         x0 = grid_icon_x(sGridCol) - 2;
         x1 = x0 + 20;
@@ -2405,35 +2632,37 @@ static void print_grid_highlight(void) {
     }
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38, MIN(sTextBaseAlpha, 150));
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38,
+                    options_edge_alpha(y0, MIN(sTextBaseAlpha, 150)));
     grid_fill_rect(x0, y0, x1, y1);
 
     pulse = 150 + (s32) (100.0f * (0.5f + 0.5f * sins(gGlobalTimer * 0x600)));
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 140, MIN(sTextBaseAlpha, pulse));
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 140,
+                    options_edge_alpha(y0, MIN(sTextBaseAlpha, pulse)));
     grid_fill_rect(x0, y1 - 1, x1, y1);              // top
     grid_fill_rect(x0, y0, x1, y0 + 1);              // bottom
     grid_fill_rect(x0, y0 + 1, x0 + 1, y1 - 1);      // left
     grid_fill_rect(x1 - 1, y0 + 1, x1, y1 - 1);      // right
 }
 
-// Leader rules between each visible band's label and its count, so the
-// headers read as a table.
-static void print_grid_band_rules(s32 gp) {
+// Leader rules between each band's label and its count, so the headers
+// read as a table.
+static void print_grid_band_rules(void) {
     s32 b;
     char text[16];
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, MIN(sTextBaseAlpha, 60));
     for (b = 0; b < GRID_BAND_COUNT; b++) {
-        s32 ly, x0, x1;
-        if (grid_band_page(b) != gp) {
+        s32 ly = grid_label_y(b), x0, x1;
+        s32 alpha = options_edge_alpha(ly, MIN(sTextBaseAlpha, 60));
+        if (alpha <= 0) {
             continue;
         }
-        ly = grid_label_y(b);
         grid_count_text(text, grid_band_enabled(b), sGridBands[b].count);
         x0 = GRID_LABEL_X + grid_band_label_width(b) + 6;
         x1 = GRID_RIGHT_X - grid_ascii_width(text) - 6;
         if (x1 > x0) {
+            gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, alpha);
             grid_fill_rect(x0, ly + 4, x1, ly + 5);
         }
     }
@@ -2441,15 +2670,26 @@ static void print_grid_band_rules(s32 gp) {
 
 // The footer names what A would act on (the selected objective, shown
 // with its icon and state, or the band's all-on/all-off action), with the
-// pool's enabled total right-aligned.
-static void print_grid_footer(s32 whiteTextAlpha) {
+// pool's enabled total right-aligned. Pinned (drawn outside the content
+// window's scissor), and only while the focus is in the grid.
+static void print_grid_footer(void) {
+    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
     char text[40];
     char *p;
     s32 i, total = 0;
+    if (sGridBand >= 0 && sGridCol >= 0) {
+        // The selected objective again, beside its name.
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+        print_bingo_icon_alpha(GRID_LABEL_X, GRID_FOOTER_Y,
+                               get_objective_info(sGridBands[sGridBand].types[sGridCol])->icon,
+                               gOptionSelectIconOpacity);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
     if (sGridBand < 0) {
         grid_print_ascii(GRID_LABEL_X, GRID_FOOTER_Y,
-                         sGridCol == 0 ? "Named loadout: objectives, mode, unlock"
+                         sGridCol == 0 ? "Loadout: objectives, mode, unlock"
                                        : "Turn every objective on or off");
     } else if (sGridCol < 0) {
         p = grid_append(text, sGridBands[sGridBand].label);
@@ -2474,63 +2714,53 @@ static void print_grid_footer(s32 whiteTextAlpha) {
     for (i = 0; i < GRID_BAND_COUNT; i++) {
         total += grid_band_enabled(i);
     }
-    // Once the bands have flowed onto more than one page, nothing else on
-    // screen says a page 2 exists: prefix the total with the page.
-    p = text;
-    if (grid_page_count() > 1) {
-        p = grid_append(p, "Page ");
-        p = grid_append_num(p, grid_current_page() + 1);
-        p = grid_append(p, "/");
-        p = grid_append_num(p, grid_page_count());
-        p = grid_append(p, "   ");
-    }
-    grid_count_text(p, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
+    grid_count_text(text, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
     grid_text_color(255, 255, 255, whiteTextAlpha);
-    grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
+    grid_print_ascii(GRID_FOOTER_TOTAL_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
 // The control row above the bands, band-header style: yellow labels,
 // white value.
 static void print_grid_controls(void) {
+    s32 y = grid_ctrl_y();
     s32 x = GRID_LABEL_X + grid_ascii_width("PRESET") + GRID_CTRL_GAP;
-    print_grid_config_ascii(GRID_LABEL_X, GRID_CTRL_Y, "PRESET");
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, MIN(sTextBaseAlpha, 200));
-    grid_print_ascii(x, GRID_CTRL_Y, grid_preset_name());
-    print_grid_config_ascii(GRID_CTRL_TOGGLE_X, GRID_CTRL_Y, "TOGGLE ALL");
+    if (options_edge_alpha(y, 255) <= 0) {
+        return;
+    }
+    print_grid_config_ascii(GRID_LABEL_X, y, "PRESET");
+    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
+                   options_edge_alpha(y, MIN(sTextBaseAlpha, 200)));
+    grid_print_ascii(x, y, grid_preset_name());
+    print_grid_config_ascii(GRID_CTRL_TOGGLE_X, y, "TOGGLE ALL");
 }
 
 static void print_objective_grid(void) {
-    s32 b, c, gp;
-    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
+    s32 b, c;
     char text[16];
 
-    grid_clamp_cursor_to_page();
-    gp = grid_current_page();
+    grid_clamp_cursor();
 
-    print_grid_band_rules(gp);
-    print_grid_highlight();
+    print_grid_band_rules();
+    if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+        print_grid_highlight();
+    }
 
     // Icons: OFF ones stay visible but dimmed, so the whole pool reads at
     // a glance.
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
     for (b = 0; b < GRID_BAND_COUNT; b++) {
-        if (grid_band_page(b) != gp) {
-            continue;
-        }
         for (c = 0; c < sGridBands[b].count; c++) {
             u8 type = sGridBands[b].types[c];
-            print_bingo_icon_alpha(grid_icon_x(c), grid_icon_y(b, c),
-                                   get_objective_info(type)->icon,
-                                   gBingoObjectivesDisabled[type]
-                                       ? MIN(gOptionSelectIconOpacity, 70)
-                                       : gOptionSelectIconOpacity);
+            s32 iy = grid_icon_y(b, c);
+            s32 alpha = options_edge_alpha(iy, gBingoObjectivesDisabled[type]
+                                                   ? MIN(gOptionSelectIconOpacity, 70)
+                                                   : gOptionSelectIconOpacity);
+            if (alpha > 0) {
+                print_bingo_icon_alpha(grid_icon_x(c), iy,
+                                       get_objective_info(type)->icon, alpha);
+            }
         }
-    }
-    if (sGridBand >= 0 && sGridCol >= 0) {
-        // The selected objective again, beside its name in the footer.
-        print_bingo_icon_alpha(GRID_LABEL_X, GRID_FOOTER_Y,
-                               get_objective_info(sGridBands[sGridBand].types[sGridCol])->icon,
-                               gOptionSelectIconOpacity);
     }
     gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
 
@@ -2539,11 +2769,11 @@ static void print_objective_grid(void) {
     // Band headers: label left, "n/m" right-aligned into one column,
     // coloured all on (white) / some (yellow) / none (red).
     for (b = 0; b < GRID_BAND_COUNT; b++) {
-        s32 ly, n, alpha = MIN(sTextBaseAlpha, 200);
-        if (grid_band_page(b) != gp) {
+        s32 ly = grid_label_y(b), n;
+        s32 alpha = options_edge_alpha(ly, MIN(sTextBaseAlpha, 200));
+        if (alpha <= 0) {
             continue;
         }
-        ly = grid_label_y(b);
         print_grid_config_ascii(GRID_LABEL_X, ly, sGridBands[b].label);
         n = grid_band_enabled(b);
         grid_count_text(text, n, sGridBands[b].count);
@@ -2557,119 +2787,73 @@ static void print_objective_grid(void) {
         grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), ly, text);
     }
 
-    print_grid_footer(whiteTextAlpha);
-
     if (grid_controls_visible()) {
         print_grid_controls();
     }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
-static void print_line(s32 startX, s32 length, s32 y, s32 alpha) {
+// The credits, at the document's end.
+static void print_options_credits(void) {
+    static unsigned char *const left[OPT_CREDITS_LINES] = {
+        textBingo64, textCreatedBy, textContributionsFrom, textSpecialThanks,
+        textSpecialThanks1, textSpecialThanks2, textSpecialThanks3, textSpecialThanks4,
+        textSpecialThanks5, textSpecialThanks6, textSpecialThanks7,
+    };
+    // Only the special-thanks lines have a right column.
+    static unsigned char *const right[OPT_CREDITS_LINES] = {
+        NULL, NULL, NULL, NULL,
+        textSpecialThanks8, textSpecialThanks9, textSpecialThanks10, textSpecialThanks11,
+        textSpecialThanks12, textSpecialThanks13, textSpecialThanks14,
+    };
+    // Each line's x, relative to the credits' centre-left column (90).
+    static const s8 dx[OPT_CREDITS_LINES] = { 38, 0, -20, 26, -40, -40, -40, -40, -40, -40, -40 };
+    s32 i, y, alpha, x, doc = options_credits_doc();
+    s32 base = MIN(sTextBaseAlpha, 200) * 7 / 10;
+
+    // Underlines below the two headers (BINGO 64, Special thanks).
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
-    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, alpha);
-    gDPFillRectangle(gDisplayListHead++, startX, y - 1, startX + length, y);
-}
-
-static void print_bingo_page_2(void) {
-    s32 i;
-    unsigned char *creditString;
-    unsigned char *creditString2;
-    s32 optionLeftX = 90;
-    s32 offsetY;
-    s32 whiteTextAlpha = MIN(sTextBaseAlpha, 200);
-    s32 creditsLeftX;
-
-    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-    for (i = 0; i < 11; i++) {
-        offsetY = ROW_HEIGHT * (BINGO_ENTRIES_PER_COL - i) - 2;
-        creditString = NULL;
-        creditString2 = NULL;  // only rows 4+ have a right column
-        switch (i) {
-            case 0:
-                creditString = textBingo64;
-                creditsLeftX = optionLeftX + 38;
-                gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
-                print_line(
-                    creditsLeftX + 6,
-                    39,
-                    TOP_Y - 2 + ROW_HEIGHT * (i + 2) - 1,
-                    whiteTextAlpha * 0.7
-                );
-                gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-                gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-
-                break;
-            case 1:
-                creditString = textCreatedBy;
-                creditsLeftX = optionLeftX;
-                break;
-            case 2:
-                creditString = textContributionsFrom;
-                creditsLeftX = optionLeftX - 20;
-                break;
-            case 3:
-                creditString = textSpecialThanks;
-                creditsLeftX = optionLeftX + 26;
-                gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
-                print_line(
-                    creditsLeftX + 6,
-                    69,
-                    TOP_Y - 2 + ROW_HEIGHT * (i + 2) - 1,
-                    whiteTextAlpha * 0.7
-                );
-                gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
-                gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha * 0.7);
-                break;
-            case 4:
-                creditString = textSpecialThanks1;
-                creditString2 = textSpecialThanks8;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 5:
-                creditString = textSpecialThanks2;
-                creditString2 = textSpecialThanks9;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 6:
-                creditString = textSpecialThanks3;
-                creditString2 = textSpecialThanks10;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 7:
-                creditString = textSpecialThanks4;
-                creditString2 = textSpecialThanks11;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 8:
-                creditString = textSpecialThanks5;
-                creditString2 = textSpecialThanks12;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 9:
-                creditString = textSpecialThanks6;
-                creditString2 = textSpecialThanks13;
-                creditsLeftX = optionLeftX - 40;
-                break;
-            case 10:
-                creditString = textSpecialThanks7;
-                creditString2 = textSpecialThanks14;
-                creditsLeftX = optionLeftX - 40;
-                break;
-        }
-        if (creditString != NULL) {
-            print_generic_string(creditsLeftX + 6, TOP_Y + offsetY, creditString);
-        }
-        if (creditString2 != NULL) {
-            print_generic_string(creditsLeftX + 6 + 80, TOP_Y + offsetY, creditString2);
+    for (i = 0; i <= 3; i += 3) {
+        y = options_screen_y(doc + OPT_CREDITS_PITCH * i);
+        alpha = options_edge_alpha(y, base);
+        if (alpha > 0) {
+            x = 90 + dx[i] + 6;
+            gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, alpha);
+            grid_fill_rect(x, y, x + (i == 0 ? 39 : 69), y + 1);
         }
     }
 
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    for (i = 0; i < OPT_CREDITS_LINES; i++) {
+        y = options_screen_y(doc + OPT_CREDITS_PITCH * i);
+        alpha = options_edge_alpha(y, base);
+        if (alpha <= 0) {
+            continue;
+        }
+        x = 90 + dx[i] + 6;
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, alpha);
+        print_generic_string(x, y, left[i]);
+        if (right[i] != NULL) {
+            print_generic_string(x + 80, y, right[i]);
+        }
+    }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
+// A scroll arrow: five stacked rows 1..9 units wide (the slash's
+// hand-drawn fill-rect technique), bottom row at y0.
+static void print_options_arrow(s32 y0, s32 up, s32 canScroll) {
+    s32 k, alpha = 60;
+    if (canScroll) {
+        alpha = 160 + (s32) (60.0f * sins(gGlobalTimer * 0x800));
+    }
+    gDPSetPrimColor(gDisplayListHead++, 0, 0, 255, 255, 255, MIN(sTextBaseAlpha, alpha));
+    for (k = 0; k < 5; k++) {
+        s32 half = up ? 4 - k : k;
+        grid_fill_rect(OPT_ARROW_X - half, y0 + k, OPT_ARROW_X + half + 1, y0 + k + 1);
+    }
+}
 
 static void print_bingo_options(void) {
     if (gOptionSelectIconOpacity <= 10) {
@@ -2686,21 +2870,32 @@ static void print_bingo_options(void) {
         gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
     }
 #endif
-    if (sBingoOptionCurrentPage == BINGO_PAGE_SETTINGS) {
-        print_bingo_page_0();
-    } else if (grid_current_page() >= 0) {
-        print_objective_grid();
-    } else {
-        print_bingo_page_2();
+    // The scrolling document, clipped to the content window.
+    gDPPipeSync(gDisplayListHead++);
+    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, SCREEN_HEIGHT - OPT_CONTENT_TOP,
+                  SCREEN_WIDTH, SCREEN_HEIGHT - OPT_CONTENT_BOTTOM);
+    print_options_settings();
+    print_objective_grid();
+    print_options_credits();
+    gDPPipeSync(gDisplayListHead++);
+    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    // Pinned footer strip: the grid's footer, the scroll arrows, BACK.
+    if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+        print_grid_footer();
     }
+    gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+    print_options_arrow(OPT_ARROW_UP_Y, 1, sOptionsScrollTarget > 0);
+    print_options_arrow(OPT_ARROW_DOWN_Y, 0, sOptionsScrollTarget < options_max_scroll());
 #ifndef TARGET_N64
-    // Clickable BACK tag, top right; mouse users had no visible way out
-    // (the screen only exited on B/ESC).
+    // Clickable BACK tag; mouse users had no visible way out (the screen
+    // only exited on B/ESC).
     gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 140,
                    options_back_tag_hovered() ? sTextBaseAlpha
                                               : MIN(sTextBaseAlpha, 170));
-    net_print_ascii(262, 212, "BACK");
+    net_print_ascii(options_back_x(), GRID_FOOTER_Y, "BACK");
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 #endif
     if (sToggleCurrentOption) {
@@ -2708,9 +2903,6 @@ static void print_bingo_options(void) {
     }
 }
 #undef LEFT_X
-#undef RIGHT_X
-#undef TOP_Y
-#undef ROW_HEIGHT
 
 
 #undef PRINT_COURSE_NAME_CN
