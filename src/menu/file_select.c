@@ -1430,9 +1430,26 @@ static s32 grid_bottom_doc(void) {
     return grid_label_doc(last) + GRID_ICON_DROP + GRID_PITCH * (grid_band_rows(last) - 1) + 2;
 }
 
-static s32 grid_ctrl_y(void) {
-    return options_screen_y(grid_ctrl_doc());
+// The control row is a sticky section header: at its natural place until
+// that scrolls above the window's first baseline, then pinned there, until
+// the section's end (the last icon box's bottom) pushes it off upward.
+// Every draw / highlight / hit test of the row goes through here.
+static s32 grid_ctrl_pinned(void) {
+    return options_screen_y(grid_ctrl_doc()) > OPT_DOC_TOP_Y;
 }
+
+static s32 grid_ctrl_y(void) {
+    s32 natural = options_screen_y(grid_ctrl_doc());
+    s32 pushed = options_screen_y(grid_bottom_doc()) + 4;
+    if (natural <= OPT_DOC_TOP_Y) {
+        return natural;
+    }
+    return pushed > OPT_DOC_TOP_Y ? pushed : OPT_DOC_TOP_Y;
+}
+
+// The pinned row's dark backing, which the bands scroll under.
+#define GRID_CTRL_BACK_X0 20
+#define GRID_CTRL_BACK_X1 300
 
 static s32 grid_label_y(s32 band) {
     return options_screen_y(grid_label_doc(band));
@@ -1709,11 +1726,14 @@ static void options_scroll_to_focus(void) {
         bot = options_settings_doc(BINGO_CONFIGS_IN_LEFT_COL - 1) + 2;
         rowBot = options_settings_doc(sBingoOptionSelection) + 2;
     } else {
-        top = grid_ctrl_doc() - 16;
-        bot = grid_bottom_doc();
         if (sGridBand < 0) {
-            rowBot = grid_ctrl_doc() + 2;
-        } else if (sGridCol < 0) {
+            // The sticky control row is visible whenever the section is.
+            return;
+        }
+        // Keep the focused band row clear of the sticky header's 20 units.
+        top = grid_ctrl_doc() - 16 - 20;
+        bot = grid_bottom_doc();
+        if (sGridCol < 0) {
             rowBot = grid_label_doc(sGridBand) + 2;
         } else {
             rowBot = grid_label_doc(sGridBand) + GRID_ICON_DROP
@@ -1723,7 +1743,11 @@ static void options_scroll_to_focus(void) {
     if (bot - top <= OPT_VIEW_ABOVE + OPT_VIEW_BELOW) {
         options_reveal(top, bot);
     } else {
-        options_reveal(rowBot - 18 - OPT_FOCUS_MARGIN, rowBot + OPT_FOCUS_MARGIN);
+        s32 rowTop = rowBot - 18 - OPT_FOCUS_MARGIN;
+        if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+            rowTop -= 20;  // below the sticky header
+        }
+        options_reveal(rowTop, rowBot + OPT_FOCUS_MARGIN);
     }
 }
 
@@ -1779,7 +1803,8 @@ static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
     if (!options_in_window(y)) {
         return 0;
     }
-    // The control row: same box as a band label's.
+    // The control row first (it overlays the bands while pinned): same
+    // box as a band label's.
     if (grid_controls_visible() && y >= cy + 2 && y < cy + 16) {
         for (c = 0; c < 2; c++) {
             if (x >= grid_control_x(c) - 2 && x < grid_control_end_x(c) + 2) {
@@ -1788,6 +1813,11 @@ static s32 grid_hit_test(f32 x, f32 y, s32 *band, s32 *col) {
                 return 1;
             }
         }
+    }
+    // The rest of the pinned row's backing hides what's under it.
+    if (grid_controls_visible() && grid_ctrl_pinned() && y >= cy - 3 && y < cy + 17
+        && x >= GRID_CTRL_BACK_X0 && x < GRID_CTRL_BACK_X1) {
+        return 0;
     }
     for (b = 0; b < GRID_BAND_COUNT; b++) {
         s32 ly = grid_label_y(b);
@@ -2621,6 +2651,8 @@ static void print_grid_config_ascii(s32 x, s32 y, const char *str) {
 static void print_grid_highlight(void) {
     s32 x0, x1, y0, y1, pulse;
     if (sGridBand < 0) {
+        // (The control row's box: drawn after the row's backing, by
+        // print_grid_control_row, so the pinned row overlays the bands.)
         // A control: the band-label box, around the control's text.
         x0 = grid_control_x(sGridCol) - 2;
         x1 = grid_control_end_x(sGridCol) + 3;
@@ -2729,17 +2761,31 @@ static void print_grid_footer(void) {
 
 // The control row above the bands, band-header style: yellow labels,
 // white value.
-static void print_grid_controls(void) {
+// Drawn after the bands so the pinned row overlays them: its backing
+// (while pinned), its selection box, then the text.
+static void print_grid_control_row(void) {
     s32 y = grid_ctrl_y();
     s32 x = GRID_LABEL_X + grid_ascii_width("PRESET") + GRID_CTRL_GAP;
     if (options_edge_alpha(y, 255) <= 0) {
         return;
     }
+    if (grid_ctrl_pinned()) {
+        gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+        gDPSetRenderMode(gDisplayListHead++, G_RM_XLU_SURF, G_RM_XLU_SURF);
+        gDPSetPrimColor(gDisplayListHead++, 0, 0, 38, 38, 38,
+                        options_edge_alpha(y, MIN(sTextBaseAlpha, 200)));
+        grid_fill_rect(GRID_CTRL_BACK_X0, y - 3, GRID_CTRL_BACK_X1, y + 17);
+    }
+    if (sOptionsFocus == OPTIONS_FOCUS_GRID && sGridBand < 0) {
+        print_grid_highlight();
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
     print_grid_config_ascii(GRID_LABEL_X, y, "PRESET");
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255,
                    options_edge_alpha(y, MIN(sTextBaseAlpha, 200)));
     grid_print_ascii(x, y, grid_preset_name());
     print_grid_config_ascii(GRID_CTRL_TOGGLE_X, y, "TOGGLE ALL");
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
 static void print_objective_grid(void) {
@@ -2749,7 +2795,7 @@ static void print_objective_grid(void) {
     grid_clamp_cursor();
 
     print_grid_band_rules();
-    if (sOptionsFocus == OPTIONS_FOCUS_GRID) {
+    if (sOptionsFocus == OPTIONS_FOCUS_GRID && sGridBand >= 0) {
         print_grid_highlight();
     }
 
@@ -2794,10 +2840,11 @@ static void print_objective_grid(void) {
         grid_print_ascii(GRID_RIGHT_X - grid_ascii_width(text), ly, text);
     }
 
-    if (grid_controls_visible()) {
-        print_grid_controls();
-    }
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
+    if (grid_controls_visible()) {
+        print_grid_control_row();
+    }
 }
 
 // The credits, at the document's end.
