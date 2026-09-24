@@ -1292,16 +1292,22 @@ static s32 options_in_window(f32 y) {
 // bands (PRESET, TOGGLE ALL). Bands wrap onto extra icon rows when they
 // don't fit one (see grid_label_doc).
 
-#define GRID_BAND_COUNT 5
+#define GRID_BAND_COUNT 6
 
+// Vanilla star collection: the star is earned the normal way.
 static const u8 sGridStars[] = {
-    BINGO_OBJECTIVE_STAR, BINGO_OBJECTIVE_STAR_TIMED,
-    BINGO_OBJECTIVE_STAR_TTC_RANDOM, BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE,
-    BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE, BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
-    BINGO_OBJECTIVE_RACING_STARS, BINGO_OBJECTIVE_SECRETS_STARS,
-    BINGO_OBJECTIVE_CANNON_STARS, BINGO_OBJECTIVE_RED_COIN_STARS,
-    BINGO_OBJECTIVE_BOWSER, BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON,
-    BINGO_OBJECTIVE_STARS_IN_LEVEL, BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS,
+    BINGO_OBJECTIVE_STAR, BINGO_OBJECTIVE_RACING_STARS,
+    BINGO_OBJECTIVE_SECRETS_STARS, BINGO_OBJECTIVE_CANNON_STARS,
+    BINGO_OBJECTIVE_RED_COIN_STARS, BINGO_OBJECTIVE_BOWSER,
+    BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON, BINGO_OBJECTIVE_STARS_IN_LEVEL,
+    BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS,
+};
+// Stars with a rule attached (a timer, a random TTC setting, a banned
+// button).
+static const u8 sGridStarChallenges[] = {
+    BINGO_OBJECTIVE_STAR_TIMED, BINGO_OBJECTIVE_STAR_TTC_RANDOM,
+    BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE, BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE,
+    BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
 };
 // The game's first-class modifiers, in enum BingoModifier order.
 static const u8 sGridModifiers[] = {
@@ -1343,6 +1349,7 @@ struct ObjectiveGridBand {
 
 static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
     { "STARS",     sGridStars,     ARRAY_COUNT(sGridStars) },
+    { "STAR CHALLENGES", sGridStarChallenges, ARRAY_COUNT(sGridStarChallenges) },
     { "MODIFIERS", sGridModifiers, ARRAY_COUNT(sGridModifiers) },
     { "COLLECT",   sGridCollect,   ARRAY_COUNT(sGridCollect) },
     { "ANTICS",    sGridAntics,    ARRAY_COUNT(sGridAntics) },
@@ -1354,7 +1361,7 @@ static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
 // a band. Uniqueness isn't checkable at compile time; keep the tables in
 // sync with the enum by hand.
 typedef char grid_bands_cover_every_objective[
-    (ARRAY_COUNT(sGridStars) + ARRAY_COUNT(sGridModifiers)
+    (ARRAY_COUNT(sGridStars) + ARRAY_COUNT(sGridStarChallenges) + ARRAY_COUNT(sGridModifiers)
      + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridAntics)
      + ARRAY_COUNT(sGridEnemies) == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
 
