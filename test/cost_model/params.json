@@ -1,0 +1,92 @@
+{
+ "_about": "HAND PRIORS for the bingo64 cost model. All times are integer DECISECONDS (600 = 1 minute). Every number here is a GUESS, to be replaced by fit.py from votes. Keys starting with '_' are comments. Courses use the dump abbreviations (BOB..RR, BitDW..SA) plus 'Castle' (the hub, always visited, V=0).",
+
+ "V": {
+  "_why": "Cost of visiting a course once: walk from wherever you are in the castle to the painting + star select + load (the 'travel' part, ~12-45 s by floor) + ~25-35 s of getting oriented / moving around (the 'roam' part; 10 s for the tiny secret courses). Bowser courses include the full obstacle-course traversal (60/90/120 s), because every tile there needs it. Stars exit the course in vanilla, so a SECOND star in the same course pays params.reentry, not V.",
+  "BOB": 370, "WF": 370, "JRB": 500, "CCM": 500, "BBH": 600, "HMC": 600, "LLL": 470,
+  "SSL": 570, "DDD": 600, "SL": 550, "WDW": 650, "TTM": 670, "THI": 670, "TTC": 730,
+  "RR": 750,
+  "BitDW": 750, "BitFS": 1150, "BitS": 1650, "PSS": 250, "CotMC": 400, "TotWC": 320,
+  "VCutM": 400, "WMotR": 480, "SA": 250,
+  "Castle": 0
+ },
+
+ "reentry": 120,
+ "_reentry_why": "Every star after the first in the same course: star dance, exit, walk back into the painting, star select (~12 s). GUESS.",
+
+ "star": {
+  "_why": "Work for one star once you are in the course. Main-course stars 1-6 = starTimes[] from bingo_const.c (RTA-ish seconds, the same table STAR_TIMED uses) x scale_pct. The 100-coin star = the coin-tier cost of 100 coins in that course + hundred_extra. Special-course stars are flat guesses. 'B' = the Bowser fight (not a star; does not count toward star totals).",
+  "scale_pct": 130,
+  "min": 80,
+  "hundred_extra": 100,
+  "overrides": {
+   "_why": "1-based 'COURSE:STAR' -> deciseconds; beats the starTimes rule. Empty until Matt disagrees with a star."
+  },
+  "special": {
+   "BitDW:1": 500, "BitFS:1": 600, "BitS:1": 800,
+   "BitDW:B": 400, "BitFS:B": 500, "BitS:B": 800,
+   "PSS:1": 350, "PSS:2": 600,
+   "CotMC:1": 600, "TotWC:1": 500, "VCutM:1": 600, "WMotR:1": 700, "SA:1": 500
+  }
+ },
+
+ "modifiers": {
+  "_why": "Challenge stars cost star work x pct/100 (retries, slower movement). STAR_TIMED: base pct, plus per_s_pct for every second of slack below tight_s (slack = limit - starTimes). CLICK_GAME: +tight_pct when at most 1 click is allowed. DAREDEVIL on a 100-coin star uses hundred_pct. All GUESSES; the A-button number is the least certain.",
+  "STAR_TIMED": {"base_pct": 120, "tight_s": 20, "per_s_pct": 6},
+  "STAR_TTC_RANDOM": 150,
+  "STAR_A_BUTTON_CHALLENGE": 300,
+  "STAR_B_BUTTON_CHALLENGE": 150,
+  "STAR_Z_BUTTON_CHALLENGE": 140,
+  "STAR_CLICK_GAME": {"base_pct": 150, "tight_pct": 40},
+  "STAR_REVERSE_JOYSTICK": 200,
+  "STAR_GREEN_DEMON": 180,
+  "STAR_DAREDEVIL": {"base_pct": 140, "hundred_pct": 220},
+  "RANDOM_RED_COINS": 160
+ },
+
+ "u": {
+  "_why": "Marginal cost of one more unit of a global counter once you are already in a course that has it (walk over + kill/collect). Units past counter_tail.pct of a course's supply cost x counter_tail.mult (the last few are the far-flung ones). GUESSES scaled from how spread out each thing is.",
+  "KILL_GOOMBAS": 50, "KILL_BOBOMBS": 70, "KILL_SPINDRIFTS": 60, "KILL_MR_IS": 150,
+  "KILL_SCUTTLEBUGS": 80, "KILL_BULLIES": 100, "KILL_CHUCKYAS": 250, "KILL_WHOMPS": 200,
+  "KILL_BOOS": 120, "KILL_SNUFITS": 120, "HURT_BY_CLAMS": 150, "KILL_FLY_GUYS": 120,
+  "KILL_MR_BLIZZARDS": 120, "KILL_SKEETERS": 150, "KILL_KOOPAS": 200, "CRUSHED": 200,
+  "AMPS": 80, "SIGNPOST": 80, "POLES": 60, "SHOOT_CANNONS": 200, "RED_COIN": 80,
+  "BLUE_COIN": 60, "EXCLAMATION_MARK_BOX": 80, "WING_CAP_BOX": 150, "VANISH_CAP_BOX": 200,
+  "METAL_CAP_BOX": 200, "LOSE_MARIO_HAT": 300, "CANNON_STARS": 600, "UNIQUE_DEATHS": 250
+ },
+ "counter_tail": {"pct": 70, "mult": 2},
+
+ "f": {
+  "_why": "Free units per visit: things you kill/collect anyway while in the course for something else = pct% of that course's supply, capped. Deliberate actions (getting hurt, dying, shooting cannons, losing the hat) are never free (pct 0). The hub gives nothing free. GUESS: the plan's '~30% of supply'.",
+  "pct": 30,
+  "cap": 6,
+  "type_pct": {
+   "UNIQUE_DEATHS": 0, "LOSE_MARIO_HAT": 0, "CANNON_STARS": 0, "SHOOT_CANNONS": 0,
+   "CRUSHED": 0, "HURT_BY_CLAMS": 0, "AMPS": 0, "KILL_CHUCKYAS": 0, "KILL_WHOMPS": 0,
+   "KILL_KOOPAS": 0
+  },
+  "overrides": {
+   "_why": "TYPE -> {course: free units}, beats the pct rule. Example knob; empty by default."
+  }
+ },
+
+ "coins": {
+  "_why": "Coins are per-entry (the HUD count resets on exit). free_per_visit coins come with any visit, +free_with_star if a star run shares the entry. u per coin; coins past tier1_pct of the course's total cost x tier2_mult, past tier2_pct x tier3_mult (the last coins are the hard ones). MULTICOIN farms with the same curve in visited courses (or opens new ones). Every 50 coins in one entry is a 1-up.",
+  "free_per_visit": 20,
+  "free_with_star": 15,
+  "u": 7,
+  "tier1_pct": 60, "tier2_pct": 85, "tier2_mult": 2, "tier3_mult": 4,
+  "lives_per_50": 1
+ },
+
+ "oneups": {
+  "_why": "1-ups: free_pct of a course's 1-ups come free per visit; the rest cost u each (tail_mult for the last 30%). The castle grounds' 9 cost castle_u each. Lives start at start_lives; every death costs one (LIVES vs UNIQUE_DEATHS anti-synergy).",
+  "free_pct": 25, "u": 150, "tail_mult": 2, "castle_u": 200, "start_lives": 4
+ },
+
+ "blj": {"_why": "BLJ in N unique courses: per visited course cost (walk to stairs/slope, do it). GUESS.", "per_course": 200},
+ "dwk": {"_why": "K perilous wall kicks in each of N courses: per course base + per kick. GUESS.", "per_course": 250, "per_kick": 40},
+ "splatoon": {"_why": "Inking: per floor tile, minus free_pct% of the course's floors per visit and per star entry. GUESS (TTM's 1501 tiles are small).", "per_tile": 8, "free_pct": 5, "free_pct_per_star": 8},
+ "purple": {"_why": "3 random purple stars: per star, a traversal to a random spot. GUESS.", "per_star": 250, "big_course_pct": 140, "big": ["TTM", "THI", "SSL", "HMC", "CCM", "TTC", "RR", "BBH", "WDW", "DDD", "JRB"]},
+ "roof": {"_why": "Reach the castle roof without the cannon (hub work). GUESS.", "work": 900}
+}
