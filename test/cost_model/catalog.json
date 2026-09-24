@@ -1,0 +1,653 @@
+{
+ "version": 1,
+ "keyGrammar": "TYPE[:COURSE][:N or STARINDEX(1-based)][:extra]. Multi-course tiles use '<perCourse>x<courses>': STARS_MULTIPLE_LEVELS:2x3 = 2 stars in each of 3 courses; DANGEROUS_WALL_KICKS:6x3 = 6 kicks in each of 3 courses. STAR_TIMED extra = seconds; STAR_CLICK_GAME extra = max clicks.",
+ "tiles": [
+  {
+   "key": "STAR:BOB:1",
+   "text": "Collect \"Big Bob-omb on the Summit\" (BOB 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:WF:1",
+   "text": "Collect \"Chip Off Whomp's Block\" (WF 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:WF:3",
+   "text": "Collect \"Shoot into the Wild Blue\" (WF 3)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:JRB:1",
+   "text": "Collect \"Plunder in the Sunken Ship\" (JRB 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:CCM:3",
+   "text": "Collect \"Big Penguin Race\" (CCM 3)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:BBH:6",
+   "text": "Collect \"Eye to Eye in the Secret Room\" (BBH 6)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:HMC:1",
+   "text": "Collect \"Swimming Beast in the Cavern\" (HMC 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:LLL:1",
+   "text": "Collect \"Boil the Big Bully\" (LLL 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:SSL:3",
+   "text": "Collect \"Inside the Ancient Pyramid\" (SSL 3)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:DDD:1",
+   "text": "Collect \"Board Bowser's Sub\" (DDD 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:SL:1",
+   "text": "Collect \"Snowman's Big Head\" (SL 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:WDW:1",
+   "text": "Collect \"Shocking Arrow Lifts!\" (WDW 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:TTM:1",
+   "text": "Collect \"Scale the Mountain\" (TTM 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:THI:1",
+   "text": "Collect \"Pluck the Piranha Flower\" (THI 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:THI:3",
+   "text": "Collect \"Rematch with Koopa the Quick\" (THI 3)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:TTC:1",
+   "text": "Collect \"Roll into the Cage\" (TTC 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:RR:1",
+   "text": "Collect \"Cruiser Crossing the Rainbow\" (RR 1)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:BBH:4",
+   "text": "Collect \"Seek the 8 Red Coins\" (BBH 4)",
+   "group": "star"
+  },
+  {
+   "key": "STAR:SSL:6",
+   "text": "Collect \"Pyramid Puzzle\" (SSL 6)",
+   "group": "star"
+  },
+  {
+   "key": "STAR_TIMED:WF:1:60",
+   "text": "Collect Chip Off Whomp's Block (WF 1) in under 1:00",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_A_BUTTON_CHALLENGE:WF:1",
+   "text": "Collect Chip Off Whomp's Block (WF 1) without pressing A",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_B_BUTTON_CHALLENGE:BOB:1",
+   "text": "Collect Big Bob-omb on the Summit (BOB 1) without pressing B",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_Z_BUTTON_CHALLENGE:TTM:1",
+   "text": "Collect Scale the Mountain (TTM 1) without pressing Z",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_REVERSE_JOYSTICK:JRB:1",
+   "text": "Collect Plunder in the Sunken Ship (JRB 1) with the joystick reversed",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_DAREDEVIL:LLL:1",
+   "text": "Collect Boil the Big Bully (LLL 1) with only 1 HP",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_GREEN_DEMON:SL:1",
+   "text": "Collect Snowman's Big Head (SL 1) before the Green Demon catches you",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_CLICK_GAME:BOB:1:3",
+   "text": "Collect Big Bob-omb on the Summit (BOB 1) using at most 3 camera clicks",
+   "group": "challenge"
+  },
+  {
+   "key": "STAR_TTC_RANDOM:TTC:1",
+   "text": "Collect Roll into the Cage (TTC 1) with the clock on random",
+   "group": "challenge"
+  },
+  {
+   "key": "COIN:BOB:60",
+   "text": "Collect 60 coins in BOB",
+   "group": "course"
+  },
+  {
+   "key": "COIN:BOB:99",
+   "text": "Collect 99 coins in BOB",
+   "group": "course"
+  },
+  {
+   "key": "COIN:JRB:90",
+   "text": "Collect 90 coins in JRB",
+   "group": "course"
+  },
+  {
+   "key": "COIN:SSL:80",
+   "text": "Collect 80 coins in SSL",
+   "group": "course"
+  },
+  {
+   "key": "COIN:TTC:99",
+   "text": "Collect 99 coins in TTC",
+   "group": "course"
+  },
+  {
+   "key": "COIN:PSS:20",
+   "text": "Collect 20 coins in PSS",
+   "group": "course"
+  },
+  {
+   "key": "COIN:WMotR:40",
+   "text": "Collect 40 coins in WMotR",
+   "group": "course"
+  },
+  {
+   "key": "STARS_IN_LEVEL:THI:3",
+   "text": "Collect 3 stars in THI",
+   "group": "course"
+  },
+  {
+   "key": "STARS_IN_LEVEL:WDW:5",
+   "text": "Collect 5 stars in WDW",
+   "group": "course"
+  },
+  {
+   "key": "STARS_IN_LEVEL:TTC:7",
+   "text": "Collect all the stars in TTC",
+   "group": "course"
+  },
+  {
+   "key": "1UPS_IN_LEVEL:TTM:2",
+   "text": "Collect 2 1-up mushrooms in TTM",
+   "group": "course"
+  },
+  {
+   "key": "1UPS_IN_LEVEL:THI:5",
+   "text": "Collect 5 1-up mushrooms in THI",
+   "group": "course"
+  },
+  {
+   "key": "RANDOM_RED_COINS:BOB:8",
+   "text": "Collect the 8 red coins in BOB in the Random Route order",
+   "group": "course"
+  },
+  {
+   "key": "RANDOM_STARS:WF:3",
+   "text": "Collect the 3 random purple stars in WF",
+   "group": "course"
+  },
+  {
+   "key": "SPLATOON:BOB:15",
+   "text": "Splatoon: ink 15% of BOB's floor tiles",
+   "group": "course"
+  },
+  {
+   "key": "SPLATOON:BOB:45",
+   "text": "Splatoon: ink 45% of BOB's floor tiles",
+   "group": "course"
+  },
+  {
+   "key": "MULTICOIN:200",
+   "text": "Collect 200 coins total",
+   "group": "wild"
+  },
+  {
+   "key": "MULTICOIN:300",
+   "text": "Collect 300 coins total",
+   "group": "wild"
+  },
+  {
+   "key": "MULTISTAR:4",
+   "text": "Collect 4 stars total",
+   "group": "wild"
+  },
+  {
+   "key": "MULTISTAR:8",
+   "text": "Collect 8 stars total",
+   "group": "wild"
+  },
+  {
+   "key": "MULTISTAR:12",
+   "text": "Collect 12 stars total",
+   "group": "wild"
+  },
+  {
+   "key": "STARS_MULTIPLE_LEVELS:1x4",
+   "text": "Collect 1 star in each of 4 main courses",
+   "group": "wild"
+  },
+  {
+   "key": "STARS_MULTIPLE_LEVELS:2x3",
+   "text": "Collect 2 stars in each of 3 main courses",
+   "group": "wild"
+  },
+  {
+   "key": "STARS_MULTIPLE_LEVELS:1x10",
+   "text": "Collect 1 star in each of 10 main courses",
+   "group": "wild"
+  },
+  {
+   "key": "LIVES:9",
+   "text": "Get your life counter up to 9",
+   "group": "wild"
+  },
+  {
+   "key": "LIVES:14",
+   "text": "Get your life counter up to 14",
+   "group": "wild"
+  },
+  {
+   "key": "UNIQUE_DEATHS:3",
+   "text": "Die in 3 unique ways",
+   "group": "wild"
+  },
+  {
+   "key": "UNIQUE_DEATHS:5",
+   "text": "Die in 5 unique ways",
+   "group": "wild"
+  },
+  {
+   "key": "BLJ:1",
+   "text": "Perform a BLJ",
+   "group": "wild"
+  },
+  {
+   "key": "DANGEROUS_WALL_KICKS:6x3",
+   "text": "Perform 6 perilous wall kicks in each of 3 courses",
+   "group": "wild"
+  },
+  {
+   "key": "LOSE_MARIO_HAT:1",
+   "text": "Lose Mario's hat",
+   "group": "misc"
+  },
+  {
+   "key": "ROOF_WITHOUT_CANNON:1",
+   "text": "Get on the castle roof without a cannon",
+   "group": "misc"
+  },
+  {
+   "key": "RACING_STARS:3",
+   "text": "Collect all three racing stars",
+   "group": "misc"
+  },
+  {
+   "key": "SECRETS_STARS:4",
+   "text": "Collect all four secrets stars (BOB, SSL, WDW, THI)",
+   "group": "misc"
+  },
+  {
+   "key": "BOWSER:1",
+   "text": "Defeat Bowser 1 (in BitDW)",
+   "group": "misc"
+  },
+  {
+   "key": "BOWSER:2",
+   "text": "Defeat Bowser 2 (in BitFS)",
+   "group": "misc"
+  },
+  {
+   "key": "CANNON_STARS:1",
+   "text": "Collect 1 star mid-flight straight out of a cannon",
+   "group": "misc"
+  },
+  {
+   "key": "CANNON_STARS:3",
+   "text": "Collect 3 stars mid-flight straight out of a cannon",
+   "group": "misc"
+  },
+  {
+   "key": "RED_COIN_STARS:3",
+   "text": "Collect 3 red coin stars",
+   "group": "misc"
+  },
+  {
+   "key": "RED_COIN_STARS:6",
+   "text": "Collect 6 red coin stars",
+   "group": "misc"
+  },
+  {
+   "key": "KILL_GOOMBAS:6",
+   "text": "Kill 6 Goombas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_GOOMBAS:12",
+   "text": "Kill 12 Goombas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_GOOMBAS:18",
+   "text": "Kill 18 Goombas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BOBOMBS:6",
+   "text": "Kill 6 Bob-ombs",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BOBOMBS:15",
+   "text": "Kill 15 Bob-ombs",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SPINDRIFTS:9",
+   "text": "Kill 9 Spindrifts",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SPINDRIFTS:15",
+   "text": "Kill 15 Spindrifts",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_MR_IS:3",
+   "text": "Kill 3 Mr. Is",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_MR_IS:6",
+   "text": "Kill 6 Mr. Is",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SCUTTLEBUGS:4",
+   "text": "Kill 4 Scuttlebugs",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SCUTTLEBUGS:8",
+   "text": "Kill 8 Scuttlebugs",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BULLIES:6",
+   "text": "Kill 6 Bullies",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BULLIES:14",
+   "text": "Kill 14 Bullies",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_CHUCKYAS:2",
+   "text": "Kill 2 Chuckyas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_CHUCKYAS:4",
+   "text": "Kill 4 Chuckyas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_WHOMPS:2",
+   "text": "Kill 2 Whomps",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_WHOMPS:3",
+   "text": "Kill 3 Whomps",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BOOS:5",
+   "text": "Kill 5 Boos",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_BOOS:11",
+   "text": "Kill 11 Boos",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SNUFITS:3",
+   "text": "Kill 3 Snufits",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SNUFITS:6",
+   "text": "Kill 6 Snufits",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_FLY_GUYS:3",
+   "text": "Kill 3 Fly Guys",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_FLY_GUYS:6",
+   "text": "Kill 6 Fly Guys",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_MR_BLIZZARDS:3",
+   "text": "Kill 3 Mr. Blizzards",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_MR_BLIZZARDS:5",
+   "text": "Kill 5 Mr. Blizzards",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SKEETERS:2",
+   "text": "Kill 2 Skeeters",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_SKEETERS:4",
+   "text": "Kill 4 Skeeters",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_KOOPAS:2",
+   "text": "Kill 2 Koopas",
+   "group": "kill"
+  },
+  {
+   "key": "KILL_KOOPAS:3",
+   "text": "Kill 3 Koopas",
+   "group": "kill"
+  },
+  {
+   "key": "HURT_BY_CLAMS:3",
+   "text": "Get bitten by 3 Clams",
+   "group": "collect"
+  },
+  {
+   "key": "HURT_BY_CLAMS:6",
+   "text": "Get bitten by 6 Clams",
+   "group": "collect"
+  },
+  {
+   "key": "CRUSHED:3",
+   "text": "Get crushed by 3 different crushers",
+   "group": "collect"
+  },
+  {
+   "key": "CRUSHED:7",
+   "text": "Get crushed by 7 different crushers",
+   "group": "collect"
+  },
+  {
+   "key": "AMPS:6",
+   "text": "Get zapped by 6 Amps",
+   "group": "collect"
+  },
+  {
+   "key": "AMPS:13",
+   "text": "Get zapped by 13 Amps",
+   "group": "collect"
+  },
+  {
+   "key": "SIGNPOST:8",
+   "text": "Read 8 signposts",
+   "group": "collect"
+  },
+  {
+   "key": "SIGNPOST:16",
+   "text": "Read 16 signposts",
+   "group": "collect"
+  },
+  {
+   "key": "POLES:12",
+   "text": "Grab 12 poles",
+   "group": "collect"
+  },
+  {
+   "key": "POLES:24",
+   "text": "Grab 24 poles",
+   "group": "collect"
+  },
+  {
+   "key": "SHOOT_CANNONS:7",
+   "text": "Shoot from 7 cannons",
+   "group": "collect"
+  },
+  {
+   "key": "SHOOT_CANNONS:15",
+   "text": "Shoot from 15 cannons",
+   "group": "collect"
+  },
+  {
+   "key": "RED_COIN:14",
+   "text": "Collect 14 red coins (any course)",
+   "group": "collect"
+  },
+  {
+   "key": "RED_COIN:25",
+   "text": "Collect 25 red coins (any course)",
+   "group": "collect"
+  },
+  {
+   "key": "BLUE_COIN:16",
+   "text": "Collect 16 unique blue coins",
+   "group": "collect"
+  },
+  {
+   "key": "BLUE_COIN:28",
+   "text": "Collect 28 unique blue coins",
+   "group": "collect"
+  },
+  {
+   "key": "EXCLAMATION_MARK_BOX:5",
+   "text": "Break 5 yellow ! boxes",
+   "group": "collect"
+  },
+  {
+   "key": "EXCLAMATION_MARK_BOX:10",
+   "text": "Break 10 yellow ! boxes",
+   "group": "collect"
+  },
+  {
+   "key": "WING_CAP_BOX:3",
+   "text": "Break 3 wing cap boxes",
+   "group": "collect"
+  },
+  {
+   "key": "WING_CAP_BOX:5",
+   "text": "Break 5 wing cap boxes",
+   "group": "collect"
+  },
+  {
+   "key": "VANISH_CAP_BOX:3",
+   "text": "Break 3 vanish cap boxes",
+   "group": "collect"
+  },
+  {
+   "key": "VANISH_CAP_BOX:5",
+   "text": "Break 5 vanish cap boxes",
+   "group": "collect"
+  },
+  {
+   "key": "METAL_CAP_BOX:3",
+   "text": "Break 3 metal cap boxes",
+   "group": "collect"
+  },
+  {
+   "key": "METAL_CAP_BOX:5",
+   "text": "Break 5 metal cap boxes",
+   "group": "collect"
+  }
+ ],
+ "contexts": [
+  {
+   "key": "STAR:BOB:1",
+   "text": "You're already in BOB going for \"Big Bob-omb on the Summit\""
+  },
+  {
+   "key": "STAR:WF:1",
+   "text": "You're already in WF going for \"Chip Off Whomp's Block\""
+  },
+  {
+   "key": "STAR:BBH:6",
+   "text": "You're already in BBH going for \"Eye to Eye in the Secret Room\""
+  },
+  {
+   "key": "STAR:HMC:1",
+   "text": "You're already in HMC going for \"Swimming Beast in the Cavern\""
+  },
+  {
+   "key": "STAR:LLL:1",
+   "text": "You're already in LLL going for \"Boil the Big Bully\""
+  },
+  {
+   "key": "STAR:SSL:3",
+   "text": "You're already in SSL going for \"Inside the Ancient Pyramid\""
+  },
+  {
+   "key": "STAR:SL:1",
+   "text": "You're already in SL going for \"Snowman's Big Head\""
+  },
+  {
+   "key": "STAR:WDW:1",
+   "text": "You're already in WDW going for \"Shocking Arrow Lifts!\""
+  },
+  {
+   "key": "STAR:TTM:1",
+   "text": "You're already in TTM going for \"Scale the Mountain\""
+  },
+  {
+   "key": "STAR:THI:1",
+   "text": "You're already in THI going for \"Pluck the Piranha Flower\""
+  }
+ ]
+}
