@@ -522,7 +522,7 @@ void get_red_coin_stars_objective_desc(struct BingoObjective *obj, char *desc) {
     } else {
         sprintf(suffix, ". Remaining: %d", obj->data.collectableData.toGet - obj->data.collectableData.gotten);
     }
-    sprintf(desc, "Collect %d red coin star%s (the star for a course's 8 red coins; Bowser courses and castle secrets count)%s",
+    sprintf(desc, "Collect %d red coin star%s (the star for a course's 8 red coins. Bowser courses and castle secrets count)%s",
             obj->data.collectableData.toGet, obj->data.collectableData.toGet == 1 ? "" : "s", suffix);
 }
 
