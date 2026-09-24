@@ -112,6 +112,20 @@ ALIGNED8 static const u8 seg2_texture_heart[] = {
 #include "textures/segment2/custom/segment2.heart.rgba16.inc.c"
 };
 
+// icons from STROOP sprites (Bob-omb Buddy, Toad, MIPS's head and ears),
+// may be replaced by hand art
+ALIGNED8 static const u8 seg2_texture_bombbuddy[] = {
+#include "textures/segment2/custom/segment2.bombbuddy.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_toad[] = {
+#include "textures/segment2/custom/segment2.toad.rgba16.inc.c"
+};
+
+ALIGNED8 static const u8 seg2_texture_mips[] = {
+#include "textures/segment2/custom/segment2.mips.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_signpost[] = {
 #include "textures/segment2/custom/segment2.signpost.rgba16.inc.c"
 };
@@ -320,6 +334,9 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_WARP_PADS, BINGO_ICON_WARP_PADS, { TEXT_WARP_PADS }, seg2_texture_warppad },
     { BINGO_OBJECTIVE_KOOPA_SHELLS, BINGO_ICON_KOOPA_SHELLS, { TEXT_KOOPA_SHELLS }, seg2_texture_koopashell },
     { BINGO_OBJECTIVE_SPIN_HEARTS, BINGO_ICON_SPIN_HEARTS, { TEXT_SPIN_HEARTS }, seg2_texture_heart },
+    { BINGO_OBJECTIVE_OPEN_CANNONS, BINGO_ICON_OPEN_CANNONS, { TEXT_OPEN_CANNONS }, seg2_texture_bombbuddy },
+    { BINGO_OBJECTIVE_TOAD_STARS, BINGO_ICON_TOAD_STARS, { TEXT_TOAD_STARS }, seg2_texture_toad },
+    { BINGO_OBJECTIVE_MIPS, BINGO_ICON_MIPS, { TEXT_MIPS }, seg2_texture_mips },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

@@ -1300,7 +1300,7 @@ static s32 options_in_window(f32 y) {
 // bands (PRESET, TOGGLE ALL). Bands wrap onto extra icon rows when they
 // don't fit one (see grid_label_doc).
 
-#define GRID_BAND_COUNT 6
+#define GRID_BAND_COUNT 7
 
 // Band contents and order are Matt's (2026-09-23, arranged with the band sorter page).
 static const u8 sGridStars[] = {
@@ -1377,6 +1377,13 @@ static const u8 sGridEnemies[] = {
     BINGO_OBJECTIVE_KILL_FLY_GUYS,
 };
 
+// Only dealt with "Unlock full game" OFF: shown dimmed while unlock is ON.
+static const u8 sGridProgression[] = {
+    BINGO_OBJECTIVE_OPEN_CANNONS,
+    BINGO_OBJECTIVE_TOAD_STARS,
+    BINGO_OBJECTIVE_MIPS,
+};
+
 struct ObjectiveGridBand {
     const char *label;
     const u8 *types;
@@ -1390,6 +1397,7 @@ static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
     { "ANTICS", sGridAntics, ARRAY_COUNT(sGridAntics) },
     { "COLLECTING", sGridCollect, ARRAY_COUNT(sGridCollect) },
     { "ENEMIES", sGridEnemies, ARRAY_COUNT(sGridEnemies) },
+    { "PROGRESSION", sGridProgression, ARRAY_COUNT(sGridProgression) },
 };
 
 // Every objective must be reachable (the old paged list silently dropped
@@ -1399,7 +1407,8 @@ static const struct ObjectiveGridBand sGridBands[GRID_BAND_COUNT] = {
 typedef char grid_bands_cover_every_objective[
     (ARRAY_COUNT(sGridStars) + ARRAY_COUNT(sGridStarChallenges) + ARRAY_COUNT(sGridModifiers)
      + ARRAY_COUNT(sGridCollect) + ARRAY_COUNT(sGridAntics)
-     + ARRAY_COUNT(sGridEnemies) == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
+     + ARRAY_COUNT(sGridEnemies) + ARRAY_COUNT(sGridProgression)
+     == BINGO_OBJECTIVE_TOTAL_AMOUNT) ? 1 : -1];
 
 // Cursor: band index 0..GRID_BAND_COUNT-1; col -1 = the band's label,
 // else a linear icon index. Band -1 is the control row above the bands:
@@ -1423,6 +1432,9 @@ static s32 sGridCol = 0;
 #define GRID_RIGHT_X     296
 #define GRID_FOOTER_NAME_X 44
 #define GRID_FOOTER_TOTAL_RIGHT_X 238  // clear of the scroll arrows and BACK
+// Footer note (in place of the total) on a progression objective while
+// unlock is ON: the generator skips those (bingo_objective_eligible).
+#define GRID_GATED_NOTE "Unlock OFF only"
 #define GRID_CTRL_TOGGLE_X 150
 #define GRID_CTRL_GAP    6     // PRESET label -> value
 
@@ -2788,6 +2800,7 @@ static void print_grid_footer(void) {
     char text[40];
     char *p;
     s32 i, total = 0;
+    s32 gatedNote = 0;
     if (sGridBand >= 0 && sGridCol >= 0) {
         // The selected objective again, beside its name.
         gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
@@ -2821,13 +2834,24 @@ static void print_grid_footer(void) {
         } else {
             print_generic_string(x, GRID_FOOTER_Y, textOn);
         }
+        if (gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type)) {
+            // The toggle still works; the generator just skips it while
+            // unlock is ON. Say so where the total usually sits.
+            gatedNote = 1;
+        }
     }
-    for (i = 0; i < GRID_BAND_COUNT; i++) {
-        total += grid_band_enabled(i);
+    if (gatedNote) {
+        grid_text_color(255, 255, 140, whiteTextAlpha);
+        grid_print_ascii(GRID_FOOTER_TOTAL_RIGHT_X - grid_ascii_width(GRID_GATED_NOTE), GRID_FOOTER_Y,
+                         GRID_GATED_NOTE);
+    } else {
+        for (i = 0; i < GRID_BAND_COUNT; i++) {
+            total += grid_band_enabled(i);
+        }
+        grid_count_text(text, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
+        grid_text_color(255, 255, 255, whiteTextAlpha);
+        grid_print_ascii(GRID_FOOTER_TOTAL_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
     }
-    grid_count_text(text, total, BINGO_OBJECTIVE_TOTAL_AMOUNT);
-    grid_text_color(255, 255, 255, whiteTextAlpha);
-    grid_print_ascii(GRID_FOOTER_TOTAL_RIGHT_X - grid_ascii_width(text), GRID_FOOTER_Y, text);
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
@@ -2878,8 +2902,11 @@ static void print_objective_grid(void) {
         for (c = 0; c < sGridBands[b].count; c++) {
             u8 type = sGridBands[b].types[c];
             s32 iy = grid_icon_y(b, c);
-            s32 alpha = options_edge_alpha(iy, gBingoObjectivesDisabled[type]
-                                                   ? MIN(gOptionSelectIconOpacity, 70)
+            // Progression objectives dim too while unlock is ON: the
+            // generator won't deal them either way.
+            s32 dim = gBingoObjectivesDisabled[type]
+                      || (gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type));
+            s32 alpha = options_edge_alpha(iy, dim ? MIN(gOptionSelectIconOpacity, 70)
                                                    : gOptionSelectIconOpacity);
             if (alpha > 0) {
                 print_bingo_icon_alpha(grid_icon_x(c), iy,
@@ -3320,6 +3347,11 @@ s32 lvl_update_obj_and_load_file_selected(UNUSED s32 arg, UNUSED s32 unused) {
         setup_bingo_objectives(gBingoSeed);
         if (gBingoFullGameUnlocked) {
             unlock_full_game();
+        } else {
+            // A fresh file, whatever this slot held before (an earlier
+            // race, or the unlock-ON stamp): the progression objectives
+            // and vanilla door/act gating assume one.
+            save_file_reset_for_race(sSelectedFileNum - 1);
         }
     }
     return sSelectedFileNum;

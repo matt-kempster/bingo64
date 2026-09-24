@@ -28,7 +28,8 @@ function cStringBytes(ptr) {
   return Buffer.from(heap.subarray(ptr, end));
 }
 
-function wasmDump(seed, target, disabledTypes) {
+function wasmDump(seed, target, disabledTypes, unlock = 1) {
+  M._gen_set_unlock(unlock);
   let disabledPtr = 0;
   if (disabledTypes.length > 0) {
     disabledPtr = M._malloc(NUM_TYPES);
@@ -40,8 +41,9 @@ function wasmDump(seed, target, disabledTypes) {
   return bytes;
 }
 
-function oracleDump(seed, target, disabledTypes) {
+function oracleDump(seed, target, disabledTypes, unlock = 1) {
   const env = { ...process.env, BOARD_SEED: String(seed) };
+  if (unlock !== 1) env.BOARD_UNLOCK = String(unlock);
   if (target !== 1) env.BOARD_TARGET = String(target);
   if (disabledTypes.length > 0) env.BOARD_DISABLE = disabledTypes.join(',');
   return execFileSync(ORACLE, { cwd: ORACLE_CWD, env });
@@ -96,6 +98,17 @@ for (let i = 0; i < OPTION_SWEEP_SEEDS; i++) {
   compare(name, wasmDump(seed, target, disabled), oracleDump(seed, target, disabled));
 }
 console.log(`option sweep: checked ${OPTION_SWEEP_SEEDS}`);
+
+// 4. Unlock OFF (progression objectives eligible), random disabled sets.
+for (let i = 0; i < OPTION_SWEEP_SEEDS; i++) {
+  const seed = rng() % 1000000000;
+  const disabled = [];
+  const nDisable = rng() % 8;
+  for (let j = 0; j < nDisable; j++) disabled.push(rng() % NUM_TYPES);
+  const name = `seed ${seed} unlock 0 disable [${disabled.join(',')}]`;
+  compare(name, wasmDump(seed, 1, disabled, 0), oracleDump(seed, 1, disabled, 0));
+}
+console.log(`unlock-off sweep: checked ${OPTION_SWEEP_SEEDS}`);
 
 if (failures > 0) {
   console.error(`FAILED: ${failures} mismatch(es)`);

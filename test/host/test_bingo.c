@@ -315,6 +315,9 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_WARP_PADS] = "WARP_PADS",
     [BINGO_OBJECTIVE_KOOPA_SHELLS] = "KOOPA_SHELLS",
     [BINGO_OBJECTIVE_SPIN_HEARTS] = "SPIN_HEARTS",
+    [BINGO_OBJECTIVE_OPEN_CANNONS] = "OPEN_CANNONS",
+    [BINGO_OBJECTIVE_TOAD_STARS] = "TOAD_STARS",
+    [BINGO_OBJECTIVE_MIPS] = "MIPS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -1479,6 +1482,161 @@ static void test_solo_timeout(void) {
 // cell, even where a preset starves a difficulty class down to a few
 // entries (the generator's uniform fallback has to cover those draws).
 
+// ---------------------------------------------------------------------------
+// Progression objectives (unlock OFF only).
+
+// Open cannons: one per course, keyed by course; the same Buddy (or a
+// second talk in the same course) never counts twice.
+static void test_sim_open_cannons_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_OPEN_CANNONS;
+    o->data.collectableData.toGet = 3;
+
+    CHECK_EQ_INT(bingo_track_cannon_opened(COURSE_BOB), 1);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(bingo_track_cannon_opened(COURSE_BOB), 0);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // Other collectable events don't count, and course changes keep it.
+    bingo_update(BINGO_UPDATE_CANNON_COLLECTABLE);
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // The key is the course passed in, not gCurrCourseNum.
+    gCurrCourseNum = COURSE_BOB;
+    CHECK_EQ_INT(bingo_track_cannon_opened(COURSE_CCM), 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(bingo_track_cannon_opened(COURSE_WMOTR), 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 3);
+    bingo_tracking_collectables_reset();
+}
+
+// Toad stars: castle stars 0-2 (bingo_set_star(-1, i)); MIPS's (3, 4)
+// and course stars don't count.
+static void test_sim_toad_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    o->type = BINGO_OBJECTIVE_TOAD_STARS;
+    o->data.collectableData.toGet = 2;
+
+    bingo_set_star(COURSE_BOB - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(-1, 3);  // MIPS 1
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    bingo_set_star(-1, 0);  // basement Toad
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    bingo_set_star(-1, 0);  // same star again
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    bingo_set_star(-1, 2);  // top-floor Toad
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_star_reset();
+}
+
+static void test_sim_mips_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    o->type = BINGO_OBJECTIVE_MIPS;
+    o->data.collectableData.toGet = 1;
+
+    bingo_set_star(-1, 0);  // a Toad star isn't MIPS
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(COURSE_HMC - 1, 3);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    bingo_set_star(-1, 4);  // either MIPS star counts (the 50-star one here)
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_star_reset();
+}
+
+static int count_progression_cells(void) {
+    int i, n = 0;
+    for (i = 0; i < 25; i++) {
+        n += bingo_objective_needs_unlock_off(gBingoObjectives[i].type) ? 1 : 0;
+    }
+    return n;
+}
+
+// The gate: unlock ON never deals a progression objective, unlock OFF does
+// (in every class they have weights in), and unlock OFF boards still meet
+// the sweep's invariants.
+static void test_unlock_gate(void) {
+    static s32 seen[BINGO_OBJECTIVE_TOTAL_AMOUNT][4];
+    u32 seed;
+    int i, onCells = 0, offBoards = 0, dupBoards = 0;
+
+    memset(seen, 0, sizeof(seen));
+    gBingoFullGameUnlocked = 1;
+    for (seed = 1; seed <= 1000; seed++) {
+        generate_board(seed);
+        onCells += count_progression_cells();
+    }
+    CHECK_EQ_INT(onCells, 0);
+
+    gBingoFullGameUnlocked = 0;
+    for (seed = 1; seed <= 1000; seed++) {
+        generate_board(seed);
+        offBoards += count_progression_cells() > 0;
+        dupBoards += board_has_line_duplicates();
+        for (i = 0; i < 25; i++) {
+            struct BingoObjective *o = &gBingoObjectives[i];
+            CHECK(o->initialized);
+            CHECK(o->title[0] != '\0');
+            seen[o->type][o->class]++;
+            if (o->type == BINGO_OBJECTIVE_OPEN_CANNONS) {
+                CHECK(o->data.collectableData.toGet >= 3 && o->data.collectableData.toGet <= 5);
+            } else if (o->type == BINGO_OBJECTIVE_TOAD_STARS || o->type == BINGO_OBJECTIVE_MIPS) {
+                CHECK_EQ_INT(o->data.collectableData.toGet, 1);
+            }
+        }
+        if (gCurrentTestFailed) {
+            printf("  (seed %u)\n", seed);
+            break;
+        }
+    }
+    printf("  unlock OFF: %d of 1000 boards have a progression cell\n", offBoards);
+    CHECK(offBoards > 100);
+    CHECK_EQ_INT(dupBoards, EXPECTED_BOARDS_WITH_DUPLICATES);
+    CHECK(seen[BINGO_OBJECTIVE_OPEN_CANNONS][BINGO_CLASS_EASY] > 0);
+    CHECK(seen[BINGO_OBJECTIVE_OPEN_CANNONS][BINGO_CLASS_MEDIUM] > 0);
+    CHECK(seen[BINGO_OBJECTIVE_OPEN_CANNONS][BINGO_CLASS_HARD] > 0);
+    CHECK(seen[BINGO_OBJECTIVE_TOAD_STARS][BINGO_CLASS_HARD] > 0);
+    CHECK(seen[BINGO_OBJECTIVE_MIPS][BINGO_CLASS_HARD] > 0);
+
+    // Heavy mask: only the progression types enabled. Unlock OFF deals
+    // nothing else (the uniform fallback covers classes without them);
+    // unlock ON treats them as disabled, so the all-disabled fallback
+    // (plain STAR) is what comes out.
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        gBingoObjectivesDisabled[i] = !bingo_objective_needs_unlock_off(i);
+    }
+    for (seed = 1; seed <= 50; seed++) {
+        generate_board(seed);
+        CHECK_EQ_INT(count_progression_cells(), 25);
+    }
+    gBingoFullGameUnlocked = 1;
+    for (seed = 1; seed <= 50; seed++) {
+        generate_board(seed);
+        CHECK_EQ_INT(count_progression_cells(), 0);
+    }
+
+    memset(gBingoObjectivesDisabled, 0, sizeof(gBingoObjectivesDisabled));
+    gBingoFullGameUnlocked = 1;
+}
+
 static void test_presets_generate_clean_boards(void) {
     s32 p;
     u32 seed;
@@ -1493,6 +1651,7 @@ static void test_presets_generate_clean_boards(void) {
                 struct BingoObjective *o = &gBingoObjectives[i];
                 CHECK(o->initialized);
                 CHECK(!gBingoObjectivesDisabled[o->type]);
+                CHECK(bingo_objective_eligible(o->type));
                 if (gCurrentTestFailed) {
                     printf("  (preset %d, seed %u, cell %d, type %d)\n",
                            (int) p, seed, i, o->type);
@@ -1512,13 +1671,19 @@ static void test_presets_generate_clean_boards(void) {
 int main(void) {
     // BOARD_SEED=n prints that board instead of running tests. Handy for
     // comparing against what the ROM shows on screen, and used as the
-    // oracle by web/check.mjs. BOARD_TARGET=n (1, 2, 3, or 12) and
-    // BOARD_DISABLE=t1,t2,... (objective type numbers) set the same options
-    // the file select screen offers.
+    // oracle by web/check.mjs. BOARD_TARGET=n (1, 2, 3, or 12),
+    // BOARD_DISABLE=t1,t2,... (objective type numbers) and BOARD_UNLOCK=0|1
+    // set the same options the file select screen offers.
     const char *seedArg = getenv("BOARD_SEED");
     if (seedArg != NULL) {
         const char *targetArg = getenv("BOARD_TARGET");
         const char *disableArg = getenv("BOARD_DISABLE");
+        // BOARD_UNLOCK=0 plays "Unlock full game" OFF (default ON, as at
+        // boot): the only setting that makes progression objectives eligible.
+        const char *unlockArg = getenv("BOARD_UNLOCK");
+        if (unlockArg != NULL) {
+            gBingoFullGameUnlocked = (u8) (strtol(unlockArg, NULL, 10) != 0);
+        }
         if (disableArg != NULL) {
             char *end;
             while (*disableArg != '\0') {
@@ -1577,6 +1742,10 @@ int main(void) {
     RUN_TEST(test_win_detection);
     RUN_TEST(test_regeneration_resets_completion);
     RUN_TEST(test_solo_timeout);
+    RUN_TEST(test_sim_open_cannons_objective);
+    RUN_TEST(test_sim_toad_stars_objective);
+    RUN_TEST(test_sim_mips_objective);
+    RUN_TEST(test_unlock_gate);
     RUN_TEST(test_presets_generate_clean_boards);
     return test_summary();
 }

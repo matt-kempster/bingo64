@@ -89,6 +89,8 @@ struct UID {
 #define MAX_KOOPA_SHELLS 12
 // 13: BitFS 2, BitS 2, RR 2, TTC 2, BOB/CCM/HMC/LLL/SSL 1 each
 #define MAX_SPIN_HEARTS 16
+// 11 cannon-opening Bob-omb Buddies, at most one per course; keyed by course.
+#define MAX_OPEN_CANNONS 16
 
 #define TOTAL_UIDS ( \
         MAX_GOOMBAS \
@@ -122,6 +124,7 @@ struct UID {
         + MAX_WARP_PADS \
         + MAX_KOOPA_SHELLS \
         + MAX_SPIN_HEARTS \
+        + MAX_OPEN_CANNONS \
     ) + 2
 
 // I really hope nothing is actually at (0, 0, 0)....
@@ -240,6 +243,9 @@ void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) 
             case BINGO_UPDATE_SPIN_HEART:
                 rangeLength = MAX_SPIN_HEARTS;
                 break;
+            case BINGO_UPDATE_OPEN_CANNON:
+                rangeLength = MAX_OPEN_CANNONS;
+                break;
         }
         *start += prevRangeLength;
         if (i == update) {
@@ -344,4 +350,13 @@ s32 bingo_track_warp_pad(s32 area, s32 nodeA, s32 nodeB) {
     s32 hi = nodeA < nodeB ? nodeB : nodeA;
 
     return bingo_count_unique_source(BINGO_UPDATE_WARP_PAD, (f32) area, (f32) lo, (f32) hi);
+}
+
+/**
+ * A Bob-omb Buddy just opened the cannon in `course`. Each course has one
+ * cannon Buddy, so the course is the key (course numbers start at 1, never
+ * the (0, 0, 0) empty-slot marker).
+ */
+s32 bingo_track_cannon_opened(s32 course) {
+    return bingo_count_unique_source(BINGO_UPDATE_OPEN_CANNON, (f32) course, 0.0f, 0.0f);
 }

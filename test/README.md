@@ -146,6 +146,9 @@ through the weight tables.
 
 `BOARD_SEED=n ./build/run_tests` (in `test/host`) prints any seed's board
 for eyeballing.
+Add `BOARD_UNLOCK=0` for an "Unlock full game" OFF board: the progression
+objectives (open cannons, Toad stars, MIPS) are only dealt then, so the
+goldens (unlock ON, the boot default) never contain them.
 
 ## Porting notes
 

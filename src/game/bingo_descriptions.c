@@ -529,6 +529,38 @@ void get_red_coin_stars_objective_desc(struct BingoObjective *obj, char *desc) {
             obj->data.collectableData.toGet, obj->data.collectableData.toGet == 1 ? "" : "s", suffix);
 }
 
+// Progression objectives: dealt only with unlock OFF, where the race file
+// starts fresh (closed cannons and doors, no Toad or MIPS stars).
+void get_progression_objective_desc(struct BingoObjective *obj, char *desc) {
+    struct CollectableData *data = &obj->data.collectableData;
+    char suffix[20];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Remaining: %d", data->toGet - data->gotten);
+    }
+    switch (obj->type) {
+        case BINGO_OBJECTIVE_OPEN_CANNONS:
+            sprintf(desc,
+                    "Open %d cannons by talking to Bob-omb Buddies, one per course (first floor: BOB and "
+                    "JRB from act 2, WF from act 3, CCM; then SSL in the basement)%s",
+                    data->toGet, suffix);
+            break;
+        case BINGO_OBJECTIVE_TOAD_STARS:
+            sprintf(desc,
+                    "Get %d star%s from the castle Toads (the basement Toad gives one at 12 stars, behind "
+                    "the Dark World key; the upper-floor Toads want 25 and 35)%s",
+                    data->toGet, data->toGet == 1 ? "" : "s", suffix);
+            break;
+        case BINGO_OBJECTIVE_MIPS:
+            sprintf(desc,
+                    "Catch MIPS, the rabbit in the basement, and collect his star (he appears at 15 stars; "
+                    "the basement needs the Dark World key)%s",
+                    suffix);
+            break;
+    }
+}
+
 void get_bowser_objective_desc(struct BingoObjective *obj, char *desc) {
     char revEncLevelName[60];
     char suffix[20];
@@ -838,6 +870,11 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_RED_COIN_STARS:
             get_red_coin_stars_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_OPEN_CANNONS:
+        case BINGO_OBJECTIVE_TOAD_STARS:
+        case BINGO_OBJECTIVE_MIPS:
+            get_progression_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
         case BINGO_OBJECTIVE_UNIQUE_DEATHS:

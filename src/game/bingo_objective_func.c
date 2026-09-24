@@ -339,6 +339,29 @@ s32 objective_red_coin_stars(struct BingoObjective *objective, enum BingoObjecti
     }
 }
 
+// Toad and MIPS stars live in the castle "course" (bingo_set_star(-1, i)).
+// Count the race's castle stars in `mask`, like the red coin star recount.
+static s32 objective_castle_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update,
+                                  u32 mask) {
+    struct CollectableData *data = &objective->data.collectableData;
+    s32 count = 0;
+    s32 old_count;
+    u32 flags;
+
+    if (update == BINGO_UPDATE_STAR) {
+        for (flags = gbSecretStarFlags & mask; flags != 0; flags &= flags - 1) {
+            count++;
+        }
+        old_count = data->gotten;
+        data->gotten = count;
+        if (count >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (count > old_count) {
+            bingo_hud_update_number(objective->icon, count);
+        }
+    }
+}
+
 s32 objective_stars_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
     s32 count = 0;
@@ -588,6 +611,12 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_generic_collectable(objective, update, BINGO_UPDATE_KOOPA_SHELL);
         case BINGO_OBJECTIVE_SPIN_HEARTS:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_SPIN_HEART);
+        case BINGO_OBJECTIVE_OPEN_CANNONS:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_OPEN_CANNON);
+        case BINGO_OBJECTIVE_TOAD_STARS:
+            return objective_castle_stars(objective, update, BINGO_SECRET_FLAGS_TOAD);
+        case BINGO_OBJECTIVE_MIPS:
+            return objective_castle_stars(objective, update, BINGO_SECRET_FLAGS_MIPS);
         case BINGO_OBJECTIVE_EXCLAMATION_MARK_BOX:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_EXCLAMATION_MARK_BOX);
         case BINGO_OBJECTIVE_WING_CAP_BOX:

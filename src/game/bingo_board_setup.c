@@ -36,6 +36,8 @@ struct ObjectiveWeight sWeightsEasy[] = {
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
+    // Progression (unlock OFF only; filtered out of the draw otherwise).
+    { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
 s32 sWeightsSizeEasy = sizeof(sWeightsEasy) / sizeof(struct ObjectiveWeight);
 
@@ -99,6 +101,8 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
     { BINGO_OBJECTIVE_KOOPA_SHELLS, 4, 1 },
     { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
+    // Progression (unlock OFF only; filtered out of the draw otherwise).
+    { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
 s32 sWeightsSizeMedium = sizeof(sWeightsMedium) / sizeof(struct ObjectiveWeight);
 
@@ -136,6 +140,12 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_STAR_COINLESS, 4, 1 },
     { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
     { BINGO_OBJECTIVE_KOOPA_SHELLS, 3, 1 },
+    // Progression (unlock OFF only; filtered out of the draw otherwise).
+    // Toad and MIPS both sit behind the basement key (Bowser in the Dark
+    // World) plus 12 / 15 stars, so they're hard-only.
+    { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
+    { BINGO_OBJECTIVE_TOAD_STARS, 3, 1 },
+    { BINGO_OBJECTIVE_MIPS, 3, 1 },
 };
 s32 sWeightsSizeHard = sizeof(sWeightsHard) / sizeof(struct ObjectiveWeight);
 
@@ -244,10 +254,12 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
     // hand-picked few — keep the class structure and relative weights of
     // whatever remains. With nothing disabled this consumes the same
     // random stream as it always did (golden boards depend on that).
+    // "Disabled" includes the unlock gate: with unlock ON the progression
+    // types are ineligible (bingo_objective_eligible), same code path.
     sum = 0;
     for (i = 0; i < size; i++) {
         if (weights[i].usesRemaining != 0
-            && !gBingoObjectivesDisabled[weights[i].objective]) {
+            && bingo_objective_eligible(weights[i].objective)) {
             sum += weights[i].weight;
         }
     }
@@ -263,7 +275,7 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
     do {
         i++;
         if (weights[i].usesRemaining != 0
-            && !gBingoObjectivesDisabled[weights[i].objective]) {
+            && bingo_objective_eligible(weights[i].objective)) {
             sum += weights[i].weight;
         }
     } while (sum < want_sum);
@@ -289,7 +301,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
         // The draw is filtered, but the want_sum == 0 edge can still hand
         // back an ineligible first row (the budget-leak known bug), so
         // keep the check-and-retry.
-        if (!gBingoObjectivesDisabled[candidate->objective]) {
+        if (bingo_objective_eligible(candidate->objective)) {
             if (candidate->usesRemaining != NO_LIMIT) {
                 candidate->usesRemaining--;
             }
@@ -299,7 +311,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
     }
     // No weighted pick possible; get a completely random enabled objective
     for (i = BINGO_OBJECTIVE_TYPE_MIN; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        if (!gBingoObjectivesDisabled[i]) {
+        if (bingo_objective_eligible(i)) {
             enabledSum++;
         }
     }
@@ -309,7 +321,7 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
     }
     randomIndex = (random_u16() % enabledSum) + 1;
     for (i = BINGO_OBJECTIVE_TYPE_MIN; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        if (!gBingoObjectivesDisabled[i]) {
+        if (bingo_objective_eligible(i)) {
             enabledCounter++;
         }
         if (enabledCounter == randomIndex) {
@@ -384,6 +396,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
             || type1 == BINGO_OBJECTIVE_SECRETS_STARS
             || type1 == BINGO_OBJECTIVE_CANNON_STARS
             || type1 == BINGO_OBJECTIVE_RED_COIN_STARS
+            || bingo_objective_needs_unlock_off(type1)
         ) {
             return 1;
         }

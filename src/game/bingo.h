@@ -175,8 +175,20 @@ enum BingoObjectiveType
     // put). Not a generic collectable: it counts specific (course, star)
     // pairs, like CANNON_STARS / SECRETS_STARS.
     BINGO_OBJECTIVE_RED_COIN_STARS,
+    // Progression: only dealt when "Unlock full game" is OFF (see
+    // bingo_objective_needs_unlock_off). With unlock ON cannons start open
+    // and the Toad/MIPS stars are stamped as collected, so these would be
+    // free or impossible. Appended so earlier type numbers stay put.
+    BINGO_OBJECTIVE_PROGRESSION_MIN,
+    // Open N cannons by talking to Bob-omb Buddies (one per course).
+    BINGO_OBJECTIVE_OPEN_CANNONS = BINGO_OBJECTIVE_PROGRESSION_MIN,
+    // Collect N of the castle Toads' stars.
+    BINGO_OBJECTIVE_TOAD_STARS,
+    // Catch MIPS and collect his star.
+    BINGO_OBJECTIVE_MIPS,
+    BINGO_OBJECTIVE_PROGRESSION_MAX = BINGO_OBJECTIVE_MIPS,
     // End
-    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_RED_COIN_STARS,
+    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_MIPS,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
 };
 
@@ -246,7 +258,10 @@ enum BingoObjectiveIcon {
     BINGO_ICON_STAR_COINLESS,
     BINGO_ICON_WARP_PADS,
     BINGO_ICON_KOOPA_SHELLS,
-    BINGO_ICON_SPIN_HEARTS
+    BINGO_ICON_SPIN_HEARTS,
+    BINGO_ICON_OPEN_CANNONS,
+    BINGO_ICON_TOAD_STARS,
+    BINGO_ICON_MIPS
 };
 
 enum BingoObjectiveUpdate
@@ -292,6 +307,8 @@ enum BingoObjectiveUpdate
     BINGO_UPDATE_KOOPA_SHELL,
     // Mario first makes a recovery heart spin, once per heart.
     BINGO_UPDATE_SPIN_HEART,
+    // A Bob-omb Buddy opened a course's cannon, once per course.
+    BINGO_UPDATE_OPEN_CANNON,
 
     BINGO_UPDATE_BLJ,
     BINGO_UPDATE_DANGEROUS_WALL_KICK,
@@ -429,6 +446,13 @@ struct BingoObjective
 
 extern struct BingoObjective gBingoObjectives[25];
 extern u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+
+// Progression objectives only make sense on a fresh (unlock OFF) file.
+s32 bingo_objective_needs_unlock_off(enum BingoObjectiveType type);
+// What the board generator deals from: enabled in the toggles AND playable
+// under the current unlock setting. With unlock ON a progression type is
+// treated exactly like a disabled one.
+s32 bingo_objective_eligible(enum BingoObjectiveType type);
 
 // Objective presets: named loadouts of the objective toggles plus the
 // full-game-unlock flag. Applying one is a stamp, not a mode — the

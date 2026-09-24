@@ -64,16 +64,33 @@ s8 gBingoStickyActNum[COURSE_STAGES_COUNT] = { 0 };
 struct BingoObjective gBingoObjectives[25];
 u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
 
+// The toggles travel as a u64 bitmask (presets, the online options message).
+STATIC_ASSERT(BINGO_OBJECTIVE_TOTAL_AMOUNT <= 64, "objective mask is a u64");
+
+s32 bingo_objective_needs_unlock_off(enum BingoObjectiveType type) {
+    return BINGO_OBJECTIVE_PROGRESSION_MIN <= type && type <= BINGO_OBJECTIVE_PROGRESSION_MAX;
+}
+
+s32 bingo_objective_eligible(enum BingoObjectiveType type) {
+    if (gBingoObjectivesDisabled[type]) {
+        return 0;
+    }
+    return !(gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type));
+}
+
 #define OBJ_BIT(name) ((u64) 1 << BINGO_OBJECTIVE_##name)
 #define ALL_OBJECTIVES ((((u64) 1) << BINGO_OBJECTIVE_TOTAL_AMOUNT) - 1)
 
 // SRL-style boards are star/coin/level goals in an unmodified game;
-// modifiers, timers, and counter-grinding collectables are all off.
+// modifiers, timers, and counter-grinding collectables are all off. Opening
+// cannons and Toad stars are SRL goals (the preset plays unlock OFF, so
+// they're dealt); MIPS is not an SRL goal.
 #define PRESET_SRL_ENABLED \
     (OBJ_BIT(STAR) | OBJ_BIT(COIN) | OBJ_BIT(STARS_IN_LEVEL) | OBJ_BIT(BOWSER) \
      | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(RACING_STARS) | OBJ_BIT(SECRETS_STARS) \
      | OBJ_BIT(MULTICOIN) | OBJ_BIT(MULTISTAR) | OBJ_BIT(STARS_MULTIPLE_LEVELS) \
-     | OBJ_BIT(RED_COIN) | OBJ_BIT(BLUE_COIN) | OBJ_BIT(RED_COIN_STARS))
+     | OBJ_BIT(RED_COIN) | OBJ_BIT(BLUE_COIN) | OBJ_BIT(RED_COIN_STARS) \
+     | OBJ_BIT(OPEN_CANNONS) | OBJ_BIT(TOAD_STARS))
 
 // Everything that couldn't happen under vanilla rules: the game-modifying
 // stars, splatoon, ordered reds, and forced-timer stars. (TTC Random stays:

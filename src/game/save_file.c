@@ -68,6 +68,30 @@ void unlock_full_game(void) {
     gSaveBuffer.files[0][0].courseStars[24] = 0x01;
 }
 
+/**
+ * Bingo: an unlock-OFF race plays from a fresh file. Blank the chosen slot
+ * in memory (stars, cannons, keys and doors, cap state, Toad/MIPS flags,
+ * coin scores) so a slot that holds an earlier race's progress -- or the
+ * 120-star unlock_full_game stamp -- can't pre-open doors, pre-collect
+ * Toad/MIPS stars or pass star-count gates.
+ *
+ * Only RAM changes here: nothing is written to EEPROM / the text save until
+ * the race itself saves (collecting a star), exactly as it would for a slot
+ * that really was empty. The backup copy is blanked too, because a game
+ * over restores the file from it (save_file_reload). SAVE_FLAG_FILE_EXISTS
+ * stays set, so every racer skips the Peach intro the same way (a truly
+ * empty slot would play it, an unlock-ON race never does).
+ */
+void save_file_reset_for_race(s32 fileIndex) {
+    if (fileIndex < 0 || fileIndex >= NUM_SAVE_FILES) {
+        return;
+    }
+    bzero(&gSaveBuffer.files[fileIndex][0], sizeof(gSaveBuffer.files[fileIndex][0]));
+    gSaveBuffer.files[fileIndex][0].flags = SAVE_FLAG_FILE_EXISTS;
+    bcopy(&gSaveBuffer.files[fileIndex][0], &gSaveBuffer.files[fileIndex][1],
+          sizeof(gSaveBuffer.files[fileIndex][1]));
+}
+
 #ifdef SWAP_ENDIAN_SAVE_FILE
 /**
  * Byteswap all multibyte fields in a SaveBlockSignature.

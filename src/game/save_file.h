@@ -135,6 +135,7 @@ extern s8 gMainMenuDataModified;
 extern s8 gSaveFileModified;
 
 void unlock_full_game(void);
+void save_file_reset_for_race(s32 fileIndex);
 
 void save_file_do_save(s32 fileIndex);
 void save_file_erase(s32 fileIndex);

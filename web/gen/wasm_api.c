@@ -153,9 +153,18 @@ const char *gen_options_json(void) {
     return sBuf;
 }
 
+// "Unlock full game" (default ON, as at boot). OFF is the only setting that
+// makes the progression objectives (open cannons, Toad stars, MIPS)
+// eligible, so it's a generation input; it sticks for later boards.
+EMSCRIPTEN_KEEPALIVE
+void gen_set_unlock(s32 unlocked) {
+    gBingoFullGameUnlocked = (u8) (unlocked != 0);
+}
+
 // Objective presets, mirroring the game's Preset row. The web generator
-// has no unlock or game-mode concepts, so only the objective mask crosses
-// over, as a list of disabled type numbers. Names must stay plain ASCII
+// has no game-mode concept; the objective mask crosses over as a list of
+// disabled type numbers, plus the preset's unlock flag (feed it to
+// gen_set_unlock to get the game's boards). Names must stay plain ASCII
 // (the game's labels live in the menu charmap); keep in sync with
 // enum BingoPresetId.
 static const char *sPresetNames[BINGO_PRESET_COUNT] = { "SRL", "Vanilla", "Casual" };
@@ -170,6 +179,7 @@ const char *gen_presets_json(void) {
     for (p = 0; p < BINGO_PRESET_COUNT; p++) {
         emitf(p == 0 ? "{" : ",{");
         emit_json_str("name", sPresetNames[p]);
+        emitf(",\"unlock\":%d", gBingoPresets[p].fullGameUnlocked ? 1 : 0);
         emitf(",\"off\":[");
         first = 1;
         for (t = 0; t < BINGO_OBJECTIVE_TOTAL_AMOUNT; t++) {

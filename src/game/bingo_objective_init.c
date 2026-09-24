@@ -1181,6 +1181,54 @@ s32 bingo_objective_crushed_init(enum BingoObjectiveClass class) {
     }
 }
 
+// Progression objectives (dealt only with unlock OFF, i.e. a fresh file).
+//
+// 11 Bob-omb Buddies open cannons: BOB, WF, JRB, CCM, SSL, WDW, TTM, THI, SL,
+// RR, WMotR. On a fresh file only four stand on the first floor, and three
+// of those are act-gated (BOB acts 2-6, JRB acts 2-6, WF acts 3-6; CCM's is
+// always there), so N=4 costs a few stars first. SSL (the 5th) needs the
+// basement key; everything else needs the upstairs key (30 stars, DDD's sub
+// star and Bowser in the Fire Sea) or the 50-star door. This generator's
+// scale tops out around 12 stars (MULTISTAR hard), so N stays <= 5.
+s32 bingo_objective_open_cannons_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            toGet = 3;
+            break;
+        case BINGO_CLASS_MEDIUM:
+            toGet = 4;
+            break;
+        default:
+            toGet = 5;
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
+// The Toads give stars at 12 (basement, needs the Bowser in the Dark World
+// key), 25 (second floor, needs the Fire Sea key: 30 stars first) and 35
+// total stars (third floor, behind the 50-star door). Only the first fits a
+// bingo race, so N is 1; the counter takes any Toad.
+s32 bingo_objective_toad_stars_init(
+    struct BingoObjective *objective, UNUSED enum BingoObjectiveClass class
+) {
+    objective->data.collectableData.toGet = 1;
+    objective->data.collectableData.gotten = 0;
+}
+
+// MIPS appears in the basement at 15 stars (and a second time at 50). Either of
+// his stars counts.
+s32 bingo_objective_mips_init(
+    struct BingoObjective *objective, UNUSED enum BingoObjectiveClass class
+) {
+    objective->data.collectableData.toGet = 1;
+    objective->data.collectableData.gotten = 0;
+}
+
 s32 bingo_objective_collectable_init(struct BingoObjective *obj, s32 toGet) {
     obj->data.collectableData.toGet = toGet;
     obj->data.collectableData.gotten = 0;
@@ -1322,6 +1370,12 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_bowser_init(objective, class);
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
             return bingo_objective_roof_without_cannon_init(objective, class);
+        case BINGO_OBJECTIVE_OPEN_CANNONS:
+            return bingo_objective_open_cannons_init(objective, class);
+        case BINGO_OBJECTIVE_TOAD_STARS:
+            return bingo_objective_toad_stars_init(objective, class);
+        case BINGO_OBJECTIVE_MIPS:
+            return bingo_objective_mips_init(objective, class);
     }
     if (BINGO_OBJECTIVE_COLLECTABLE_MIN <= type && type <= BINGO_OBJECTIVE_COLLECTABLE_MAX) {
         collectables = bingo_objective_collectable_init_dispatch(class, type);

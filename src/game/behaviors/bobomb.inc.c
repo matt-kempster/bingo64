@@ -343,6 +343,8 @@ void bobomb_buddy_cannon_dialog(s16 dialogFirstText, s16 dialogSecondText) {
             buddyText = cutscene_object_with_dialog(CUTSCENE_DIALOG, o, dialogFirstText);
             if (buddyText != DIALOG_RESPONSE_NONE) {
                 save_file_set_cannon_unlocked();
+                // Bingo: the Open cannons objective, once per course.
+                bingo_track_cannon_opened(gCurrCourseNum);
                 cannonClosed = cur_obj_nearest_object_with_behavior(bhvCannonClosed);
                 if (cannonClosed != NULL) {
                     o->oBobombBuddyCannonStatus = BOBOMB_BUDDY_CANNON_OPENING;
