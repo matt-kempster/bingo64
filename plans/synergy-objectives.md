@@ -142,8 +142,9 @@ badge for the condition (cap, shell). Needs a design pass before any code.
 - **Use N warp pads**: 24 fading-warp pads = 12 pairs over BoB 4, SSL 4,
   WF/CCM/LLL/WDW/TTM/THI/SL/RR 2 each. Count unique pairs (N 3–5).
 - **Ride N Koopa shells**: 5 total. Land shells from ! boxes in LLL, SL, SSL;
-  underwater in JRB and DDD. Stomped Koopa Troopas do NOT drop rideable
-  shells. Hook: `interaction.c:1559`.
+  underwater in JRB and DDD, plus Koopa Troopas: knocking one out of its
+  shell spawns a rideable shell (koopa.inc.c; the sm64.sql spawn table missed
+  it). IMPLEMENTED on overnight-0923. Hook: `interaction.c:1559`.
 - **Touch N spinning hearts**: 13 total. BitFS 2, BitS 2, RR 2, TTC 2, and
   1 each in BoB, CCM, HMC, LLL, SSL.
 - **Coinless star**: "collect star X without touching a coin", in the
