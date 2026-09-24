@@ -31,7 +31,7 @@
  },
 
  "modifiers": {
-  "_why": "Challenge stars cost star work x pct/100 (retries, slower movement). STAR_TIMED: base pct, plus per_s_pct for every second of slack below tight_s (slack = limit - starTimes). CLICK_GAME: +tight_pct when at most 1 click is allowed. DAREDEVIL on a 100-coin star uses hundred_pct. All GUESSES; the A-button number is the least certain.",
+  "_why": "Challenge stars cost star work x pct/100 (retries, slower movement). STAR_TIMED: base pct, plus per_s_pct for every second of slack below tight_s (slack = limit - starTimes). CLICK_GAME: +tight_pct when the allowance equals the star's minimum clicks. DAREDEVIL on a 100-coin star uses hundred_pct. All GUESSES; the A-button number is the least certain.",
   "STAR_TIMED": {"base_pct": 120, "tight_s": 20, "per_s_pct": 6},
   "STAR_TTC_RANDOM": 150,
   "STAR_A_BUTTON_CHALLENGE": 300,

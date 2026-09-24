@@ -302,7 +302,9 @@ class Model(object):
             return base * pct // 100
         if t == "STAR_CLICK_GAME":
             mc = m["STAR_CLICK_GAME"]
-            pct = mc["base_pct"] + (mc["tight_pct"] if (tile.extra or 0) <= 1 else 0)
+            lo = D.CLICK.get((c, i + 1), (0, 0))[0]
+            tight = tile.extra is not None and tile.extra <= lo
+            pct = mc["base_pct"] + (mc["tight_pct"] if tight else 0)
             return base * pct // 100
         if t == "STAR_DAREDEVIL":
             md = m["STAR_DAREDEVIL"]
