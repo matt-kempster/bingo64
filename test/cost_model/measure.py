@@ -189,15 +189,79 @@ def examples(board_dir, count=10):
     return rows
 
 
+_SENS = None
+
+
+def _sens_init(boards):
+    global _SENS
+    _SENS = boards
+
+
+def _sens_one(path_mult):
+    """Flip rate of the cheapest line when one knob is multiplied."""
+    import fit as F
+    path, mult = path_mult
+    prior = M.load_params()
+    m = M.Model(F.apply(prior, [path], [math.log(mult)]))
+    base = M.Model(prior)
+    flips = 0
+    dcv = 0.0
+    for cells in _SENS:
+        lc0 = [base.fast_line_cost([cells[i] for i in ln]) for ln in D.LINES]
+        lc1 = [m.fast_line_cost([cells[i] for i in ln]) for ln in D.LINES]
+        flips += lc0.index(min(lc0)) != lc1.index(min(lc1))
+        dcv += abs(max(lc1) / float(min(lc1)) - max(lc0) / float(min(lc0)))
+    return path, flips, dcv / len(_SENS)
+
+
+def sensitivity(board_dir, nboards, jobs, mult=1.5):
+    """Which knobs, if off by x1.5, most change which line is cheapest."""
+    import fit as F
+    from multiprocessing import Pool
+    boards = []
+    for seed in range(1, 3000):
+        if len(boards) >= nboards:
+            break
+        b = M.load_board(os.path.join(board_dir, "%d.txt" % seed))
+        if b:
+            boards.append(b)
+    prior = M.load_params()
+    knobs = F.knob_list(prior)
+    cat = M.load_catalog()
+    items = [t["key"] for t in cat["tiles"]] + ["%s|%s" % (c["key"], t["key"])
+                                                 for c in cat["contexts"] for t in cat["tiles"]]
+    base = F.predict(prior, items)
+    with Pool(jobs, initializer=_sens_init, initargs=(boards,)) as pool:
+        res = pool.map(_sens_one, [(k, mult) for k in knobs])
+    rows = []
+    for path, flips, dcv in res:
+        pr = F.predict(F.apply(prior, [path], [math.log(mult)]), items)
+        n_sa = sum(1 for i in items if "|" not in i and abs(pr[i] - base[i]) > 1e-9)
+        n_ctx = sum(1 for i in items if "|" in i and abs(pr[i] - base[i]) > 1e-9)
+        rows.append((flips, dcv, ".".join(path), n_sa, n_ctx))
+    rows.sort(reverse=True)
+    print("knob x%.1f -> share of %d master boards whose cheapest line changes; "
+          "catalog tiles/ctx items it moves" % (mult, len(boards)))
+    for flips, dcv, name, n_sa, n_ctx in rows:
+        print("  %-38s flips %5.1f%%  d(max/min) %.3f  catalog %3d  ctx %4d" % (
+            name, 100.0 * flips / len(boards), dcv, n_sa, n_ctx))
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--boards", default=DEFAULT_BOARDS)
     ap.add_argument("--limit", type=int, default=100000)
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--examples", action="store_true")
+    ap.add_argument("--sensitivity", type=int, default=0, metavar="NBOARDS",
+                    help="knob sensitivity over NBOARDS master boards")
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
+    if a.sensitivity:
+        sensitivity(a.boards, a.sensitivity, a.jobs)
+        return
     if a.examples:
         rows = examples(a.boards)
         with open(os.path.join(a.out, "examples.json"), "w") as fh:

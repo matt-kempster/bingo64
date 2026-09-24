@@ -763,8 +763,9 @@ class Model(object):
 def fmt_time(ds):
     if ds >= INF:
         return "inf"
-    s = ds // 10
-    return "%d:%02d" % (s // 60, s % 60)
+    sign = "-" if ds < 0 else ""
+    s = abs(ds) // 10
+    return "%s%d:%02d" % (sign, s // 60, s % 60)
 
 
 def load_catalog():

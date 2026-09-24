@@ -126,6 +126,8 @@ def main():
     ap.add_argument("--modes", default="line,lockout,blackout")
     ap.add_argument("--set", action="append", default=[], help="mode.key=json, e.g. line.line_tol=20")
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
+    ap.add_argument("--reuse", action="store_true",
+                    help="re-summarize existing out/v2_*.jsonl instead of regenerating")
     a = ap.parse_args()
     for s in a.set:
         k, v = s.split("=", 1)
@@ -144,7 +146,11 @@ def main():
             else:
                 master = ME.run(a.boards, 100000, a.jobs)
             master = [r for r in master if r["seed"] <= a.seeds]
-            v2 = pool.map(_v2, [("line", s) for s in range(1, a.seeds + 1)], chunksize=4)
+            vpath = os.path.join(a.out, "v2_line.jsonl")
+            if a.reuse and os.path.exists(vpath):
+                v2 = [json.loads(l) for l in open(vpath)]
+            else:
+                v2 = pool.map(_v2, [("line", s) for s in range(1, a.seeds + 1)], chunksize=4)
             with open(os.path.join(a.out, "v2_line.jsonl"), "w") as fh:
                 for r in v2:
                     fh.write(json.dumps(r) + "\n")
@@ -164,7 +170,11 @@ def main():
         for mode in ("lockout", "blackout"):
             if mode not in modes:
                 continue
-            v2 = pool.map(_v2, [(mode, s) for s in range(1, a.seeds + 1)], chunksize=8)
+            vpath = os.path.join(a.out, "v2_%s.jsonl" % mode)
+            if a.reuse and os.path.exists(vpath):
+                v2 = [json.loads(l) for l in open(vpath)]
+            else:
+                v2 = pool.map(_v2, [(mode, s) for s in range(1, a.seeds + 1)], chunksize=8)
             with open(os.path.join(a.out, "v2_%s.jsonl" % mode), "w") as fh:
                 for r in v2:
                     fh.write(json.dumps(r) + "\n")
