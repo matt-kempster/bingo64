@@ -1174,7 +1174,8 @@ static void test_coinless_star_pool(void) {
             s = o->data.starObjective.starIndex;
             CHECK(c >= COURSE_BOB && c <= COURSE_RR);
             CHECK(s >= 0 && s <= 5);
-            CHECK(!(c == COURSE_BOB && (s == 3 || s == 4)));
+            CHECK(!(c == COURSE_BOB && (s == 1 || s == 3 || s == 4)));
+            CHECK(!(c == COURSE_SSL && s == 5));
             CHECK(!(c == COURSE_CCM && (s == 0 || s == 2 || s == 3)));
             CHECK(!(c == COURSE_TTM && (s == 2 || s == 3)));
             CHECK(!((c == COURSE_WF || c == COURSE_JRB || c == COURSE_BBH) && s == 3));

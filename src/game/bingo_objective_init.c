@@ -151,8 +151,10 @@ retry:
     switch (*course) {
         case COURSE_BOB:
             // 8 red coins; Mario Wings to the Sky is flown through the
-            // coin rings, which is the whole point of that star.
-            if (*star == 3 || *star == 4) {
+            // coin rings, which is the whole point of that star. Behind
+            // Chain Chomp's Gate: a red coin sits right over the post you
+            // pound to free the Chomp (only a Bob-omb clip avoids it).
+            if (*star == 3 || *star == 4 || *star == 1) {
                 goto retry;
             }
             break;
@@ -192,6 +194,12 @@ retry:
             }
             break;
         case COURSE_SSL:
+            // Pyramid Puzzle: a coin hangs 10 units over each secret, and
+            // only the top sliver of a secret's hitbox misses it.
+            if (*star == 5) {
+                goto retry;
+            }
+            // fallthrough
         case COURSE_SL:
         case COURSE_WDW:
         case COURSE_THI:
