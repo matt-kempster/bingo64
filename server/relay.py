@@ -69,7 +69,9 @@ Line protocol (space-separated fields):
                              starts when the host sends X)
     O <mode> <unlock> <maskhex> <seed> <claimvis> <where> <timeout>
                              room settings (host only, before the start):
-                             game mode 0..4, full-game unlock,
+                             game mode 0..4, room flags (bit 0 full-game
+                             unlock, bit 1 nonstop; field still named
+                             unlock),
                              disabled-objective bitmask as hex (up
                              to 128 bits), the
                              seed proposal (0 = random at start), the
@@ -950,7 +952,7 @@ class Relay:
             if client.id != room.creator_id or room.started:
                 return True
             room.mode = clamped_int(parts[1], 0, 4)
-            room.unlock = clamped_int(parts[2], 0, 1)
+            room.unlock = clamped_int(parts[2], 0, 3)  # flags: unlock|nonstop<<1
             try:
                 # 128 bits = 32 hex digits, the client's NET_MASK_HEX_LEN.
                 room.mask = int(parts[3], 16) & (2 ** 128 - 1)

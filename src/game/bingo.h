@@ -44,6 +44,9 @@ extern s16 gbStarIndex;
 extern u8 gbStarFromCannon;
 extern s32 gbCoinsJustGotten;
 extern u8 gBingoFullGameUnlocked;
+// Room setting: stars don't kick you out of the course (Bowser keys and the
+// Grand Star still do). Modifiers stay on until you leave the course.
+extern u8 gBingoNonstop;
 extern s32 gBingoReverseJoystickActive;
 extern s32 gBingoRandomStarsActive;
 extern s32 gBingoClickGameActive;

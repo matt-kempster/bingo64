@@ -814,6 +814,15 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
     u32 noExit = (o->oInteractionSubtype & INT_SUBTYPE_NO_EXIT) != 0;
     u32 grandStar = (o->oInteractionSubtype & INT_SUBTYPE_GRAND_STAR) != 0;
     u32 randoStar = (o->oInteractionSubtype & INT_SUBTYPE_RANDO_STAR) != 0;
+    // Nonstop: every star is a no-exit star with the rando stars' short,
+    // prompt-free dance (actionArg 3). Bowser keys and the Grand Star
+    // still end the course.
+    u32 nonstop = gBingoNonstop && !grandStar
+        && gCurrLevelNum != LEVEL_BOWSER_1 && gCurrLevelNum != LEVEL_BOWSER_2;
+
+    if (nonstop) {
+        noExit = TRUE;
+    }
 
     if (m->health >= 0x100) {
         mario_stop_riding_and_holding(m);
@@ -901,7 +910,7 @@ u32 interact_star_or_key(struct MarioState *m, UNUSED u32 interactType, struct O
             return set_mario_action(m, ACT_JUMBO_STAR_CUTSCENE, 0);
         }
 
-        if (randoStar) {
+        if (randoStar || nonstop) {
             return set_mario_action(m, starGrabAction, 3);
         } else {
             return set_mario_action(m, starGrabAction, noExit + 2 * grandStar);

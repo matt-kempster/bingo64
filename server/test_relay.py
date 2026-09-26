@@ -440,6 +440,20 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         o = (await b.wait_line("O 2")).split()
         self.assertEqual(o[6], "f" * 32)
 
+    async def test_v10_room_flags_carry_nonstop(self):
+        # The unlock field is room flags: bit 1 = nonstop rides through
+        # the rebroadcast and the start; anything wider clamps to 3.
+        a, b = await self.two_joined()
+        a.send("O 3 2 0 0 0 1 0")
+        o = (await b.wait_line("O 3")).split()
+        self.assertEqual(o[5], "2")
+        a.send("O 2 9 0 0 0 1 0")
+        o = (await b.wait_line("O 2")).split()
+        self.assertEqual(o[5], "3")
+        a.send("X")
+        s = (await b.wait_line("S ")).split()
+        self.assertEqual(s[4], "3")
+
     async def test_v7_hidden_tiers_filter_claims(self):
         a, b = await self.two_joined()
         # PROGRESS tier in 1-bingo mode: peers hear M, never C.

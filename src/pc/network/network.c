@@ -132,7 +132,7 @@ static s32 sPendingRoomMode = -1;  // room mode from W, applied once H tells
 static s32 sPendingClaimVis = -1;  // visibility settings riding the same W
 static s32 sPendingWhereabouts = -1;
 static s32 sPendingTimeout = -1;   // race timeout (minutes) riding the same W
-static s32 sPendingUnlock = -1;    // full-game unlock riding the same W (v8)
+static s32 sPendingUnlock = -1;    // room flags (unlock/nonstop) riding the same W
 static char sPendingMask[NET_MASK_HEX_LEN] = "0";  // objective mask, ditto
 
 // Room visibility settings (v6). The host's local values are the room's;
@@ -464,6 +464,21 @@ static void format_objective_mask(char *out) {
     *p = '\0';
 }
 
+// The W/O/S "unlock" field carries room flags since v10: bit 0 = full-game
+// unlock, bit 1 = nonstop (stars don't kick you out).
+#define NET_FLAG_UNLOCK  1
+#define NET_FLAG_NONSTOP 2
+
+static void apply_room_flags(s32 flags) {
+    gBingoFullGameUnlocked = (u8) ((flags & NET_FLAG_UNLOCK) != 0);
+    gBingoNonstop = (u8) ((flags & NET_FLAG_NONSTOP) != 0);
+}
+
+static s32 local_room_flags(void) {
+    return (gBingoFullGameUnlocked ? NET_FLAG_UNLOCK : 0)
+         | (gBingoNonstop ? NET_FLAG_NONSTOP : 0);
+}
+
 static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
@@ -543,7 +558,7 @@ static void handle_line(char *line) {
                                                    sPendingRoomMode);
                 gNetShowWhereabouts = sPendingWhereabouts != 0;
                 gbBingoTimeout = sPendingTimeout;
-                gBingoFullGameUnlocked = (u8) (sPendingUnlock != 0);
+                apply_room_flags(sPendingUnlock);
                 apply_objective_mask(sPendingMask);
             }
             sPendingRoomMode = -1;
@@ -579,7 +594,7 @@ static void handle_line(char *line) {
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
-            gBingoFullGameUnlocked = (u8) (unlock != 0);
+            apply_room_flags(unlock);
             apply_objective_mask(mask);
             // delta is negative when the race already started (late join /
             // reconnect); unsigned wrap keeps the shared clock correct.
@@ -724,7 +739,7 @@ static void handle_line(char *line) {
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
-            gBingoFullGameUnlocked = (u8) (unlock != 0);
+            apply_room_flags(unlock);
             apply_objective_mask(mask);
         }
     } else if (cmd == 'F') {
@@ -1465,14 +1480,14 @@ s32 network_countdown_frames(void) {
     return 0;
 }
 
-void network_send_options(s32 mode, s32 unlock, const char *maskHex, u32 seed,
+void network_send_options(s32 mode, s32 flags, const char *maskHex, u32 seed,
                           s32 claimVis, s32 whereabouts, s32 timeoutMin) {
     char line[128];
     if (!network_active()) {
         return;
     }
     snprintf(line, sizeof(line), "O %d %d %s %u %d %d %d\n",
-             mode, unlock, maskHex, seed,
+             mode, flags, maskHex, seed,
              claimVis, whereabouts, timeoutMin);
     net_send_line(line);
 }
@@ -1487,7 +1502,7 @@ void network_push_local_options(void) {
     // Coerce before sending so the wire never carries an invalid pair
     // (the relay would coerce identically anyway).
     gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);
-    network_send_options((s32) gbBingoMode, gBingoFullGameUnlocked, mask,
+    network_send_options((s32) gbBingoMode, local_room_flags(), mask,
                          bingo_seed_proposal(), gNetClaimVis,
                          gNetShowWhereabouts, gbBingoTimeout);
 }

@@ -20,7 +20,8 @@
 // 8: unlock + objective mask ride W and the O rebroadcast so guests see
 // the room's options live in the lobby (the seed still only rides S).
 // 10: board generation changed (coinless star, warp pads, Koopa shells,
-// spinning hearts; enum renumbered): seed-shared boards must match.
+// spinning hearts; enum renumbered): seed-shared boards must match. The
+// unlock field became room flags (bit 0 unlock, bit 1 nonstop).
 // During active development the version bumps on every wire change — the
 // old side is refused outright ("E version"), never accommodated.
 #define NET_PROTOCOL_VERSION 10
@@ -179,10 +180,11 @@ s32 network_countdown_frames(void);
 #define NET_MASK_SCAN "%32s"
 
 // Send the room's settings (server only accepts them from the host).
-// maskHex bit i set = objective type i disabled; seed 0 = random at start.
+// flags: bit 0 = full-game unlock, bit 1 = nonstop. maskHex bit i set =
+// objective type i disabled; seed 0 = random at start.
 // The options that arrive with the start message are applied to the
 // bingo globals directly. timeoutMin: race timeout in minutes (0 = off).
-void network_send_options(s32 mode, s32 unlock, const char *maskHex, u32 seed,
+void network_send_options(s32 mode, s32 flags, const char *maskHex, u32 seed,
                           s32 claimVis, s32 whereabouts, s32 timeoutMin);
 // Push the current bingo globals as room options (no-op unless we are
 // the room creator). Called after the welcome and whenever the options

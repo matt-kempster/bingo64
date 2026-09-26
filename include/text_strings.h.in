@@ -199,6 +199,7 @@
 #define TEXT_SEED_TYPING_HINT _("Type digits. Enter when done")
 
 #define TEXT_UNLOCK_GAME _("Unlock full game")
+#define TEXT_NONSTOP _("Nonstop stars")
 #define TEXT_TOGGLE_ALL _("Toggle all")
 
 // Objective presets (the Preset row stamps a loadout of the objective

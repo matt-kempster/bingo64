@@ -43,6 +43,7 @@ u8 gbStarFromCannon = 0;
 s32 gbCoinsJustGotten = 0;
 
 u8 gBingoFullGameUnlocked = 1;
+u8 gBingoNonstop = 0;
 s32 gBingoReverseJoystickActive = 0;
 s32 gBingoRandomStarsActive = 0;
 s32 gBingoClickGameActive = 0;

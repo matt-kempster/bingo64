@@ -205,12 +205,12 @@ u8 gBingoSeedText[] = { TEXT_RANDOM 0xFF, 0xFF, 0xFF };
 s32 sBingoOptionSelection = 0;
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
-// mean something in an online room; solo shows mode/unlock/timeout.
+// mean something in an online room; solo shows mode/unlock/nonstop/timeout.
 // (Preset and Toggle all live on the grid pages' control row.) All uses
 // are runtime expressions, so the count may vary per frame.
-#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 5 : 3)
+#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 6 : 4)
 #else
-#define BINGO_CONFIGS_IN_LEFT_COL 3 // not more than 10, hopefully
+#define BINGO_CONFIGS_IN_LEFT_COL 4 // not more than 10, hopefully
 #endif
 s32 sBingoOptionSelectTimer = 0;
 #define BINGO_OPTION_TIMER_FRAMES 3
@@ -2523,6 +2523,7 @@ static unsigned char textBlackout[] = { TEXT_TARGET_BLACKOUT };
 static unsigned char textLockout[] = { TEXT_TARGET_LOCKOUT };
 
 static unsigned char textUnlockGame[] = { TEXT_UNLOCK_GAME };
+static unsigned char textNonstop[] = { TEXT_NONSTOP };
 static unsigned char textTimeout[] = { TEXT_TIMEOUT };
 static unsigned char textTimeout5[] = { TEXT_TIMEOUT_5 };
 static unsigned char textTimeout15[] = { TEXT_TIMEOUT_15 };
@@ -2682,13 +2683,21 @@ static void print_bingo_configs(void) {
             }
             offsetX = bingo_config_value_x(target);
         } else if (i == 2) {
+            label = textNonstop;
+            if (sToggleCurrentOption && sBingoOptionSelection == i) {
+                sToggleCurrentOption = 0;
+                gBingoNonstop ^= 1;
+            }
+            target = gBingoNonstop ? textOn : textOff;
+            offsetX = bingo_config_value_x(target);
+        } else if (i == 3) {
             label = textTimeout;
             offsetX = bingo_config_timeout(i, &target);
 #ifndef TARGET_N64
-        } else if (i == 3) {
+        } else if (i == 4) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 4) {
+        } else if (i == 5) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
