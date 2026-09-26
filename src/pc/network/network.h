@@ -208,6 +208,10 @@ s32 network_poll_claim(s32 *cell, s32 *claimerId);
 // once. The server assigns the placement and authoritative time.
 void network_notify_local_finish(void);
 
+// Match history (v11): one Y line the relay logs verbatim and never
+// relays; see bingo_net.c send_board_history.
+void network_send_board_line(const char *payload);
+
 // Frames (30/s) since GO; the room's shared race clock. 0 before GO.
 s32 network_race_frames(void);
 

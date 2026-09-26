@@ -286,15 +286,122 @@ void bingo_net_keepalive(void) {
     network_update();
 }
 
+// Match history: the relay logs every racer's board verbatim (Y lines), so
+// the history outlives the generator that dealt it. A cell is
+// type.class.a.b.c with the dump_cell fields (test/host/test_bingo.c):
+// stars course.star.limit (timed: seconds, click game: clicks), per-course
+// course.toGet, multi-course total.each, Bowser level, else toGet. Trailing
+// zeros are dropped.
+static s32 sBoardSent = 0;
+static u32 sBoardSentSeed = 0;
+
+static s32 board_cell_code(char *buf, s32 size, s32 i) {
+    struct BingoObjective *obj = &gBingoObjectives[i];
+    s32 f[5];
+    s32 n, len, k;
+    f[0] = obj->type;
+    f[1] = obj->class;
+    f[2] = f[3] = f[4] = 0;
+    switch (obj->type) {
+        case BINGO_OBJECTIVE_STAR_TIMED:
+            f[2] = obj->data.starTimerObjective.course;
+            f[3] = obj->data.starTimerObjective.starIndex;
+            f[4] = obj->data.starTimerObjective.maxTime / 30;
+            break;
+        case BINGO_OBJECTIVE_STAR_CLICK_GAME:
+            f[2] = obj->data.starClicksObjective.course;
+            f[3] = obj->data.starClicksObjective.starIndex;
+            f[4] = obj->data.starClicksObjective.maxClicks;
+            break;
+        case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
+            f[2] = obj->data.abcStarObjective.course;
+            f[3] = obj->data.abcStarObjective.starIndex;
+            break;
+        case BINGO_OBJECTIVE_STAR:
+        case BINGO_OBJECTIVE_STAR_TTC_RANDOM:
+        case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
+        case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
+        case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+        case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+        case BINGO_OBJECTIVE_STAR_COINLESS:
+            f[2] = obj->data.starObjective.course;
+            f[3] = obj->data.starObjective.starIndex;
+            break;
+        case BINGO_OBJECTIVE_RANDOM_STARS:
+        case BINGO_OBJECTIVE_COIN:
+        case BINGO_OBJECTIVE_1UPS_IN_LEVEL:
+        case BINGO_OBJECTIVE_STARS_IN_LEVEL:
+        case BINGO_OBJECTIVE_RANDOM_RED_COINS:
+        case BINGO_OBJECTIVE_SPLATOON:
+            f[2] = obj->data.courseCollectableData.course;
+            f[3] = obj->data.courseCollectableData.toGet;
+            break;
+        case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
+        case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+            f[2] = obj->data.multiCourseCollectableData.toGetTotal;
+            f[3] = obj->data.multiCourseCollectableData.toGetEachCourse;
+            break;
+        case BINGO_OBJECTIVE_BOWSER:
+            f[2] = obj->data.levelData.level;
+            break;
+        default:
+            f[2] = obj->data.collectableData.toGet;
+            break;
+    }
+    n = 5;
+    while (n > 2 && f[n - 1] == 0) {
+        n--;
+    }
+    len = 0;
+    for (k = 0; k < n && len < size; k++) {
+        len += snprintf(buf + len, size - len, k ? ".%d" : "%d", f[k]);
+    }
+    return len < size ? len : size - 1;
+}
+
+static void send_board_history(void) {
+    char line[480];
+    s32 i, len = 0;
+    u32 seed;
+    if (network_state() != NET_STATE_RACING || !network_has_seed(&seed)
+        || seed != gBingoInitialSeed) {
+        return;  // not racing yet, or the board isn't this race's
+    }
+    if (sBoardSent && sBoardSentSeed == seed) {
+        return;
+    }
+    sBoardSent = 1;
+    sBoardSentSeed = seed;
+    for (i = 0; i < 25 && len < (s32) sizeof(line) - 24; i++) {
+        if (i) {
+            line[len++] = ' ';
+        }
+        len += board_cell_code(line + len, sizeof(line) - len, i);
+    }
+    line[len] = '\0';
+    network_send_board_line(line);
+    if (gbBingoMode == BINGO_MODE_CALLS) {
+        len = snprintf(line, sizeof(line), "q");
+        for (i = 0; i < 25 && len < (s32) sizeof(line) - 4; i++) {
+            len += snprintf(line + len, sizeof(line) - len, i ? ".%d" : " %d",
+                            gBingoCallQueue[i]);
+        }
+        network_send_board_line(line);
+    }
+}
+
 // Called once per gameplay frame from play_mode_normal.
 void bingo_net_update(void) {
     if (!network_active()) {
         sFinishAnnounced = 0;
+        sBoardSent = 0;
         return;
     }
     freeze_ownership_snapshot();
     spawn_missing_ghosts();
     if (gBingoInitialized) {
+        send_board_history();
         apply_remote_claims();
         if (network_take_resync_flag()) {
             resend_missed_claims();

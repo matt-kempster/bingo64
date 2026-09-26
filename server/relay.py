@@ -98,6 +98,12 @@ Line protocol (space-separated fields):
                              rematch is simply K followed by X.
     F                        local win condition met (line modes; the
                              server ignores it in lockout)
+    Y <25 cells>             the racer's board, once per race (v11): for
+    Y q <queue>              the match history only, never relayed. A
+                             cell is type.class[.a[.b[.c]]] (trailing
+                             zeros dropped); the q line carries the Call
+                             and Response call order, cells joined by
+                             dots.
     L                        list public rooms
     ?                        occupancy probe (no join needed): one
                              "? rooms=<n> members=<m> racing=<r>" reply,
@@ -169,9 +175,12 @@ No dependencies beyond the Python standard library.
 import argparse
 import asyncio
 import functools
+import gzip
 import json
 import os
 import random
+import re
+import shutil
 import struct
 import time
 
@@ -288,6 +297,10 @@ UDP_ACK = 2
 UDP_KEEPALIVE = 3
 UDP_HEADER = struct.Struct("!BBII")
 UDP_MAX_PAYLOAD = 512
+# Match history: cap on "where" (level/area change) events per player per
+# race, so a glitchy warp loop can't flood the log.
+WHERE_EVENTS_MAX = 1000
+BOARD_TOKEN = re.compile(r"^[0-9]{1,5}(\.[0-9]{1,5}){0,24}$")
 UDP_RESEND_S = 0.25         # retransmit cadence for unacked messages
 UDP_RESEND_WINDOW = 8       # head-of-queue messages per retransmit tick
 UDP_TIMEOUT_S = 30.0        # silence after which a session is dropped
@@ -508,6 +521,16 @@ class Room:
         self.claim_seq = []     # (frames, id, cell) in acceptance order
         self.timeout_result = None  # (winner_id, frames, tiebreak) once
                                     # the race ended on the timeout
+        # Match-history bookkeeping (per race): whose board is logged,
+        # and each player's last logged (level, area) plus event count.
+        self.boards_logged = set()
+        self.where = {}         # id -> (level, area)
+        self.where_count = {}   # id -> "where" events this race
+
+    def clear_history_marks(self):
+        self.boards_logged = set()
+        self.where = {}
+        self.where_count = {}
 
     @property
     def started(self):
@@ -629,6 +652,35 @@ class MatchLog:
             self.paused = None
         self.written += 1
 
+    def compress_old(self):
+        """Gzip every finished month (history compresses ~11x): keeps the
+        free-tier disk and any log pull (egress) small. Blocking; the
+        daily loop runs it in a worker thread. Atomic per file: the .jsonl
+        goes only once its .gz is complete."""
+        if self.dir is None or not os.path.isdir(self.dir):
+            return 0
+        current = time.strftime("%Y-%m", time.gmtime()) + ".jsonl"
+        done = 0
+        for name in sorted(os.listdir(self.dir)):
+            if not name.endswith(".jsonl") or name >= current:
+                continue
+            src = os.path.join(self.dir, name)
+            tmp = src + ".gz.tmp"
+            try:
+                with open(src, "rb") as fin, gzip.open(tmp, "wb") as fout:
+                    shutil.copyfileobj(fin, fout)
+                os.replace(tmp, src + ".gz")
+                os.remove(src)
+                done += 1
+            except OSError as exc:
+                print("[%s] matchlog: compress %s failed (%s)"
+                      % (ts(), name, exc))
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+        return done
+
     def _pause(self, why):
         if self.paused != why:  # one journal line per distinct trouble
             print("[%s] matchlog: paused (%s)" % (ts(), why))
@@ -647,6 +699,8 @@ class Relay:
         needs an ssh session: journalctl -u bingo64-relay | tail."""
         while True:
             await asyncio.sleep(STATS_INTERVAL_S)
+            await asyncio.get_running_loop().run_in_executor(
+                None, self.log.compress_old)
             print("[%s] daily: %d rooms open, %d joins, %d races started,"
                   " %d history events"
                   % (ts(), len(self.rooms), self.stat_joins,
@@ -672,6 +726,7 @@ class Relay:
         room.seed = (room.seed_proposal
                      if room.seed_proposal else random.randrange(1, 999999999))
         room.started_at = time.monotonic() + COUNTDOWN_FRAMES / FPS
+        room.clear_history_marks()
         self.stat_races += 1
         room.broadcast(room.start_line())
         print("[%s] room '%s' starting: %d players, seed %d, mode %d"
@@ -702,6 +757,7 @@ class Relay:
         room.winner = None
         room.claim_seq = []
         room.timeout_result = None
+        room.clear_history_marks()
         room.broadcast("K")
         for c in room.members.values():
             c.ready = False
@@ -710,6 +766,53 @@ class Relay:
         print("[%s] room '%s' back to lobby (%d members)"
               % (ts(), room.name, len(room.members)))
         self.log.event("lobby_reset", room=room.name)
+
+    def log_where(self, room, client, level, area):
+        """History only: a racer's (level, area) changed. Transitions are
+        few (a race is a few hundred), so the log can later attribute the
+        time between claims to courses without the ghost stream itself."""
+        if not room.started or room.start_delta_frames() > 0:
+            return
+        try:
+            where = (int(level), int(area))
+        except ValueError:
+            return
+        if room.where.get(client.id) == where:
+            return
+        room.where[client.id] = where
+        n = room.where_count.get(client.id, 0)
+        if n >= WHERE_EVENTS_MAX:
+            return
+        room.where_count[client.id] = n + 1
+        self.log.event("where", room=room.name, id=client.id,
+                       level=where[0], area=where[1],
+                       frames=room.elapsed_frames())
+
+    def log_board(self, room, client, cells):
+        """History only: Y <25 cells>, or Y q <queue>. Each cell is
+        type.class.a.b.c (see bingo_net.c board_cell_code); the queue (Call
+        and Response) is the call order, 25 cell indices joined by dots.
+        Logged once per player per race, so the history holds every board
+        verbatim instead of depending on a seed and the generator that
+        read it."""
+        if not room.started:
+            return
+        if len(cells) == 2 and cells[0] == "q":
+            key = ("q", client.id)
+            if key in room.boards_logged or not BOARD_TOKEN.match(cells[1]):
+                return
+            queue = [int(x) for x in cells[1].split(".")]
+            if len(queue) != 25:
+                return
+            room.boards_logged.add(key)
+            self.log.event("calls_queue", room=room.name, id=client.id,
+                           queue=queue)
+            return
+        if (client.id in room.boards_logged or len(cells) != 25
+                or not all(BOARD_TOKEN.match(c) for c in cells)):
+            return
+        room.boards_logged.add(client.id)
+        self.log.event("board", room=room.name, id=client.id, cells=cells)
 
     def pass_host(self, room, leaving_id):
         """Keep the host role on a connected member in every phase."""
@@ -929,6 +1032,7 @@ class Relay:
                            color=client.color, members=len(room.members))
         elif cmd == "G" and client.room and len(parts) == 9:
             client.ghost_updates += 1
+            self.log_where(client.room, client, parts[1], parts[2])
             client.room.broadcast(
                 "G %d %s" % (client.id, " ".join(parts[1:])),
                 skip=client.id, lossy=True)
@@ -958,6 +1062,8 @@ class Relay:
                            else -1)
             if room.mode in MODE_EXCLUSIVE:
                 self.adjudicate_lockout(room)
+        elif cmd == "Y" and client.room:
+            self.log_board(client.room, client, parts[1:])
         elif cmd == "F" and client.room:
             room = client.room
             if (not room.started or room.mode in MODE_EXCLUSIVE

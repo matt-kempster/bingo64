@@ -184,7 +184,7 @@ static u32 sInLen = 0;
 #define UDP_T_ACK       2  // seq = highest reliable seq received in order
 #define UDP_T_KEEPALIVE 3
 #define UDP_HEADER_LEN  10
-#define UDP_MSG_MAX     224
+#define UDP_MSG_MAX     480  // < the relay's 512; a Y board line is up to ~450
 #define UDP_OUT_RING    32   // unacked reliable messages (a reconnect
                              // resync can burst ~25 claim lines)
 #define UDP_RESEND_FRAMES    8    // ~266 ms between retransmit bursts
@@ -1591,6 +1591,15 @@ s32 network_poll_claim(s32 *cell, s32 *claimerId) {
     *claimerId = sClaimIds[sClaimHead];
     sClaimHead = (sClaimHead + 1) % CLAIM_QUEUE_LEN;
     return 1;
+}
+
+void network_send_board_line(const char *payload) {
+    char line[UDP_MSG_MAX + 8];
+    if (!network_active()) {
+        return;
+    }
+    snprintf(line, sizeof(line), "Y %s\n", payload);
+    net_send_line(line);
 }
 
 void network_notify_local_finish(void) {

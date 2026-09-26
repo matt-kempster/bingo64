@@ -882,6 +882,69 @@ class MatchLogTest(unittest.TestCase):
                 self.assertIn("t", e)
                 self.assertEqual(e["room"], "peach")
 
+    def test_v11_board_and_whereabouts_history(self):
+        with tempfile.TemporaryDirectory() as logdir:
+            relay = Relay(matchlog=relaymod.MatchLog(logdir))
+            host, other = _NullClient(), _NullClient()
+            relay.process_line(host, ("J %d peach matt 2 0"
+                                      % PROTOCOL_VERSION).split())
+            relay.process_line(other, ("J %d peach luigi 4 0"
+                                       % PROTOCOL_VERSION).split())
+            ghost = "G 9 1 0 0 0 0 0 0".split()
+            relay.process_line(host, ghost)       # lobby: not history
+            cells = ["1.0.9.2"] * 24 + ["30.3.1500"]
+            relay.process_line(host, ["Y"] + cells)  # before X: ignored
+            relay.process_line(host, "X".split())
+            room = relay.rooms["peach"]
+            relay.process_line(host, ghost)       # countdown: ignored
+            room.started_at = relaymod.time.monotonic() - 10  # GO: 10 s ago
+            relay.process_line(host, ["Y"] + cells)
+            relay.process_line(host, ["Y"] + cells)  # once per race
+            relay.process_line(other, ["Y"] + cells[:24])  # malformed
+            relay.process_line(other, "Y q 0.1.2".split())  # short queue
+            queue = ".".join(str(i) for i in range(24, -1, -1))
+            relay.process_line(host, ["Y", "q", queue])
+            relay.process_line(host, ghost)
+            relay.process_line(host, ghost)       # unchanged: no event
+            relay.process_line(host, "G 9 2 0 0 0 0 0 0".split())
+            relay.process_line(other, "G 16 1 0 0 0 0 0 0".split())
+
+            events = self._events(logdir)
+            boards = [e for e in events if e["ev"] == "board"]
+            self.assertEqual(len(boards), 1)
+            self.assertEqual(boards[0]["id"], 1)
+            self.assertEqual(boards[0]["cells"], cells)
+            queues = [e for e in events if e["ev"] == "calls_queue"]
+            self.assertEqual(len(queues), 1)
+            self.assertEqual(queues[0]["queue"], list(range(24, -1, -1)))
+            where = [(e["id"], e["level"], e["area"]) for e in events
+                     if e["ev"] == "where"]
+            self.assertEqual(where, [(1, 9, 1), (1, 9, 2), (2, 16, 1)])
+            self.assertTrue(all(e["frames"] >= 290 for e in events
+                                if e["ev"] == "where"))
+
+            # A new race logs the board afresh.
+            relay.process_line(host, "K".split())
+            relay.process_line(host, "X".split())
+            relay.process_line(host, ["Y"] + cells)
+            self.assertEqual(len([e for e in self._events(logdir)
+                                  if e["ev"] == "board"]), 2)
+
+    def test_finished_months_are_gzipped(self):
+        import gzip
+        with tempfile.TemporaryDirectory() as logdir:
+            log = relaymod.MatchLog(logdir)
+            log.event("start", room="peach")  # the current month
+            old = os.path.join(logdir, "2020-01.jsonl")
+            with open(old, "w", encoding="utf-8") as f:
+                f.write('{"ev":"start"}\n')
+            self.assertEqual(log.compress_old(), 1)
+            self.assertFalse(os.path.exists(old))
+            with gzip.open(old + ".gz", "rt", encoding="utf-8") as f:
+                self.assertEqual(f.read(), '{"ev":"start"}\n')
+            self.assertEqual(len(self._events(logdir)), 1)  # current kept
+            self.assertEqual(log.compress_old(), 0)
+
     def test_disk_guard_pauses_history_not_relay(self):
         with tempfile.TemporaryDirectory() as logdir:
             relay = Relay(matchlog=relaymod.MatchLog(logdir))
