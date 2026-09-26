@@ -38,8 +38,7 @@ Idea: each board picks 4-5 featured courses and course-pinned tiles favour
 them (~60%), spread across different lines so one visit advances several
 lines instead of handing out a free bingo. Parked: Matt worries a steering
 generator reads as weird or biased ("why is it always LLL"), while pure
-random is beyond suspicion. Family caps (a ceiling per tile family) were
-done instead, since they change the rule mix without steering where you go.
+random is beyond suspicion.
 
 Family caps were tried the same day (at most 4 of each non-star family):
 averages barely moved and the histograms piled up at exactly 4, which read
