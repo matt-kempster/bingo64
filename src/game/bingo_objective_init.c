@@ -809,17 +809,17 @@ s32 bingo_objective_red_coin_stars_init(
 }
 
 // 15 exist (one per main course); each is a full-course coin sweep, longer
-// than a red coin star. SRL's list asks for 3 to 6.
+// than a red coin star, so N stays small (SRL's list asks for 3 to 6).
 s32 bingo_objective_hundred_coin_stars_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
     s32 toGet;
     switch (class) {
         case BINGO_CLASS_MEDIUM:
-            toGet = 3;
+            toGet = random_range_inclusive(1, 2);
             break;
         default:
-            toGet = random_range_inclusive(4, 6);
+            toGet = 3;
             break;
     }
     objective->data.collectableData.toGet = toGet;

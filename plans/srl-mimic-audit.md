@@ -49,7 +49,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 4 | Mario Wings to the Sky BOB | BOB, wingcap | EXACT | `STAR` (BOB, 4) |
 | 4 | Red Coin Star in HMC | HMC | EXACT | `STAR` (HMC, 1) |
 | 4 | All Stars in Whomps | WF | EXACT | `STARS_IN_LEVEL` (WF, 7) |
-| 4 | Three 100 Coin Stars | hundredcoin | EXACT | `HUNDRED_COIN_STARS` N=3 (medium) |
+| 4 | Three 100 Coin Stars | hundredcoin | EXACT | `HUNDRED_COIN_STARS` N=3 (hard) |
 | 4 | BITS Red Coin Star | bowserreds | EXACT | `STAR` (BITS, 0) |
 | 5 | Red Coin Star in TTM | TTM | EXACT | `STAR` (TTM, 2) |
 | 5 | Cruiser Crossing the Rainbow RR | RR | EXACT | `STAR` (RR, 0) |
@@ -83,7 +83,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 12 | 100 Coin Star in TTM | TTM | EXACT | `STAR` (TTM, 6) |
 | 12 | 4 Stars each from SSL and HMC | SSL, HMC | NEW | Two-course stars: `bingo_get_course_count` ≥ K in both courses |
 | 12 | All Stars in LLL | LLL | EXACT | `STARS_IN_LEVEL` (LLL, 7) |
-| 12 | Four 100 Coin Stars | hundredcoin | EXACT | `HUNDRED_COIN_STARS` N=4 (hard) |
+| 12 | Four 100 Coin Stars | hundredcoin | PARAM | `HUNDRED_COIN_STARS` N=4 (init caps at 3) |
 | 13 | Race Through Downtown WDW | WDW, vanishcap | EXACT | `STAR` (WDW, 5) |
 | 13 | 100 Coin Star in HMC | HMC | EXACT | `STAR` (HMC, 6) |
 | 13 | 100 Coin Star in THI | THI | EXACT | `STAR` (THI, 6) |
@@ -106,14 +106,14 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 16 | 5 Stars in SL | SL | EXACT | `STARS_IN_LEVEL` (SL, 5) |
 | 17 | 3 Stars each from TTC and RR | TTC, RR | NEW | Two-course stars |
 | 17 | All Stars in HMC | HMC | EXACT | `STARS_IN_LEVEL` (HMC, 7) |
-| 17 | Five 100 Coin Stars | hundredcoin, starseach, lives | EXACT | `HUNDRED_COIN_STARS` N=5 (hard) |
+| 17 | Five 100 Coin Stars | hundredcoin, starseach, lives | PARAM | `HUNDRED_COIN_STARS` N=5 (init caps at 3) |
 | 17 | Collect 140 Coins in two stages | hundredcoin | NEW | Count distinct courses whose single-visit coin total reached 140 (a per-course high-water mark in race tracking) |
 | 17 | 5 Stars in DDD | DDD | EXACT | `STARS_IN_LEVEL` (DDD, 5) |
 | 18 | 4 Stars each from JRB and DDD | JRB, DDD | NEW | Two-course stars |
 | 18 | 3 Stars each from THI and TTM | THI, TTM | NEW | Two-course stars |
 | 18 | All Stars in BOB | BOB | EXACT | `STARS_IN_LEVEL` (BOB, 7) |
 | 19 | All Stars in TTC | TTC | EXACT | `STARS_IN_LEVEL` (TTC, 7) |
-| 19 | Six 100 Coin Stars | hundredcoin, starseach, lives | EXACT | `HUNDRED_COIN_STARS` N=6 (hard) |
+| 19 | Six 100 Coin Stars | hundredcoin, starseach, lives | PARAM | `HUNDRED_COIN_STARS` N=6 (init caps at 3) |
 | 19 | 5 Stars in BBH | BBH | EXACT | `STARS_IN_LEVEL` (BBH, 5) |
 | 19 | Open 9 Cannons | cannons | PLANNED | Cannon ladder |
 | 20 | All Stars in SSL | SSL | EXACT | `STARS_IN_LEVEL` (SSL, 7) |
