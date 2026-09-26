@@ -137,7 +137,7 @@ void render_100_coin_star(u8 stars) {
 // work) picks it, left/right picks the act as in vanilla. A strip of the
 // board's own icons where the old 3D modifier stars were. Gold sparkles
 // mark what the board wants in this course (acts some tile needs,
-// modifiers some tile needs). Under the name, "BOARD" + a status dot:
+// modifiers some tile needs). Under the name, "ON BOARD" + a status dot:
 // green when this act + modifier would score a tile, red when this act's
 // tile needs a different modifier, no line otherwise.
 
@@ -590,7 +590,7 @@ static void print_bingo_modifier_picker(u8 *name) {
     if (!scores && nWants == 0) {
         return;
     }
-    // "BOARD" + dot centred as one line (dot 7 wide, 4 gap).
+    // "ON BOARD" + dot centred as one line (dot 7 wide, 4 gap).
     textLeft = get_str_x_pos_from_center(159 - 6, gBingoTextBoard, 8.0f);
     x = (159 - 6) * 2 - textLeft + 4;
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
