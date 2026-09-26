@@ -1316,10 +1316,10 @@ static const u8 sGridStarChallenges[] = {
     BINGO_OBJECTIVE_STAR_TIMED,
     BINGO_OBJECTIVE_STAR_TTC_RANDOM,
     BINGO_OBJECTIVE_CANNON_STARS,
+    BINGO_OBJECTIVE_STAR_COINLESS,
     BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE,
     BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE,
     BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE,
-    BINGO_OBJECTIVE_STAR_COINLESS,
 };
 // The game's first-class modifiers, in enum BingoModifier order.
 static const u8 sGridModifiers[] = {
@@ -1377,7 +1377,8 @@ static const u8 sGridEnemies[] = {
     BINGO_OBJECTIVE_KILL_FLY_GUYS,
 };
 
-// Only dealt with "Unlock full game" OFF: shown dimmed while unlock is ON.
+// Only dealt with "Unlock full game" OFF: while unlock is ON they show as
+// OFF and A buzzes (the saved toggle is kept for when unlock goes OFF).
 static const u8 sGridProgression[] = {
     BINGO_OBJECTIVE_OPEN_CANNONS,
     BINGO_OBJECTIVE_TOAD_STARS,
@@ -1434,7 +1435,7 @@ static s32 sGridCol = 0;
 #define GRID_FOOTER_TOTAL_RIGHT_X 238  // clear of the scroll arrows and BACK
 // Footer note (in place of the total) on a progression objective while
 // unlock is ON: the generator skips those (bingo_objective_eligible).
-#define GRID_GATED_NOTE "Unlock OFF only"
+#define GRID_GATED_NOTE "Needs Unlock OFF"
 #define GRID_CTRL_TOGGLE_X 150
 #define GRID_CTRL_GAP    6     // PRESET label -> value
 
@@ -1531,10 +1532,24 @@ static void grid_clamp_cursor(void) {
     }
 }
 
+// A progression objective while unlock is ON: the generator won't deal it,
+// so the grid shows it OFF and A won't toggle it.
+static s32 grid_objective_gated(u8 type) {
+    return gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type);
+}
+
+static s32 grid_objective_on(u8 type) {
+    return !gBingoObjectivesDisabled[type] && !grid_objective_gated(type);
+}
+
+static s32 grid_band_gated(s32 band) {
+    return grid_objective_gated(sGridBands[band].types[0]);
+}
+
 static s32 grid_band_enabled(s32 band) {
     s32 i, n = 0;
     for (i = 0; i < sGridBands[band].count; i++) {
-        n += !gBingoObjectivesDisabled[sGridBands[band].types[i]];
+        n += grid_objective_on(sGridBands[band].types[i]);
     }
     return n;
 }
@@ -1698,17 +1713,20 @@ static s32 grid_control_end_x(s32 col) {
 }
 
 // Mixed or all-off turns everything on; only a fully-on pool clears
-// (the band labels' rule, pool-wide).
+// (the band labels' rule, pool-wide). Gated objectives are skipped: they
+// read as OFF and keep their saved toggle.
 static void grid_toggle_all(void) {
     s32 i;
     u8 disable = 1;
     for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        if (gBingoObjectivesDisabled[i]) {
+        if (!grid_objective_gated(i) && gBingoObjectivesDisabled[i]) {
             disable = 0;
         }
     }
     for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        gBingoObjectivesDisabled[i] = disable;
+        if (!grid_objective_gated(i)) {
+            gBingoObjectivesDisabled[i] = disable;
+        }
     }
 }
 
@@ -1966,6 +1984,8 @@ static void grid_activate(void) {
         } else {
             grid_toggle_all();
         }
+    } else if (grid_band_gated(sGridBand)) {
+        play_sound(SOUND_MENU_CAMERA_BUZZ, gGlobalSoundSource);
     } else if (sGridCol < 0) {
         grid_toggle_band(sGridBand);
     } else {
@@ -2815,6 +2835,10 @@ static void print_grid_footer(void) {
         grid_print_ascii(GRID_LABEL_X, GRID_FOOTER_Y,
                          sGridCol == 0 ? "Loadout: objectives, mode, unlock"
                                        : "Turn every objective on or off");
+    } else if (sGridCol < 0 && grid_band_gated(sGridBand)) {
+        p = grid_append(text, sGridBands[sGridBand].label);
+        grid_append(p, ": needs Unlock OFF");
+        grid_print_ascii(GRID_LABEL_X, GRID_FOOTER_Y, text);
     } else if (sGridCol < 0) {
         p = grid_append(text, sGridBands[sGridBand].label);
         grid_append(p, grid_band_enabled(sGridBand) == sGridBands[sGridBand].count
@@ -2827,16 +2851,15 @@ static void print_grid_footer(void) {
         s32 x = GRID_FOOTER_NAME_X;
         print_generic_string(x, GRID_FOOTER_Y, name);
         x += get_string_width(name) + 8;
-        if (gBingoObjectivesDisabled[type]) {
+        if (!grid_objective_on(type)) {
             gDPSetEnvColor(gDisplayListHead++, 255, 80, 80, whiteTextAlpha);
             print_generic_string(x, GRID_FOOTER_Y, textOff);
             gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, whiteTextAlpha);
         } else {
             print_generic_string(x, GRID_FOOTER_Y, textOn);
         }
-        if (gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type)) {
-            // The toggle still works; the generator just skips it while
-            // unlock is ON. Say so where the total usually sits.
+        if (grid_objective_gated(type)) {
+            // OFF because unlock is ON: say why where the total usually sits.
             gatedNote = 1;
         }
     }
@@ -2902,10 +2925,8 @@ static void print_objective_grid(void) {
         for (c = 0; c < sGridBands[b].count; c++) {
             u8 type = sGridBands[b].types[c];
             s32 iy = grid_icon_y(b, c);
-            // Progression objectives dim too while unlock is ON: the
-            // generator won't deal them either way.
-            s32 dim = gBingoObjectivesDisabled[type]
-                      || (gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type));
+            // Progression objectives read as OFF while unlock is ON.
+            s32 dim = !grid_objective_on(type);
             s32 alpha = options_edge_alpha(iy, dim ? MIN(gOptionSelectIconOpacity, 70)
                                                    : gOptionSelectIconOpacity);
             if (alpha > 0) {
