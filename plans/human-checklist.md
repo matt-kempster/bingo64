@@ -1,5 +1,8 @@
 # Human-only checklist (Matt's list)
 
+Live tracking moved to the Homebase dashboard
+(https://claude.ai/artifact/7jeRpMXQ4oGuXa1oSEdyS5), 2026-09-26.
+
 Stuff that needs a human — decisions, accounts, or real hands on real
 hardware. Everything Claude can do lives in
 [netplay-release-checklist.md](netplay-release-checklist.md); this file
@@ -18,8 +21,8 @@ is only the parts that block on YOU. Ordered roughly by "do this next".
       Bless the drop or ask for it back behind cheats.
 - [ ] **Late joiner UX**: someone joins a started race — do they race
       (timer already behind) or spectate?
-- [ ] **Whereabouts privacy default**: suggest broadcast ON (it's a
-      race), toggleable off.
+- [x] **Whereabouts privacy default**: broadcast ON, toggleable off
+      (Matt: yes, 2026-09-26; already the default in code).
 
 ## Accounts & infra — only your logins can do these
 
@@ -31,7 +34,7 @@ is only the parts that block on YOU. Ordered roughly by "do this next".
       repeat this silently. Fallback if it recurs: the relay can move
       to any always-on box; the playit tunnel address follows the
       playit account, not the VM.
-- [ ] **RELEASE GATE — create the DNS TXT record** at your kempster.com
+- [x] **RELEASE GATE — create the DNS TXT record** (verified resolving 2026-09-26) at your kempster.com
       registrar: name `_bingo64`, type TXT, TTL 300, value
       `udp:mauritania-defines.tun.ply.gg:16118` (one string). Fresh
       installs default to `auto` and need this to find the server.
