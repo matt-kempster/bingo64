@@ -186,6 +186,21 @@ apply.
   estimate.
 - **Win:** first to N (Matt floated 5), or a timer with a count.
 
+**Implemented, v1 (2026-09-26, branch overnight-0923, protocol 11):**
+mode 5 `BINGO_MODE_CALLS`, room settings "Open calls" (1-3, default 2)
+and "Calls to win" (3-9, default 5).
+- The queue (`bingo_calls_build_queue`) is easy, then medium/center,
+  then hard, shuffled within each tier. A call avoids the courses of the
+  two calls before it when its tier allows.
+- The open calls are the first K cells of the queue nobody has claimed,
+  so every client derives them from the claims alone. The relay needs
+  only the target and adjudicates like lockout.
+- Only open calls receive events (`bingo_update` gates on a snapshot), so
+  counters start at the call. Recount tiles (N stars total, red coin
+  stars...) still read race-wide progress.
+- Not done yet: fast+slow pairing, the time-estimate cap, and the relay
+  checking that a claimed cell is an open call (it trusts clients).
+
 ## 5. Cost model: time and synergy without wall-clock data
 
 Matt (2026-09-23): the relay has only a few matches, and "how long do 133

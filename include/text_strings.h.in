@@ -188,12 +188,16 @@
 #define TEXT_FILE_MARIO_D _("MARIO D")
 
 // Bingo Options
-#define TEXT_GAME_MODE _("Game mode")
+#define TEXT_GAME_MODE _("Mode")
 #define TEXT_TARGET_1 _("1 Bingo")
 #define TEXT_TARGET_2 _("2 Bingos")
 #define TEXT_TARGET_3 _("3 Bingos")
 #define TEXT_TARGET_BLACKOUT _("Blackout")
 #define TEXT_TARGET_LOCKOUT _("Lockout")
+#define TEXT_TARGET_CALLS _("Call and Response")
+// Call and Response settings (rows shown only in that mode).
+#define TEXT_CALLS_OPEN _("Open calls")
+#define TEXT_CALLS_TO_WIN _("Calls to win")
 
 #define TEXT_SEED_CLICK_HINT _("Click the seed to type one")
 #define TEXT_SEED_TYPING_HINT _("Type digits. Enter when done")

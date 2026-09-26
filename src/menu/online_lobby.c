@@ -356,6 +356,7 @@ static const char *mode_name(void) {
         case BINGO_MODE_LINE_3:   return "3 BINGOS";
         case BINGO_MODE_BLACKOUT: return "BLACKOUT";
         case BINGO_MODE_LOCKOUT:  return "LOCKOUT";
+        case BINGO_MODE_CALLS:    return "CALL AND RESPONSE";
         default:                  return "1 BINGO";
     }
 }

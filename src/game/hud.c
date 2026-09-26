@@ -674,6 +674,7 @@ void render_hud(void) {
             }
 
             draw_bingo_notices();
+            draw_bingo_calls_hud();
             draw_bingo_race_verdict();
 
 #ifndef TARGET_N64

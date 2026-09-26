@@ -8,16 +8,47 @@
 // Line modes race to N completed rows/columns/diagonals; BLACKOUT needs the
 // whole board (online: co-op, claims are shared); LOCKOUT races to 13
 // squares (online: claims are exclusive, first claimant owns the square).
+// CALLS (Call and Response) plays the board as a queue: only a few calls
+// are open at a time, claims are exclusive like lockout, and the first to
+// win gBingoCallsToWin calls wins.
 enum BingoGameMode {
     BINGO_MODE_LINE_1,
     BINGO_MODE_LINE_2,
     BINGO_MODE_LINE_3,
     BINGO_MODE_BLACKOUT,
     BINGO_MODE_LOCKOUT,
+    BINGO_MODE_CALLS,
     BINGO_MODE_COUNT
 };
 
 #define BINGO_LOCKOUT_TARGET 13
+
+// Call and Response room settings: how many calls are open at once, and
+// how many calls win the race. The menu cycles through these ranges.
+#define BINGO_CALLS_OPEN_MIN 1
+#define BINGO_CALLS_OPEN_MAX 3
+#define BINGO_CALLS_OPEN_DEFAULT 2
+#define BINGO_CALLS_TO_WIN_MIN 3
+#define BINGO_CALLS_TO_WIN_MAX 9
+#define BINGO_CALLS_TO_WIN_DEFAULT 5
+extern s32 gBingoCallsOpen;
+extern s32 gBingoCallsToWin;
+// The board's cells in call order, built from the seed with the board
+// (bingo_calls_build_queue). The open calls are always the first
+// gBingoCallsOpen cells of the queue that nobody has completed yet, so
+// every client derives the same calls from the claims alone.
+extern u8 gBingoCallQueue[25];
+void bingo_calls_build_queue(u32 seed);
+// Claims are exclusive (one owner per cell): LOCKOUT and CALLS.
+s32 bingo_mode_exclusive(void);
+// Bit i set = cell i is an open call right now (always 0 outside CALLS).
+u32 bingo_calls_open_mask(void);
+// Cells that count for the local player under the current mode: every
+// cell outside CALLS, only the open calls inside it.
+s32 bingo_cell_live(s32 cell);
+// Squares an exclusive mode's win needs (13 in lockout, the room's call
+// target in CALLS).
+s32 bingo_exclusive_target(void);
 
 // Optional race timeout in minutes (0 = off; the menu offers 5/15/30/45/60).
 // Online it is a host-owned room option like the mode; the relay ends the

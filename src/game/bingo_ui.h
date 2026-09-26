@@ -9,6 +9,7 @@ void print_bingo_icon_alpha(s32 x, s32 y, s32 iconIndex, u8 alpha);
 void draw_bingo_hud_timer(void);
 void draw_bingo_screen(void);
 void draw_bingo_win_screen(void);
+void draw_bingo_calls_hud(void);  // Call and Response: open calls, always up
 
 // Toast feed for online events ("Quate completed [icon] TTC 80", "Boop
 // left"). Toasts expire after 4s; rich toasts open with a hat-colored name

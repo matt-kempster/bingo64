@@ -22,9 +22,11 @@
 // 10: board generation changed (coinless star, warp pads, Koopa shells,
 // spinning hearts; enum renumbered): seed-shared boards must match. The
 // unlock field became room flags (bit 0 unlock, bit 1 nonstop).
+// 11: Call and Response (mode 5): open calls + calls to win ride W/O/S as
+// two trailing fields.
 // During active development the version bumps on every wire change — the
 // old side is refused outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 10
+#define NET_PROTOCOL_VERSION 11
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.
@@ -184,6 +186,7 @@ s32 network_countdown_frames(void);
 // objective type i disabled; seed 0 = random at start.
 // The options that arrive with the start message are applied to the
 // bingo globals directly. timeoutMin: race timeout in minutes (0 = off).
+// The Call and Response settings go along from the bingo globals.
 void network_send_options(s32 mode, s32 flags, const char *maskHex, u32 seed,
                           s32 claimVis, s32 whereabouts, s32 timeoutMin);
 // Push the current bingo globals as room options (no-op unless we are

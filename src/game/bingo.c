@@ -31,6 +31,9 @@ enum BingoGameMode gbBingoMode = BINGO_MODE_LINE_1;
 s32 gbBingosCompleted = 0;
 s32 gbBingoTimeout = 0;
 u32 gBingoCellClaimers[25] = { 0 };
+s32 gBingoCallsOpen = BINGO_CALLS_OPEN_DEFAULT;
+s32 gBingoCallsToWin = BINGO_CALLS_TO_WIN_DEFAULT;
+u8 gBingoCallQueue[25];
 s32 gbBingoShowCongratsCounter = 0;
 s32 gbBingoShowCongratsLimit = 2;
 s32 gbBingoTimerDisabled = 0;
@@ -199,13 +202,109 @@ void set_objective_state(struct BingoObjective *objective, enum BingoObjectiveSt
     objective->state = state;
 }
 
+s32 bingo_mode_exclusive(void) {
+    return gbBingoMode == BINGO_MODE_LOCKOUT || gbBingoMode == BINGO_MODE_CALLS;
+}
+
+s32 bingo_exclusive_target(void) {
+    return gbBingoMode == BINGO_MODE_CALLS ? gBingoCallsToWin : BINGO_LOCKOUT_TARGET;
+}
+
+// A cell's course, for spacing the call queue out; 0 = not tied to one.
+// The star and per-course objectives all keep the course as the first
+// member of their data (the unions are aligned, see are_duplicates).
+static s32 bingo_objective_course(struct BingoObjective *objective) {
+    enum BingoObjectiveType type = objective->type;
+    if ((BINGO_OBJECTIVE_STAR_MIN <= type && type <= BINGO_OBJECTIVE_STAR_MAX)
+        || type == BINGO_OBJECTIVE_RANDOM_STARS || type == BINGO_OBJECTIVE_COIN
+        || type == BINGO_OBJECTIVE_1UPS_IN_LEVEL || type == BINGO_OBJECTIVE_STARS_IN_LEVEL
+        || type == BINGO_OBJECTIVE_RANDOM_RED_COINS || type == BINGO_OBJECTIVE_SPLATOON) {
+        return objective->data.starObjective.course;
+    }
+    return 0;
+}
+
+// Call order: easy cells first, then medium (and the center), then hard,
+// shuffled within each tier; then, where the tier allows it, a call never
+// shares a course with the two calls before it (those are the ones likely
+// to be open next to it, and the last call's winner is standing there).
+// Uses its own generator so the board's random stream is untouched.
+void bingo_calls_build_queue(u32 seed) {
+    u32 state = seed * 2654435761u + 0x9E3779B9u;
+    s32 tier[25];
+    s32 n = 0, t, i, j, k;
+    for (t = 0; t < 3; t++) {
+        s32 start = n;
+        for (i = 0; i < 25; i++) {
+            enum BingoObjectiveClass class = gBingoObjectives[i].class;
+            s32 cellTier = class == BINGO_CLASS_EASY ? 0 : class == BINGO_CLASS_HARD ? 2 : 1;
+            if (cellTier == t) {
+                tier[n] = t;
+                gBingoCallQueue[n++] = i;
+            }
+        }
+        for (i = n - 1; i > start; i--) {
+            u8 tmp;
+            state = state * 1664525u + 1013904223u;
+            j = start + (s32) ((state >> 8) % (u32) (i - start + 1));
+            tmp = gBingoCallQueue[i];
+            gBingoCallQueue[i] = gBingoCallQueue[j];
+            gBingoCallQueue[j] = tmp;
+        }
+    }
+    for (i = 1; i < 25; i++) {
+        for (j = i; j < 25 && tier[j] == tier[i]; j++) {
+            s32 c = bingo_objective_course(&gBingoObjectives[gBingoCallQueue[j]]);
+            s32 clash = 0;
+            for (k = i - 1; k >= 0 && k >= i - 2; k--) {
+                clash |= c != 0 && c == bingo_objective_course(&gBingoObjectives[gBingoCallQueue[k]]);
+            }
+            if (!clash) {
+                break;
+            }
+        }
+        if (j < 25 && tier[j] == tier[i] && j != i) {
+            // Pull the first non-clashing cell forward, keeping the rest
+            // of the tier in order.
+            u8 pick = gBingoCallQueue[j];
+            for (k = j; k > i; k--) {
+                gBingoCallQueue[k] = gBingoCallQueue[k - 1];
+            }
+            gBingoCallQueue[i] = pick;
+        }
+    }
+}
+
+u32 bingo_calls_open_mask(void) {
+    u32 mask = 0;
+    s32 i, open = 0;
+    if (gbBingoMode != BINGO_MODE_CALLS) {
+        return 0;
+    }
+    for (i = 0; i < 25 && open < gBingoCallsOpen; i++) {
+        s32 cell = gBingoCallQueue[i];
+        if (gBingoObjectives[cell].state != BINGO_STATE_COMPLETE && gBingoCellClaimers[cell] == 0) {
+            mask |= (u32) 1 << cell;
+            open++;
+        }
+    }
+    return mask;
+}
+
+s32 bingo_cell_live(s32 cell) {
+    if (gbBingoMode != BINGO_MODE_CALLS) {
+        return 1;
+    }
+    return (bingo_calls_open_mask() >> cell) & 1;
+}
+
 s32 bingo_mode_line_target(void) {
     switch (gbBingoMode) {
         case BINGO_MODE_LINE_1:   return 1;
         case BINGO_MODE_LINE_2:   return 2;
         case BINGO_MODE_LINE_3:   return 3;
         case BINGO_MODE_BLACKOUT: return 12;
-        default:                  return 0;  // LOCKOUT: not line-based
+        default:                  return 0;  // LOCKOUT/CALLS: not line-based
     }
 }
 
@@ -220,20 +319,21 @@ s32 bingo_complete_cell_count(void) {
 }
 
 s32 bingo_race_won(void) {
-    if (gbBingoMode == BINGO_MODE_LOCKOUT) {
+    if (bingo_mode_exclusive()) {
         if (bingo_net_racing()) {
-            // Online lockout: claims are exclusive and the server decides
-            // the winner (first to 13 in 1v1, uncatchable lead otherwise).
+            // Online lockout/calls: claims are exclusive and the server
+            // decides the winner (first to the target, or an uncatchable
+            // lead).
             return bingo_net_local_won();
         }
         if (bingo_net_dropped()) {
-            // An online lockout whose connection died: the board still
+            // An online race whose connection died: the board still
             // holds everyone's squares, so counting all complete cells
             // would hand us our opponents' progress. Only ours count.
-            return bingo_net_local_cell_count() >= BINGO_LOCKOUT_TARGET;
+            return bingo_net_local_cell_count() >= bingo_exclusive_target();
         }
-        // Solo lockout: race to any 13 squares.
-        return bingo_complete_cell_count() >= BINGO_LOCKOUT_TARGET;
+        // Solo: race to any 13 squares (lockout) or the call target.
+        return bingo_complete_cell_count() >= bingo_exclusive_target();
     }
     return gbBingosCompleted >= bingo_mode_line_target();
 }
@@ -262,7 +362,7 @@ s32 bingo_race_over(void) {
         return 1;
     }
     // An online lockout decided for someone else ends the race for us too.
-    return gbBingoMode == BINGO_MODE_LOCKOUT && bingo_net_race_decided();
+    return bingo_mode_exclusive() && bingo_net_race_decided();
 }
 
 /**
@@ -349,6 +449,7 @@ void bingo_track_death(u32 deathAction) {
 
 void bingo_update(enum BingoObjectiveUpdate update) {
     s32 i;
+    u32 live;
     // This is to avoid a bug where the call to bingo_update() from area.c
     // (the once-a-frame call) crashes before setup_bingo_objectives() has
     // been called.
@@ -367,8 +468,15 @@ void bingo_update(enum BingoObjectiveUpdate update) {
         }
     }
 
+    // Call and Response: only the open calls see events, so progress
+    // counts from the call. Snapshot the open set first, or a call that
+    // opens mid-loop would also collect the event that closed its
+    // predecessor (one star, two calls).
+    live = gbBingoMode == BINGO_MODE_CALLS ? bingo_calls_open_mask() : 0x1FFFFFF;
     for (i = 0; i < 25; i++) {
-        update_objective(&gBingoObjectives[i], update);
+        if ((live >> i) & 1) {
+            update_objective(&gBingoObjectives[i], update);
+        }
     }
 
     if (update == BINGO_UPDATE_TIMER_FRAME_GLOBAL && !bingo_race_over()) {

@@ -1730,6 +1730,98 @@ static void test_unlock_gate(void) {
     gBingoFullGameUnlocked = 1;
 }
 
+// Call and Response: the queue is a permutation of the board, ramps
+// easy -> medium/center -> hard, and is a pure function of the seed.
+static void test_calls_queue(void) {
+    u32 seed;
+    s32 clashes = 0, pairs = 0;
+    for (seed = 1; seed <= 500; seed++) {
+        u8 first[25];
+        s32 seen[25] = { 0 };
+        s32 i, prevTier = 0;
+        generate_board(seed);
+        memcpy(first, gBingoCallQueue, 25);
+        for (i = 0; i < 25; i++) {
+            enum BingoObjectiveClass c = gBingoObjectives[gBingoCallQueue[i]].class;
+            s32 tier = c == BINGO_CLASS_EASY ? 0 : c == BINGO_CLASS_HARD ? 2 : 1;
+            seen[gBingoCallQueue[i]]++;
+            CHECK(tier >= prevTier);
+            prevTier = tier;
+            if (i > 0) {
+                struct BingoObjective *a = &gBingoObjectives[gBingoCallQueue[i - 1]];
+                struct BingoObjective *b = &gBingoObjectives[gBingoCallQueue[i]];
+                if (is_star_type(a->type) && is_star_type(b->type)) {
+                    pairs++;
+                    clashes += a->data.starObjective.course == b->data.starObjective.course;
+                }
+            }
+        }
+        for (i = 0; i < 25; i++) {
+            CHECK_EQ_INT(seen[i], 1);
+        }
+        bingo_calls_build_queue(seed);
+        CHECK(memcmp(first, gBingoCallQueue, 25) == 0);
+    }
+    // Consecutive star calls almost never share a course (only when a
+    // tier runs out of other courses).
+    printf("  calls: %d of %d consecutive star calls share a course\n", clashes, pairs);
+    CHECK(clashes * 50 < pairs);
+}
+
+// Only the open calls see events, a call that opens mid-update does not
+// also collect that update, and the call target wins a solo race.
+static void test_calls_gating_and_win(void) {
+    s32 i;
+    reset_sim();
+    gbBingoMode = BINGO_MODE_CALLS;
+    gBingoCallsOpen = 2;
+    gBingoCallsToWin = 3;
+    for (i = 0; i < 25; i++) {
+        gBingoCallQueue[i] = i;
+        gBingoCellClaimers[i] = 0;
+    }
+    for (i = 0; i < 5; i++) {
+        gBingoObjectives[i].type = BINGO_OBJECTIVE_STAR;
+        gBingoObjectives[i].data.starObjective.course = 1;
+        gBingoObjectives[i].data.starObjective.starIndex = i;
+    }
+    // Cell 2 wants the same star as cell 0, but is not called yet.
+    gBingoObjectives[2].data.starObjective.starIndex = 0;
+    CHECK_EQ_INT(bingo_calls_open_mask(), 0x3);
+
+    // A closed call ignores its star.
+    gCurrCourseNum = 1;
+    gbStarIndex = 3;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(gBingoObjectives[3].state, BINGO_STATE_NONE);
+
+    // Star 0 wins call 0; call 2 opens but the same star must not win it.
+    gbStarIndex = 0;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(gBingoObjectives[0].state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(gBingoObjectives[2].state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(bingo_calls_open_mask(), 0x6);
+
+    // An opponent's claim closes a call too (online exclusive claim).
+    gBingoCellClaimers[1] = 1u << 2;
+    CHECK_EQ_INT(bingo_calls_open_mask(), 0xC);
+
+    gbStarIndex = 0;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(gBingoObjectives[2].state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(bingo_race_won(), 0);
+    gbStarIndex = 3;
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(gBingoObjectives[3].state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(bingo_race_won(), 1);
+    CHECK_EQ_INT(bingo_race_over(), 1);
+
+    for (i = 0; i < 25; i++) {
+        gBingoCellClaimers[i] = 0;
+    }
+    gbBingoMode = BINGO_MODE_LINE_1;
+}
+
 static void test_presets_generate_clean_boards(void) {
     s32 p;
     u32 seed;
@@ -1856,5 +1948,7 @@ int main(void) {
     RUN_TEST(test_sim_mips_objective);
     RUN_TEST(test_unlock_gate);
     RUN_TEST(test_presets_generate_clean_boards);
+    RUN_TEST(test_calls_queue);
+    RUN_TEST(test_calls_gating_and_win);
     return test_summary();
 }

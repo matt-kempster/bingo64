@@ -408,7 +408,7 @@ void draw_bingo_race_verdict(void) {
 #ifndef TARGET_N64
     s32 i, winnerId = 0, myPlace, n;
     char buf[64];
-    if (!network_active() || gbBingoMode == BINGO_MODE_LOCKOUT
+    if (!network_active() || bingo_mode_exclusive()
         || !gBingoInitialized) {
         return;
     }
@@ -520,7 +520,7 @@ void draw_bingo_win_screen() {
             return;
         }
     }
-    if (network_active() && gbBingoMode == BINGO_MODE_LOCKOUT
+    if (network_active() && bingo_mode_exclusive()
         && network_race_winner_id() != 0) {
         // Lockout ends for the whole room at once: show the verdict in
         // the same register as the race finish ("Finished 1st in ..."),
@@ -538,12 +538,14 @@ void draw_bingo_win_screen() {
         time_fmt_dialog(timestamp);
         if (winner == network_local_id()) {
             // Your win: same quiet strip, celebratory rainbow text.
-            sprintf(msg, "Won %d squares in %s",
-                    net_cell_count_of_id(winner), timestamp);
+            sprintf(msg, "Won %d %s in %s", net_cell_count_of_id(winner),
+                    gbBingoMode == BINGO_MODE_CALLS ? "calls" : "squares",
+                    timestamp);
             draw_quiet_line(-1, 60, NULL, NULL, msg, rainbow, -1, NULL, 255);
         } else {
-            sprintf(msg, "won %d squares in %s",
-                    net_cell_count_of_id(winner), timestamp);
+            sprintf(msg, "won %d %s in %s", net_cell_count_of_id(winner),
+                    gbBingoMode == BINGO_MODE_CALLS ? "calls" : "squares",
+                    timestamp);
             draw_quiet_line(-1, 60, net_name_of_id(winner),
                             gNetColorRGB[network_color_of_id(winner)
                                          % NET_COLOR_COUNT],
@@ -574,8 +576,9 @@ void draw_bingo_win_screen() {
 
     // Solo: the clock ran out without a win.
     if (bingo_race_timed_out()) {
-        sprintf(msg, "Time's up - you got %d squares",
-                bingo_complete_cell_count());
+        sprintf(msg, "Time's up - you got %d %s",
+                bingo_complete_cell_count(),
+                gbBingoMode == BINGO_MODE_CALLS ? "calls" : "squares");
         draw_quiet_line(-1, 60, NULL, NULL, msg, sQuietWhite, -1, NULL, 255);
         draw_win_hint(FALSE);
         return;
@@ -623,7 +626,8 @@ void draw_bingo_hud_timer() {
         for (j = 0; j < 5; j++) {
             objective = &gBingoObjectives[5 * i + j];
             if (
-                objective->type == BINGO_OBJECTIVE_STAR_TIMED
+                bingo_cell_live(5 * i + j)
+                && objective->type == BINGO_OBJECTIVE_STAR_TIMED
                 && objective->data.starTimerObjective.course == gCurrCourseNum
                 && objective->state != BINGO_STATE_FAILED_IN_THIS_COURSE
                 && objective->state != BINGO_STATE_COMPLETE
@@ -723,6 +727,212 @@ void print_bingo_icon(s32 x, s32 y, s32 iconIndex) {
 }
 
 
+// --- Call and Response ------------------------------------------------
+// The L screen shows the open calls as cards (icon + full description)
+// instead of the board, plus the calls already won; the HUD keeps the
+// open calls' icons up in the bottom-right corner at all times.
+
+// A call's description, word-wrapped to maxW units of dialog font.
+// Returns the line count; lines go to out (at most maxLines).
+#define CALLS_LINE_LEN 64
+static s32 calls_wrap(const char *str, s32 maxW, char out[][CALLS_LINE_LEN], s32 maxLines) {
+    char word[CALLS_LINE_LEN];
+    char trial[CALLS_LINE_LEN * 2];
+    s32 n = 0, i = 0, w;
+    out[0][0] = '\0';
+    while (str[i] != '\0') {
+        w = 0;
+        while (str[i] == ' ') {
+            i++;
+        }
+        while (str[i] != '\0' && str[i] != ' ' && w < CALLS_LINE_LEN - 1) {
+            // The HUD font's filled star is the dialog font's '*'.
+            word[w++] = (u8) str[i] == 0xFA ? '*' : str[i];
+            i++;
+        }
+        word[w] = '\0';
+        if (w == 0) {
+            break;
+        }
+        sprintf(trial, "%s%s%s", out[n], out[n][0] != '\0' ? " " : "", word);
+        if (out[n][0] != '\0'
+            && (bingostrlen(trial) >= CALLS_LINE_LEN || get_string_width_ascii(trial) > maxW)) {
+            if (n + 1 >= maxLines) {
+                // Out of room: end the last line on "..." (dropping
+                // words until it fits).
+                s32 len = bingostrlen(out[n]);
+                for (;;) {
+                    sprintf(trial, "%s...", out[n]);
+                    if (len == 0 || get_string_width_ascii(trial) <= maxW) {
+                        break;
+                    }
+                    while (len > 0 && out[n][len - 1] != ' ') {
+                        len--;
+                    }
+                    while (len > 0 && out[n][len - 1] == ' ') {
+                        len--;
+                    }
+                    out[n][len] = '\0';
+                }
+                sprintf(out[n], "%s", trial);
+                break;
+            }
+            n++;
+            sprintf(out[n], "%s", word);
+        } else {
+            sprintf(out[n], "%s", trial);
+        }
+    }
+    return out[0][0] != '\0' ? n + 1 : 0;
+}
+
+#define CALLS_CARD_X0 21
+#define CALLS_CARD_X1 228
+#define CALLS_TEXT_X 46
+
+// Lines per card, so the open calls always fit between the header and
+// the history row.
+static s32 calls_card_lines(void) {
+    switch (gBingoCallsOpen) {
+        case 1:  return 8;
+        case 2:  return 4;
+        default: return 2;
+    }
+}
+
+#define CALLS_HISTORY_MAX 8
+
+static void draw_calls_screen(void) {
+    u32 open = bingo_calls_open_mask();
+    char lines[8][CALLS_LINE_LEN];
+    char desc[300];
+    char buf[40];
+    s32 i, j, n, top = 160;
+    s32 yours = 0, nHist = 0, nCalled = 0;
+    struct BingoObjective *objective;
+
+    for (i = 0; i < 25; i++) {
+        objective = &gBingoObjectives[i];
+#ifndef TARGET_N64
+        if (network_active() || bingo_net_dropped()) {
+            yours += (gBingoCellClaimers[i] >> bingo_net_display_id()) & 1;
+            continue;
+        }
+#endif
+        yours += objective->state == BINGO_STATE_COMPLETE;
+    }
+
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    sprintf(buf, "First to %d  -  you have %d", gBingoCallsToWin, yours);
+    print_generic_string_ascii_detail(CALLS_CARD_X0, 168, buf, 255, 255, 140, 255, TRUE, 1);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+
+    // One card per open call, in call order.
+    for (i = 0; i < 25; i++) {
+        s32 cell = gBingoCallQueue[i];
+        s32 h;
+        if (!((open >> cell) & 1)) {
+            continue;
+        }
+        objective = &gBingoObjectives[cell];
+        describe_objective(objective, desc);
+        n = calls_wrap(desc, CALLS_CARD_X1 - CALLS_TEXT_X - 4, lines, calls_card_lines());
+        h = MAX(24, 13 * n + 8);
+        print_solid_color_quad(CALLS_CARD_X0, SCREEN_HEIGHT - top, CALLS_CARD_X1,
+                               SCREEN_HEIGHT - (top - h), 0, 0, 0, 150);
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+        for (j = 0; j < n; j++) {
+            print_generic_string_ascii_detail(CALLS_TEXT_X, top - 15 - 13 * j, lines[j],
+                                              255, 255, 255, 255, TRUE, 1);
+        }
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+        print_bingo_icon_alpha(CALLS_CARD_X0 + 4, top - 4 - 16, objective->icon, 255);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+        top -= h + 6;
+    }
+
+    // The latest calls won, in call order along one row, tinted with the
+    // winner's color online.
+    for (i = 0; i < 25; i++) {
+        s32 cell = gBingoCallQueue[i];
+        nCalled += gBingoObjectives[cell].state == BINGO_STATE_COMPLETE || gBingoCellClaimers[cell] != 0;
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    print_generic_string_ascii_detail(CALLS_CARD_X0, 17, "Called", 255, 255, 140, 255, TRUE, 1);
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+    for (i = 0; i < 25; i++) {
+        s32 cell = gBingoCallQueue[i];
+        s32 x, y;
+        if (gBingoObjectives[cell].state != BINGO_STATE_COMPLETE && gBingoCellClaimers[cell] == 0) {
+            continue;
+        }
+        if (nCalled-- > CALLS_HISTORY_MAX) {
+            continue;
+        }
+        x = CALLS_CARD_X0 + 44 + 20 * nHist;
+        y = 16;
+        nHist++;
+#ifndef TARGET_N64
+        if (gBingoCellClaimers[cell] != 0) {
+            s32 id, color;
+            for (id = 0; id < 32 && !(gBingoCellClaimers[cell] & ((u32) 1 << id)); id++) {}
+            color = bingo_net_display_color(id) % NET_COLOR_COUNT;
+            print_solid_color_quad(x - 1, SCREEN_HEIGHT - (y + 17), x + 17, SCREEN_HEIGHT - (y - 1),
+                                   gNetColorRGB[color][0], gNetColorRGB[color][1],
+                                   gNetColorRGB[color][2], 150);
+        }
+#endif
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+        print_bingo_icon_alpha(x, y, gBingoObjectives[cell].icon, 255);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+    }
+}
+
+// HUD: the open calls' icons, bottom-right, always up. On PC a new call
+// also gets a toast ("New call [icon] BoB*3").
+void draw_bingo_calls_hud(void) {
+    u32 open;
+    s32 i, k = 0;
+#ifndef TARGET_N64
+    static u32 sPrevOpen = 0;
+    static u32 sPrevSeed = 0;
+#endif
+    if (gbBingoMode != BINGO_MODE_CALLS || !gBingoInitialized || bingo_race_over()) {
+        return;
+    }
+    open = bingo_calls_open_mask();
+#ifndef TARGET_N64
+    if (sPrevSeed != gBingoInitialSeed) {
+        sPrevSeed = gBingoInitialSeed;  // a new race: its first calls
+        sPrevOpen = 0;
+    }
+    if (open != sPrevOpen) {
+        static const u8 yellow[3] = { 255, 255, 140 };
+        for (i = 0; i < 25; i++) {
+            s32 cell = gBingoCallQueue[i];
+            if (((open & ~sPrevOpen) >> cell) & 1) {
+                bingo_notice_rich("", yellow, "New call", gBingoObjectives[cell].icon,
+                                  gBingoObjectives[cell].title);
+                printf("bingo: new call, cell %d\n", cell);
+                fflush(stdout);
+            }
+        }
+        sPrevOpen = open;
+    }
+#endif
+    // A column above the camera widget, the oldest call on top.
+    gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+    for (i = 24; i >= 0; i--) {
+        s32 cell = gBingoCallQueue[i];
+        if ((open >> cell) & 1) {
+            print_bingo_icon_alpha(SCREEN_WIDTH - 40, 44 + 20 * k, gBingoObjectives[cell].icon, 255);
+            k++;
+        }
+    }
+    gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+}
+
 void draw_bingo_screen() {
     struct BingoObjective *objective;
     int i, j, length;
@@ -734,6 +944,7 @@ void draw_bingo_screen() {
     char time_print[40];
     char number[5];
     char *bingo[5] = { "B", "I", "N", "G", "O" };
+    char *calls[5] = { "C", "A", "L", "L", "S" };
 
     if (!gBingoAllowBoardToShow) {
         return;
@@ -748,7 +959,8 @@ void draw_bingo_screen() {
     // Title.
     for (i = 0; i < 5; i++) {
         // print_text_large(6 + spacing * i, HUD_TOP_Y + 5, bingo[i]);
-        print_text_large(BINGO_MIN_X + spacing * i, BINGO_MAX_Y, bingo[i]);
+        print_text_large(BINGO_MIN_X + spacing * i, BINGO_MAX_Y,
+                         gbBingoMode == BINGO_MODE_CALLS ? calls[i] : bingo[i]);
     }
 
     // Seed and time.
@@ -830,7 +1042,7 @@ void draw_bingo_screen() {
             // the dialog font's interpunct) or "1st ; 12'34.50" once
             // finished. Count right-aligned to the square, interpunct
             // column fixed so the rows read as a table.
-            if (res != NULL && gbBingoMode != BINGO_MODE_LOCKOUT) {
+            if (res != NULL && !bingo_mode_exclusive()) {
                 getTimeFmtPrecise(timestamp, res->frames);
                 time_fmt_dialog(timestamp);
                 sprintf(detail, "%d%s", res->place,
@@ -898,6 +1110,11 @@ void draw_bingo_screen() {
         }
     }
 #endif
+
+    if (gbBingoMode == BINGO_MODE_CALLS) {
+        draw_calls_screen();
+        return;
+    }
 
     // Lines.
     for (i = 0; i < 4; i++) {

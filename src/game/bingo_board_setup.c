@@ -646,6 +646,9 @@ void setup_bingo_objectives(u32 seed) {
     // another is "kill 11 Goombas", we want to remove one of them
     // and replace with another "non duplicate".
     deduplicate();
+
+    // Call and Response deals the same board as a queue.
+    bingo_calls_build_queue(seed);
 }
 
 #undef NO_LIMIT

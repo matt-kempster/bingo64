@@ -134,6 +134,8 @@ static s32 sPendingWhereabouts = -1;
 static s32 sPendingTimeout = -1;   // race timeout (minutes) riding the same W
 static s32 sPendingUnlock = -1;    // room flags (unlock/nonstop) riding the same W
 static char sPendingMask[NET_MASK_HEX_LEN] = "0";  // objective mask, ditto
+static s32 sPendingCallsOpen = 0;  // Call and Response settings, ditto
+static s32 sPendingCallsToWin = 0;
 
 // Room visibility settings (v6). The host's local values are the room's;
 // everyone else receives them via W/O/S.
@@ -147,8 +149,10 @@ s32 net_claimvis_coerce(s32 vis, s32 mode) {
     if (vis >= NET_CLAIMVIS_COUNT) {
         vis = NET_CLAIMVIS_COUNT - 1;
     }
-    if (mode == BINGO_MODE_LOCKOUT || mode == BINGO_MODE_BLACKOUT) {
-        // Lockout is ABOUT the squares; blackout is co-op on a shared
+    if (mode == BINGO_MODE_LOCKOUT || mode == BINGO_MODE_CALLS
+        || mode == BINGO_MODE_BLACKOUT) {
+        // Lockout (and calls) are ABOUT the squares — the open calls
+        // follow from everyone's claims; blackout is co-op on a shared
         // board (peer claims complete YOUR board) — hiding is nonsense.
         return NET_CLAIMVIS_OPEN;
     }
@@ -479,20 +483,31 @@ static s32 local_room_flags(void) {
          | (gBingoNonstop ? NET_FLAG_NONSTOP : 0);
 }
 
+// Call and Response settings (v11), the last two fields of W/O/S.
+static void apply_calls_settings(s32 open, s32 toWin) {
+    if (open >= BINGO_CALLS_OPEN_MIN && open <= BINGO_CALLS_OPEN_MAX) {
+        gBingoCallsOpen = open;
+    }
+    if (toWin >= BINGO_CALLS_TO_WIN_MIN && toWin <= BINGO_CALLS_TO_WIN_MAX) {
+        gBingoCallsToWin = toWin;
+    }
+}
+
 static void handle_line(char *line) {
     char cmd = line[0];
     // (log lines below are flushed so redirected logs survive a kill)
     if (cmd == 'W') {
         s32 public_ = 0, mode = 0, claimVis = 0, where = 1, timeoutMin = 0;
         s32 unlock = 0;
+        s32 callsOpen = 0, callsToWin = 0;
         s32 id = 0;
         s32 nFields;
         u32 token = 0;
         char mask[NET_MASK_HEX_LEN] = "0";
-        nFields = sscanf(line + 1, "%d %d %d %u %d %d %d %d " NET_MASK_SCAN, &id,
+        nFields = sscanf(line + 1, "%d %d %d %u %d %d %d %d " NET_MASK_SCAN " %d %d", &id,
                          &public_, &mode, &token, &claimVis, &where,
-                         &timeoutMin, &unlock, mask);
-        if (nFields == 9) {
+                         &timeoutMin, &unlock, mask, &callsOpen, &callsToWin);
+        if (nFields == 11) {
             // An older relay packs other fields here; fail loudly instead
             // of running a half-broken lobby against an outdated server.
             if (public_ < 0 || public_ > 1 || mode < 0 || mode >= BINGO_MODE_COUNT) {
@@ -532,6 +547,8 @@ static void handle_line(char *line) {
             sPendingWhereabouts = where;
             sPendingTimeout = timeoutMin;
             sPendingUnlock = unlock;
+            sPendingCallsOpen = callsOpen;
+            sPendingCallsToWin = callsToWin;
             snprintf(sPendingMask, sizeof(sPendingMask), "%s", mask);
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
@@ -540,7 +557,7 @@ static void handle_line(char *line) {
                 network_set_ready(1);
             }
         } else if (nFields >= 7) {
-            // A pre-v8 relay that slipped past the version gate.
+            // An older relay that slipped past the version gate.
             sToken = 0;
             net_fail("server runs an old relay version");
         }
@@ -559,6 +576,7 @@ static void handle_line(char *line) {
                 gNetShowWhereabouts = sPendingWhereabouts != 0;
                 gbBingoTimeout = sPendingTimeout;
                 apply_room_flags(sPendingUnlock);
+                apply_calls_settings(sPendingCallsOpen, sPendingCallsToWin);
                 apply_objective_mask(sPendingMask);
             }
             sPendingRoomMode = -1;
@@ -580,10 +598,11 @@ static void handle_line(char *line) {
         u32 seed = 0;
         s32 delta = 0, mode = 0, unlock = 0, claimVis = 0, where = 1;
         s32 timeoutMin = 0;
+        s32 callsOpen = 0, callsToWin = 0;
         char mask[NET_MASK_HEX_LEN] = "0";
-        if (sscanf(line + 1, "%u %d %d %d " NET_MASK_SCAN " %d %d %d", &seed, &delta,
+        if (sscanf(line + 1, "%u %d %d %d " NET_MASK_SCAN " %d %d %d %d %d", &seed, &delta,
                    &mode, &unlock, mask, &claimVis, &where,
-                   &timeoutMin) == 8) {
+                   &timeoutMin, &callsOpen, &callsToWin) == 10) {
             sSharedSeed = seed;
             sSeedValid = 1;
             // The room creator's bingo options apply to the whole room;
@@ -595,6 +614,7 @@ static void handle_line(char *line) {
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
             apply_room_flags(unlock);
+            apply_calls_settings(callsOpen, callsToWin);
             apply_objective_mask(mask);
             // delta is negative when the race already started (late join /
             // reconnect); unsigned wrap keeps the shared clock correct.
@@ -731,15 +751,17 @@ static void handle_line(char *line) {
     } else if (cmd == 'O') {
         // The host changed the room options while we sat in the lobby.
         s32 mode, claimVis = 0, where = 1, timeoutMin = 0, unlock = 0;
+        s32 callsOpen = 0, callsToWin = 0;
         char mask[NET_MASK_HEX_LEN] = "0";
-        if (sscanf(line + 1, "%d %d %d %d %d " NET_MASK_SCAN, &mode, &claimVis,
-                   &where, &timeoutMin, &unlock, mask) == 6
+        if (sscanf(line + 1, "%d %d %d %d %d " NET_MASK_SCAN " %d %d", &mode, &claimVis,
+                   &where, &timeoutMin, &unlock, mask, &callsOpen, &callsToWin) == 8
             && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
             gNetShowWhereabouts = where != 0;
             gbBingoTimeout = timeoutMin;
             apply_room_flags(unlock);
+            apply_calls_settings(callsOpen, callsToWin);
             apply_objective_mask(mask);
         }
     } else if (cmd == 'F') {
@@ -1486,9 +1508,9 @@ void network_send_options(s32 mode, s32 flags, const char *maskHex, u32 seed,
     if (!network_active()) {
         return;
     }
-    snprintf(line, sizeof(line), "O %d %d %s %u %d %d %d\n",
+    snprintf(line, sizeof(line), "O %d %d %s %u %d %d %d %d %d\n",
              mode, flags, maskHex, seed,
-             claimVis, whereabouts, timeoutMin);
+             claimVis, whereabouts, timeoutMin, gBingoCallsOpen, gBingoCallsToWin);
     net_send_line(line);
 }
 

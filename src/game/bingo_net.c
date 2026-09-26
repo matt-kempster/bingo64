@@ -130,7 +130,7 @@ static void spawn_missing_ghosts(void) {
 
 // How server-confirmed claims land on the local board depends on the mode:
 //   BLACKOUT  co-op: any member's claim completes the shared board.
-//   LOCKOUT   exclusive: the claim records the owner; completion state is
+//   LOCKOUT   (and CALLS) exclusive: the claim records the owner; completion state is
 //             only set so the board shows the square as taken (tinted with
 //             the owner's color). Counting is owner-based.
 //   line modes  race: a peer's claim is recorded for display only; each
@@ -220,8 +220,7 @@ static void apply_remote_claims(void) {
                 break;
             }
         }
-        if (gbBingoMode == BINGO_MODE_BLACKOUT
-            || gbBingoMode == BINGO_MODE_LOCKOUT
+        if (gbBingoMode == BINGO_MODE_BLACKOUT || bingo_mode_exclusive()
             || claimer == network_local_id()) {
             gBingoNetApplyingRemoteClaim = 1;
             set_objective_state(&gBingoObjectives[cell], BINGO_STATE_COMPLETE);
@@ -318,8 +317,8 @@ void bingo_net_update(void) {
                 gbGlobalBingoTimer = network_race_frames();
             }
             // Announce meeting the win condition (line modes; the server
-            // itself decides lockout from the claims).
-            if (gbBingoMode != BINGO_MODE_LOCKOUT && !sFinishAnnounced
+            // itself decides lockout and calls from the claims).
+            if (!bingo_mode_exclusive() && !sFinishAnnounced
                 && bingo_race_won()) {
                 sFinishAnnounced = 1;
                 network_notify_local_finish();

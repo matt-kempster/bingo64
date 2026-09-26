@@ -206,11 +206,14 @@ s32 sBingoOptionSelection = 0;
 #ifndef TARGET_N64
 // The Opp. rows (visibility of other players' squares/locations) only
 // mean something in an online room; solo shows mode/unlock/nonstop/timeout.
+// Call and Response adds its two rows under the mode.
 // (Preset and Toggle all live on the grid pages' control row.) All uses
 // are runtime expressions, so the count may vary per frame.
-#define BINGO_CONFIGS_IN_LEFT_COL (network_active() ? 6 : 4)
+#define BINGO_CONFIGS_IN_LEFT_COL \
+    ((network_active() ? 6 : 4) + (gbBingoMode == BINGO_MODE_CALLS ? 2 : 0))
 #else
-#define BINGO_CONFIGS_IN_LEFT_COL 4 // not more than 10, hopefully
+#define BINGO_CONFIGS_IN_LEFT_COL \
+    (4 + (gbBingoMode == BINGO_MODE_CALLS ? 2 : 0)) // not more than 10, hopefully
 #endif
 s32 sBingoOptionSelectTimer = 0;
 #define BINGO_OPTION_TIMER_FRAMES 3
@@ -2521,6 +2524,10 @@ static unsigned char text2Bingos[] = { TEXT_TARGET_2 };
 static unsigned char text3Bingos[] = { TEXT_TARGET_3 };
 static unsigned char textBlackout[] = { TEXT_TARGET_BLACKOUT };
 static unsigned char textLockout[] = { TEXT_TARGET_LOCKOUT };
+static unsigned char textCalls[] = { TEXT_TARGET_CALLS };
+static unsigned char textCallsOpen[] = { TEXT_CALLS_OPEN };
+static unsigned char textCallsToWin[] = { TEXT_CALLS_TO_WIN };
+static unsigned char textDigits[BINGO_CALLS_TO_WIN_MAX + 1][2];
 
 static unsigned char textUnlockGame[] = { TEXT_UNLOCK_GAME };
 static unsigned char textNonstop[] = { TEXT_NONSTOP };
@@ -2599,8 +2606,48 @@ static s32 bingo_config_target(s32 i, u8 **target) {
         case BINGO_MODE_LOCKOUT:
             *target = textLockout;
             break;
+        case BINGO_MODE_CALLS:
+            *target = textCalls;
+            break;
     }
     return bingo_config_value_x(*target);
+}
+
+// A one-digit count as a dialog-font string (digits are glyphs 0..9).
+static u8 *bingo_config_digit(s32 n) {
+    textDigits[n][0] = (u8) n;
+    textDigits[n][1] = 0xFF;
+    return textDigits[n];
+}
+
+// The Call and Response rows: cycle within the setting's range.
+static s32 bingo_config_count(s32 i, s32 *value, s32 lo, s32 hi, u8 **target) {
+    if (sToggleCurrentOption && sBingoOptionSelection == i) {
+        sToggleCurrentOption = 0;
+        *value = *value >= hi ? lo : *value + 1;
+    }
+    *target = bingo_config_digit(*value);
+    return bingo_config_value_x(*target);
+}
+
+// Settings rows in display order; the Call and Response rows only exist
+// in that mode, and the Opp. rows only online.
+enum BingoConfigRow {
+    CONFIG_ROW_MODE,
+    CONFIG_ROW_CALLS_OPEN,
+    CONFIG_ROW_CALLS_TO_WIN,
+    CONFIG_ROW_UNLOCK,
+    CONFIG_ROW_NONSTOP,
+    CONFIG_ROW_TIMEOUT,
+    CONFIG_ROW_CLAIMS,
+    CONFIG_ROW_LOCATIONS
+};
+
+static enum BingoConfigRow bingo_config_row(s32 i) {
+    if (i > 0 && gbBingoMode != BINGO_MODE_CALLS) {
+        i += 2;
+    }
+    return (enum BingoConfigRow) i;
 }
 
 // The Timeout row: cycle OFF -> 5 -> 15 -> 30 -> 45 -> 60 minutes.
@@ -2662,15 +2709,24 @@ static void print_bingo_configs(void) {
     s32 cfgs = BINGO_CONFIGS_IN_LEFT_COL;
     for (i = 0; i < cfgs; i++) {
         s32 y, shadowAlpha, textAlpha;
+        enum BingoConfigRow row = bingo_config_row(i);
         label = textEmpty;
         target = textEmpty;
         offsetX = 0;
         // Every row runs (even scrolled out of view): the value helpers
         // also apply a pending toggle.
-        if (i == 0) {
+        if (row == CONFIG_ROW_MODE) {
             label = textGameMode;
             offsetX = bingo_config_target(i, &target);
-        } else if (i == 1) {
+        } else if (row == CONFIG_ROW_CALLS_OPEN) {
+            label = textCallsOpen;
+            offsetX = bingo_config_count(i, &gBingoCallsOpen, BINGO_CALLS_OPEN_MIN,
+                                         BINGO_CALLS_OPEN_MAX, &target);
+        } else if (row == CONFIG_ROW_CALLS_TO_WIN) {
+            label = textCallsToWin;
+            offsetX = bingo_config_count(i, &gBingoCallsToWin, BINGO_CALLS_TO_WIN_MIN,
+                                         BINGO_CALLS_TO_WIN_MAX, &target);
+        } else if (row == CONFIG_ROW_UNLOCK) {
             label = textUnlockGame;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
@@ -2682,7 +2738,7 @@ static void print_bingo_configs(void) {
                 target = textOn;
             }
             offsetX = bingo_config_value_x(target);
-        } else if (i == 2) {
+        } else if (row == CONFIG_ROW_NONSTOP) {
             label = textNonstop;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;
@@ -2690,14 +2746,14 @@ static void print_bingo_configs(void) {
             }
             target = gBingoNonstop ? textOn : textOff;
             offsetX = bingo_config_value_x(target);
-        } else if (i == 3) {
+        } else if (row == CONFIG_ROW_TIMEOUT) {
             label = textTimeout;
             offsetX = bingo_config_timeout(i, &target);
 #ifndef TARGET_N64
-        } else if (i == 4) {
+        } else if (row == CONFIG_ROW_CLAIMS) {
             label = textClaims;
             offsetX = bingo_config_claimvis(i, &target);
-        } else if (i == 5) {
+        } else if (row == CONFIG_ROW_LOCATIONS) {
             label = textLocations;
             if (sToggleCurrentOption && sBingoOptionSelection == i) {
                 sToggleCurrentOption = 0;

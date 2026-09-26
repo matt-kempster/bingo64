@@ -403,7 +403,7 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         # (v8 appends unlock and the objective mask to the rebroadcast.)
         a.send("O 0 0 0 0 2 0")
         o = (await b.wait_line("O 0")).split()
-        self.assertEqual(o[1:], ["0", "1", "0", "0", "0", "0"])
+        self.assertEqual(o[1:7], ["0", "1", "0", "0", "0", "0"])
         # Blackout is co-op on a shared board: forced open.
         a.send("O 3 0 0 0 3 1")
         await b.wait_line("O 3 0 1")
@@ -420,7 +420,7 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         # where timeout); guests get everything back except the seed.
         a.send("O 4 1 7ffdf10ebfe 123 0 1 0")
         o = (await b.wait_line("O 4")).split()
-        self.assertEqual(o[1:], ["4", "0", "1", "0", "1", "7ffdf10ebfe"])
+        self.assertEqual(o[1:7], ["4", "0", "1", "0", "1", "7ffdf10ebfe"])
         self.assertNotIn("123", o)  # the seed proposal must not leak
         # A late joiner's welcome carries the same unlock + mask.
         c = self.track(RefClient(self.udp_port))
@@ -453,6 +453,53 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         a.send("X")
         s = (await b.wait_line("S ")).split()
         self.assertEqual(s[4], "3")
+
+    async def test_v11_calls_settings_ride_everywhere(self):
+        # Calls open + calls to win trail O/W/S; out-of-range clamps.
+        a, b = await self.two_joined()
+        a.send("O 5 0 0 0 0 1 0 3 7")
+        o = (await b.wait_line("O 5")).split()
+        self.assertEqual(o[7:], ["3", "7"])
+        a.send("O 5 0 0 0 0 1 0 9 1")
+        o = (await b.wait_line("O 5", skip=1)).split()
+        self.assertEqual(o[7:], ["3", "3"])
+        # An older-shaped O (no calls fields) keeps the room's values.
+        a.send("O 5 0 0 0 2 1 0")
+        o = (await b.wait_line("O 5", skip=2)).split()
+        self.assertEqual(o[2], "0")     # calls forces the OPEN tier
+        self.assertEqual(o[7:], ["3", "3"])
+        c = self.track(RefClient(self.udp_port))
+        await c.start()
+        c.join("testroom", "carol")
+        w = (await c.wait_line("W ")).split()
+        self.assertEqual(w[10:], ["3", "3"])
+        a.send("X")
+        s = (await c.wait_line("S ")).split()
+        self.assertEqual(s[9:], ["3", "3"])
+
+    async def test_v11_calls_first_to_target_wins(self):
+        a, b = await self.two_joined()
+        a.send("O 5 0 0 0 0 1 0 2 3")   # calls, first to 3
+        await b.wait_line("O 5")
+        a.send("X")
+        await b.wait_line("S ")
+        a.send("C 0")
+        b.send("C 0")                   # exclusive: alice already owns it
+        b.send("C 1")
+        a.send("C 2")
+        await b.wait_line("C 2 1")
+        self.assertEqual(b.count("C 0 2"), 0)
+        self.assertEqual(a.count("V "), 0)  # 2-1, far from decided
+        b.send("F")                     # finishes are ignored in calls
+        await asyncio.sleep(0.2)
+        self.assertEqual(a.count("F "), 0)
+        a.send("C 3")
+        v = (await b.wait_line("V ")).split()
+        self.assertEqual(v[1], "1")
+        # The race is over: later claims are refused.
+        b.send("C 9")
+        await asyncio.sleep(0.3)
+        self.assertEqual(a.count("C 9"), 0)
 
     async def test_v7_hidden_tiers_filter_claims(self):
         a, b = await self.two_joined()

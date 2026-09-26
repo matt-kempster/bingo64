@@ -192,8 +192,11 @@ static void bingo_compute_wants(void) {
         if (o->state == BINGO_STATE_COMPLETE) {
             continue;
         }
-        if (gbBingoMode == BINGO_MODE_LOCKOUT && gBingoCellClaimers[i] != 0) {
+        if (bingo_mode_exclusive() && gBingoCellClaimers[i] != 0) {
             continue;
+        }
+        if (!bingo_cell_live(i)) {
+            continue;  // Call and Response: not called (yet)
         }
         switch (o->type) {
             case BINGO_OBJECTIVE_STAR:
