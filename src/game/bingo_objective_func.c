@@ -339,6 +339,30 @@ s32 objective_red_coin_stars(struct BingoObjective *objective, enum BingoObjecti
     }
 }
 
+// The 100-coin star is STAR_INDEX_100_COINS (6) in every main course.
+// Recounted from the star flags like the red coin stars.
+s32 objective_hundred_coin_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+    s32 count = 0;
+    s32 old_count;
+    s32 course;
+
+    if (update == BINGO_UPDATE_STAR) {
+        for (course = COURSE_MIN; course <= COURSE_STAGES_MAX; course++) {
+            if (bingo_get_course_flags(course - 1) & (1 << STAR_INDEX_100_COINS)) {
+                count++;
+            }
+        }
+        old_count = data->gotten;
+        data->gotten = count;
+        if (count >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (count > old_count) {
+            bingo_hud_update_number(objective->icon, count);
+        }
+    }
+}
+
 // Toad and MIPS stars live in the castle "course" (bingo_set_star(-1, i)).
 // Count the race's castle stars in `mask`, like the red coin star recount.
 static s32 objective_castle_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update,
@@ -587,6 +611,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_cannon_stars(objective, update);
         case BINGO_OBJECTIVE_RED_COIN_STARS:
             return objective_red_coin_stars(objective, update);
+        case BINGO_OBJECTIVE_HUNDRED_COIN_STARS:
+            return objective_hundred_coin_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_LIVES:

@@ -187,8 +187,11 @@ enum BingoObjectiveType
     // Catch MIPS and collect his star.
     BINGO_OBJECTIVE_MIPS,
     BINGO_OBJECTIVE_PROGRESSION_MAX = BINGO_OBJECTIVE_MIPS,
+    // Collect N of the 15 main courses' 100-coin stars. Counts (course, star
+    // 6) pairs like RED_COIN_STARS; appended so earlier type numbers stay put.
+    BINGO_OBJECTIVE_HUNDRED_COIN_STARS,
     // End
-    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_MIPS,
+    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_HUNDRED_COIN_STARS,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
 };
 
@@ -261,7 +264,8 @@ enum BingoObjectiveIcon {
     BINGO_ICON_SPIN_HEARTS,
     BINGO_ICON_OPEN_CANNONS,
     BINGO_ICON_TOAD_STARS,
-    BINGO_ICON_MIPS
+    BINGO_ICON_MIPS,
+    BINGO_ICON_HUNDRED_COIN_STARS
 };
 
 enum BingoObjectiveUpdate

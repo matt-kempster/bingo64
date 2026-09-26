@@ -1,25 +1,25 @@
-00 type=00 class=0 icon=02 title="JRBú4" course=3 star=3
-01 type=02 class=1 icon=04 title="TTCú6" course=14 star=5
-02 type=32 class=1 icon=30 title="x16" toGet=16
-03 type=34 class=1 icon=32 title="x9" toGet=9
-04 type=00 class=2 icon=02 title="WDWú6" course=11 star=5
-05 type=31 class=1 icon=28 title="x6" toGet=6
-06 type=03 class=2 icon=05 title="TTMú6" course=12 star=5 hint="Use the Crazy Box to get to the mushroom."
-07 type=37 class=1 icon=36 title="x7" toGet=7
-08 type=16 class=0 icon=53 title="BBH 100" course=5 toGet=100
-09 type=00 class=1 icon=02 title="LLLú6" course=7 star=5
-10 type=00 class=1 icon=02 title="CCMú6" course=4 star=5
-11 type=10 class=1 icon=12 title="VCutMú" course=22 star=0
-12 type=26 class=3 icon=16 title="x15" toGetTotal=15 toGetEachCourse=1
-13 type=50 class=1 icon=49 title="x4" toGet=4
-14 type=22 class=1 icon=55 title="x10" toGet=10
-15 type=47 class=1 icon=46 title="x6" toGet=6
-16 type=58 class=0 icon=61 title="x3" toGet=3
-17 type=17 class=1 icon=20 title="6x 4c" toGetTotal=4 toGetEachCourse=6
-18 type=10 class=2 icon=12 title="SLú7" course=10 star=6
-19 type=42 class=1 icon=41 title="x4" toGet=4
-20 type=32 class=2 icon=30 title="x29" toGet=29
-21 type=23 class=1 icon=27 title="x1" toGet=1
-22 type=14 class=1 icon=18 title="WF 4" course=2 toGet=4
-23 type=49 class=1 icon=48 title="x5" toGet=5
-24 type=27 class=0 icon=22 title="x5" toGet=5
+00 type=16 class=0 icon=53 title="THI 70" course=13 toGet=70
+01 type=10 class=1 icon=12 title="RRú4" course=15 star=3
+02 type=55 class=1 icon=56 title="x18" toGet=18
+03 type=22 class=1 icon=55 title="x8" toGet=8
+04 type=09 class=2 icon=10 title="WDWú2" course=11 star=1
+05 type=42 class=1 icon=41 title="x4" toGet=4
+06 type=37 class=2 icon=36 title="x13" toGet=13
+07 type=34 class=1 icon=32 title="x8" toGet=8
+08 type=25 class=0 icon=15 title="x4" toGet=4
+09 type=02 class=1 icon=04 title="TTCú4" course=14 star=3
+10 type=00 class=1 icon=02 title="WDWú7" course=11 star=6
+11 type=00 class=1 icon=02 title="VCutMú" course=22 star=0
+12 type=39 class=3 icon=38 title="x16" toGet=16
+13 type=15 class=1 icon=19 title="SSLú5" course=8 toGet=4
+14 type=08 class=1 icon=09 title="THIú3" course=13 star=2
+15 type=15 class=1 icon=19 title="RRú3" course=15 toGet=2
+16 type=27 class=0 icon=22 title="x6" toGet=6
+17 type=48 class=1 icon=47 title="x6" toGet=6
+18 type=06 class=2 icon=58 title="RRú4" course=15 star=3
+19 type=01 class=1 icon=03 title="RRú3" course=15 star=2 maxTime=2010
+20 type=30 class=2 icon=35 title="x13" toGet=13
+21 type=02 class=1 icon=04 title="TTCú6" course=14 star=5
+22 type=59 class=1 icon=57 title="x3" toGet=3
+23 type=00 class=1 icon=02 title="WFú4" course=2 star=3
+24 type=12 class=0 icon=13 title="CCM 52" course=4 toGet=52

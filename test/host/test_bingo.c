@@ -318,6 +318,7 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_OPEN_CANNONS] = "OPEN_CANNONS",
     [BINGO_OBJECTIVE_TOAD_STARS] = "TOAD_STARS",
     [BINGO_OBJECTIVE_MIPS] = "MIPS",
+    [BINGO_OBJECTIVE_HUNDRED_COIN_STARS] = "HUNDRED_COIN_STARS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -815,6 +816,52 @@ static void test_sim_red_coin_stars_objective(void) {
     gCurrCourseNum = COURSE_BITDW;
     gbStarIndex = 0;
     bingo_set_star(COURSE_BITDW - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+}
+
+static void test_sim_hundred_coin_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_HUNDRED_COIN_STARS;
+    o->data.collectableData.toGet = 2;
+
+    // Another WF star (act 1) does nothing.
+    gCurrCourseNum = COURSE_WF;
+    gbStarIndex = 0;
+    bingo_set_star(COURSE_WF - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // WF's 100-coin star counts and updates the HUD.
+    gbStarIndex = 6;
+    bingo_set_star(COURSE_WF - 1, 6);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+    CHECK_EQ_INT(gGlueHudNumberLast, 1);
+
+    // Re-collecting it doesn't count twice.
+    bingo_set_star(COURSE_WF - 1, 6);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    CHECK_EQ_INT(gGlueHudNumberCalls, 1);
+
+    // Bit 6 in a secret course isn't a 100-coin star.
+    gCurrCourseNum = COURSE_BITDW;
+    bingo_set_star(COURSE_BITDW - 1, 6);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    // RR's (the last main course) completes it.
+    gCurrCourseNum = COURSE_RR;
+    bingo_set_star(COURSE_RR - 1, 6);
     bingo_update(BINGO_UPDATE_STAR);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
     CHECK_EQ_INT(o->data.collectableData.gotten, 2);
@@ -1724,6 +1771,7 @@ int main(void) {
     RUN_TEST(test_sim_coin_objective);
     RUN_TEST(test_sim_cannon_stars_objective);
     RUN_TEST(test_sim_red_coin_stars_objective);
+    RUN_TEST(test_sim_hundred_coin_stars_objective);
     RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_unique_deaths);
     RUN_TEST(test_sim_random_stars_objective);

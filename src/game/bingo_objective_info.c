@@ -80,6 +80,10 @@ ALIGNED8 static const u8 seg2_texture_redcoinstar[] = {
 #include "textures/segment2/custom/segment2.redcoinstar.rgba16.inc.c"
 };
 
+ALIGNED8 static const u8 seg2_texture_hundredcoinstar[] = {
+#include "textures/segment2/custom/segment2.hundredcoinstar.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -337,6 +341,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_OPEN_CANNONS, BINGO_ICON_OPEN_CANNONS, { TEXT_OPEN_CANNONS }, seg2_texture_bombbuddy },
     { BINGO_OBJECTIVE_TOAD_STARS, BINGO_ICON_TOAD_STARS, { TEXT_TOAD_STARS }, seg2_texture_toad },
     { BINGO_OBJECTIVE_MIPS, BINGO_ICON_MIPS, { TEXT_MIPS }, seg2_texture_mips },
+    { BINGO_OBJECTIVE_HUNDRED_COIN_STARS, BINGO_ICON_HUNDRED_COIN_STARS, { TEXT_HUNDRED_COIN_STARS }, seg2_texture_hundredcoinstar },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

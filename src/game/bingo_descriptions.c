@@ -529,6 +529,17 @@ void get_red_coin_stars_objective_desc(struct BingoObjective *obj, char *desc) {
             obj->data.collectableData.toGet, obj->data.collectableData.toGet == 1 ? "" : "s", suffix);
 }
 
+void get_hundred_coin_stars_objective_desc(struct BingoObjective *obj, char *desc) {
+    char suffix[20];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Remaining: %d", obj->data.collectableData.toGet - obj->data.collectableData.gotten);
+    }
+    sprintf(desc, "Collect %d 100 coin star%s (the star for 100 coins in one of the 15 main courses)%s",
+            obj->data.collectableData.toGet, obj->data.collectableData.toGet == 1 ? "" : "s", suffix);
+}
+
 // Progression objectives: dealt only with unlock OFF, where the race file
 // starts fresh (closed cannons and doors, no Toad or MIPS stars).
 void get_progression_objective_desc(struct BingoObjective *obj, char *desc) {
@@ -870,6 +881,9 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_RED_COIN_STARS:
             get_red_coin_stars_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_HUNDRED_COIN_STARS:
+            get_hundred_coin_stars_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_OPEN_CANNONS:
         case BINGO_OBJECTIVE_TOAD_STARS:
