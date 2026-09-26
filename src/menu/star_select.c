@@ -137,9 +137,9 @@ void render_100_coin_star(u8 stars) {
 // work) picks it, left/right picks the act as in vanilla. A strip of the
 // board's own icons where the old 3D modifier stars were. Gold sparkles
 // mark what the board wants in this course (acts some tile needs,
-// modifiers some tile needs); a check beside the name says the current act
-// + modifier would score a tile, and "BOARD WANTS <icons>" warns when this
-// act's tile needs a different modifier.
+// modifiers some tile needs). Under the name, "BOARD" + a status dot:
+// green when this act + modifier would score a tile, red when this act's
+// tile needs a different modifier, no line otherwise.
 
 // Icon per enum BingoModifier (the icon its board tiles use).
 static const u8 sBingoModifierIcons[BINGO_STARS_TOTAL_AMOUNT] = {
@@ -509,7 +509,7 @@ void print_course_number(void) {
 #endif
 
 u8 gBingoTextNoModifier[] = { BINGO_NO_MODIFIER };
-u8 gBingoTextBoardWants[] = { BINGO_BOARD_WANTS };
+u8 gBingoTextBoard[] = { BINGO_BOARD_STATUS };
 u8 gBingoTextGreenDemon[] = { BINGO_GREEN_DEMON };
 u8 gBingoTextReverseJoystick[] = { BINGO_REVERSE_JOYSTICK };
 u8 gBingoTextClickGame[] = { BINGO_CLICK_GAME };
@@ -531,6 +531,18 @@ static void print_want_sparkle(s32 x, s32 y) {
     print_solid_color_quad(x + 3, y + 3, x + 4, y + 4, 255, 245, 170, 255);
 }
 
+// A round 7x7 status dot (a square with its corners knocked off), green
+// or red, with a darker rim.
+static void print_status_dot(s32 x, s32 y, s32 good) {
+    u8 r = good ? 30 : 205, g = good ? 150 : 40, b = good ? 50 : 30;
+    u8 lr = good ? 90 : 245, lg = good ? 210 : 100, lb = good ? 100 : 80;
+    print_solid_color_quad(x + 2, y, x + 5, y + 7, r, g, b, 255);
+    print_solid_color_quad(x, y + 2, x + 7, y + 5, r, g, b, 255);
+    print_solid_color_quad(x + 1, y + 1, x + 6, y + 6, r, g, b, 255);
+    print_solid_color_quad(x + 2, y + 2, x + 5, y + 5, lr, lg, lb, 255);
+    print_solid_color_quad(x + 2, y + 2, x + 3, y + 3, 255, 255, 255, 255);
+}
+
 static void print_modifier_icon(s32 x, s32 topY, s32 icon, u8 alpha) {
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
     print_bingo_icon_alpha(x, 224 - topY, icon, alpha);
@@ -541,7 +553,7 @@ static void print_bingo_modifier_picker(u8 *name) {
     s32 i, x;
     s32 act = sSelectedActIndex + 1;
     s32 mod = gBingoStarSelected;
-    s32 scores, nameLeft, nameRight, wantsLeft, nWants;
+    s32 scores, textLeft, nWants;
 
     bingo_compute_wants();
     // A plain-star tile still counts with a modifier on.
@@ -566,40 +578,26 @@ static void print_bingo_modifier_picker(u8 *name) {
         print_modifier_icon(x, MOD_STRIP_Y, sBingoModifierIcons[i], i == mod ? 255 : 120);
     }
 
-    // Name, with a check when this act + modifier would score a tile.
-    // (8.0: the menu font's per-glyph scale, as the act name uses.)
-    nameLeft = get_str_x_pos_from_center(159, name, 8.0f);
-    nameRight = 159 + (159 - nameLeft);
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
-    print_menu_generic_string(nameLeft, 112, name);
+    print_menu_generic_string(get_str_x_pos_from_center(159, name, 8.0f), 112, name);
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
-    if (scores) {
-        print_modifier_icon(nameRight + 1, 110, BINGO_ICON_SUCCESS, 255);
-        return;
-    }
 
-    // Otherwise warn when this act's tile wants another modifier.
     nWants = 0;
     for (i = 1; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
         nWants += sWantPair[act][i];
     }
-    if (nWants == 0) {
+    if (!scores && nWants == 0) {
         return;
     }
-    // Text + icons centred as one line: text centre c, icons right after.
-    wantsLeft = get_str_x_pos_from_center(159 - nWants * 9, gBingoTextBoardWants, 8.0f);
-    x = (159 - nWants * 9) * 2 - wantsLeft + 4;
+    // "BOARD" + dot centred as one line (dot 7 wide, 4 gap).
+    textLeft = get_str_x_pos_from_center(159 - 6, gBingoTextBoard, 8.0f);
+    x = (159 - 6) * 2 - textLeft + 4;
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
-    gDPSetEnvColor(gDisplayListHead++, 170, 90, 0, 255);
-    print_menu_generic_string(wantsLeft, 128, gBingoTextBoardWants);
+    gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
+    print_menu_generic_string(textLeft, 127, gBingoTextBoard);
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
-    for (i = 1; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
-        if (sWantPair[act][i]) {
-            print_modifier_icon(x, 126, sBingoModifierIcons[i], 255);
-            x += 18;
-        }
-    }
+    print_status_dot(x, 129, scores);
 }
 
 /**
