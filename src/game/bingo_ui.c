@@ -889,6 +889,8 @@ static void draw_calls_screen(void) {
     }
 }
 
+#define CALLS_HUD_X (SCREEN_WIDTH - 40)
+
 // HUD: the open calls' icons, bottom-right, always up. On PC a new call
 // also gets a toast ("New call [icon] BoB*3").
 void draw_bingo_calls_hud(void) {
@@ -921,12 +923,26 @@ void draw_bingo_calls_hud(void) {
         sPrevOpen = open;
     }
 #endif
-    // A column above the camera widget, the oldest call on top.
+    // A column above the camera widget, the oldest call on top, each
+    // icon with its board caption ("CCM 80") on a dim strip to its left.
+    for (i = 24; i >= 0; i--) {
+        s32 cell = gBingoCallQueue[i];
+        if ((open >> cell) & 1) {
+            s32 top = 224 - (44 + 20 * k);  // the icon's top edge, top-down
+            print_solid_color_quad(CALLS_HUD_X - 6 - strlen_tiny(gBingoObjectives[cell].title),
+                                   top + 3, CALLS_HUD_X - 1, top + 13, 0, 0, 0, 140);
+            k++;
+        }
+    }
+    k = 0;
     gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
     for (i = 24; i >= 0; i--) {
         s32 cell = gBingoCallQueue[i];
         if ((open >> cell) & 1) {
-            print_bingo_icon_alpha(SCREEN_WIDTH - 40, 44 + 20 * k, gBingoObjectives[cell].icon, 255);
+            // (Tiny text counts y from the top, icons from the bottom.)
+            print_bingo_icon_alpha(CALLS_HUD_X, 44 + 20 * k, gBingoObjectives[cell].icon, 255);
+            print_text_tiny(CALLS_HUD_X - 3 - strlen_tiny(gBingoObjectives[cell].title),
+                            184 - 20 * k, gBingoObjectives[cell].title);
             k++;
         }
     }
