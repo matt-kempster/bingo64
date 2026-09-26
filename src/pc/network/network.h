@@ -173,11 +173,16 @@ s32 network_local_ready(void);
 // Frames (30/s) until GO. Positive during the countdown, 0 once racing.
 s32 network_countdown_frames(void);
 
+// Objective mask on the wire: hex, bit i = type i disabled. 32 digits =
+// 128 types (the relay clamps to the same width).
+#define NET_MASK_HEX_LEN 33
+#define NET_MASK_SCAN "%32s"
+
 // Send the room's settings (server only accepts them from the host).
-// mask bit i set = objective type i disabled; seed 0 = random at start.
+// maskHex bit i set = objective type i disabled; seed 0 = random at start.
 // The options that arrive with the start message are applied to the
 // bingo globals directly. timeoutMin: race timeout in minutes (0 = off).
-void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
+void network_send_options(s32 mode, s32 unlock, const char *maskHex, u32 seed,
                           s32 claimVis, s32 whereabouts, s32 timeoutMin);
 // Push the current bingo globals as room options (no-op unless we are
 // the room creator). Called after the welcome and whenever the options

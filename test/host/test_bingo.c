@@ -319,6 +319,7 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_TOAD_STARS] = "TOAD_STARS",
     [BINGO_OBJECTIVE_MIPS] = "MIPS",
     [BINGO_OBJECTIVE_HUNDRED_COIN_STARS] = "HUNDRED_COIN_STARS",
+    [BINGO_OBJECTIVE_CASTLE_SECRET_STARS] = "CASTLE_SECRET_STARS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -865,6 +866,50 @@ static void test_sim_hundred_coin_stars_objective(void) {
     bingo_update(BINGO_UPDATE_STAR);
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
     CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+}
+
+static void test_sim_castle_secret_stars_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_star_reset();
+    gGlueHudNumberCalls = 0;
+    gGlueHudNumberLast = -1;
+    o->type = BINGO_OBJECTIVE_CASTLE_SECRET_STARS;
+    o->data.collectableData.toGet = 4;
+
+    // A main-course star does nothing.
+    gCurrCourseNum = COURSE_BOB;
+    gbStarIndex = 0;
+    bingo_set_star(COURSE_BOB - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 0);
+
+    // Both slide stars count.
+    gCurrCourseNum = COURSE_PSS;
+    bingo_set_star(COURSE_PSS - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    bingo_set_star(COURSE_PSS - 1, 1);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    CHECK_EQ_INT(gGlueHudNumberLast, 2);
+
+    // Re-collecting one doesn't count twice.
+    bingo_set_star(COURSE_PSS - 1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+
+    // A Toad star (castle "course", bingo_set_star(-1, i)) counts.
+    gCurrCourseNum = COURSE_NONE;
+    bingo_set_star(-1, 0);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 3);
+
+    // A MIPS star (castle bit 3) completes it.
+    bingo_set_star(-1, 3);
+    bingo_update(BINGO_UPDATE_STAR);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 4);
 }
 
 static void test_sim_splatoon_objective(void) {
@@ -1690,6 +1735,20 @@ static void test_presets_generate_clean_boards(void) {
     u32 seed;
     int i;
 
+    // Types past 63 live in the second mask word: SRL must enable the
+    // castle secret stars (64) and still disable everything off-list,
+    // including the last type.
+    bingo_preset_apply(BINGO_PRESET_SRL);
+    CHECK_EQ_INT(BINGO_OBJECTIVE_CASTLE_SECRET_STARS >= 64, 1);
+    CHECK_EQ_INT(gBingoObjectivesDisabled[BINGO_OBJECTIVE_CASTLE_SECRET_STARS], 0);
+    CHECK_EQ_INT(gBingoObjectivesDisabled[BINGO_OBJECTIVE_HUNDRED_COIN_STARS], 0);
+    CHECK_EQ_INT(gBingoObjectivesDisabled[BINGO_OBJECTIVE_SPLATOON], 1);
+    CHECK_EQ_INT(gBingoObjectivesDisabled[BINGO_OBJECTIVE_MIPS], 1);
+    gBingoObjectivesDisabled[BINGO_OBJECTIVE_CASTLE_SECRET_STARS] = 1;
+    CHECK_EQ_INT(bingo_preset_current(), -1);
+    bingo_preset_apply(BINGO_PRESET_VANILLA);
+    CHECK_EQ_INT(gBingoObjectivesDisabled[BINGO_OBJECTIVE_CASTLE_SECRET_STARS], 0);
+
     for (p = 0; p < BINGO_PRESET_COUNT; p++) {
         bingo_preset_apply(p);
         CHECK_EQ_INT(bingo_preset_current(), p);
@@ -1772,6 +1831,7 @@ int main(void) {
     RUN_TEST(test_sim_cannon_stars_objective);
     RUN_TEST(test_sim_red_coin_stars_objective);
     RUN_TEST(test_sim_hundred_coin_stars_objective);
+    RUN_TEST(test_sim_castle_secret_stars_objective);
     RUN_TEST(test_sim_splatoon_objective);
     RUN_TEST(test_sim_unique_deaths);
     RUN_TEST(test_sim_random_stars_objective);

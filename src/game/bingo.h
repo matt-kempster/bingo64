@@ -190,8 +190,12 @@ enum BingoObjectiveType
     // Collect N of the 15 main courses' 100-coin stars. Counts (course, star
     // 6) pairs like RED_COIN_STARS; appended so earlier type numbers stay put.
     BINGO_OBJECTIVE_HUNDRED_COIN_STARS,
+    // Collect N of the 15 castle secret stars: the 10 in the secret courses
+    // plus Toad x3 and MIPS x2. With unlock ON the save already holds the
+    // Toad/MIPS stars, so only the 10 course stars are collectable.
+    BINGO_OBJECTIVE_CASTLE_SECRET_STARS,
     // End
-    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_HUNDRED_COIN_STARS,
+    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_CASTLE_SECRET_STARS,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
 };
 
@@ -265,7 +269,8 @@ enum BingoObjectiveIcon {
     BINGO_ICON_OPEN_CANNONS,
     BINGO_ICON_TOAD_STARS,
     BINGO_ICON_MIPS,
-    BINGO_ICON_HUNDRED_COIN_STARS
+    BINGO_ICON_HUNDRED_COIN_STARS,
+    BINGO_ICON_CASTLE_SECRET_STARS
 };
 
 enum BingoObjectiveUpdate
@@ -469,8 +474,12 @@ enum BingoPresetId {
     BINGO_PRESET_COUNT
 };
 
+// Objective toggles as a bitmask: bit i = enum BingoObjectiveType i.
+#define BINGO_MASK_WORDS 2
+#define BINGO_MASK_BIT(mask, i) (((mask)[(i) >> 6] >> ((i) & 63)) & 1)
+
 struct BingoPreset {
-    u64 objectivesDisabled; // bit i = enum BingoObjectiveType i disabled
+    u64 objectivesDisabled[BINGO_MASK_WORDS]; // bit i set = type i disabled
     u8 fullGameUnlocked;
     enum BingoGameMode mode;
 };

@@ -70,7 +70,8 @@ Line protocol (space-separated fields):
     O <mode> <unlock> <maskhex> <seed> <claimvis> <where> <timeout>
                              room settings (host only, before the start):
                              game mode 0..4, full-game unlock,
-                             disabled-objective bitmask as hex, the
+                             disabled-objective bitmask as hex (up
+                             to 128 bits), the
                              seed proposal (0 = random at start), the
                              claim-visibility tier 0..3 (open/progress/
                              bingos/hidden; invalid tier+mode pairs are
@@ -951,7 +952,8 @@ class Relay:
             room.mode = clamped_int(parts[1], 0, 4)
             room.unlock = clamped_int(parts[2], 0, 1)
             try:
-                room.mask = int(parts[3], 16) & (2 ** 64 - 1)
+                # 128 bits = 32 hex digits, the client's NET_MASK_HEX_LEN.
+                room.mask = int(parts[3], 16) & (2 ** 128 - 1)
             except ValueError:
                 room.mask = 0
             if len(parts) >= 5:

@@ -183,7 +183,7 @@ const char *gen_presets_json(void) {
         emitf(",\"off\":[");
         first = 1;
         for (t = 0; t < BINGO_OBJECTIVE_TOTAL_AMOUNT; t++) {
-            if ((gBingoPresets[p].objectivesDisabled >> t) & 1) {
+            if (BINGO_MASK_BIT(gBingoPresets[p].objectivesDisabled, t)) {
                 emitf(first ? "%d" : ",%d", t);
                 first = 0;
             }

@@ -37,7 +37,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 1 | Peach's Slide x 2 | secrets | PARAM | `STARS_IN_LEVEL` (PSS, 2). The detector (`bingo_get_course_count`) works for any course, but the init only picks main courses. Also covered by the star-set counter (§2). |
 | 1 | Reach the Castle Roof | lives | EXACT | `ROOF_WITHOUT_CANNON`. On a fresh file the grounds cannon needs 120 stars, so "without cannon" is implied. |
 | 1 | Lose Mario's Hat | losehat | PARAM | `LOSE_MARIO_HAT` with N=1 (the init gives 3–4). |
-| 2 | 5 Castle Secret Stars | secrets | NEW | Star-set counter over the 15 castle secret stars (§2) |
+| 2 | 5 Castle Secret Stars | secrets | EXACT | `CASTLE_SECRET_STARS` N=5 (hard) |
 | 2 | Beat the King in BOB | BOB | EXACT | `STAR` (BOB, 0). The goal name has a trailing space (list:24). |
 | 2 | Two Bowser Stage Red Coin Stars | bowserreds | PARAM | `RED_COIN_STARS` restricted to BitDW/BitFS/BitS, N=2 (needs a course-mask field) |
 | 2 | Collect 120 Coins in one stage | WF, hundredcoin | PARAM | `COIN` with course = any and N=120. The per-visit counter already resets on course change. The init caps N at 99 and always pins a course. |
@@ -59,7 +59,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 6 | Red Coin Star in BOB | BOB | EXACT | `STAR` (BOB, 3) |
 | 6 | 2 Cap Stage Stars | wingcap, vanishcap, metalcap, secrets | PARAM | `RED_COIN_STARS` masked to TotWC/CotMC/VCutM (each cap stage has only its red coin star), N=2 |
 | 6 | Red Coin Star in BBH | BBH | EXACT | `STAR` (BBH, 3) |
-| 7 | 7 Castle Secret Stars | secrets | NEW | Castle-secrets star-set counter, N=7 |
+| 7 | 7 Castle Secret Stars | secrets | PARAM | `CASTLE_SECRET_STARS` N=7 (init caps at 5) |
 | 7 | 100 Coin Star in LLL | LLL | EXACT | `STAR` (LLL, 6) |
 | 7 | 20 lives | lives | PARAM | `LIVES` 20 (the init caps it at 15) |
 | 7 | Red Coin Star in SSL | SSL, wingcap | EXACT | `STAR` (SSL, 4) |
@@ -99,7 +99,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 15 | 30 Total Stars | manystar | PARAM | `MULTISTAR` 30 (the init caps it at 12). It counts stars from this race, not the save file. |
 | 15 | 100 Coin Star in SL | SL, vanishcap | EXACT | `STAR` (SL, 6) |
 | 15 | Rematch with Koopa the Quick THI | THI | EXACT | `STAR` (THI, 2) |
-| 16 | 10 Castle Secret Stars | secrets, aquarium | NEW | Castle-secrets set, N=10. The 10 non-Toad/MIPS secrets are enough. |
+| 16 | 10 Castle Secret Stars | secrets, aquarium | PARAM | `CASTLE_SECRET_STARS` N=10 (init caps at 5). The 10 non-Toad/MIPS secrets are enough. |
 | 16 | At least 3 stars from 6 stages | starseach, manystar | EXACT | `STARS_MULTIPLE_LEVELS` K=3, N=6 (CENTER gives 3×5–6) |
 | 16 | At least 2 stars from 10 stages | starseach, manystar | PARAM | `STARS_MULTIPLE_LEVELS` K=2, N=10 (the init caps K=2 at N=8) |
 | 16 | All Stars in JRB | JRB | EXACT | `STARS_IN_LEVEL` (JRB, 7) |
@@ -123,7 +123,7 @@ Star indices below are 0-based, as used by `StarObjectiveData.starIndex`.
 | 21 | Win All 3 Character Races | BOB, CCM, THI | EXACT | `RACING_STARS`: KTQ BOB, Big Penguin Race, KTQ rematch. The same three as the types. |
 | 21 | At least 3 stars from 8 stages | starseach, manystar | PARAM | `STARS_MULTIPLE_LEVELS` K=3, N=8 (the init caps K=3 at N=6) |
 | 21 | All Stars in TTM | TTM | EXACT | `STARS_IN_LEVEL` (TTM, 7) |
-| 22 | 12 Castle Secret Stars | secrets, aquarium | NEW | Castle-secrets set, N=12. It needs at least 2 Toad/MIPS stars, so it also depends on PLANNED and unlock OFF (§4). |
+| 22 | 12 Castle Secret Stars | secrets, aquarium | PARAM | `CASTLE_SECRET_STARS` N=12 (init caps at 5). It needs at least 2 Toad/MIPS stars, so it also depends on PLANNED and unlock OFF (§4). |
 | 22 | 35 Total Stars | manystar | PARAM | `MULTISTAR` 35 |
 | 22 | 6 Stars in RR | RR | EXACT | `STARS_IN_LEVEL` (RR, 6) |
 | 23 | Star #1 from each stage | starseach | NEW | All-of star set: star 0 of the 15 mains |

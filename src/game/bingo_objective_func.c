@@ -363,6 +363,47 @@ s32 objective_hundred_coin_stars(struct BingoObjective *objective, enum BingoObj
     }
 }
 
+// The 10 secret-course stars (course, 0-based star index); Toad and MIPS
+// come from gbSecretStarFlags on top.
+static const struct {
+    u8 course;
+    u8 starIndex;
+} sCastleSecretCourseStars[] = {
+    { COURSE_PSS, 0 },   { COURSE_PSS, 1 },   { COURSE_SA, 0 },    { COURSE_TOTWC, 0 },
+    { COURSE_COTMC, 0 }, { COURSE_VCUTM, 0 }, { COURSE_WMOTR, 0 }, { COURSE_BITDW, 0 },
+    { COURSE_BITFS, 0 }, { COURSE_BITS, 0 },
+};
+
+// No unlock special case: unlock ON stamps Toad/MIPS into the save file,
+// not the race flags, and a collected Toad/MIPS star never respawns.
+s32 objective_castle_secret_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+    s32 count = 0;
+    s32 old_count;
+    u32 i;
+    u32 flags;
+
+    if (update == BINGO_UPDATE_STAR) {
+        for (i = 0; i < sizeof(sCastleSecretCourseStars) / sizeof(sCastleSecretCourseStars[0]); i++) {
+            if (bingo_get_course_flags(sCastleSecretCourseStars[i].course - 1)
+                & (1 << sCastleSecretCourseStars[i].starIndex)) {
+                count++;
+            }
+        }
+        for (flags = gbSecretStarFlags & (BINGO_SECRET_FLAGS_TOAD | BINGO_SECRET_FLAGS_MIPS); flags != 0;
+             flags &= flags - 1) {
+            count++;
+        }
+        old_count = data->gotten;
+        data->gotten = count;
+        if (count >= data->toGet) {
+            set_objective_state(objective, BINGO_STATE_COMPLETE);
+        } else if (count > old_count) {
+            bingo_hud_update_number(objective->icon, count);
+        }
+    }
+}
+
 // Toad and MIPS stars live in the castle "course" (bingo_set_star(-1, i)).
 // Count the race's castle stars in `mask`, like the red coin star recount.
 static s32 objective_castle_stars(struct BingoObjective *objective, enum BingoObjectiveUpdate update,
@@ -613,6 +654,8 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             return objective_red_coin_stars(objective, update);
         case BINGO_OBJECTIVE_HUNDRED_COIN_STARS:
             return objective_hundred_coin_stars(objective, update);
+        case BINGO_OBJECTIVE_CASTLE_SECRET_STARS:
+            return objective_castle_secret_stars(objective, update);
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             return objective_stars_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_LIVES:

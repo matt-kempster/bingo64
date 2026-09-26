@@ -133,7 +133,7 @@ static s32 sPendingClaimVis = -1;  // visibility settings riding the same W
 static s32 sPendingWhereabouts = -1;
 static s32 sPendingTimeout = -1;   // race timeout (minutes) riding the same W
 static s32 sPendingUnlock = -1;    // full-game unlock riding the same W (v8)
-static unsigned long long sPendingMask = 0;  // objective mask, ditto
+static char sPendingMask[NET_MASK_HEX_LEN] = "0";  // objective mask, ditto
 
 // Room visibility settings (v6). The host's local values are the room's;
 // everyone else receives them via W/O/S.
@@ -423,13 +423,45 @@ static const char *place_suffix(s32 place) {
     return "th";
 }
 
-// The room's objective toggles arrive as a u64 bitmask (bit i = type i
-// disabled) on W, O, and S; one decoder keeps the three in lockstep.
-static void apply_objective_mask(unsigned long long mask) {
-    s32 i;
-    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
-        gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
+// The room's objective toggles travel as a hex bitmask (bit i = type i
+// disabled) on W, O, and S; one decoder keeps the three in lockstep. Kept
+// as text end to end so the width grows with the type count.
+static void apply_objective_mask(const char *hex) {
+    s32 len = (s32) strlen(hex);
+    s32 i, nib, v;
+    char c;
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        nib = len - 1 - i / 4;
+        v = 0;
+        if (nib >= 0) {
+            c = hex[nib];
+            if (c >= '0' && c <= '9') v = c - '0';
+            else if (c >= 'a' && c <= 'f') v = c - 'a' + 10;
+            else if (c >= 'A' && c <= 'F') v = c - 'A' + 10;
+        }
+        gBingoObjectivesDisabled[i] = (u8) ((v >> (i % 4)) & 1);
     }
+}
+
+// The local toggles as the same hex (most significant nibble first, no
+// leading zeros).
+static void format_objective_mask(char *out) {
+    s32 nibs = (BINGO_OBJECTIVE_TOTAL_AMOUNT + 3) / 4;
+    s32 k, b, v, t;
+    char *p = out;
+    for (k = nibs - 1; k >= 0; k--) {
+        v = 0;
+        for (b = 0; b < 4; b++) {
+            t = k * 4 + b;
+            if (t < BINGO_OBJECTIVE_TOTAL_AMOUNT && gBingoObjectivesDisabled[t]) {
+                v |= 1 << b;
+            }
+        }
+        if (v != 0 || p != out || k == 0) {
+            *p++ = "0123456789abcdef"[v];
+        }
+    }
+    *p = '\0';
 }
 
 static void handle_line(char *line) {
@@ -441,10 +473,10 @@ static void handle_line(char *line) {
         s32 id = 0;
         s32 nFields;
         u32 token = 0;
-        unsigned long long mask = 0;
-        nFields = sscanf(line + 1, "%d %d %d %u %d %d %d %d %llx", &id,
+        char mask[NET_MASK_HEX_LEN] = "0";
+        nFields = sscanf(line + 1, "%d %d %d %u %d %d %d %d " NET_MASK_SCAN, &id,
                          &public_, &mode, &token, &claimVis, &where,
-                         &timeoutMin, &unlock, &mask);
+                         &timeoutMin, &unlock, mask);
         if (nFields == 9) {
             // An older relay packs other fields here; fail loudly instead
             // of running a half-broken lobby against an outdated server.
@@ -485,7 +517,7 @@ static void handle_line(char *line) {
             sPendingWhereabouts = where;
             sPendingTimeout = timeoutMin;
             sPendingUnlock = unlock;
-            sPendingMask = mask;
+            snprintf(sPendingMask, sizeof(sPendingMask), "%s", mask);
             // A started room's S replay follows immediately and advances
             // us back to COUNTDOWN/RACING.
             sState = NET_STATE_LOBBY;
@@ -519,7 +551,7 @@ static void handle_line(char *line) {
             sPendingWhereabouts = -1;
             sPendingTimeout = -1;
             sPendingUnlock = -1;
-            sPendingMask = 0;
+            snprintf(sPendingMask, sizeof(sPendingMask), "0");
             // The role passed on (0 = the initial announcement).
             if (prevHost != 0 && id != prevHost) {
                 if (id == sLocalId) {
@@ -533,9 +565,9 @@ static void handle_line(char *line) {
         u32 seed = 0;
         s32 delta = 0, mode = 0, unlock = 0, claimVis = 0, where = 1;
         s32 timeoutMin = 0;
-        unsigned long long mask = 0;
-        if (sscanf(line + 1, "%u %d %d %d %llx %d %d %d", &seed, &delta,
-                   &mode, &unlock, &mask, &claimVis, &where,
+        char mask[NET_MASK_HEX_LEN] = "0";
+        if (sscanf(line + 1, "%u %d %d %d " NET_MASK_SCAN " %d %d %d", &seed, &delta,
+                   &mode, &unlock, mask, &claimVis, &where,
                    &timeoutMin) == 8) {
             sSharedSeed = seed;
             sSeedValid = 1;
@@ -684,9 +716,9 @@ static void handle_line(char *line) {
     } else if (cmd == 'O') {
         // The host changed the room options while we sat in the lobby.
         s32 mode, claimVis = 0, where = 1, timeoutMin = 0, unlock = 0;
-        unsigned long long mask = 0;
-        if (sscanf(line + 1, "%d %d %d %d %d %llx", &mode, &claimVis,
-                   &where, &timeoutMin, &unlock, &mask) == 6
+        char mask[NET_MASK_HEX_LEN] = "0";
+        if (sscanf(line + 1, "%d %d %d %d %d " NET_MASK_SCAN, &mode, &claimVis,
+                   &where, &timeoutMin, &unlock, mask) == 6
             && mode >= 0 && mode < BINGO_MODE_COUNT && sLocalId != sHostId) {
             gbBingoMode = (enum BingoGameMode) mode;
             gNetClaimVis = net_claimvis_coerce(claimVis, mode);
@@ -930,7 +962,7 @@ static void reset_session_state(void) {
     sPendingClaimVis = -1;
     sPendingWhereabouts = -1;
     sPendingUnlock = -1;
-    sPendingMask = 0;
+    snprintf(sPendingMask, sizeof(sPendingMask), "0");
     sGoFlag = 0;
     sLobbyReturnFlag = 0;
     // gNetClaimVis/gNetShowWhereabouts deliberately survive: they are the
@@ -1433,30 +1465,25 @@ s32 network_countdown_frames(void) {
     return 0;
 }
 
-void network_send_options(s32 mode, s32 unlock, u64 mask, u32 seed,
+void network_send_options(s32 mode, s32 unlock, const char *maskHex, u32 seed,
                           s32 claimVis, s32 whereabouts, s32 timeoutMin) {
-    char line[96];
+    char line[128];
     if (!network_active()) {
         return;
     }
-    snprintf(line, sizeof(line), "O %d %d %llx %u %d %d %d\n",
-             mode, unlock, (unsigned long long) mask, seed,
+    snprintf(line, sizeof(line), "O %d %d %s %u %d %d %d\n",
+             mode, unlock, maskHex, seed,
              claimVis, whereabouts, timeoutMin);
     net_send_line(line);
 }
 
 void network_push_local_options(void) {
-    s32 i;
-    u64 mask = 0;
+    char mask[NET_MASK_HEX_LEN];
     // Only the host's settings count; the server drops the rest.
     if (!network_is_host()) {
         return;
     }
-    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT && i < 64; i++) {
-        if (gBingoObjectivesDisabled[i]) {
-            mask |= (u64) 1 << i;
-        }
-    }
+    format_objective_mask(mask);
     // Coerce before sending so the wire never carries an invalid pair
     // (the relay would coerce identically anyway).
     gNetClaimVis = net_claimvis_coerce(gNetClaimVis, (s32) gbBingoMode);

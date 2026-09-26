@@ -84,6 +84,11 @@ ALIGNED8 static const u8 seg2_texture_hundredcoinstar[] = {
 #include "textures/segment2/custom/segment2.hundredcoinstar.rgba16.inc.c"
 };
 
+// Hand-drawn: Peach's castle with a star in the window.
+ALIGNED8 static const u8 seg2_texture_castlesecret[] = {
+#include "textures/segment2/custom/segment2.castlesecret.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -342,6 +347,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_TOAD_STARS, BINGO_ICON_TOAD_STARS, { TEXT_TOAD_STARS }, seg2_texture_toad },
     { BINGO_OBJECTIVE_MIPS, BINGO_ICON_MIPS, { TEXT_MIPS }, seg2_texture_mips },
     { BINGO_OBJECTIVE_HUNDRED_COIN_STARS, BINGO_ICON_HUNDRED_COIN_STARS, { TEXT_HUNDRED_COIN_STARS }, seg2_texture_hundredcoinstar },
+    { BINGO_OBJECTIVE_CASTLE_SECRET_STARS, BINGO_ICON_CASTLE_SECRET_STARS, { TEXT_CASTLE_SECRET_STARS }, seg2_texture_castlesecret },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

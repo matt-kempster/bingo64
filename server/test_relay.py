@@ -429,6 +429,17 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         w = (await c.wait_line("W ")).split()
         self.assertEqual((w[8], w[9]), ("1", "7ffdf10ebfe"))
 
+    async def test_v10_wide_objective_mask(self):
+        # 65+ objective types: the mask outgrows 64 bits and must survive
+        # intact (clamped at 128 bits = 32 hex digits).
+        a, b = await self.two_joined()
+        a.send("O 4 0 1fffffffffffffffe 0 0 1 0")
+        o = (await b.wait_line("O 4")).split()
+        self.assertEqual(o[6], "1fffffffffffffffe")
+        a.send("O 2 0 " + "f" * 40 + " 0 0 1 0")
+        o = (await b.wait_line("O 2")).split()
+        self.assertEqual(o[6], "f" * 32)
+
     async def test_v7_hidden_tiers_filter_claims(self):
         a, b = await self.two_joined()
         # PROGRESS tier in 1-bingo mode: peers hear M, never C.

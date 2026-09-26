@@ -64,8 +64,9 @@ s8 gBingoStickyActNum[COURSE_STAGES_COUNT] = { 0 };
 struct BingoObjective gBingoObjectives[25];
 u8 gBingoObjectivesDisabled[BINGO_OBJECTIVE_TOTAL_AMOUNT] = { 0 };
 
-// The toggles travel as a u64 bitmask (presets, the online options message).
-STATIC_ASSERT(BINGO_OBJECTIVE_TOTAL_AMOUNT <= 64, "objective mask is a u64");
+// Presets hold the toggles as BINGO_MASK_WORDS u64s (the online options
+// message carries them as a hex string of any width).
+STATIC_ASSERT(BINGO_OBJECTIVE_TOTAL_AMOUNT <= 64 * BINGO_MASK_WORDS, "objective mask too narrow");
 
 s32 bingo_objective_needs_unlock_off(enum BingoObjectiveType type) {
     return BINGO_OBJECTIVE_PROGRESSION_MIN <= type && type <= BINGO_OBJECTIVE_PROGRESSION_MAX;
@@ -78,53 +79,61 @@ s32 bingo_objective_eligible(enum BingoObjectiveType type) {
     return !(gBingoFullGameUnlocked && bingo_objective_needs_unlock_off(type));
 }
 
-#define OBJ_BIT(name) ((u64) 1 << BINGO_OBJECTIVE_##name)
-// (~0 >> (64 - n), not (1 << n) - 1: the shift is undefined at n == 64.)
-#define ALL_OBJECTIVES (~(u64) 0 >> (64 - BINGO_OBJECTIVE_TOTAL_AMOUNT))
+// Mask words are built per word w: OBJ_BIT(name, w) is the type's bit if it
+// lives in word w, else 0. (Shift counts are & 63 so the untaken branches
+// stay in range.)
+#define OBJ_BIT(name, w) \
+    ((BINGO_OBJECTIVE_##name >> 6) == (w) ? (u64) 1 << (BINGO_OBJECTIVE_##name & 63) : 0)
+#define ALL_OBJECTIVES(w)                                                  \
+    (BINGO_OBJECTIVE_TOTAL_AMOUNT >= 64 * ((w) + 1) ? ~(u64) 0             \
+     : BINGO_OBJECTIVE_TOTAL_AMOUNT <= 64 * (w)     ? 0                    \
+     : ~(u64) 0 >> ((64 * ((w) + 1) - BINGO_OBJECTIVE_TOTAL_AMOUNT) & 63))
 
 // SRL-style boards are star/coin/level goals in an unmodified game;
 // modifiers, timers, and counter-grinding collectables are all off. Opening
 // cannons and Toad stars are SRL goals (the preset plays unlock OFF, so
-// they're dealt); MIPS is not an SRL goal. So are "N 100 Coin Stars".
-#define PRESET_SRL_ENABLED \
-    (OBJ_BIT(STAR) | OBJ_BIT(COIN) | OBJ_BIT(STARS_IN_LEVEL) | OBJ_BIT(BOWSER) \
-     | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(RACING_STARS) | OBJ_BIT(SECRETS_STARS) \
-     | OBJ_BIT(MULTICOIN) | OBJ_BIT(MULTISTAR) | OBJ_BIT(STARS_MULTIPLE_LEVELS) \
-     | OBJ_BIT(RED_COIN) | OBJ_BIT(BLUE_COIN) | OBJ_BIT(RED_COIN_STARS) \
-     | OBJ_BIT(OPEN_CANNONS) | OBJ_BIT(TOAD_STARS) | OBJ_BIT(HUNDRED_COIN_STARS))
+// they're dealt); MIPS is not an SRL goal. So are "N 100 Coin Stars" and
+// "N Castle Secret Stars".
+#define PRESET_SRL_ENABLED(w) \
+    (OBJ_BIT(STAR, w) | OBJ_BIT(COIN, w) | OBJ_BIT(STARS_IN_LEVEL, w) | OBJ_BIT(BOWSER, w) \
+     | OBJ_BIT(ROOF_WITHOUT_CANNON, w) | OBJ_BIT(RACING_STARS, w) | OBJ_BIT(SECRETS_STARS, w) \
+     | OBJ_BIT(MULTICOIN, w) | OBJ_BIT(MULTISTAR, w) | OBJ_BIT(STARS_MULTIPLE_LEVELS, w) \
+     | OBJ_BIT(RED_COIN, w) | OBJ_BIT(BLUE_COIN, w) | OBJ_BIT(RED_COIN_STARS, w) \
+     | OBJ_BIT(OPEN_CANNONS, w) | OBJ_BIT(TOAD_STARS, w) | OBJ_BIT(HUNDRED_COIN_STARS, w) \
+     | OBJ_BIT(CASTLE_SECRET_STARS, w))
 
 // Everything that couldn't happen under vanilla rules: the game-modifying
 // stars, splatoon, ordered reds, and forced-timer stars. (TTC Random stays:
 // the clock setting is a vanilla mechanic.)
-#define PRESET_VANILLA_DISABLED \
-    (OBJ_BIT(STAR_TIMED) | OBJ_BIT(STAR_CLICK_GAME) \
-     | OBJ_BIT(STAR_REVERSE_JOYSTICK) | OBJ_BIT(STAR_GREEN_DEMON) \
-     | OBJ_BIT(STAR_DAREDEVIL) | OBJ_BIT(RANDOM_RED_COINS) | OBJ_BIT(SPLATOON))
+#define PRESET_VANILLA_DISABLED(w) \
+    (OBJ_BIT(STAR_TIMED, w) | OBJ_BIT(STAR_CLICK_GAME, w) \
+     | OBJ_BIT(STAR_REVERSE_JOYSTICK, w) | OBJ_BIT(STAR_GREEN_DEMON, w) \
+     | OBJ_BIT(STAR_DAREDEVIL, w) | OBJ_BIT(RANDOM_RED_COINS, w) | OBJ_BIT(SPLATOON, w))
 
 // Casual keeps the fun modifiers (daredevil, splatoon) but drops anything
 // timed or execution-heavy (the coinless star rides with the button
 // challenges: same restriction-star family).
-#define PRESET_CASUAL_DISABLED \
-    (OBJ_BIT(STAR_TIMED) | OBJ_BIT(STAR_A_BUTTON_CHALLENGE) \
-     | OBJ_BIT(STAR_B_BUTTON_CHALLENGE) | OBJ_BIT(STAR_Z_BUTTON_CHALLENGE) \
-     | OBJ_BIT(STAR_COINLESS) \
-     | OBJ_BIT(STAR_CLICK_GAME) | OBJ_BIT(STAR_REVERSE_JOYSTICK) \
-     | OBJ_BIT(STAR_GREEN_DEMON) | OBJ_BIT(DANGEROUS_WALL_KICKS) \
-     | OBJ_BIT(ROOF_WITHOUT_CANNON) | OBJ_BIT(BLJ))
+#define PRESET_CASUAL_DISABLED(w) \
+    (OBJ_BIT(STAR_TIMED, w) | OBJ_BIT(STAR_A_BUTTON_CHALLENGE, w) \
+     | OBJ_BIT(STAR_B_BUTTON_CHALLENGE, w) | OBJ_BIT(STAR_Z_BUTTON_CHALLENGE, w) \
+     | OBJ_BIT(STAR_COINLESS, w) \
+     | OBJ_BIT(STAR_CLICK_GAME, w) | OBJ_BIT(STAR_REVERSE_JOYSTICK, w) \
+     | OBJ_BIT(STAR_GREEN_DEMON, w) | OBJ_BIT(DANGEROUS_WALL_KICKS, w) \
+     | OBJ_BIT(ROOF_WITHOUT_CANNON, w) | OBJ_BIT(BLJ, w))
 
 // Rows in enum BingoPresetId order. SRL races start from a fresh file
 // (unlock OFF) and play the modern head-to-head format (lockout).
 const struct BingoPreset gBingoPresets[BINGO_PRESET_COUNT] = {
-    { ALL_OBJECTIVES & ~PRESET_SRL_ENABLED, 0, BINGO_MODE_LOCKOUT },
-    { PRESET_VANILLA_DISABLED,              1, BINGO_MODE_LINE_1 },
-    { PRESET_CASUAL_DISABLED,               1, BINGO_MODE_LINE_1 },
+    { { ALL_OBJECTIVES(0) & ~PRESET_SRL_ENABLED(0), ALL_OBJECTIVES(1) & ~PRESET_SRL_ENABLED(1) },
+      0, BINGO_MODE_LOCKOUT },
+    { { PRESET_VANILLA_DISABLED(0), PRESET_VANILLA_DISABLED(1) }, 1, BINGO_MODE_LINE_1 },
+    { { PRESET_CASUAL_DISABLED(0), PRESET_CASUAL_DISABLED(1) }, 1, BINGO_MODE_LINE_1 },
 };
 
 void bingo_preset_apply(enum BingoPresetId preset) {
     s32 i;
-    u64 mask = gBingoPresets[preset].objectivesDisabled;
     for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        gBingoObjectivesDisabled[i] = (u8) ((mask >> i) & 1);
+        gBingoObjectivesDisabled[i] = (u8) BINGO_MASK_BIT(gBingoPresets[preset].objectivesDisabled, i);
     }
     gBingoFullGameUnlocked = gBingoPresets[preset].fullGameUnlocked;
     gbBingoMode = gBingoPresets[preset].mode;
@@ -133,14 +142,16 @@ void bingo_preset_apply(enum BingoPresetId preset) {
 s32 bingo_preset_current(void) {
     s32 p;
     s32 i;
-    u64 mask = 0;
-    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-        if (gBingoObjectivesDisabled[i]) {
-            mask |= (u64) 1 << i;
-        }
-    }
+    s32 same;
     for (p = 0; p < BINGO_PRESET_COUNT; p++) {
-        if (gBingoPresets[p].objectivesDisabled == mask
+        same = 1;
+        for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+            if (BINGO_MASK_BIT(gBingoPresets[p].objectivesDisabled, i) != (gBingoObjectivesDisabled[i] != 0)) {
+                same = 0;
+                break;
+            }
+        }
+        if (same
             && gBingoPresets[p].fullGameUnlocked == (gBingoFullGameUnlocked != 0)
             && gBingoPresets[p].mode == gbBingoMode) {
             return p;

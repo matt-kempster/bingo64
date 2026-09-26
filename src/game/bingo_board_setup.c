@@ -88,6 +88,7 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_CANNON_STARS, 6, 1 },
     { BINGO_OBJECTIVE_RED_COIN_STARS, 6, 1 },
     { BINGO_OBJECTIVE_HUNDRED_COIN_STARS, 6, 1 },
+    { BINGO_OBJECTIVE_CASTLE_SECRET_STARS, 6, 1 },
     { BINGO_OBJECTIVE_RACING_STARS, 4, 1 },
     { BINGO_OBJECTIVE_WING_CAP_BOX, 4, 2 },
     { BINGO_OBJECTIVE_VANISH_CAP_BOX, 4, 2 },
@@ -123,6 +124,7 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_CANNON_STARS, 4, 1 },
     { BINGO_OBJECTIVE_RED_COIN_STARS, 4, 1 },
     { BINGO_OBJECTIVE_HUNDRED_COIN_STARS, 4, 1 },
+    { BINGO_OBJECTIVE_CASTLE_SECRET_STARS, 4, 1 },
     { BINGO_OBJECTIVE_POLES, 12, 2 },
     { BINGO_OBJECTIVE_SHOOT_CANNONS, 12, 1 },
     { BINGO_OBJECTIVE_RED_COIN, 12, 1 },
@@ -399,6 +401,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
             || type1 == BINGO_OBJECTIVE_CANNON_STARS
             || type1 == BINGO_OBJECTIVE_RED_COIN_STARS
             || type1 == BINGO_OBJECTIVE_HUNDRED_COIN_STARS
+            || type1 == BINGO_OBJECTIVE_CASTLE_SECRET_STARS
             || bingo_objective_needs_unlock_off(type1)
         ) {
             return 1;

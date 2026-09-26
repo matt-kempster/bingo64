@@ -826,6 +826,25 @@ s32 bingo_objective_hundred_coin_stars_init(
     objective->data.collectableData.gotten = 0;
 }
 
+// 15 exist, but only 10 with unlock ON (Toad/MIPS come pre-collected), and
+// on a fresh file (unlock OFF) the slide, aquarium, Wing Cap tower and BitDW
+// open first; the rest sit behind the basement key or big star doors.
+s32 bingo_objective_castle_secret_stars_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_MEDIUM:
+            toGet = random_range_inclusive(2, 3);
+            break;
+        default:
+            toGet = random_range_inclusive(4, 5);
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
 s32 bingo_objective_bowser_init(
     struct BingoObjective *objective, enum BingoObjectiveClass class
 ) {
@@ -1394,6 +1413,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_red_coin_stars_init(objective, class);
         case BINGO_OBJECTIVE_HUNDRED_COIN_STARS:
             return bingo_objective_hundred_coin_stars_init(objective, class);
+        case BINGO_OBJECTIVE_CASTLE_SECRET_STARS:
+            return bingo_objective_castle_secret_stars_init(objective, class);
         case BINGO_OBJECTIVE_BOWSER:
             return bingo_objective_bowser_init(objective, class);
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
