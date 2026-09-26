@@ -91,6 +91,14 @@ struct UID {
 #define MAX_SPIN_HEARTS 16
 // 11 cannon-opening Bob-omb Buddies, at most one per course; keyed by course.
 #define MAX_OPEN_CANNONS 16
+// 13: WDW 3, BitDW 2, and one each in BOB, HMC, JRB, DDD, TTM, THI, RR, BitS
+// (sm64.sql: FloorSwitchHiddenObjects/AnimatesObject/Grills); keyed by spot.
+#define MAX_PURPLE_SWITCHES 16
+// Per-course credit for the horizontal tiles, keyed (course, cell + 1): one
+// tile of each type per board (are_duplicates), so one slot per course.
+#define MAX_COURSES_STUCK 25
+#define MAX_COURSES_COINS 16
+#define MAX_COURSES_1UP 16
 
 #define TOTAL_UIDS ( \
         MAX_GOOMBAS \
@@ -125,6 +133,10 @@ struct UID {
         + MAX_KOOPA_SHELLS \
         + MAX_SPIN_HEARTS \
         + MAX_OPEN_CANNONS \
+        + MAX_PURPLE_SWITCHES \
+        + MAX_COURSES_STUCK \
+        + MAX_COURSES_COINS \
+        + MAX_COURSES_1UP \
     ) + 2
 
 // I really hope nothing is actually at (0, 0, 0)....
@@ -245,6 +257,18 @@ void get_index_range(enum BingoObjectiveUpdate update, s32 *start, s32 *length) 
                 break;
             case BINGO_UPDATE_OPEN_CANNON:
                 rangeLength = MAX_OPEN_CANNONS;
+                break;
+            case BINGO_UPDATE_PURPLE_SWITCH:
+                rangeLength = MAX_PURPLE_SWITCHES;
+                break;
+            case BINGO_UPDATE_STUCK_IN_GROUND:
+                rangeLength = MAX_COURSES_STUCK;
+                break;
+            case BINGO_UPDATE_COINS_COURSE_DONE:
+                rangeLength = MAX_COURSES_COINS;
+                break;
+            case BINGO_UPDATE_1UP_COURSE_DONE:
+                rangeLength = MAX_COURSES_1UP;
                 break;
         }
         *start += prevRangeLength;

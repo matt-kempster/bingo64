@@ -250,6 +250,7 @@ static void emit_cell_json(int i) {
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
             emitf(",\"toGetTotal\":%d,\"toGetEachCourse\":%d",
                   o->data.multiCourseCollectableData.toGetTotal,
                   o->data.multiCourseCollectableData.toGetEachCourse);
@@ -331,6 +332,7 @@ static void emit_cell_dump(int i) {
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
             emitf(" toGetTotal=%d toGetEachCourse=%d",
                   o->data.multiCourseCollectableData.toGetTotal,
                   o->data.multiCourseCollectableData.toGetEachCourse);

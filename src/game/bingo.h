@@ -228,8 +228,20 @@ enum BingoObjectiveType
     // plus Toad x3 and MIPS x2. With unlock ON the save already holds the
     // Toad/MIPS stars, so only the 10 course stars are collectable.
     BINGO_OBJECTIVE_CASTLE_SECRET_STARS,
+    // 2026-09-26 wave (plans/horizontal-objectives.md), appended so earlier
+    // type numbers stay put.
+    // Wear the wing, metal and vanish caps (always all 3; flags per cap).
+    BINGO_OBJECTIVE_CAPS_WORN,
+    // Press N unique purple switches (13 exist).
+    BINGO_OBJECTIVE_PURPLE_SWITCHES,
+    // Get stuck in the ground (snow/sand) in N unique courses.
+    BINGO_OBJECTIVE_STUCK_IN_GROUND,
+    // Collect K coins (one visit) in each of N main courses.
+    BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS,
+    // Collect a 1-up mushroom in each of N main courses.
+    BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS,
     // End
-    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_CASTLE_SECRET_STARS,
+    BINGO_OBJECTIVE_TYPE_MAX = BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS,
     BINGO_OBJECTIVE_TOTAL_AMOUNT
 };
 
@@ -304,7 +316,12 @@ enum BingoObjectiveIcon {
     BINGO_ICON_TOAD_STARS,
     BINGO_ICON_MIPS,
     BINGO_ICON_HUNDRED_COIN_STARS,
-    BINGO_ICON_CASTLE_SECRET_STARS
+    BINGO_ICON_CASTLE_SECRET_STARS,
+    BINGO_ICON_CAPS_WORN,
+    BINGO_ICON_PURPLE_SWITCHES,
+    BINGO_ICON_STUCK_IN_GROUND,
+    BINGO_ICON_COINS_MULTIPLE_LEVELS,
+    BINGO_ICON_1UPS_MULTIPLE_LEVELS
 };
 
 enum BingoObjectiveUpdate
@@ -350,6 +367,13 @@ enum BingoObjectiveUpdate
     BINGO_UPDATE_KOOPA_SHELL,
     // Mario first makes a recovery heart spin, once per heart.
     BINGO_UPDATE_SPIN_HEART,
+    // Mario presses a purple switch, once per switch.
+    BINGO_UPDATE_PURPLE_SWITCH,
+    // Mario got stuck in the ground; keyed per (objective, course).
+    BINGO_UPDATE_STUCK_IN_GROUND,
+    // Never fired: UID namespaces for "done in this course" per objective.
+    BINGO_UPDATE_COINS_COURSE_DONE,
+    BINGO_UPDATE_1UP_COURSE_DONE,
     // A Bob-omb Buddy opened a course's cannon, once per course.
     BINGO_UPDATE_OPEN_CANNON,
 
@@ -401,7 +425,14 @@ enum BingoObjectiveUpdate
     BINGO_UPDATE_DEATH_LAVA,
     BINGO_UPDATE_DEATH_WHIRLPOOL,
     BINGO_UPDATE_DEATH_FELL_OUT,
-    BINGO_UPDATE_DEATH_FLAGS_END = BINGO_UPDATE_DEATH_FELL_OUT
+    BINGO_UPDATE_DEATH_FLAGS_END = BINGO_UPDATE_DEATH_FELL_OUT,
+
+    // Mario puts on a power cap (interact_cap), one flag per cap.
+    BINGO_UPDATE_CAP_FLAGS_BEGIN,
+    BINGO_UPDATE_WORE_WING_CAP = BINGO_UPDATE_CAP_FLAGS_BEGIN,
+    BINGO_UPDATE_WORE_METAL_CAP,
+    BINGO_UPDATE_WORE_VANISH_CAP,
+    BINGO_UPDATE_CAP_FLAGS_END = BINGO_UPDATE_WORE_VANISH_CAP
 };
 
 

@@ -20,6 +20,10 @@ Vertical = N of one thing. Horizontal = breadth: N places or N kinds.
 
 ## Accepted (Matt, 2026-09-26)
 
+BUILT 2026-09-26 on overnight-0923: coins in N courses, 1-up in N courses,
+all 3 caps, purple switches, stuck in the ground (types 65-69). Still to do:
+enemy kinds, throwers.
+
 - **K coins in each of N courses.** Twin of "K stars in each of N
   courses"; coins already count per entry. "Might be ok."
 - **A 1-up in each of N courses.** Same shape. "Might be ok."
@@ -64,6 +68,10 @@ Vertical = N of one thing. Horizontal = breadth: N places or N kinds.
 "Die in 3 ways" only says "Remaining: 2" (bingo_descriptions.c has a TODO).
 Every N-kinds tile needs the description to list the kinds with checkmarks;
 it also fixes the two existing ways tiles. Build this first.
+
+BUILT 2026-09-26: bingo_objective_kinds() names the kinds; the board screen
+draws two columns under the description, done kinds green (deaths, hat,
+caps). A new kinds tile only needs a names list there.
 
 ## Enemy-kinds audit (before code)
 

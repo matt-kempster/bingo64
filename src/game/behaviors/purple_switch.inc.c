@@ -1,3 +1,5 @@
+#include "game/bingo_tracking_collectables.h"
+
 
 /**
  * Behavior for bhvFloorSwitchHardcodedModel, bhvFloorSwitchGrills, and
@@ -21,6 +23,9 @@ void bhv_purple_switch_loop(void) {
             if (gMarioObject->platform == o && !(gMarioStates[0].action & MARIO_UNKNOWN_13)) {
                 if (lateral_dist_between_objects(o, gMarioObject) < 127.5) {
                     o->oAction = PURPLE_SWITCH_ACT_PRESSED;
+                    // Bingo: switches never move, so the spot keys it; only
+                    // the first press of each switch counts.
+                    bingo_count_unique_source(BINGO_UPDATE_PURPLE_SWITCH, o->oPosX, o->oPosY, o->oPosZ);
                 }
             }
             break;

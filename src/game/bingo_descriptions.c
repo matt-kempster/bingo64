@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include <ultra64.h>
+#include "macros.h"
 #include <PR/os_libc.h>
 
 #include "area.h"
@@ -613,7 +614,7 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
     u32 flags;
     s32 count = 0;
 
-    char verb[25];
+    char verb[40];
     char collectName[30];
     char suffix[30];
     s8 printUnique = 1;
@@ -650,6 +651,12 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             break;
         case BINGO_OBJECTIVE_CRUSHED:
             strcpy(verb, "Get crushed by");
+            break;
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+            strcpy(verb, "Press");
+            break;
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
+            strcpy(verb, "Get stuck in the ground in");
             break;
         case BINGO_OBJECTIVE_BLJ:
             strcpy(verb, "Perform");
@@ -771,6 +778,12 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
             // four squishes under the same thwomp.
             strcpy(collectName, "Crushers");
             break;
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+            strcpy(collectName, "Purple Switches");
+            break;
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
+            strcpy(collectName, "courses (snow or sand)");
+            break;
     }
 
     if (obj->state == BINGO_STATE_COMPLETE) {
@@ -809,6 +822,49 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
     );
 }
 
+void get_caps_worn_objective_desc(struct BingoObjective *obj, char *desc) {
+    static const char *names[3] = { "Wing", "Metal", "Vanish" };
+    u32 flags = obj->data.collectableFlagsData.flags;
+    char missing[30];
+    s32 i, len = 0;
+
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        sprintf(desc, "Wear the Wing, Metal and Vanish caps: Complete!");
+        return;
+    }
+    // Flag order follows BINGO_UPDATE_WORE_WING/METAL/VANISH_CAP.
+    missing[0] = '\0';
+    for (i = 0; i < 3; i++) {
+        if (!(flags & (1 << i))) {
+            len += sprintf(missing + len, "%s%s", len ? ", " : "", names[i]);
+        }
+    }
+    sprintf(desc, "Wear the Wing, Metal and Vanish caps. Still need: %s", missing);
+}
+
+void get_coins_multiple_levels_objective_desc(struct BingoObjective *obj, char *desc) {
+    struct MultiCourseCollectableData *data = &obj->data.multiCourseCollectableData;
+    char suffix[30];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Done: %d", data->gottenTotal);
+    }
+    sprintf(desc, "Collect %d coins in one visit to each of %d main courses%s",
+            data->toGetEachCourse, data->toGetTotal, suffix);
+}
+
+void get_1ups_multiple_levels_objective_desc(struct BingoObjective *obj, char *desc) {
+    char suffix[30];
+    if (obj->state == BINGO_STATE_COMPLETE) {
+        strcpy(suffix, ": Complete!");
+    } else {
+        sprintf(suffix, ". Done: %d", obj->data.collectableData.gotten);
+    }
+    sprintf(desc, "Collect a 1-up mushroom in each of %d main courses%s",
+            obj->data.collectableData.toGet, suffix);
+}
+
 void get_dangerous_wall_kicks_objective_desc(struct BingoObjective *obj, char *desc) {
     struct MultiCourseCollectableData *data = &obj->data.multiCourseCollectableData;
     sprintf(
@@ -839,6 +895,34 @@ void get_roof_without_cannon_objective_desc(struct BingoObjective *obj, char *de
     );
 }
 
+
+// Names follow the event order in bingo.h (BINGO_UPDATE_*_FLAGS_BEGIN..END).
+// The three KO kinds are health running out on land, told apart by how
+// Mario falls (bingo_track_death); "KO swim" is the same underwater.
+static const char *const sDeathKinds[] = {
+    "KO standing", "KO backward", "KO forward", "Drowned", "KO swim",
+    "Quicksand", "Shocked", "Toxic gas", "Bubba", "Squished", "Lava",
+    "Whirlpool", "Fell out",
+};
+// Blown off by strong wind: the SL snowman's breath, the TTM Fwoosh.
+static const char *const sHatKinds[] = { "Klepto", "Snowman", "Fwoosh", "Ukiki" };
+static const char *const sCapKinds[] = { "Wing", "Metal", "Vanish" };
+
+s32 bingo_objective_kinds(struct BingoObjective *obj, const char *const **names) {
+    switch (obj->type) {
+        case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+            *names = sDeathKinds;
+            return ARRAY_COUNT(sDeathKinds);
+        case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
+            *names = sHatKinds;
+            return ARRAY_COUNT(sHatKinds);
+        case BINGO_OBJECTIVE_CAPS_WORN:
+            *names = sCapKinds;
+            return ARRAY_COUNT(sCapKinds);
+        default:
+            return 0;
+    }
+}
 
 void describe_objective(struct BingoObjective *objective, char *desc) {
     switch (objective->type) {
@@ -937,7 +1021,18 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
         case BINGO_OBJECTIVE_KILL_SKEETERS:
         case BINGO_OBJECTIVE_KILL_KOOPAS:
         case BINGO_OBJECTIVE_CRUSHED:
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
             get_collectable_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_CAPS_WORN:
+            get_caps_worn_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
+            get_coins_multiple_levels_objective_desc(objective, desc);
+            break;
+        case BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS:
+            get_1ups_multiple_levels_objective_desc(objective, desc);
             break;
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
             get_stars_multiple_levels_objective_desc(objective, desc);

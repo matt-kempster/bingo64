@@ -1,25 +1,25 @@
-00 type=63 class=2 icon=65 title="x3" toGet=3
-01 type=01 class=1 icon=03 title="WDWú2" course=11 star=1 maxTime=1650
-02 type=32 class=1 icon=30 title="x14" toGet=14
-03 type=10 class=1 icon=12 title="CotMCú" course=20 star=0
-04 type=58 class=0 icon=61 title="x3" toGet=3
-05 type=45 class=1 icon=44 title="x3" toGet=3
-06 type=54 class=0 icon=54 title="x4" toGet=4
-07 type=35 class=1 icon=33 title="x7" toGet=7
-08 type=37 class=2 icon=36 title="x12" toGet=12
-09 type=11 class=1 icon=11 title="JRB" course=3 toGet=3
-10 type=00 class=1 icon=02 title="SLú1" course=10 star=0
-11 type=11 class=1 icon=11 title="HMC" course=6 toGet=3
-12 type=24 class=3 icon=14 title="327" toGet=327
-13 type=04 class=1 icon=06 title="TTCú3" course=14 star=2
-14 type=13 class=1 icon=17 title="SSL 8" course=8 toGet=8
-15 type=08 class=1 icon=09 title="BBHú7" course=5 star=6
+00 type=32 class=2 icon=30 title="x25" toGet=25
+01 type=16 class=1 icon=53 title="WDW 140" course=11 toGet=140
+02 type=66 class=1 icon=68 title="x4" toGet=4
+03 type=64 class=1 icon=66 title="x2" toGet=2
+04 type=00 class=0 icon=02 title="BBHú2" course=5 star=1
+05 type=13 class=1 icon=17 title="LLL 4" course=7 toGet=4
+06 type=28 class=0 icon=21 title="x3" toGet=3
+07 type=68 class=1 icon=70 title="50x 2c" toGetTotal=2 toGetEachCourse=50
+08 type=53 class=2 icon=52 title="x8" toGet=8
+09 type=00 class=1 icon=02 title="JRBú6" course=3 star=5
+10 type=17 class=1 icon=20 title="7x 3c" toGetTotal=3 toGetEachCourse=7
+11 type=50 class=1 icon=49 title="x5" toGet=5
+12 type=24 class=3 icon=14 title="210" toGet=210
+13 type=49 class=1 icon=48 title="x6" toGet=6
+14 type=00 class=1 icon=02 title="PSS 21s" course=19 star=1
+15 type=13 class=1 icon=17 title="VCutM 3" course=22 toGet=3
 16 type=08 class=2 icon=09 title="RRú7" course=15 star=6
-17 type=54 class=1 icon=54 title="x5" toGet=5
-18 type=27 class=0 icon=22 title="x6" toGet=6
-19 type=57 class=1 icon=60 title="x2" toGet=2
-20 type=12 class=0 icon=13 title="JRB 39" course=3 toGet=39
-21 type=12 class=1 icon=13 title="BBH 83" course=5 toGet=83
-22 type=10 class=1 icon=12 title="RRú6" course=15 star=5
-23 type=64 class=1 icon=66 title="x3" toGet=3
-24 type=03 class=2 icon=05 title="SLú4" course=10 star=3 hint=""
+17 type=42 class=1 icon=41 title="x5" toGet=5
+18 type=12 class=0 icon=13 title="CotMC46" course=20 toGet=46
+19 type=63 class=1 icon=65 title="x1" toGet=1
+20 type=27 class=0 icon=22 title="x5" toGet=5
+21 type=35 class=1 icon=33 title="x4" toGet=4
+22 type=21 class=1 icon=26 title="x4" toGet=4
+23 type=14 class=1 icon=18 title="JRB 3" course=3 toGet=3
+24 type=66 class=2 icon=68 title="x6" toGet=6

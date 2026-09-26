@@ -16,6 +16,7 @@
 #include "segment2.h"
 #include "strcpy.h"
 #include "print.h"
+#include "macros.h"
 
 struct ObjectiveWeight {
     enum BingoObjectiveType objective;
@@ -36,6 +37,11 @@ struct ObjectiveWeight sWeightsEasy[] = {
     { BINGO_OBJECTIVE_MULTISTAR, 6, 1 },
     { BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
+    // 2026-09-26 wave, weights provisional
+    { BINGO_OBJECTIVE_PURPLE_SWITCHES, 4, 1 },
+    { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
+    { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
@@ -103,6 +109,12 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
     { BINGO_OBJECTIVE_KOOPA_SHELLS, 4, 1 },
     { BINGO_OBJECTIVE_SPIN_HEARTS, 4, 1 },
+    // 2026-09-26 wave, weights provisional
+    { BINGO_OBJECTIVE_CAPS_WORN, 4, 1 },
+    { BINGO_OBJECTIVE_PURPLE_SWITCHES, 4, 1 },
+    { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
+    { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
@@ -144,6 +156,12 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_STAR_COINLESS, 4, 1 },
     { BINGO_OBJECTIVE_WARP_PADS, 4, 1 },
     { BINGO_OBJECTIVE_KOOPA_SHELLS, 3, 1 },
+    // 2026-09-26 wave, weights provisional
+    { BINGO_OBJECTIVE_CAPS_WORN, 4, 1 },
+    { BINGO_OBJECTIVE_PURPLE_SWITCHES, 4, 1 },
+    { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
+    { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     // Toad and MIPS both sit behind the basement key (Bowser in the Dark
     // World) plus 12 / 15 stars, so they're hard-only.
@@ -171,8 +189,13 @@ s32 sWeightsSizeCenter = sizeof(sWeightsCenter) / sizeof(struct ObjectiveWeight)
 // they must start fresh for every board. Regenerating in-process — netplay
 // rematches, new save files — otherwise drains them until a class's weight
 // sum reaches 0 and get_random_objective_type faults on `% sum`.
+#define WEIGHT_ENTRIES_MAX 192
+STATIC_ASSERT((sizeof(sWeightsEasy) + sizeof(sWeightsMedium) + sizeof(sWeightsHard)
+               + sizeof(sWeightsCenter)) / sizeof(struct ObjectiveWeight) <= WEIGHT_ENTRIES_MAX,
+              "raise WEIGHT_ENTRIES_MAX");
+
 static void reset_weight_budgets(void) {
-    static s32 sFreshUses[128];  // >= total entries across the four tables
+    static s32 sFreshUses[WEIGHT_ENTRIES_MAX];  // >= total entries across the four tables
     static s32 sFreshSaved = 0;
     struct ObjectiveWeight *tables[4];
     s32 sizes[4];
@@ -402,6 +425,11 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
             || type1 == BINGO_OBJECTIVE_RED_COIN_STARS
             || type1 == BINGO_OBJECTIVE_HUNDRED_COIN_STARS
             || type1 == BINGO_OBJECTIVE_CASTLE_SECRET_STARS
+            || type1 == BINGO_OBJECTIVE_CAPS_WORN
+            || type1 == BINGO_OBJECTIVE_PURPLE_SWITCHES
+            || type1 == BINGO_OBJECTIVE_STUCK_IN_GROUND
+            || type1 == BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS
+            || type1 == BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS
             || bingo_objective_needs_unlock_off(type1)
         ) {
             return 1;

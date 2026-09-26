@@ -339,6 +339,7 @@ static s32 board_cell_code(char *buf, s32 size, s32 i) {
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
             f[2] = obj->data.multiCourseCollectableData.toGetTotal;
             f[3] = obj->data.multiCourseCollectableData.toGetEachCourse;
             break;

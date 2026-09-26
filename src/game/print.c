@@ -300,10 +300,16 @@ void print_text_not_tiny(int x, int y, const char *str) {
     int len = 0;
     int srcIndex = 0;
 
-    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(gEffectsMemoryPool, 150))
+    // Sized to the string: long bingo descriptions outgrow a fixed 150.
+    while (str[len] != 0) {
+        len++;
+    }
+    if ((sTextLabels[sTextLabelsCount] = (struct TextLabel *) mem_pool_alloc(
+             gEffectsMemoryPool, sizeof(struct TextLabel) + len))
         == NULL) {
         return;
     }
+    len = 0;
 
     sTextLabels[sTextLabelsCount]->x = x;
     sTextLabels[sTextLabelsCount]->y = y;

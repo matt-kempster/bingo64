@@ -197,7 +197,14 @@ void get_objective_title(struct BingoObjective *objective) {
         case BINGO_OBJECTIVE_KILL_SKEETERS:
         case BINGO_OBJECTIVE_KILL_KOOPAS:
         case BINGO_OBJECTIVE_CRUSHED:
+        case BINGO_OBJECTIVE_CAPS_WORN:
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
+        case BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS:
             get_collectable_objective_title(objective);
+            break;
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
+            get_dangerous_wallkicks_title(objective);
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
             get_dangerous_wallkicks_title(objective);

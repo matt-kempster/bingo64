@@ -493,14 +493,36 @@ s32 objective_flags_collectable(
     }
 }
 
+// UID for "this objective, in the current course": the collectables table
+// keys (course, x, y, z), so x = cell + 1 identifies the objective. (Not the
+// bare cell: cell 0 would read as the table's empty-slot marker (0, 0, 0)
+// and get re-claimed by every new course.) (u32) -1 when the range is full.
+static u32 course_credit_uid(enum BingoObjectiveUpdate range, struct BingoObjective *objective) {
+    return get_unique_id(range, (f32) (objective - gBingoObjectives + 1), 0.0f, 0.0f);
+}
+
+// Credits the current course to `objective` once; 1 the first time.
+static s32 course_credit_new(enum BingoObjectiveUpdate range, struct BingoObjective *objective) {
+    u32 uid = course_credit_uid(range, objective);
+    return uid != (u32) -1 && is_new_kill(range, uid);
+}
+
+// "N courses" progress: HUD message, or completion at the target.
+static void course_credit_progress(struct BingoObjective *objective, s32 gotten, s32 toGet) {
+    char message[12];
+    if (gotten >= toGet) {
+        set_objective_state(objective, BINGO_STATE_COMPLETE);
+    } else {
+        sprintf(message, "%d COURSE%s", gotten, gotten == 1 ? "" : "S");
+        bingo_hud_update_message(objective->icon, message, 1);
+    }
+}
+
 s32 objective_blj(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct CollectableData *data = &objective->data.collectableData;
-    s32 objIndex = objective - gBingoObjectives;  // to uniquely identify _this_ objective
-    u32 uid;
 
     if (update == BINGO_UPDATE_BLJ) {
-        uid = get_unique_id(BINGO_UPDATE_BLJ, objIndex, 0.0f, 0.0f);
-        if (!is_new_kill(BINGO_UPDATE_BLJ, uid)) {
+        if (!course_credit_new(BINGO_UPDATE_BLJ, objective)) {
             return;
         }
         data->gotten++;
@@ -554,7 +576,6 @@ s32 objective_generic_collectable(
 s32 objective_dangerous_wall_kicks(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
     struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
     u32 uid;
-    s32 objIndex = objective - gBingoObjectives;  // to uniquely identify _this_ objective
     char message[10];
 
     if (update == BINGO_UPDATE_DANGEROUS_WALL_KICK_FAILED) {
@@ -563,8 +584,8 @@ s32 objective_dangerous_wall_kicks(struct BingoObjective *objective, enum BingoO
         }
         data->gottenThisCourse = 0;
     } else if (update == BINGO_UPDATE_DANGEROUS_WALL_KICK) {
-        uid = get_unique_id(BINGO_UPDATE_DANGEROUS_WALL_KICK, objIndex, 0.0f, 0.0f);
-        if (!peek_would_be_new_kill(BINGO_UPDATE_DANGEROUS_WALL_KICK, uid)) {
+        uid = course_credit_uid(BINGO_UPDATE_DANGEROUS_WALL_KICK, objective);
+        if (uid == (u32) -1 || !peek_would_be_new_kill(BINGO_UPDATE_DANGEROUS_WALL_KICK, uid)) {
             return;
         }
         data->gottenThisCourse++;
@@ -580,6 +601,46 @@ s32 objective_dangerous_wall_kicks(struct BingoObjective *objective, enum BingoO
                 bingo_hud_update_message(objective->icon, message, 1);
             }
         }
+    }
+}
+
+s32 objective_stuck_in_ground(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+
+    if (update == BINGO_UPDATE_STUCK_IN_GROUND
+        && course_credit_new(BINGO_UPDATE_STUCK_IN_GROUND, objective)) {
+        data->gotten++;
+        course_credit_progress(objective, data->gotten, data->toGet);
+    }
+}
+
+// K coins in one visit, in each of N main courses. Coins count per entry
+// like the COIN tile (the HUD count resets on every course entry).
+s32 objective_coins_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
+
+    if (update == BINGO_UPDATE_COURSE_CHANGED) {
+        data->gottenThisCourse = 0;
+    } else if (update == BINGO_UPDATE_COIN
+               && gCurrCourseNum >= COURSE_BOB && gCurrCourseNum <= COURSE_RR) {
+        data->gottenThisCourse += gbCoinsJustGotten;
+        if (data->gottenThisCourse >= data->toGetEachCourse
+            && course_credit_new(BINGO_UPDATE_COINS_COURSE_DONE, objective)) {
+            data->gottenTotal++;
+            course_credit_progress(objective, data->gottenTotal, data->toGetTotal);
+        }
+    }
+}
+
+// A 1-up mushroom in each of N main courses.
+s32 objective_1ups_multiple_levels(struct BingoObjective *objective, enum BingoObjectiveUpdate update) {
+    struct CollectableData *data = &objective->data.collectableData;
+
+    if (update == BINGO_UPDATE_GOT_1UP
+        && gCurrCourseNum >= COURSE_BOB && gCurrCourseNum <= COURSE_RR
+        && course_credit_new(BINGO_UPDATE_1UP_COURSE_DONE, objective)) {
+        data->gotten++;
+        course_credit_progress(objective, data->gotten, data->toGet);
     }
 }
 
@@ -644,6 +705,19 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
             );
         case BINGO_OBJECTIVE_BLJ:
             return objective_blj(objective, update);
+        case BINGO_OBJECTIVE_CAPS_WORN:
+            return objective_flags_collectable(
+                objective, update,
+                BINGO_UPDATE_CAP_FLAGS_BEGIN, BINGO_UPDATE_CAP_FLAGS_END
+            );
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+            return objective_generic_collectable(objective, update, BINGO_UPDATE_PURPLE_SWITCH);
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
+            return objective_stuck_in_ground(objective, update);
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
+            return objective_coins_multiple_levels(objective, update);
+        case BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS:
+            return objective_1ups_multiple_levels(objective, update);
         case BINGO_OBJECTIVE_RACING_STARS:
             return objective_racing_stars(objective, update);
         case BINGO_OBJECTIVE_SECRETS_STARS:

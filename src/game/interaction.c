@@ -1708,16 +1708,19 @@ u32 interact_cap(struct MarioState *m, UNUSED u32 interactType, struct Object *o
         switch (capFlag) {
             case MARIO_VANISH_CAP:
                 capTime = VC_TIME;
+                bingo_update(BINGO_UPDATE_WORE_VANISH_CAP);
                 capMusic = SEQUENCE_ARGS(4, SEQ_EVENT_POWERUP);
                 break;
 
             case MARIO_METAL_CAP:
                 capTime = MC_TIME;
+                bingo_update(BINGO_UPDATE_WORE_METAL_CAP);
                 capMusic = SEQUENCE_ARGS(4, SEQ_EVENT_METAL_CAP);
                 break;
 
             case MARIO_WING_CAP:
                 capTime = WC_TIME;
+                bingo_update(BINGO_UPDATE_WORE_WING_CAP);
                 capMusic = SEQUENCE_ARGS(4, SEQ_EVENT_POWERUP);
                 break;
         }

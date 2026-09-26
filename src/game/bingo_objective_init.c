@@ -1274,6 +1274,103 @@ s32 bingo_objective_mips_init(
     objective->data.collectableData.gotten = 0;
 }
 
+// Wing, metal and vanish: always all three.
+s32 bingo_objective_caps_worn_init(struct BingoObjective *objective, UNUSED enum BingoObjectiveClass class) {
+    objective->data.collectableFlagsData.toGet = 3;
+    objective->data.collectableFlagsData.flags = 0;
+}
+
+// 13 purple switches over 10 courses (WDW 3, BitDW 2, BOB, HMC, JRB, DDD,
+// TTM, THI, RR, BitS).
+s32 bingo_objective_purple_switches_init(struct BingoObjective *objective, enum BingoObjectiveClass class) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            toGet = random_range_inclusive(2, 3);
+            break;
+        case BINGO_CLASS_MEDIUM:
+            toGet = random_range_inclusive(4, 5);
+            break;
+        default:
+            toGet = random_range_inclusive(6, 7);
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
+// Only snow and sand areas bury Mario: SL, CCM, SSL (outside) and WMotR.
+s32 bingo_objective_stuck_in_ground_init(struct BingoObjective *objective, enum BingoObjectiveClass class) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            toGet = 1;
+            break;
+        case BINGO_CLASS_MEDIUM:
+            toGet = 2;
+            break;
+        default:
+            toGet = 3;
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
+// K coins in one visit, in each of N main courses. The player picks the
+// courses, so K sits near the low end of the single-course COIN tile.
+s32 bingo_objective_coins_multiple_levels_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    struct MultiCourseCollectableData *data = &objective->data.multiCourseCollectableData;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            data->toGetEachCourse = 30;
+            data->toGetTotal = 2;
+            break;
+        case BINGO_CLASS_MEDIUM:
+            if (random_u16() % 2 == 0) {
+                data->toGetEachCourse = 30;
+                data->toGetTotal = 3;
+            } else {
+                data->toGetEachCourse = 50;
+                data->toGetTotal = 2;
+            }
+            break;
+        default:
+            if (random_u16() % 2 == 0) {
+                data->toGetEachCourse = 50;
+                data->toGetTotal = 3;
+            } else {
+                data->toGetEachCourse = 40;
+                data->toGetTotal = 4;
+            }
+            break;
+    }
+    data->gottenTotal = 0;
+    data->gottenThisCourse = 0;
+}
+
+// A 1-up mushroom in each of N main courses.
+s32 bingo_objective_1ups_multiple_levels_init(
+    struct BingoObjective *objective, enum BingoObjectiveClass class
+) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            toGet = 2;
+            break;
+        case BINGO_CLASS_MEDIUM:
+            toGet = random_range_inclusive(3, 4);
+            break;
+        default:
+            toGet = random_range_inclusive(5, 6);
+            break;
+    }
+    objective->data.collectableData.toGet = toGet;
+    objective->data.collectableData.gotten = 0;
+}
+
 s32 bingo_objective_collectable_init(struct BingoObjective *obj, s32 toGet) {
     obj->data.collectableData.toGet = toGet;
     obj->data.collectableData.gotten = 0;
@@ -1425,6 +1522,16 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_toad_stars_init(objective, class);
         case BINGO_OBJECTIVE_MIPS:
             return bingo_objective_mips_init(objective, class);
+        case BINGO_OBJECTIVE_CAPS_WORN:
+            return bingo_objective_caps_worn_init(objective, class);
+        case BINGO_OBJECTIVE_PURPLE_SWITCHES:
+            return bingo_objective_purple_switches_init(objective, class);
+        case BINGO_OBJECTIVE_STUCK_IN_GROUND:
+            return bingo_objective_stuck_in_ground_init(objective, class);
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
+            return bingo_objective_coins_multiple_levels_init(objective, class);
+        case BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS:
+            return bingo_objective_1ups_multiple_levels_init(objective, class);
     }
     if (BINGO_OBJECTIVE_COLLECTABLE_MIN <= type && type <= BINGO_OBJECTIVE_COLLECTABLE_MAX) {
         collectables = bingo_objective_collectable_init_dispatch(class, type);

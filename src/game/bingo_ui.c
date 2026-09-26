@@ -659,20 +659,24 @@ void draw_bingo_hud_timer() {
     }
 }
 
-void bingo_print_description(char *str) {
+// Wrapped description text in the board screen's right panel, growing
+// upward from baseY (bottom-origin).
+// lineH 0 keeps the classic placement (top at baseY + 10 per wrap, the
+// last wrap uncounted); otherwise baseY is the bottom line's baseline.
+static void bingo_print_description_at(char *str, s32 baseY, s32 lineH) {
     int last_space = 0;
     int last_space_line_chars = 0;
     int line_chars = 0;
     s32 iter = 0;
     s32 total_lines = 0;
-    u8 finalDesc[150] = { 0x11, 0x28, 0x2F, 0x2F, 0xFF };
+    u8 finalDesc[300] = { 0x11, 0x28, 0x2F, 0x2F, 0xFF };
 
     // #define MAX_LINE_CHARS 25
     #define MAX_LINE_CHARS 22
     // TODO: This really really needs to be based on line widths
     // of each character.
 
-    while (str[iter] != '\0') {
+    while (str[iter] != '\0' && iter < (s32) sizeof(finalDesc) - 1) {
         line_chars++;
         // Chop the line if it's getting too long
         if (str[iter] == ' ') {
@@ -691,11 +695,49 @@ void bingo_print_description(char *str) {
     // sue me
     if (line_chars >= MAX_LINE_CHARS) {
         finalDesc[last_space] = 0xFE;
+        if (lineH != 0) {
+            total_lines++;
+        }
     }
     finalDesc[iter] = 0xFF;
 
     // print_text_not_tiny(180, 100 + total_lines * 10, finalDesc);
-    print_text_not_tiny(190, 100 + total_lines * 10, finalDesc);
+    print_text_not_tiny(190, baseY + total_lines * (lineH != 0 ? lineH : 10), finalDesc);
+}
+
+void bingo_print_description(char *str) {
+    bingo_print_description_at(str, 100, 0);
+}
+
+// Checklist for "N ways" tiles: every kind in two columns under the
+// description, done ones green. Returns the height it took.
+#define CHECKLIST_X 190
+#define CHECKLIST_COL_W 68
+#define CHECKLIST_ROW_H 12
+#define CHECKLIST_BOTTOM 52
+
+static s32 draw_kinds_checklist(struct BingoObjective *objective) {
+    const char *const *names;
+    u32 done = objective->data.collectableFlagsData.flags;
+    s32 n = bingo_objective_kinds(objective, &names);
+    s32 rows, i, x, y;
+
+    if (n == 0) {
+        return 0;
+    }
+    rows = (n + 1) / 2;
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+    for (i = 0; i < n; i++) {
+        x = CHECKLIST_X + (i / rows) * CHECKLIST_COL_W;
+        y = CHECKLIST_BOTTOM + (rows - 1 - i % rows) * CHECKLIST_ROW_H;
+        if ((done >> i) & 1) {
+            print_generic_string_ascii_detail(x, y, (char *) names[i], 120, 255, 120, 255, TRUE, 1);
+        } else {
+            print_generic_string_ascii_detail(x, y, (char *) names[i], 150, 150, 150, 255, TRUE, 1);
+        }
+    }
+    gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+    return rows * CHECKLIST_ROW_H;
 }
 
 void print_bingo_icon_alpha(s32 x, s32 y, s32 iconIndex, u8 alpha) {
@@ -1311,7 +1353,14 @@ void draw_bingo_screen() {
 
         objective = &gBingoObjectives[5 * sBingoCursorY + sBingoCursorX];
         describe_objective(objective, desc_text);
-        bingo_print_description(desc_text);
+        {
+            s32 h = draw_kinds_checklist(objective);
+            if (h > 0) {
+                bingo_print_description_at(desc_text, CHECKLIST_BOTTOM + h + 6, 16);
+            } else {
+                bingo_print_description(desc_text);
+            }
+        }
     }
 
     return;

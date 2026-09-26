@@ -129,6 +129,7 @@ static void dump_cell(FILE *out, int i) {
             break;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
             fprintf(out, " toGetTotal=%d toGetEachCourse=%d",
                     o->data.multiCourseCollectableData.toGetTotal,
                     o->data.multiCourseCollectableData.toGetEachCourse);
@@ -320,6 +321,11 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_MIPS] = "MIPS",
     [BINGO_OBJECTIVE_HUNDRED_COIN_STARS] = "HUNDRED_COIN_STARS",
     [BINGO_OBJECTIVE_CASTLE_SECRET_STARS] = "CASTLE_SECRET_STARS",
+    [BINGO_OBJECTIVE_CAPS_WORN] = "CAPS_WORN",
+    [BINGO_OBJECTIVE_PURPLE_SWITCHES] = "PURPLE_SWITCHES",
+    [BINGO_OBJECTIVE_STUCK_IN_GROUND] = "STUCK_IN_GROUND",
+    [BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS] = "COINS_MULTIPLE_LEVELS",
+    [BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS] = "1UPS_MULTIPLE_LEVELS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -367,6 +373,7 @@ static s32 cell_target(struct BingoObjective *o) {
             return o->data.courseCollectableData.toGet;
         case BINGO_OBJECTIVE_DANGEROUS_WALL_KICKS:
         case BINGO_OBJECTIVE_STARS_MULTIPLE_LEVELS:
+        case BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS:
             return o->data.multiCourseCollectableData.toGetTotal;
         case BINGO_OBJECTIVE_BOWSER:
         case BINGO_OBJECTIVE_ROOF_WITHOUT_CANNON:
@@ -1204,6 +1211,163 @@ static void test_sim_spin_hearts_objective(void) {
     bingo_tracking_collectables_reset();
 }
 
+void describe_objective(struct BingoObjective *objective, char *desc);
+
+static void test_sim_caps_worn_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    char desc[300];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_CAPS_WORN;
+    o->data.collectableFlagsData.toGet = 3;
+    o->data.collectableFlagsData.flags = 0;
+
+    bingo_update(BINGO_UPDATE_WORE_WING_CAP);
+    bingo_update(BINGO_UPDATE_WORE_WING_CAP);  // the same cap twice
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    describe_objective(o, desc);
+    CHECK(strstr(desc, "Still need: Metal, Vanish") != NULL);
+
+    bingo_update(BINGO_UPDATE_WORE_VANISH_CAP);
+    describe_objective(o, desc);
+    CHECK(strstr(desc, "Still need: Metal") != NULL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    bingo_update(BINGO_UPDATE_WORE_METAL_CAP);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
+static void test_sim_purple_switches_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_PURPLE_SWITCHES;
+    o->data.collectableData.toGet = 2;
+    o->data.collectableData.gotten = 0;
+
+    gCurrCourseNum = COURSE_WDW;
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_PURPLE_SWITCH, 100.0f, 200.0f, 300.0f), 1);
+    // Re-pressing the same switch (it pops back up) counts once.
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_PURPLE_SWITCH, 100.0f, 200.0f, 300.0f), 0);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    gCurrCourseNum = COURSE_DDD;
+    CHECK_EQ_INT(bingo_count_unique_source(BINGO_UPDATE_PURPLE_SWITCH, 100.0f, 200.0f, 300.0f), 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+// Stuck in the ground: once per course. The tile sits in cell 0 on
+// purpose: per-course credit used to key on the bare cell index, and cell
+// 0 aliased the UID table's empty-slot marker, so alternating two courses
+// re-counted forever.
+static void test_sim_stuck_in_ground_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_STUCK_IN_GROUND;
+    o->data.collectableData.toGet = 3;
+    o->data.collectableData.gotten = 0;
+
+    gCurrCourseNum = COURSE_SL;
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    gCurrCourseNum = COURSE_CCM;
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    gCurrCourseNum = COURSE_SL;
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    gCurrCourseNum = COURSE_CCM;
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    gCurrCourseNum = COURSE_WMOTR;
+    bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+// The same cell-0 regression for BLJ, which shares the per-course keying.
+static void test_sim_blj_cell0_alternating_courses(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_BLJ;
+    o->data.collectableData.toGet = 5;
+    o->data.collectableData.gotten = 0;
+
+    gCurrCourseNum = COURSE_BOB;
+    bingo_update(BINGO_UPDATE_BLJ);
+    gCurrCourseNum = COURSE_WF;
+    bingo_update(BINGO_UPDATE_BLJ);
+    gCurrCourseNum = COURSE_BOB;
+    bingo_update(BINGO_UPDATE_BLJ);
+    gCurrCourseNum = COURSE_WF;
+    bingo_update(BINGO_UPDATE_BLJ);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    bingo_tracking_collectables_reset();
+}
+
+static void test_sim_coins_multiple_levels_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[3];
+    struct MultiCourseCollectableData *d = &o->data.multiCourseCollectableData;
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS;
+    d->toGetEachCourse = 30;
+    d->toGetTotal = 2;
+    d->gottenTotal = 0;
+    d->gottenThisCourse = 0;
+
+    // 20 + 20 over two visits is not 30 in one visit.
+    gCurrCourseNum = COURSE_BOB;
+    gbCoinsJustGotten = 20;
+    bingo_update(BINGO_UPDATE_COIN);
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(d->gottenTotal, 0);
+    gbCoinsJustGotten = 10;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(d->gottenTotal, 1);
+    // The same course again adds nothing.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    gbCoinsJustGotten = 40;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(d->gottenTotal, 1);
+    // Castle and secret-course coins don't count.
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    gCurrCourseNum = COURSE_NONE;
+    bingo_update(BINGO_UPDATE_COIN);
+    gCurrCourseNum = COURSE_PSS;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(d->gottenTotal, 1);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    bingo_update(BINGO_UPDATE_COURSE_CHANGED);
+    gCurrCourseNum = COURSE_WF;
+    bingo_update(BINGO_UPDATE_COIN);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
+static void test_sim_1ups_multiple_levels_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS;
+    o->data.collectableData.toGet = 2;
+    o->data.collectableData.gotten = 0;
+
+    gCurrCourseNum = COURSE_BOB;
+    bingo_update(BINGO_UPDATE_GOT_1UP);
+    bingo_update(BINGO_UPDATE_GOT_1UP);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    gCurrCourseNum = COURSE_NONE;  // castle grounds 1-ups don't count
+    bingo_update(BINGO_UPDATE_GOT_1UP);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+    gCurrCourseNum = COURSE_THI;
+    bingo_update(BINGO_UPDATE_GOT_1UP);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+    bingo_tracking_collectables_reset();
+}
+
 // Coinless star: any coin in the target course fails the visit; coins
 // elsewhere don't; re-entering resets; a clean visit completes it.
 static void test_sim_coinless_star(void) {
@@ -1932,6 +2096,12 @@ int main(void) {
     RUN_TEST(test_sim_warp_pads_objective);
     RUN_TEST(test_sim_koopa_shells_objective);
     RUN_TEST(test_sim_spin_hearts_objective);
+    RUN_TEST(test_sim_caps_worn_objective);
+    RUN_TEST(test_sim_purple_switches_objective);
+    RUN_TEST(test_sim_stuck_in_ground_objective);
+    RUN_TEST(test_sim_blj_cell0_alternating_courses);
+    RUN_TEST(test_sim_coins_multiple_levels_objective);
+    RUN_TEST(test_sim_1ups_multiple_levels_objective);
     RUN_TEST(test_sim_coinless_star);
     RUN_TEST(test_coinless_star_pool);
     RUN_TEST(test_sim_abz_fail_and_reset);

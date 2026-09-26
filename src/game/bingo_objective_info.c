@@ -89,6 +89,25 @@ ALIGNED8 static const u8 seg2_texture_castlesecret[] = {
 #include "textures/segment2/custom/segment2.castlesecret.rgba16.inc.c"
 };
 
+// 2026-09-26 wave, hand-drawn (PIL): wing/metal/vanish caps; a purple
+// switch; Mario's legs out of a snow mound; a coin / 1-up in front of a
+// course painting (the frame reads "per course").
+ALIGNED8 static const u8 seg2_texture_capsworn[] = {
+#include "textures/segment2/custom/segment2.capsworn.rgba16.inc.c"
+};
+ALIGNED8 static const u8 seg2_texture_purpleswitch[] = {
+#include "textures/segment2/custom/segment2.purpleswitch.rgba16.inc.c"
+};
+ALIGNED8 static const u8 seg2_texture_stuck[] = {
+#include "textures/segment2/custom/segment2.stuck.rgba16.inc.c"
+};
+ALIGNED8 static const u8 seg2_texture_coinscourses[] = {
+#include "textures/segment2/custom/segment2.coinscourses.rgba16.inc.c"
+};
+ALIGNED8 static const u8 seg2_texture_1upcourses[] = {
+#include "textures/segment2/custom/segment2.1upcourses.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -348,6 +367,11 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_MIPS, BINGO_ICON_MIPS, { TEXT_MIPS }, seg2_texture_mips },
     { BINGO_OBJECTIVE_HUNDRED_COIN_STARS, BINGO_ICON_HUNDRED_COIN_STARS, { TEXT_HUNDRED_COIN_STARS }, seg2_texture_hundredcoinstar },
     { BINGO_OBJECTIVE_CASTLE_SECRET_STARS, BINGO_ICON_CASTLE_SECRET_STARS, { TEXT_CASTLE_SECRET_STARS }, seg2_texture_castlesecret },
+    { BINGO_OBJECTIVE_CAPS_WORN, BINGO_ICON_CAPS_WORN, { TEXT_CAPS_WORN }, seg2_texture_capsworn },
+    { BINGO_OBJECTIVE_PURPLE_SWITCHES, BINGO_ICON_PURPLE_SWITCHES, { TEXT_PURPLE_SWITCHES }, seg2_texture_purpleswitch },
+    { BINGO_OBJECTIVE_STUCK_IN_GROUND, BINGO_ICON_STUCK_IN_GROUND, { TEXT_STUCK_IN_GROUND }, seg2_texture_stuck },
+    { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, BINGO_ICON_COINS_MULTIPLE_LEVELS, { TEXT_COINS_MULTI_LEVELS }, seg2_texture_coinscourses },
+    { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, BINGO_ICON_1UPS_MULTIPLE_LEVELS, { TEXT_1UPS_MULTI_LEVELS }, seg2_texture_1upcourses },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

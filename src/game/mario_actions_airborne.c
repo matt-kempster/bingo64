@@ -200,6 +200,7 @@ s32 check_fall_damage_or_get_stuck(struct MarioState *m, u32 hardFallAction) {
 #endif
         m->particleFlags |= PARTICLE_MIST_CIRCLE;
         drop_and_set_mario_action(m, ACT_FEET_STUCK_IN_GROUND, 0);
+        bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
 #ifdef RUMBLE_FEEDBACK
         queue_rumble_data(5, 80);
 #endif
@@ -829,6 +830,7 @@ s32 act_dive(struct MarioState *m) {
 #endif
                 m->particleFlags |= PARTICLE_MIST_CIRCLE;
                 drop_and_set_mario_action(m, ACT_HEAD_STUCK_IN_GROUND, 0);
+                bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
             } else if (!check_fall_damage(m, ACT_HARD_FORWARD_GROUND_KB)) {
                 if (m->heldObj == NULL) {
                     set_mario_action(m, ACT_DIVE_SLIDE, 0);
@@ -1035,6 +1037,7 @@ s32 act_ground_pound(struct MarioState *m) {
 #endif
                 m->particleFlags |= PARTICLE_MIST_CIRCLE;
                 set_mario_action(m, ACT_BUTT_STUCK_IN_GROUND, 0);
+                bingo_update(BINGO_UPDATE_STUCK_IN_GROUND);
             } else {
                 play_mario_heavy_landing_sound(m, SOUND_ACTION_TERRAIN_HEAVY_LANDING);
                 if (!check_fall_damage(m, ACT_HARD_BACKWARD_GROUND_KB)) {

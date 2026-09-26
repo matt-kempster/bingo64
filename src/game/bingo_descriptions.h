@@ -15,4 +15,9 @@ void getTimeFmtPreciseTiny(char *buf, s32 timestamp);
 
 void describe_objective(struct BingoObjective *obj, char*);
 
+// The kinds behind an "N ways" tile (deaths, hat, caps), in flag order, for
+// the board screen's checklist; done kinds are the set bits of
+// collectableFlagsData.flags. Returns the count; 0 = not a kinds tile.
+s32 bingo_objective_kinds(struct BingoObjective *obj, const char *const **names);
+
 #endif /* _BINGO_DESCRIPTIONS_H */
