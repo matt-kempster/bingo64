@@ -31,3 +31,18 @@ Rough size: S = an evening, M = a few days, L = a real project.
 - **Per-tile time estimates** (C&R endurance clock, fast+slow call
   pairing, balanced boards). Matt 2026-09-26: log durably now, datamine
   later. Logging: plans/match-history.md. Model: test/cost_model/.
+
+## Featured courses ("forced overlap") -- PARKED, Matt skeptical (2026-09-26)
+
+Idea: each board picks 4-5 featured courses and course-pinned tiles favour
+them (~60%), spread across different lines so one visit advances several
+lines instead of handing out a free bingo. Parked: Matt worries a steering
+generator reads as weird or biased ("why is it always LLL"), while pure
+random is beyond suspicion. Family caps (a ceiling per tile family) were
+done instead, since they change the rule mix without steering where you go.
+
+Family caps were tried the same day (at most 4 of each non-star family):
+averages barely moved and the histograms piled up at exactly 4, which read
+as weird. Dropped. Decision: change nothing until playtests; match history
+already logs boards, so tile skips can be mined later. If more stars are
+wanted, scale the specific-star weights instead (smooth, no spike).
