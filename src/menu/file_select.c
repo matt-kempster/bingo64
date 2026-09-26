@@ -1,3 +1,6 @@
+#ifndef TARGET_N64
+#include <stdlib.h>
+#endif
 #include <PR/ultratypes.h>
 #include <PR/gbi.h>
 #include <PR/os_libc.h>
@@ -3349,6 +3352,12 @@ u32 get_seed(void) {
         if (network_has_seed(&netSeed)) {
             return netSeed;
         }
+    }
+#endif
+#ifndef TARGET_N64
+    // Debug: a fixed board for screenshot runs (test/pc).
+    if (getenv("BINGO64_SEED") != NULL) {
+        return (u32) strtoul(getenv("BINGO64_SEED"), NULL, 10);
     }
 #endif
     if (!gBingoSeedIsSet) {

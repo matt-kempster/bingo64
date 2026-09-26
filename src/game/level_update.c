@@ -1,3 +1,6 @@
+#ifndef TARGET_N64
+#include <stdlib.h>
+#endif
 #include <ultra64.h>
 #ifndef TARGET_N64
 #include <stdbool.h>
@@ -1093,6 +1096,17 @@ s32 play_mode_normal(void) {
         update_camera(gCurrentArea->camera);
     }
 
+#ifndef TARGET_N64
+    // Debug: BINGO64_TEST_WARP=<level> takes the test warp once, on the first
+    // playable frame (level 9 = BOB), for star-select screenshot runs.
+    {
+        static s32 sEnvWarpChecked = 0;
+        if (!sEnvWarpChecked && getenv("BINGO64_TEST_WARP") != NULL) {
+            gTestWarpRequest = atoi(getenv("BINGO64_TEST_WARP"));
+        }
+        sEnvWarpChecked = 1;
+    }
+#endif
     if (gTestWarpRequest != 0 && !gWarpTransition.isActive && sDelayedWarpOp == WARP_OP_NONE
         && sWarpDest.type == WARP_TYPE_NOT_WARPING) {
         initiate_test_warp();

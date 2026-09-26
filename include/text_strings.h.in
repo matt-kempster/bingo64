@@ -373,6 +373,8 @@
 
 // Bingo course modifiers
 #define BINGO_MODIFIER _("BINGO MODIFIER")
+#define BINGO_NO_MODIFIER _("NO MODIFIER")
+#define BINGO_ON_YOUR_BOARD _("ON YOUR BOARD")
 #define BINGO_PRESS_L_OR_R _(" PRESS Z OR R...")  // space intentional for centering
 
 #define BINGO_GREEN_DEMON _("GREEN DEMON")

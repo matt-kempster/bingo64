@@ -23,6 +23,11 @@
 #include "game/camera.h"
 #include "game/splatoon.h"
 #include "text_strings.h"
+#include "game/bingo_ui.h"
+#include "extras/draw_util.h"
+#ifndef TARGET_N64
+#include <stdlib.h>
+#endif
 
 /**
  * @file star_select.c
@@ -32,9 +37,6 @@
  */
 
 static struct Object *sStarSelectorModels[9];
-
-// Bingo star selection:
-static struct Object *sBingoStarSelectorModels[BINGO_STARS_TOTAL_AMOUNT];
 
 // The act the course is loaded as, affects whether some objects spawn.
 static s8 sLoadedActNum;
@@ -57,8 +59,6 @@ static s8 sSelectableStarIndex = 0;
 
 // Act Selector menu timer that keeps counting until you choose an act.
 static s32 sActSelectorMenuTimer = 0;
-
-static s32 gBingoModifierScrollLockoutTimer = 0;
 
 /**
  * Act Selector Star Type Loop Action
@@ -135,46 +135,153 @@ void render_100_coin_star(u8 stars) {
     }
 }
 
-/**
- * Renders the extra Bingo "modifier" star.
- */
-void render_bingo_modifier_star(void) {
-    // Indexed by enum BingoModifier.
-    static const u32 sBingoStarModels[BINGO_STARS_TOTAL_AMOUNT] = {
-        MODEL_STAR,        // BINGO_MODIFIER_NONE
-        MODEL_STAR_GREEN,  // BINGO_MODIFIER_GREEN_DEMON
-        MODEL_STAR_BLUE,   // BINGO_MODIFIER_REVERSE_JOYSTICK
-        MODEL_STAR_ORANGE, // BINGO_MODIFIER_ORDERED_RED_COINS
-        MODEL_STAR_GRAY,   // BINGO_MODIFIER_CLICK_GAME
-        MODEL_STAR_PURPLE, // BINGO_MODIFIER_RANDOM_STARS
-        MODEL_STAR_RED,    // BINGO_MODIFIER_DAREDEVIL
-        MODEL_STAR_PINK,   // BINGO_MODIFIER_SPLATOON
-    };
-    s32 i;
-    // The row keeps a fixed total width and gets denser as modifiers are
-    // added, so it stays centered without manual position tuning.
-    #define ROW_WIDTH 750
-    s32 xSpace = ROW_WIDTH / (BINGO_STARS_TOTAL_AMOUNT - 1);
-    s32 xLeft = -(xSpace * (BINGO_STARS_TOTAL_AMOUNT - 1)) / 2;
+// ---------------------------------------------------------------------------
+// Bingo modifier picker (prototype). The modifier is its own axis: up/down
+// (Z/R still work) picks it, left/right picks the act as in vanilla. Drawn
+// in 2D with the board's own icons. Small dots mark what the board wants in
+// this course: acts some tile needs, modifiers some tile needs; one line
+// confirms when the current act + modifier is itself a board tile.
 
+// Icon per enum BingoModifier (the icon its board tiles use).
+static const u8 sBingoModifierIcons[BINGO_STARS_TOTAL_AMOUNT] = {
+    BINGO_ICON_STAR,                  // NONE
+    BINGO_ICON_STAR_GREEN_DEMON,      // GREEN_DEMON
+    BINGO_ICON_STAR_REVERSE_JOYSTICK, // REVERSE_JOYSTICK
+    BINGO_ICON_RANDOM_RED_COINS,      // ORDERED_RED_COINS
+    BINGO_ICON_STAR_CLICK_GAME,       // CLICK_GAME
+    BINGO_ICON_RANDOM_STARS,          // RANDOM_STARS
+    BINGO_ICON_STAR_DAREDEVIL,        // DAREDEVIL
+    BINGO_ICON_SPLATOON,              // SPLATOON
+};
+
+// What the board wants in this course, rebuilt every frame (claims can
+// land mid-screen online). sWantPair[act][mod]: act 0 = any act.
+static u8 sWantPair[8][BINGO_STARS_TOTAL_AMOUNT];
+static u8 sWantAct[8];
+static u8 sWantMod[BINGO_STARS_TOTAL_AMOUNT];
+
+// 'a' = strip where the old 3D stars were, 'b' = column down the left.
+static char sBingoModUi = 'a';
+static s32 sBingoModStickHeld = 0;
+
+static void bingo_want_pair(s32 act, s32 mod) {
+    sWantPair[act][mod] = 1;
+    if (act != 0) {
+        sWantAct[act] = 1;
+    }
+    if (mod != BINGO_MODIFIER_NONE) {
+        sWantMod[mod] = 1;
+    }
+}
+
+static void bingo_compute_wants(void) {
+    s32 i, j;
+    for (i = 0; i < 8; i++) {
+        sWantAct[i] = 0;
+        for (j = 0; j < BINGO_STARS_TOTAL_AMOUNT; j++) {
+            sWantPair[i][j] = 0;
+        }
+    }
+    for (j = 0; j < BINGO_STARS_TOTAL_AMOUNT; j++) {
+        sWantMod[j] = 0;
+    }
+    if (!COURSE_IS_MAIN_COURSE(gCurrCourseNum)) {
+        return;
+    }
+    for (i = 0; i < 25; i++) {
+        struct BingoObjective *o = &gBingoObjectives[i];
+        s32 mod = -1;
+        s32 act;
+        if (o->state == BINGO_STATE_COMPLETE) {
+            continue;
+        }
+        if (gbBingoMode == BINGO_MODE_LOCKOUT && gBingoCellClaimers[i] != 0) {
+            continue;
+        }
+        switch (o->type) {
+            case BINGO_OBJECTIVE_STAR:
+            case BINGO_OBJECTIVE_STAR_TIMED:
+            case BINGO_OBJECTIVE_STAR_TTC_RANDOM:
+            case BINGO_OBJECTIVE_STAR_A_BUTTON_CHALLENGE:
+            case BINGO_OBJECTIVE_STAR_B_BUTTON_CHALLENGE:
+            case BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE:
+            case BINGO_OBJECTIVE_STAR_COINLESS:
+                mod = BINGO_MODIFIER_NONE;
+                break;
+            case BINGO_OBJECTIVE_STAR_GREEN_DEMON:
+                mod = BINGO_MODIFIER_GREEN_DEMON;
+                break;
+            case BINGO_OBJECTIVE_STAR_REVERSE_JOYSTICK:
+                mod = BINGO_MODIFIER_REVERSE_JOYSTICK;
+                break;
+            case BINGO_OBJECTIVE_STAR_CLICK_GAME:
+                mod = BINGO_MODIFIER_CLICK_GAME;
+                break;
+            case BINGO_OBJECTIVE_STAR_DAREDEVIL:
+                mod = BINGO_MODIFIER_DAREDEVIL;
+                break;
+            case BINGO_OBJECTIVE_RANDOM_STARS:
+                if ((s32) o->data.courseCollectableData.course == gCurrCourseNum) {
+                    bingo_want_pair(0, BINGO_MODIFIER_RANDOM_STARS);
+                }
+                continue;
+            case BINGO_OBJECTIVE_RANDOM_RED_COINS:
+                if ((s32) o->data.courseCollectableData.course == gCurrCourseNum) {
+                    bingo_want_pair(0, BINGO_MODIFIER_ORDERED_RED_COINS);
+                }
+                continue;
+            case BINGO_OBJECTIVE_SPLATOON:
+                if ((s32) o->data.courseCollectableData.course == gCurrCourseNum) {
+                    bingo_want_pair(0, BINGO_MODIFIER_SPLATOON);
+                }
+                continue;
+            default:
+                continue;
+        }
+        // Single-star tiles share the (course, starIndex) prefix. The
+        // 100-coin star (index 6) exists in every act.
+        if ((s32) o->data.starObjective.course != gCurrCourseNum) {
+            continue;
+        }
+        act = o->data.starObjective.starIndex < 6 ? o->data.starObjective.starIndex + 1 : 0;
+        bingo_want_pair(act, mod);
+    }
+}
+
+// Up/down (stick or D-pad) and the old Z/R aliases, with hold-to-repeat.
+static s32 bingo_modifier_input(void) {
+    s32 dir = 0;
+    u16 pressed = gPlayer1Controller->buttonPressed;
+    s32 stick = gPlayer1Controller->rawStickY > 60 ? -1 : gPlayer1Controller->rawStickY < -60 ? 1 : 0;
+    if (pressed & (U_JPAD | Z_TRIG)) {
+        dir = -1;
+    } else if (pressed & (D_JPAD | R_TRIG)) {
+        dir = 1;
+    } else if (stick != 0) {
+        sBingoModStickHeld++;
+        if (sBingoModStickHeld == 1 || (sBingoModStickHeld > 12 && sBingoModStickHeld % 4 == 0)) {
+            dir = stick;
+        }
+    }
+    if (stick == 0) {
+        sBingoModStickHeld = 0;
+    }
+    return dir;
+}
+
+void render_bingo_modifier_star(void) {
+#ifndef TARGET_N64
+    if (getenv("BINGO64_MODUI") != NULL) {
+        sBingoModUi = getenv("BINGO64_MODUI")[0];
+    }
+#endif
+    sBingoModStickHeld = 0;
     // Restore the modifier last confirmed for this course, if any.
     if (COURSE_IS_MAIN_COURSE(gCurrCourseNum)) {
         gBingoStarSelected = gBingoStickyModifier[gCurrCourseNum - 1];
     } else {
         gBingoStarSelected = BINGO_MODIFIER_NONE;
     }
-
-    for (i = 0; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
-        sBingoStarSelectorModels[i] = spawn_object_abs_with_rot(
-            gCurrentObject, 0, sBingoStarModels[i],
-            i == BINGO_MODIFIER_REVERSE_JOYSTICK ? bhvActSelectorStarTypeReversed
-                                                 : bhvActSelectorStarType,
-            xLeft + xSpace * i, 120, -300, 0, 0, 0);
-        sBingoStarSelectorModels[i]->oStarSelectorSize = 1.0;
-        sBingoStarSelectorModels[i]->oStarSelectorType = STAR_SELECTOR_100_COINS;
-    }
-    #undef ROW_WIDTH
-    obj_enable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
 }
 
 /**
@@ -316,39 +423,13 @@ void bhv_act_selector_loop(void) {
         }
     }
 
-    // Bingo star selection handling
-    if (gBingoModifierScrollLockoutTimer > 0) {
-        gBingoModifierScrollLockoutTimer--;
-    } else {
-        if (gPlayer1Controller->buttonDown & R_TRIG) {
-            gBingoModifierScrollLockoutTimer = 5;
+    // Bingo modifier: its own axis on up/down.
+    {
+        s32 dir = bingo_modifier_input();
+        if (dir != 0) {
             play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
-            // obj_disable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
-            if (gBingoStarSelected == BINGO_MODIFIER_MAX) {
-                gBingoStarSelected = BINGO_MODIFIER_NONE;
-            } else {
-                gBingoStarSelected += 1;
-            }
-            obj_enable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
-            // TODO: Use oOpacity to fade in/out selections.
-            // sBingoStarSelectorModels[gBingoStarSelected]->oOpacity /= 2;
-        } else if (gPlayer1Controller->buttonDown & Z_TRIG) {
-            gBingoModifierScrollLockoutTimer = 5;
-            play_sound(SOUND_MENU_CHANGE_SELECT, gGlobalSoundSource);
-            // obj_disable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
-            if (gBingoStarSelected == 0) {
-                gBingoStarSelected = BINGO_MODIFIER_MAX;
-            } else {
-                gBingoStarSelected -= 1;
-            }
-            obj_enable_rendering_func(sBingoStarSelectorModels[gBingoStarSelected]);
-        }
-    }
-    for (i = BINGO_MODIFIER_NONE; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
-        if (i == gBingoStarSelected) {
-            sBingoStarSelectorModels[i]->oStarSelectorType = STAR_SELECTOR_SELECTED;
-        } else {
-            sBingoStarSelectorModels[i]->oStarSelectorType = STAR_SELECTOR_NOT_SELECTED;
+            gBingoStarSelected = (gBingoStarSelected + dir + BINGO_STARS_TOTAL_AMOUNT)
+                                 % BINGO_STARS_TOTAL_AMOUNT;
         }
     }
 
@@ -435,7 +516,8 @@ void print_course_number(void) {
 #define ACT_NAME_X 163
 #endif
 
-u8 gBingoTextPressLOrR[] = { BINGO_PRESS_L_OR_R };
+u8 gBingoTextNoModifier[] = { BINGO_NO_MODIFIER };
+u8 gBingoTextOnYourBoard[] = { BINGO_ON_YOUR_BOARD };
 u8 gBingoTextGreenDemon[] = { BINGO_GREEN_DEMON };
 u8 gBingoTextReverseJoystick[] = { BINGO_REVERSE_JOYSTICK };
 u8 gBingoTextClickGame[] = { BINGO_CLICK_GAME };
@@ -443,6 +525,59 @@ u8 gBingoTextDaredevil[] = { BINGO_DAREDEVIL_1HP };
 u8 gBingoTextRandomRedCoins[] = { BINGO_RANDOM_ROUTE_RED_COINS };
 u8 gBingoTextSplatoon[] = { BINGO_SPLATOON };
 u8 gBingoTextRandomStars[] = { BINGO_RANDOM_STARS };
+
+// Screen coords are top-down here (quads); print_bingo_icon takes 224 - top.
+#define MOD_DOT(x, y) print_solid_color_quad((x), (y), (x) + 3, (y) + 3, 230, 70, 30, 255)
+
+static void print_bingo_modifier_picker(u8 *name) {
+    s32 i, x, y;
+    s32 act = sSelectedActIndex + 1;
+    s32 mod = gBingoStarSelected;
+    s32 onBoard;
+
+    bingo_compute_wants();
+    onBoard = sWantPair[act][mod] || sWantPair[0][mod];
+
+    // Dots next to the act numbers the board wants.
+    for (i = 1; i <= sVisibleStars && i < 8; i++) {
+        if (sWantAct[i] || sWantPair[0][BINGO_MODIFIER_NONE]) {
+            MOD_DOT(i * 34 - sVisibleStars * 17 + 139 + 10, 18);
+        }
+    }
+
+    for (i = 0; i < BINGO_STARS_TOTAL_AMOUNT; i++) {
+        if (sBingoModUi == 'b') {
+            x = 14;
+            y = 34 + i * 20;
+        } else {
+            x = 160 - (BINGO_STARS_TOTAL_AMOUNT * 22 - 6) / 2 + i * 22;
+            y = 84;
+        }
+        if (i == mod) {
+            print_solid_color_quad(x - 3, y - 3, x + 19, y + 19, 0, 0, 0, 45);
+        }
+        if (sWantMod[i]) {
+            if (sBingoModUi == 'b') {
+                MOD_DOT(x + 21, y + 6);
+            } else {
+                MOD_DOT(x + 6, y + 20);
+            }
+        }
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_begin);
+        print_bingo_icon_alpha(x, 224 - y, sBingoModifierIcons[i], i == mod ? 255 : 120);
+        gSPDisplayList(gDisplayListHead++, dl_hud_img_end);
+    }
+
+    gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
+    gDPSetEnvColor(gDisplayListHead++, 0, 0, 0, 255);
+    print_menu_generic_string(get_str_x_pos_from_center(159, name, 10.0f), 112, name);
+    if (onBoard) {
+        gDPSetEnvColor(gDisplayListHead++, 20, 130, 40, 255);
+        print_menu_generic_string(get_str_x_pos_from_center(159, gBingoTextOnYourBoard, 10.0f), 126,
+                                  gBingoTextOnYourBoard);
+    }
+    gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
+}
 
 /**
  * Print act selector strings, some with special checks.
@@ -473,7 +608,6 @@ void print_act_selector_strings(void) {
     s16 language = eu_get_language();
 #endif
 
-    u8 bingoModifierText[] = { BINGO_MODIFIER };
     u8 *bingoModifierName;
 
     create_dl_ortho_matrix();
@@ -542,7 +676,7 @@ void print_act_selector_strings(void) {
 
     switch (gBingoStarSelected) {
         case BINGO_MODIFIER_NONE:
-            bingoModifierName = gBingoTextPressLOrR;
+            bingoModifierName = gBingoTextNoModifier;
             break;
         case BINGO_MODIFIER_GREEN_DEMON:
             bingoModifierName = gBingoTextGreenDemon;
@@ -567,12 +701,8 @@ void print_act_selector_strings(void) {
             break;
     }
 
-    print_menu_generic_string(
-        get_str_x_pos_from_center(159, bingoModifierText, 10.0f), 115, bingoModifierText);
-    print_menu_generic_string(
-        get_str_x_pos_from_center(159, bingoModifierName, 10.0f), 128, bingoModifierName);
-
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
+    print_bingo_modifier_picker(bingoModifierName);
 }
 
 /**
