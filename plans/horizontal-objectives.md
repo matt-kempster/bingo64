@@ -44,12 +44,14 @@ enemy kinds, throwers.
 
 ## Maybe (not yet discussed)
 
-- **Carry N kinds of thing.** Grabbables from behavior_data.c: Bob-omb,
-  cork box, crazy box, underwater shell, Chuckya, Heave-Ho, King Bob-omb,
-  Bowser, Ukiki, baby penguin, MIPS. Kind list is crisp (it's the grab
-  interaction), but check it against the well-defined bar.
-- **Talk to N characters.** Needs a strict list; bosses that talk on
-  approach muddy it.
+- **Carry N kinds of thing -- ACCEPTED (Matt, 2026-09-26).** Grabbables
+  from behavior_data.c: Bob-omb, cork box, crazy box, underwater shell,
+  Chuckya, Heave-Ho, King Bob-omb, Bowser, Ukiki, baby penguin, MIPS. Kind
+  list is crisp (it's the grab interaction). Check each against unlock-all
+  before building; some dialogs/events are disabled there.
+- **Talk to N characters -- PARKED.** Matt: "fine, not crazy about them".
+  Many talk dialogs are intentionally disabled under unlock-all (Hoot etc.),
+  and it feels like signpost reading. Needs a strict list if revived.
 
 ## Rejected
 
