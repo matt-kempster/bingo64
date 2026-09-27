@@ -15,9 +15,6 @@
 #include "bingo_crushers.h"
 #include "rumble_init.h"
 #include "pc/configfile.h"
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 
 struct LandingAction {
     s16 numFrames;
@@ -519,11 +516,6 @@ void update_walking_speed(struct MarioState *m) {
         m->forwardVel = 48.0f;
     }
 
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.Responsive) {
-        m->faceAngle[1] = m->intendedYaw;
-    } else {
-#endif
     #if VELOCITY_BASED_TURN_SPEED
     if ((m->heldObj == NULL) && !(m->action & ACT_FLAG_SHORT_HITBOX)) {
         if (m->forwardVel >= 16.0f) {
@@ -542,9 +534,6 @@ void update_walking_speed(struct MarioState *m) {
     #else
     m->faceAngle[1] = m->intendedYaw - approach_s32((s16)(m->intendedYaw - m->faceAngle[1]), 0, 0x800, 0x800);
     #endif
-#ifdef CHEATS_ACTIONS
-    }
-#endif
 
     apply_slope_accel(m);
 }

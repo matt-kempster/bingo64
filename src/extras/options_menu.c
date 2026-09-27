@@ -32,9 +32,6 @@
 #include "bettercamera.h"
 #endif
 
-#ifdef CHEATS_ACTIONS
-#include "cheats.h"
-#endif
 
 #ifdef EXT_DEBUG_MENU
 #include "debug_menu.h"
@@ -51,9 +48,6 @@ s16 optmenu_y_offset = 0;
 static u8 optmenu_binding = 0;
 static u8 optmenu_bind_idx = 0;
 #endif
-
-/* Keeps track of how many times the user has pressed L while in the options menu, so cheats can be unlocked */
-static s32 l_counter = 0;
 
 #ifdef VERSION_CN // hack, todo remove
 #define SIZEOPTC(n) n * 2
@@ -386,7 +380,6 @@ static struct Option optsMain[] = {
     DEF_OPT_SUBMENU( optMainStr[5], &menuSettings ),
 
 #ifdef EXT_DEBUG_MENU
-    // NOTE: always keep cheats the last option here because of the half-assed way I toggle them
     DEF_OPT_SUBMENU( optDebugMenuStr[0], &menuDebug ),
 #endif
 
@@ -394,10 +387,6 @@ static struct Option optsMain[] = {
     DEF_OPT_BUTTON ( optMainStr[6], optmenu_act_exit ),
 #endif
 
-#ifdef CHEATS_ACTIONS
-    // NOTE: always keep cheats the last option here because of the half-assed way I toggle them
-    DEF_OPT_SUBMENU( optCheatMenuStr[0], &menuCheats ),
-#endif
 };
 
 static struct SubMenu menuMain = DEF_SUBMENU( optMainStr[0], optsMain );
@@ -649,15 +638,9 @@ void optmenu_toggle(void) {
 
         menuMain.opts = optsMain;
         menuMain.numOpts = sizeof(optsMain) / sizeof(optsMain[0]);
-#ifdef CHEATS_ACTIONS
-        // HACK: hide the last option in main if cheats are disabled
-        if (!Cheats.EnableCheats) {
-            menuMain.numOpts--;
-        }
-#endif
 #ifndef TARGET_N64
         if (network_active()) {
-            // Prepend the ONLINE entry (cheats stay last, see above).
+            // Prepend the ONLINE entry.
             s32 i;
             optsMainOnline[0] = optOnlineEntry;
             for (i = 0; i < menuMain.numOpts; i++) {
@@ -680,8 +663,6 @@ void optmenu_toggle(void) {
 
         currentMenu = &menuMain;
         optmenu_open = 1;
-        /* Resets l_counter to 0 every time the options menu is open */
-        l_counter = 0;
     } else {
         #ifndef nosound
         play_sound(SOUND_MENU_HIGH_SCORE, gGlobalSoundSource);
@@ -713,19 +694,6 @@ void optmenu_check_buttons(void) {
     if (gPlayer1Controller->buttonPressed & R_TRIG) {
         optmenu_toggle();
     }
-
-    /* Enables cheats if the user press the L trigger 3 times while in the options menu. Also plays a sound. */
-#ifdef CHEATS_ACTIONS
-    if ((gPlayer1Controller->buttonPressed & L_TRIG) && !Cheats.EnableCheats) {
-        if (l_counter == 2) {
-                Cheats.EnableCheats = true;
-                play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
-                l_counter = 0;
-        } else {
-            l_counter++;
-        }
-    }
-#endif
 
     if (!optmenu_open) return;
 

@@ -42,9 +42,6 @@ extern u8 main_menu_seg7_table_0700ABD0[];
 #define LANGUAGE_FUNCTION gInGameLanguage
 #endif
 
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 #ifdef EXT_OPTIONS_MENU
 #include "extras/options_menu.h"
 #endif
@@ -3194,9 +3191,6 @@ s8 gHudFlash = 0;
 #else
 u8 should_render_pause_options(struct MarioState *m) {
     return (m->action & ACT_FLAG_PAUSE_EXIT)
-#ifdef CHEATS_ACTIONS
-    || (Cheats.EnableCheats && Cheats.ExitAnywhere) // Added support for the "Exit course at any time" cheat
-#endif
     ;
 }
 #endif

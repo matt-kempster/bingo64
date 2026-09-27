@@ -15,9 +15,6 @@
 #include "math_util.h"
 #include "surface_collision.h"
 #include "surface_load.h"
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 
 // ex-alo change
 // Adds extended bounds defines and code via defines
@@ -630,10 +627,6 @@ static struct Surface *find_floor_from_list(struct SurfaceNode *surfaceNode, s32
         if (y - (height - FIND_FLOOR_BUFFER) < 0.0f) continue;
 #endif
 
-#ifdef CHEATS_ACTIONS
-        // Set floor height cheats for Mario.
-        height = cheats_walk_on_environment(height, x, z);
-#endif
 
         // Use the current floor
         *pheight = height;

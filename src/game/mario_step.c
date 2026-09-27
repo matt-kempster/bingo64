@@ -9,9 +9,6 @@
 #include "interaction.h"
 #include "mario_step.h"
 
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 
 #ifdef ALO
 // The retired sm64ex-alo step engine (never compiled; ALO is defined
@@ -23,7 +20,6 @@
 // Adaptations, each mechanical and marked by this note:
 //  - vec3f_find_ceil -> find_mario_ceil (tree inline; same 80-unit buffer)
 //  - MARIO_UNKNOWN_30 -> MARIO_AIR_HIT_WALL (tree rename, same bit)
-//  - CHEATS_ACTIONS quicksand hook grafted (runtime-off feature hook)
 
 static s16 sMovingSandSpeeds[] = { 12, 8, 4, 0 };
 
@@ -121,12 +117,6 @@ void mario_bonk_reflection(struct MarioState *m, u32 negateSpeed) {
 }
 
 u32 mario_update_quicksand(struct MarioState *m, f32 sinkingSpeed) {
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.Quicksand) {
-        m->quicksandDepth = 0.0f;
-        return FALSE;
-    }
-#endif
 
     if (m->action & ACT_FLAG_RIDING_SHELL) {
         m->quicksandDepth = 0.0f;

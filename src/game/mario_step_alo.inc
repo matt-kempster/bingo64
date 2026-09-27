@@ -108,12 +108,6 @@ void mario_bonk_reflection(struct MarioState *m, u32 negateSpeed) {
 }
 
 u32 mario_update_quicksand(struct MarioState *m, f32 sinkingSpeed) {
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.Quicksand) {
-        m->quicksandDepth = 0.0f;
-        return FALSE;
-    }
-#endif
 
     if (m->action & ACT_FLAG_RIDING_SHELL) {
         m->quicksandDepth = 0.0f;

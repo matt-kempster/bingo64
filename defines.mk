@@ -11,8 +11,6 @@ EXT_DEBUG_MENU ?= 0
 # Enable better camera (Puppycam 2)
 # Off for bingo64: vanilla SM64 camera only.
 BETTERCAMERA ?= 0
-# Enable cheats
-CHEATS_ACTIONS ?= 1
 # Enable rumble functions (Originally in Shindou)
 # Off for bingo64: the US original had no Rumble Pak support, and the
 # "ready to rumble" title banner comes with it.
@@ -165,11 +163,6 @@ ifeq ($(BETTERCAMERA),1)
   EXT_OPTIONS_MENU := 1
 endif
 
-# Check for Cheats option
-ifeq ($(CHEATS_ACTIONS),1)
-  CUSTOM_C_DEFINES += -DCHEATS_ACTIONS
-  EXT_OPTIONS_MENU := 1
-endif
 
 # Check for extended options menu option
 ifeq ($(EXT_OPTIONS_MENU),1)

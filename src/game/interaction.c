@@ -36,9 +36,6 @@
 #include "extras/bettercamera.h"
 #endif
 
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 
 #define INT_GROUND_POUND_OR_TWIRL (1 << 0) // 0x01
 #define INT_PUNCH                 (1 << 1) // 0x02
@@ -1938,9 +1935,6 @@ void mario_process_interactions(struct MarioState *m) {
 }
 
 void check_death_barrier(struct MarioState *m) {
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.DeathBarrier) return;
-#endif
 
     if (m->pos[1] < m->floorHeight + 2048.0f) {
         if (level_trigger_warp(m, WARP_OP_WARP_FLOOR) == 20 && !(m->flags & MARIO_UNKNOWN_18)) {
@@ -1956,9 +1950,6 @@ void check_death_barrier(struct MarioState *m) {
 #endif
 
 void check_lava_boost(struct MarioState *m) {
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.Lava) return;
-#endif
 
     if (!(m->action & ACT_FLAG_GROUP_NO_LAVA_BOOST) && m->pos[1] < m->floorHeight + 10.0f) {
         if (!(m->flags & MARIO_METAL_CAP)) {

@@ -7,9 +7,6 @@
 #include "text_options_strings.h"
 #endif
 
-#ifdef CHEATS_ACTIONS
-#include "text_cheats_strings.h"
-#endif
 
 #ifdef EXT_DEBUG_MENU
 #include "text_debug_strings.h"

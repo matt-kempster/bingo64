@@ -43,9 +43,6 @@
 #include "extras/bettercamera.h"
 #endif
 
-#ifdef CHEATS_ACTIONS
-#include "extras/cheats.h"
-#endif
 
 #ifdef EXT_DEBUG_MENU
 #include "extras/debug_menu.h"
@@ -428,9 +425,6 @@ s32 is_dangerous_wallkick(struct MarioState *m) {
  */
 s32 mario_get_floor_class(struct MarioState *m) {
     s32 floorClass;
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.Slope) return SURFACE_CLASS_NOT_SLIPPERY;
-#endif
 
     // The slide terrain type defaults to slide slipperiness.
     // This doesn't matter too much since normally the slide terrain
@@ -581,9 +575,6 @@ s32 mario_facing_downhill(struct MarioState *m, s32 turnYaw) {
 * Determines if a surface is slippery based on the surface class.
 */
 u32 mario_floor_is_slippery(struct MarioState *m) {
-#ifdef CHEATS_ACTIONS
-    if (Cheats.EnableCheats && Cheats.WalkOn.Slope) return FALSE;
-#endif
 
     f32 normY;
 
@@ -1256,13 +1247,8 @@ u8 sSquishScaleOverTime[16] = { 0x46, 0x32, 0x32, 0x3C, 0x46, 0x50, 0x50, 0x3C,
 void squish_mario_model(struct MarioState *m) {
     if (m->squishTimer != 0xFF) {
         // If no longer squished, scale back to default.
-        // Also handles the Tiny Mario and Huge Mario cheats.
         if (m->squishTimer == 0) {
-#ifdef CHEATS_ACTIONS
-            cheats_mario_size(m);
-#else
             vec3f_set(m->marioObj->header.gfx.scale, 1.0f, 1.0f, 1.0f);
-#endif
         }
         // If timer is less than 16, rubber-band Mario's size scale up and down.
         else if (m->squishTimer <= 16) {
@@ -1441,9 +1427,6 @@ void update_mario_inputs(struct MarioState *m) {
     update_mario_geometry_inputs(m);
 
     debug_print_speed_action_normal(m);
-#ifdef CHEATS_ACTIONS
-    cheats_mario_inputs(m);
-#endif
 #ifdef BETTERCAMERA
     puppycam_mario_inputs(m);
 #endif
@@ -1807,9 +1790,6 @@ void queue_rumble_particles(void) {
 s32 execute_mario_action(UNUSED struct Object *o) {
     s32 inLoop = TRUE;
 
-#ifdef CHEATS_ACTIONS
-    cheats_mario_action(gMarioState);
-#endif
 
 #ifdef EXT_DEBUG_MENU
     set_debug_mario_action(gMarioState);

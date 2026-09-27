@@ -1415,10 +1415,6 @@ ifeq ($(EXT_OPTIONS_MENU),1)
   $(BUILD_DIR)/include/text_strings.h: $(BUILD_DIR)/include/text_options_strings.h
 endif
 
-ifeq ($(CHEATS_ACTIONS),1)
-  $(BUILD_DIR)/include/text_strings.h: $(BUILD_DIR)/include/text_cheats_strings.h
-endif
-
 ifeq ($(EXT_DEBUG_MENU),1)
   $(BUILD_DIR)/include/text_strings.h: $(BUILD_DIR)/include/text_debug_strings.h
 endif
@@ -1441,10 +1437,6 @@ ifeq ($(EXT_OPTIONS_MENU),1)
 
   ifeq ($(BETTERCAMERA),1)
     $(BUILD_DIR)/src/extras/bettercamera.o: $(BUILD_DIR)/include/text_strings.h $(LANG_O_FILES)
-  endif
-
-  ifeq ($(CHEATS_ACTIONS),1)
-    $(BUILD_DIR)/src/extras/cheats.o:       $(BUILD_DIR)/include/text_strings.h $(LANG_O_FILES)
   endif
 
   ifeq ($(EXT_DEBUG_MENU),1)
@@ -1644,11 +1636,6 @@ $(BUILD_DIR)/include/text_options_strings.h: include/text_options_strings.h.in $
 	$(call print,Encoding:,$<,$@)
 	$(V)$(TEXTCONV) $(BUILD_DIR)/$(CHARMAP) $< $@
 
-ifeq ($(CHEATS_ACTIONS),1)
-$(BUILD_DIR)/include/text_cheats_strings.h: include/text_cheats_strings.h.in $(BUILD_DIR)/$(CHARMAP)
-	$(call print,Encoding:,$<,$@)
-	$(V)$(TEXTCONV) $(BUILD_DIR)/$(CHARMAP) $< $@
-endif
 
 ifeq ($(EXT_DEBUG_MENU),1)
 $(BUILD_DIR)/include/text_debug_strings.h: include/text_debug_strings.h.in $(BUILD_DIR)/$(CHARMAP)
