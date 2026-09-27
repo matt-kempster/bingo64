@@ -1083,7 +1083,9 @@ void draw_bingo_screen() {
             const struct NetResult *res = NULL;
             const char *mark = "";
             s32 r;
-            if (!p->active) {
+            // Late joiners (v12) sit this race out in the lobby: they
+            // aren't racers, so no 0-square row for them.
+            if (!p->active || network_player_waiting(p->id)) {
                 continue;
             }
             for (r = 0; r < network_result_count(); r++) {
