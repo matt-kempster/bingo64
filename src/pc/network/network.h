@@ -24,9 +24,11 @@
 // unlock field became room flags (bit 0 unlock, bit 1 nonstop).
 // 11: Call and Response (mode 5): open calls + calls to win ride W/O/S as
 // two trailing fields.
+// 12: a fresh join past GO no longer races: the relay sends I <id> instead
+// of the S replay, and the joiner waits in the lobby until the next K.
 // During active development the version bumps on every wire change — the
 // old side is refused outright ("E version"), never accommodated.
-#define NET_PROTOCOL_VERSION 11
+#define NET_PROTOCOL_VERSION 12
 // Client-only patch releases within one protocol version: shown on the
 // board as "V1.0 BETA <protocol>.<patch>" (plain "<protocol>" when 0).
 // Reset to 0 whenever NET_PROTOCOL_VERSION bumps.
@@ -143,10 +145,18 @@ s32 network_room_locked(void);
 // auto-launch the game.
 s32 network_take_go_flag(void);
 
+// A late joiner (v12): we joined a room whose race was past GO, so we sit
+// it out in the lobby until the host sends everyone back (K). Settings are
+// locked meanwhile (network_room_locked) and no GO flag is ever raised.
+s32 network_race_waiting(void);
+// Whether room member id is sitting the current race out (see above).
+s32 network_player_waiting(s32 id);
+
 // Host only: start the race now (ready marks are advisory; the host may
 // force-start). The server answers with the S start broadcast.
 void network_start_race(void);
-// Host only, once a race started: end it and send the whole room back to
+// Host only, once a race started (or while waiting it out, if the host
+// role fell to us): end it and send the whole room back to
 // the lobby. The server answers with a K broadcast; the local reset and
 // the warp to the file select both happen in reaction to that, so the
 // host takes the same path as everyone else.

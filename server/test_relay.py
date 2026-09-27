@@ -744,6 +744,84 @@ class RelayUdpTest(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(delta, 0)
         self.assertLessEqual(delta, relaymod.COUNTDOWN_FRAMES)
 
+    async def test_v12_late_joiner_waits_for_next_race(self):
+        # Past GO, a fresh joiner sits the race out in the lobby: no S,
+        # no race traffic, their claims/finishes ignored, not a racer for
+        # lockout. The host's K makes them an ordinary member.
+        a, b = await self.two_joined()
+        a.send("O 3 0 0 0")                 # lockout: racer_ids matters
+        await b.wait_line("O 3")
+        a.send("X")
+        await b.wait_line("S ")
+        room = self.endpoint.relay.rooms["testroom"]
+        room.started_at -= 10              # GO was 10 s ago
+        a.send("C 3")
+        await b.wait_line("C 3 1")
+        c = self.track(RefClient(self.udp_port))
+        await c.start()
+        c.join("testroom", "carol")
+        self.assertEqual((await c.wait_line("W ")).split()[1], "3")
+        await c.wait_line("I 3")            # told they are waiting
+        await c.wait_line("N 1 alice")
+        await a.wait_line("I 3")            # the racers hear it too...
+        await a.wait_line("N 3 carol")      # ...ahead of the roster line
+        self.assertLess(a.lines.index("I 3"),
+                        [ln.startswith("N 3") for ln in a.lines].index(True))
+        self.assertEqual(room.racer_ids(), {1, 2})
+        # Their race lines are dropped; racers' traffic does not reach them.
+        c.send("C 9")
+        c.send("F")
+        c.send("G 16 1 0.0 0.0 0.0 0 0 0")
+        b.send("C 4")
+        await a.wait_line("C 4 2")
+        await asyncio.sleep(0.2)
+        self.assertEqual(a.count("C 9"), 0)
+        self.assertEqual(a.count("G 3"), 0)
+        self.assertNotIn(9, room.claims)
+        for prefix in ("S ", "C ", "G ", "F "):
+            self.assertEqual(c.count(prefix), 0, prefix)
+        # Back to the lobby: carol is a normal member of the rematch.
+        a.send("K")
+        await c.wait_line("K")
+        self.assertEqual(room.waiting, set())
+        a.send("X")
+        seed = (await a.wait_line("S ", skip=1)).split()[1]
+        self.assertEqual((await c.wait_line("S ")).split()[1], seed)
+        c.send("C 9")
+        await a.wait_line("C 9 3")
+
+    async def test_v12_reconnect_still_resumes_as_racer(self):
+        # A token resume past GO is a racer coming back, not a waiter;
+        # a waiter who drops loses their (race-less) seat outright.
+        relaymod.UDP_TIMEOUT_S = 1.0
+        a, b = await self.two_joined(keepalive=0.3)
+        token_b = int((await b.wait_line("W ")).split()[4])
+        a.send("X")
+        seed = (await b.wait_line("S ")).split()[1]
+        room = self.endpoint.relay.rooms["testroom"]
+        room.started_at -= 10
+        c = self.track(RefClient(self.udp_port, keepalive=0.3))
+        await c.start()
+        c.join("testroom", "carol")
+        await c.wait_line("I 3")
+        b.close()
+        self._cleanup.remove(b)
+        await a.wait_line("D 2", timeout=5)
+        b2 = self.track(RefClient(self.udp_port, keepalive=0.3))
+        await b2.start()
+        b2.join("testroom", "bob", token=token_b)
+        self.assertEqual((await b2.wait_line("W ")).split()[1], "2")
+        s = (await b2.wait_line("S ")).split()
+        self.assertEqual(s[1], seed)
+        self.assertLess(int(s[2]), 0)       # already racing
+        await b2.wait_line("I 3")           # and knows carol is waiting
+        self.assertEqual(b2.count("I 2"), 0)
+        self.assertEqual(room.racer_ids(), {1, 2})
+        c.close()
+        self._cleanup.remove(c)
+        await a.wait_line("B 3", timeout=5)  # no held seat for a waiter
+        self.assertNotIn(3, room.disconnected)
+
     async def test_duplicate_names_get_suffixed(self):
         a = self.track(RefClient(self.udp_port))
         b = self.track(RefClient(self.udp_port))

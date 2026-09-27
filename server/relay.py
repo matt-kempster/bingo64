@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bingo64 relay server, protocol v11.
+"""Bingo64 relay server, protocol v12.
 
 A small room server for online bingo (plans/online-bingo.md Part D).
 Clients speak a line-based text protocol; the server groups them into
@@ -139,7 +139,8 @@ Line protocol (space-separated fields):
                              the race starts: shared seed, room options,
                              and delta = frames (30/s) until GO. Negative
                              delta means the race started -delta frames
-                             ago (late joiner / reconnect).
+                             ago (reconnect; since v12 a fresh joiner
+                             after GO gets I instead).
     G <id> <level> <area> <x> <y> <z> <yaw> <animID> <animFrame>
     C <cell> <id>            cell claim accepted. OPEN rooms: relayed to
                              the whole room. Non-OPEN tiers (line modes
@@ -161,6 +162,15 @@ Line protocol (space-separated fields):
                              regular finisher already held first place.
                              Line modes: F placements for everyone still
                              racing are broadcast immediately before.
+    I <id>                   (v12) player id joined after GO and sits
+                             this race out in the lobby: no S, no race
+                             traffic (G/C/M/F/V/T) and no claims or
+                             finishes accepted from them; not a racer for
+                             lockout or timeout standings. They become an
+                             ordinary member at the next K. id = your own
+                             id means you are the one waiting. Sent in
+                             the snapshot and broadcast before the
+                             joiner's N line.
     D <id>                   peer disconnected mid-race (may return)
     B <id>                   peer left for good
     P <name> <members> <started>
@@ -190,7 +200,7 @@ print = functools.partial(print, flush=True)
 
 # Bumped on every wire change while the protocol is under active
 # development; mismatched peers are refused ("E version"), not served.
-PROTOCOL_VERSION = 11
+PROTOCOL_VERSION = 12
 MAX_ROOM = 15          # ghost slots in the client are limited
 COUNTDOWN_FRAMES = 90  # 3 seconds at 30 fps
 FPS = 30
@@ -502,6 +512,8 @@ class Room:
         self.members = {}       # id -> Client (connected)
         self.disconnected = {}  # id -> (name, color): mid-race dropouts
         self.tokens = {}        # id -> reconnect token
+        self.waiting = set()    # ids that joined mid-race: members, but
+                                # sitting it out until the next K (v12)
         self.claims = {}        # cell -> [claiming ids, in order]
         self.next_id = 1
         self.creator_id = 1
@@ -536,9 +548,11 @@ class Room:
     def started(self):
         return self.started_at is not None
 
-    def broadcast(self, line, skip=None, lossy=False):
+    def broadcast(self, line, skip=None, lossy=False, racers_only=False):
+        """racers_only: race traffic (claims, ghosts, results) skips the
+        members waiting for the next race; they sit in the lobby."""
         for c in self.members.values():
-            if c.id != skip:
+            if c.id != skip and not (racers_only and c.id in self.waiting):
                 c.send(line, lossy)
 
     def start_delta_frames(self):
@@ -563,7 +577,7 @@ class Room:
                                      1 if ready else 0, 1 if connected else 0)
 
     def racer_ids(self):
-        return set(self.members) | set(self.disconnected)
+        return (set(self.members) - self.waiting) | set(self.disconnected)
 
     def player_progress_line(self, cid):
         """The M line for one player under the room's visibility tier:
@@ -590,13 +604,13 @@ class Room:
         have it."""
         line = "C %d %d" % (cell, cid)
         if self.claimvis == CLAIMVIS_OPEN:
-            self.broadcast(line)
+            self.broadcast(line, racers_only=True)
             return
         if cid in self.members:
             self.members[cid].send(line)
         progress = self.player_progress_line(cid)
         if progress is not None:
-            self.broadcast(progress, skip=cid)
+            self.broadcast(progress, skip=cid, racers_only=True)
 
     def claim_counts(self):
         counts = {}
@@ -750,6 +764,8 @@ class Relay:
             room.broadcast("B %d" % id_)
             room.tokens.pop(id_, None)
         room.disconnected.clear()
+        # Late joiners who sat the race out are ordinary members again.
+        room.waiting.clear()
         room.started_at = None
         room.seed = 0
         room.claims.clear()
@@ -817,18 +833,28 @@ class Relay:
     def pass_host(self, room, leaving_id):
         """Keep the host role on a connected member in every phase."""
         if leaving_id == room.creator_id and room.members:
-            room.creator_id = min(room.members)
+            # Prefer someone in the race: a late joiner waiting in the
+            # lobby only inherits the role when nobody racing is left
+            # (their client then offers END RACE, i.e. K).
+            racing = [i for i in room.members if i not in room.waiting]
+            room.creator_id = min(racing or room.members)
             room.broadcast("H %d" % room.creator_id)
             self.log.event("host", room=room.name, id=room.creator_id)
 
     def send_room_snapshot(self, room, client):
-        """Roster, claims and race status, for a joiner or reconnector."""
+        """Roster, claims and race status, for a joiner or reconnector.
+        A late joiner waiting for the next race gets the roster and the
+        I lines only: no S (so no seed, no launch) and no race state."""
         client.send("H %d" % room.creator_id)
         for other in room.members.values():
             client.send(room.roster_line(other.id, other.name, other.color,
                                          other.ready, True))
         for id_, (name, color) in sorted(room.disconnected.items()):
             client.send(room.roster_line(id_, name, color, False, False))
+        for id_ in sorted(room.waiting):
+            client.send("I %d" % id_)
+        if client.id in room.waiting:
+            return
         if room.claimvis == CLAIMVIS_OPEN:
             for cell, ids in sorted(room.claims.items()):
                 for cid in ids:
@@ -877,7 +903,7 @@ class Relay:
                 or leader_count > second_count + remaining
                 or remaining == 0):
             room.winner = (leader_id, room.elapsed_frames())
-            room.broadcast("V %d %d" % room.winner)
+            room.broadcast("V %d %d" % room.winner, racers_only=True)
             print("[%s] room '%s': %s decided, #%d wins with %d squares"
                   % (ts(), room.name,
                      "calls" if room.mode == MODE_CALLS else "lockout",
@@ -912,7 +938,8 @@ class Relay:
                     continue
                 place += 1
                 room.finishers.append((cid, place, limit))
-                room.broadcast("F %d %d %d" % (cid, place, limit))
+                room.broadcast("F %d %d %d" % (cid, place, limit),
+                               racers_only=True)
             for cid, pl, _frames in pre:
                 if pl == 1:
                     winner = cid       # a regular finish already won it
@@ -923,7 +950,7 @@ class Relay:
             if ranked and any(v for v in ranked[0][1]):
                 winner = ranked[0][0]
         room.timeout_result = (winner, limit, tiebreak)
-        room.broadcast("T %d %d %d" % room.timeout_result)
+        room.broadcast("T %d %d %d" % room.timeout_result, racers_only=True)
         print("[%s] room '%s': timed out after %dm, winner #%d%s"
               % (ts(), room.name, room.timeout_min, winner,
                  " (tiebreak)" if winner and tiebreak else ""))
@@ -1006,6 +1033,12 @@ class Relay:
                 room.next_id += 1
                 room.members[client.id] = client
                 room.tokens[client.id] = random.randrange(1, 2 ** 32)
+                if room.started and room.start_delta_frames() <= 0:
+                    # v12: a fresh join into a running race (past GO; a
+                    # join during the countdown still races) sits it out
+                    # in the lobby and becomes a racer at the next K.
+                    # (A token resume above is a racer coming back.)
+                    room.waiting.add(client.id)
             client.room = room
             self.stat_joins += 1
             # v8: unlock and the objective mask ride along so a joiner's
@@ -1019,23 +1052,32 @@ class Relay:
                            room.timeout_min, room.unlock, room.mask,
                            room.calls_open, room.calls_win))
             self.send_room_snapshot(room, client)
-            # Announce the (re)arrival to everyone else.
+            # Announce the (re)arrival to everyone else. I first, so the
+            # racers' clients word the arrival as a waiter, not a racer.
+            if client.id in room.waiting:
+                room.broadcast("I %d" % client.id, skip=client.id)
             room.broadcast(room.roster_line(client.id, client.name,
                                             client.color, client.ready,
                                             True), skip=client.id)
             print("[%s] %s %s room '%s' as #%d (%d members)"
                   % (ts(), client.name,
-                     "rejoined" if resumed >= 0 else "joined",
+                     "rejoined" if resumed >= 0
+                     else "joined (waiting)" if client.id in room.waiting
+                     else "joined",
                      room.name, client.id, len(room.members)))
             self.log.event("rejoin" if resumed >= 0 else "join",
                            room=room.name, id=client.id, name=client.name,
-                           color=client.color, members=len(room.members))
+                           color=client.color, members=len(room.members),
+                           waiting=client.id in room.waiting)
+        elif (client.room and client.id in client.room.waiting
+              and cmd in ("G", "C", "Y", "F")):
+            return True  # sitting this race out: no ghost, claims, finish
         elif cmd == "G" and client.room and len(parts) == 9:
             client.ghost_updates += 1
             self.log_where(client.room, client, parts[1], parts[2])
             client.room.broadcast(
                 "G %d %s" % (client.id, " ".join(parts[1:])),
-                skip=client.id, lossy=True)
+                skip=client.id, lossy=True, racers_only=True)
         elif cmd == "C" and client.room and len(parts) == 2:
             cell = clamped_int(parts[1], -1, 24)
             if cell < 0:
@@ -1073,7 +1115,8 @@ class Relay:
             place = len(room.finishers) + 1
             frames = room.elapsed_frames()
             room.finishers.append((client.id, place, frames))
-            room.broadcast("F %d %d %d" % (client.id, place, frames))
+            room.broadcast("F %d %d %d" % (client.id, place, frames),
+                           racers_only=True)
             print("[%s] room '%s': #%d %s finished, place %d (%d frames)"
                   % (ts(), room.name, client.id, client.name,
                      place, frames))
@@ -1146,7 +1189,10 @@ class Relay:
         if not room or room.members.get(client.id) is not client:
             return
         del room.members[client.id]
-        if room.started and room.members:
+        # A late joiner sitting the race out holds no race seat.
+        was_waiting = client.id in room.waiting
+        room.waiting.discard(client.id)
+        if room.started and room.members and not was_waiting:
             # Mid-race drop: hold the seat for a reconnect.
             room.disconnected[client.id] = (client.name, client.color)
             room.broadcast("D %d" % client.id)

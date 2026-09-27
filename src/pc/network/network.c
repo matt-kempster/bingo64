@@ -230,6 +230,7 @@ static s8 sIdToSlot[MAX_ID];
 // and sends aggregate M lines instead. -1 = nothing received.
 static s16 sPeerCells[MAX_ID];
 static s16 sPeerBingos[MAX_ID];
+static u8 sWaiting[MAX_ID];  // I lines (v12): sitting this race out
 
 #ifdef NET_SOCKETS_AVAILABLE
 
@@ -365,6 +366,7 @@ static s32 slot_for_id(s32 id) {
 static void reset_race_state(void) {
     s32 i;
     for (i = 0; i < MAX_ID; i++) {
+        sWaiting[i] = 0;  // K: the late joiners are ordinary members now
         sIdToSlot[i] = -1;
         sPeerCells[i] = -1;
         sPeerBingos[i] = -1;
@@ -393,6 +395,7 @@ static void reset_room_state(void) {
         sIdToSlot[i] = -1;
         sPeerCells[i] = -1;
         sPeerBingos[i] = -1;
+        sWaiting[i] = 0;
     }
     memset(gNetGhosts, 0, sizeof(gNetGhosts));
     memset(gNetPlayers, 0, sizeof(gNetPlayers));
@@ -675,12 +678,26 @@ static void handle_line(char *line) {
                     fflush(stdout);
                     if (wasConnected == 0 && connected != 0) {
                         notice_about(id, "reconnected");
+                    } else if (wasConnected < 0 && sWaiting[id]) {
+                        notice_about(id, "is waiting for the next race");
                     } else if (wasConnected < 0
                                && (sState == NET_STATE_COUNTDOWN
                                    || sState == NET_STATE_RACING)) {
                         notice_about(id, "joined the race");
                     }
                 }
+            }
+        }
+    } else if (cmd == 'I') {
+        // v12: this member joined after GO and sits the race out in the
+        // lobby (our own id: that's us). No S follows, so we never launch;
+        // the K that ends the race clears the mark.
+        s32 id;
+        if (sscanf(line + 1, "%d", &id) == 1 && id >= 0 && id < MAX_ID) {
+            sWaiting[id] = 1;
+            if (id == sLocalId) {
+                printf("net: race in progress, waiting for the next one\n");
+                fflush(stdout);
             }
         }
     } else if (cmd == 'R') {
@@ -737,6 +754,7 @@ static void handle_line(char *line) {
                 if (cmd == 'B') {
                     notice_about(id, "left");
                     p->active = 0;
+                    sWaiting[id] = 0;
                 } else {
                     notice_about(id, "disconnected");
                     p->connected = 0;
@@ -1484,7 +1502,7 @@ s32 network_color_of_id(s32 id) {
 
 void network_set_ready(s32 ready) {
     char line[16];
-    if (sState != NET_STATE_LOBBY) {
+    if (sState != NET_STATE_LOBBY || network_race_waiting()) {
         return;
     }
     snprintf(line, sizeof(line), "R %d\n", ready ? 1 : 0);
@@ -1539,7 +1557,16 @@ s32 network_host_id(void) {
 
 s32 network_room_locked(void) {
     return sState == NET_STATE_COUNTDOWN || sState == NET_STATE_RACING
-           || sState == NET_STATE_RECONNECTING;
+           || sState == NET_STATE_RECONNECTING || network_race_waiting();
+}
+
+s32 network_race_waiting(void) {
+    return sState == NET_STATE_LOBBY && sLocalId > 0 && sLocalId < MAX_ID
+           && sWaiting[sLocalId];
+}
+
+s32 network_player_waiting(s32 id) {
+    return id >= 0 && id < MAX_ID && sWaiting[id];
 }
 
 s32 network_take_go_flag(void) {
@@ -1556,7 +1583,8 @@ void network_start_race(void) {
 
 void network_request_lobby(void) {
     if (network_is_host() && (sState == NET_STATE_COUNTDOWN
-                              || sState == NET_STATE_RACING)) {
+                              || sState == NET_STATE_RACING
+                              || network_race_waiting())) {
         net_send_line("K\n");
     }
 }

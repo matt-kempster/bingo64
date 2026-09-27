@@ -235,10 +235,12 @@ s32 online_lobby_button_active(s32 which) {
         case LOBBY_BTN_CONNECT:
             return 1;
         case LOBBY_BTN_READY:
-            return network_state() == NET_STATE_LOBBY;
+            return network_state() == NET_STATE_LOBBY && !network_race_waiting();
         case LOBBY_BTN_OPTIONS:
             return 1;
         case LOBBY_BTN_START:
+            // A late joiner who inherited the host role mid-race gets
+            // END RACE here: nobody else left can send the room back.
             return network_is_host() && network_state() == NET_STATE_LOBBY;
     }
     return 0;
@@ -260,7 +262,11 @@ s32 online_lobby_button_pressed(s32 which) {
         case LOBBY_BTN_OPTIONS:
             return 2;  // file_select opens the OPTIONS screen over us
         case LOBBY_BTN_START:
-            network_start_race();
+            if (network_race_waiting()) {
+                network_request_lobby();
+            } else {
+                network_start_race();
+            }
             break;
     }
     return 0;
@@ -402,6 +408,9 @@ static const char *button_label(s32 which) {
         case LOBBY_BTN_OPTIONS:
             return "OPTIONS";
         case LOBBY_BTN_START:
+            if (network_race_waiting()) {
+                return network_is_host() ? "END RACE" : "STARTED";
+            }
             if (network_state() == NET_STATE_COUNTDOWN
                 || network_state() == NET_STATE_RACING) {
                 return "STARTED";
@@ -453,6 +462,15 @@ static void status_text(char *buf, s32 size, u8 rgb[3]) {
             rgb[0] = 255; rgb[1] = 220; rgb[2] = 100;
             break;
         case NET_STATE_LOBBY:
+            if (network_race_waiting()) {
+                // v12 late joiner: the race runs without us. Two short
+                // lines alternate (one long one would overrun the column).
+                snprintf(buf, size, "%s", ((gGlobalTimer >> 6) & 1)
+                                              ? "YOU'LL JOIN THE NEXT RACE"
+                                              : "RACE IN PROGRESS");
+                rgb[0] = 255; rgb[1] = 220; rgb[2] = 100;
+                break;
+            }
             for (i = 0; i < NET_MAX_PLAYERS; i++) {
                 if (gNetPlayers[i].active) {
                     total++;
@@ -631,6 +649,10 @@ void online_lobby_draw(u8 alpha, f32 curX, f32 curY) {
         } else if (!p->connected) {
             gDPSetEnvColor(gDisplayListHead++, 255, 120, 120, MIN(alpha, 220));
             print_ascii(rosterX + 80, rowY, "-");
+        } else if (network_player_waiting(p->id)) {
+            // Joined after GO: sitting this race out.
+            gDPSetEnvColor(gDisplayListHead++, 255, 220, 100, MIN(alpha, 220));
+            print_ascii(rosterX + 80, rowY, "NEXT");
         } else if (p->ready || network_state() == NET_STATE_COUNTDOWN
             || network_state() == NET_STATE_RACING) {
             gDPSetEnvColor(gDisplayListHead++, 110, 255, 110, MIN(alpha, 220));
