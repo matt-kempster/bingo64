@@ -47,6 +47,8 @@ STAR_ABC = (3,)
 STAR_CLICK = 7
 COURSE_COLLECT = (11, 12, 13, 14, 15, 16)  # 11 = random stars, 16 = splatoon
 WALL_KICKS = 17
+# Same MultiCourseCollectableData print as wall kicks.
+MULTI_COURSE = (WALL_KICKS, 26, 68)  # 26 = stars in N levels, 68 = coins in N levels
 BOWSER = 18
 
 failures = []
@@ -80,7 +82,7 @@ def dump_cell_from_ram(core, base, index):
         line += b" course=%d star=%d maxClicks=%d" % (d[0], d[1], d[2])
     elif otype in COURSE_COLLECT:
         line += b" course=%d toGet=%d" % (d[0], d[1])
-    elif otype == WALL_KICKS:
+    elif otype in MULTI_COURSE:
         line += b" toGetTotal=%d toGetEachCourse=%d" % (d[0], d[2])
     elif otype == BOWSER:
         line += b" level=%d" % d[0]
