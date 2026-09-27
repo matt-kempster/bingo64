@@ -8,9 +8,73 @@ function does. Global-counter objectives (kills, amps, signs, poles,
 cannons, red coins, boxes) are attributed to courses proportional to the
 unique-kill supply counted from sm64.sql (verified against the tracker's
 MAX_* constants). Dedup pass is NOT simulated (small effect; see notes).
+
+The objective list and the four weight tables are read straight from
+src/game/bingo.h and src/game/bingo_board_setup.c, so they can't go stale.
+What this file still knows by hand is where each type's cells land
+(course_vector). `--check` fails if any enum type is missing from that
+knowledge; test/host's `make test` runs it, so a new tile can't be
+forgotten here.
+
+  python3 test/board_gen_bias.py            # full bias report (slow-ish)
+  python3 test/board_gen_bias.py --check    # completeness check (fast)
 """
+import os
 import random
+import re
+import sys
 from collections import defaultdict
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BINGO_H = os.path.join(REPO, "src", "game", "bingo.h")
+BOARD_SETUP_C = os.path.join(REPO, "src", "game", "bingo_board_setup.c")
+PREFIX = "BINGO_OBJECTIVE_"
+
+
+def _strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def parse_objective_enum(path=BINGO_H):
+    """enum BingoObjectiveType as [(name, value)] in order, prefix dropped.
+    Range markers (*_MIN, *_MAX, TOTAL_AMOUNT) are left out; an entry
+    written `X = MARKER` (e.g. MULTICOIN = COLLECTABLE_MIN) is a real type."""
+    text = _strip_comments(open(path).read())
+    m = re.search(r"enum\s+BingoObjectiveType\s*\{(.*?)\};", text, re.S)
+    if not m:
+        raise SystemExit(f"enum BingoObjectiveType not found in {path}")
+    values, out, nxt = {}, [], 0
+    for entry in m.group(1).split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        name, _, rhs = (p.strip() for p in entry.partition("="))
+        if rhs:
+            rhs = rhs[len(PREFIX):] if rhs.startswith(PREFIX) else rhs
+            nxt = values[rhs] if rhs in values else int(rhs, 0)
+        name = name[len(PREFIX):]
+        values[name] = nxt
+        if not re.search(r"(_MIN|_MAX|TOTAL_AMOUNT)$", name):
+            out.append((name, nxt))
+        nxt += 1
+    return out
+
+
+def parse_weight_tables(path=BOARD_SETUP_C):
+    """sWeights{Easy,Medium,Hard,Center}[] as {CLASS: [(type, weight, uses)]}."""
+    text = _strip_comments(open(path).read())
+    tables = {}
+    for cls in ("Easy", "Medium", "Hard", "Center"):
+        m = re.search(r"sWeights%s\[\]\s*=\s*\{(.*?)\};" % cls, text, re.S)
+        if not m:
+            raise SystemExit(f"sWeights{cls} not found in {path}")
+        rows = re.findall(r"\{\s*%s(\w+)\s*,\s*(\d+)\s*,\s*(NO_LIMIT|-?\d+)\s*\}" % PREFIX,
+                          m.group(1))
+        tables[cls.upper()] = [(t, int(w), NL if u == "NO_LIMIT" else int(u))
+                               for t, w, u in rows]
+    return tables
+
 
 MAIN = ["BOB","WF","JRB","CCM","BBH","HMC","LLL","SSL","DDD","SL","WDW","TTM","THI","TTC","RR"]
 SPECIAL = ["BitDW","BitFS","BitS","PSS","CotMC","TotWC","VCutM","WMotR","SA"]
@@ -49,9 +113,34 @@ SUPPLY = {
  "SECRETS_STARS": {"BOB":1,"SSL":1,"WDW":1,"THI":1},
  "LOSE_MARIO_HAT":{"SSL":1,"SL":1,"TTM":1},
  "ROOF_WITHOUT_CANNON": {CASTLE:1},
+ # --- added 2026-09-27 (wave-1 enemies from test/cost_model/data.py; the
+ # rest from the supply comments in bingo_objective_init.c) ---
+ "KILL_WHOMPS":   {"WF":3,"BitS":1},
+ "KILL_BOOS":     {"BBH":13,CASTLE:11},
+ "KILL_SNUFITS":  {"HMC":4,"CotMC":4},
+ "HURT_BY_CLAMS": {"JRB":5,"DDD":4},
+ "KILL_FLY_GUYS": {"THI":3,"SSL":3,"TTM":1,"SL":1,"RR":1},
+ "KILL_MR_BLIZZARDS":{"SL":4,"CCM":3},
+ "KILL_SKEETERS": {"WDW":4},
+ "KILL_KOOPAS":   {"BOB":1,"THI":2},
+ "CRUSHED":       {"WF":5,"TTC":1,"SSL":7,"BitS":1},
+ # GUESS (cost model): stars that can be hit mid-flight from a cannon
+ "CANNON_STARS":  {"WF":1,"BOB":1,"WDW":1,"TTM":1,"THI":1,"RR":1,"SSL":1,"CCM":1,"JRB":1,"WMotR":1},
+ "WARP_PADS":     {"BOB":2,"SSL":2,"WF":1,"CCM":1,"LLL":1,"WDW":1,"TTM":1,"THI":1,"SL":1,"RR":1},
+ "KOOPA_SHELLS":  {"LLL":1,"SSL":1,"SL":1,"JRB":1,"DDD":1,"BOB":1,"THI":1},
+ "SPIN_HEARTS":   {"BitFS":2,"BitS":2,"RR":2,"TTC":2,"BOB":1,"CCM":1,"HMC":1,"LLL":1,"SSL":1},
+ "PURPLE_SWITCHES":{"WDW":3,"BitDW":2,"BOB":1,"HMC":1,"JRB":1,"DDD":1,"TTM":1,"THI":1,"RR":1,"BitS":1},
+ "STUCK_IN_GROUND":{"SL":1,"CCM":1,"SSL":1,"WMotR":1},
+ "CAPS_WORN":     {"TotWC":1,"CotMC":1,"VCutM":1},
+ "OPEN_CANNONS":  {c:1 for c in ["BOB","WF","JRB","CCM","SSL","SL","WDW","TTM","THI","RR"]},
+ "TOAD_STARS":    {CASTLE:3},
+ "MIPS":          {CASTLE:1},
 }
 PLAYER_CHOICE = {"MULTICOIN","MULTISTAR","STARS_MULTIPLE_LEVELS","LIVES","UNIQUE_DEATHS",
-                 "BLJ","DANGEROUS_WALL_KICKS"}
+                 "BLJ","DANGEROUS_WALL_KICKS","COINS_MULTIPLE_LEVELS","1UPS_MULTIPLE_LEVELS"}
+# Progression tiles are only dealt with "Unlock full game" OFF; the
+# presets below assume the default (unlock ON), so they leave the draw.
+PROGRESSION = {"OPEN_CANNONS","TOAD_STARS","MIPS"}
 
 # ---------- star-pool vectors ----------
 def star115():
@@ -90,6 +179,13 @@ def course_vector(objtype, cls):
     if objtype == "STAR_Z_BUTTON_CHALLENGE": return ZBC
     if objtype == "STAR_CLICK_GAME": return CLICK
     if objtype == "STAR_DAREDEVIL": return DD_HARD if cls=="HARD" else DD_MED
+    if objtype == "STAR_COINLESS": return STAR115          # APPROXIMATE (random_coinless_star)
+    if objtype == "RANDOM_STARS": return COURSE24          # uniform COURSE_MIN..COURSE_SA
+    if objtype == "RED_COIN_STARS": return REDS23
+    if objtype == "HUNDRED_COIN_STARS": return MAIN15
+    if objtype == "CASTLE_SECRET_STARS":                   # 10 course stars + Toad x3, MIPS x2
+        return {"PSS":2,"SA":1,"TotWC":1,"CotMC":1,"VCutM":1,"WMotR":1,
+                "BitDW":1,"BitFS":1,"BitS":1,CASTLE:5}
     if objtype == "RANDOM_RED_COINS": return REDS23
     if objtype == "COIN": return COIN_V
     if objtype == "SPLATOON" or objtype == "STARS_IN_LEVEL": return MAIN15
@@ -100,44 +196,22 @@ def course_vector(objtype, cls):
     if objtype in PLAYER_CHOICE: return {ANY:1}
     raise KeyError(objtype)
 
-# ---------- weight tables ----------
+# ---------- weight tables (read from the C source) ----------
 NL = -1
-EASY = [("COIN",12,1),("SPLATOON",8,1),("STAR",12,NL),("LOSE_MARIO_HAT",12,1),
- ("UNIQUE_DEATHS",8,1),("BLJ",12,1),("RACING_STARS",6,1),("MULTISTAR",6,1),
- ("STARS_MULTIPLE_LEVELS",4,1)]
-MEDIUM = [("COIN",12,1),("SPLATOON",8,2),("STAR",20,NL),("KILL_GOOMBAS",6,2),
- ("KILL_BOBOMBS",6,2),("KILL_SPINDRIFTS",6,1),("KILL_MR_IS",6,1),("KILL_SCUTTLEBUGS",6,1),
- ("KILL_BULLIES",6,1),("KILL_CHUCKYAS",6,1),("AMPS",6,1),("STAR_TIMED",12,3),
- ("STAR_TTC_RANDOM",8,2),("STAR_B_BUTTON_CHALLENGE",3,3),("STAR_Z_BUTTON_CHALLENGE",3,3),
- ("STAR_DAREDEVIL",12,3),("STAR_REVERSE_JOYSTICK",8,2),("STAR_CLICK_GAME",8,2),
- ("RANDOM_RED_COINS",12,3),("1UPS_IN_LEVEL",12,NL),("STARS_IN_LEVEL",8,2),("LIVES",8,1),
- ("UNIQUE_DEATHS",8,1),("SIGNPOST",12,2),("SHOOT_CANNONS",12,2),("RED_COIN",12,2),("BLUE_COIN",12,2),
- ("EXCLAMATION_MARK_BOX",8,2),("SECRETS_STARS",8,2),("RACING_STARS",4,1),
- ("WING_CAP_BOX",4,2),("VANISH_CAP_BOX",4,2),("METAL_CAP_BOX",4,2),
- ("DANGEROUS_WALL_KICKS",12,1),("MULTISTAR",6,2),("STARS_MULTIPLE_LEVELS",4,1),
- ("BOWSER",6,1),("ROOF_WITHOUT_CANNON",4,1)]
-HARD = [("STAR",16,NL),("STAR_TIMED",12,1),("SPLATOON",8,2),("STAR_A_BUTTON_CHALLENGE",12,2),
- ("1UPS_IN_LEVEL",12,1),("STARS_IN_LEVEL",16,NL),("MULTICOIN",8,NL),
- ("STAR_REVERSE_JOYSTICK",16,NL),("STAR_CLICK_GAME",8,NL),("STAR_GREEN_DEMON",12,NL),
- ("STAR_DAREDEVIL",8,3),("DANGEROUS_WALL_KICKS",12,1),("POLES",12,2),("SHOOT_CANNONS",12,1),
- ("RED_COIN",12,1),("BLUE_COIN",12,1),("AMPS",6,1),("KILL_BULLIES",6,1),("KILL_CHUCKYAS",6,1),("SIGNPOST",12,1),
- ("MULTISTAR",6,1),("STARS_MULTIPLE_LEVELS",4,1),("LIVES",8,1)]
-CENTER = [("COIN",8,NL),("KILL_GOOMBAS",6,1),("KILL_BOBOMBS",6,1),("MULTICOIN",12,NL),
- ("MULTISTAR",6,1),("STARS_MULTIPLE_LEVELS",6,1),("POLES",3,1),("SHOOT_CANNONS",3,1),
- ("AMPS",3,1),("BOWSER",3,1)]
-TABLES = {"EASY":EASY,"MEDIUM":MEDIUM,"HARD":HARD,"CENTER":CENTER}
+TABLES = parse_weight_tables()
+ENUM_TYPES = [t for t, _ in parse_objective_enum()]
 
-ALL_TYPES = sorted({t for tbl in TABLES.values() for t,_,_ in tbl})
+ALL_TYPES = ENUM_TYPES  # uniform fallback walks the whole enum
 
 # ---------- presets ----------
 SRL_ENABLED = {"STAR","COIN","STARS_IN_LEVEL","BOWSER","ROOF_WITHOUT_CANNON","RACING_STARS",
  "SECRETS_STARS","MULTICOIN","MULTISTAR","STARS_MULTIPLE_LEVELS","RED_COIN","BLUE_COIN"}
 PRESETS = {
- "default (all on)": set(),
- "SRL": {t for t in ALL_TYPES if t not in SRL_ENABLED},
- "Vanilla": {"STAR_TIMED","STAR_CLICK_GAME","STAR_REVERSE_JOYSTICK","STAR_GREEN_DEMON",
+ "default (all on)": set(PROGRESSION),
+ "SRL": {t for t in ALL_TYPES if t not in SRL_ENABLED} | PROGRESSION,
+ "Vanilla": PROGRESSION | {"STAR_TIMED","STAR_CLICK_GAME","STAR_REVERSE_JOYSTICK","STAR_GREEN_DEMON",
              "STAR_DAREDEVIL","RANDOM_RED_COINS","SPLATOON"},
- "Casual": {"STAR_TIMED","STAR_A_BUTTON_CHALLENGE","STAR_B_BUTTON_CHALLENGE",
+ "Casual": PROGRESSION | {"STAR_TIMED","STAR_A_BUTTON_CHALLENGE","STAR_B_BUTTON_CHALLENGE",
             "STAR_Z_BUTTON_CHALLENGE","STAR_CLICK_GAME","STAR_REVERSE_JOYSTICK",
             "STAR_GREEN_DEMON","DANGEROUS_WALL_KICKS","ROOF_WITHOUT_CANNON","BLJ"},
 }
@@ -204,13 +278,58 @@ def simulate(disabled, boards=60000, seed=1):
             {k:v/n for k,v in course_mass.items()},
             {k:v/n for k,v in course_pinned.items()})
 
-for name, dis in PRESETS.items():
-    types, mass, pinned = simulate(dis)
-    print(f"\n=== {name} ===")
-    print(f"expected cells/board attributed to each course (25 cells total):")
-    for c,v in sorted(mass.items(), key=lambda kv:-kv[1]):
-        p = pinned.get(c,0.0)
-        print(f"  {c:12s} {v:5.2f}  (course-pinned {p:4.2f}, supply/set-attributed {v-p:4.2f})")
-    print("objective types (expected cells/board):")
-    for t,v in sorted(types.items(), key=lambda kv:-kv[1]):
-        print(f"  {t:28s} {v:5.2f}")
+def check():
+    """Every enum type must have a course vector for every class, and every
+    weight-table row must name a real enum type. Returns problems found."""
+    problems = []
+    enum = set(ENUM_TYPES)
+    for t in ENUM_TYPES:
+        for cls in TABLES:
+            try:
+                v = course_vector(t, cls)
+            except KeyError:
+                problems.append(f"{t}: no course vector in board_gen_bias.py "
+                                f"(add it to SUPPLY, PLAYER_CHOICE or course_vector)")
+                break
+            if not v or sum(v.values()) <= 0:
+                problems.append(f"{t}: empty course vector ({cls})")
+                break
+    for cls, rows in TABLES.items():
+        if not rows:
+            problems.append(f"sWeights{cls.title()}: parsed no rows")
+        for t, _, _ in rows:
+            if t not in enum:
+                problems.append(f"sWeights{cls.title()}: {t} is not in enum BingoObjectiveType")
+    for name, dis in PRESETS.items():
+        for t in dis - enum:
+            problems.append(f"preset {name!r} disables unknown type {t}")
+    return problems
+
+
+def main(argv):
+    if "--check" in argv:
+        problems = check()
+        for p in problems:
+            print("board_gen_bias: " + p, file=sys.stderr)
+        if problems:
+            return 1
+        # A tiny simulation too, so the draw loop itself is exercised.
+        simulate(PRESETS["default (all on)"], boards=200)
+        print(f"board_gen_bias: {len(ENUM_TYPES)} objective types, "
+              f"{sum(len(r) for r in TABLES.values())} weight rows: all covered")
+        return 0
+    for name, dis in PRESETS.items():
+        types, mass, pinned = simulate(dis)
+        print(f"\n=== {name} ===")
+        print(f"expected cells/board attributed to each course (25 cells total):")
+        for c,v in sorted(mass.items(), key=lambda kv:-kv[1]):
+            p = pinned.get(c,0.0)
+            print(f"  {c:12s} {v:5.2f}  (course-pinned {p:4.2f}, supply/set-attributed {v-p:4.2f})")
+        print("objective types (expected cells/board):")
+        for t,v in sorted(types.items(), key=lambda kv:-kv[1]):
+            print(f"  {t:28s} {v:5.2f}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

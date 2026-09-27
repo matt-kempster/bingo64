@@ -140,6 +140,10 @@ After wiring the objective into the game (enum, weights table, init,
 2. **Re-bless the goldens** (see above) — board layouts will shift.
 3. Run `cd test/emu && make test`. If the new objective can appear on
    the board's first screen, the smoke golden may need re-blessing too.
+4. **Tell `test/board_gen_bias.py` where its cells land** (SUPPLY,
+   PLAYER_CHOICE or `course_vector`). It reads the enum and weight tables
+   from the C source itself; `make test` in `test/host` runs its `--check`
+   and fails naming any type it doesn't know.
 
 The invariant sweep and budget test cover the new type automatically
 through the weight tables.

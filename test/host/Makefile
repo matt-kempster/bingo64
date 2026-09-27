@@ -39,8 +39,11 @@ TEST_OBJS := $(TEST_SRCS:%.c=$(BUILD)/%.o)
 
 .PHONY: test clean
 
+# board_gen_bias.py --check: every objective type in bingo.h must be known
+# to the bias simulator (fails fast when a new tile forgets it).
 test: $(BUILD)/run_tests
 	./$(BUILD)/run_tests
+	python3 ../board_gen_bias.py --check
 
 $(BUILD):
 	mkdir -p $(BUILD)
