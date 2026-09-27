@@ -1397,6 +1397,53 @@ static void test_sim_chuckya_alternating_courses(void) {
     bingo_tracking_collectables_reset();
 }
 
+// The Big Chill Bully (SL) counts for the Bully tile like the Big Bully
+// (LLL): both key on their level-macro spawn point via bhv_big_bully_init.
+// Its death branch used to skip the report entirely. Mirrors the
+// bully_act_level_death call; re-entering either course doesn't recount.
+static void test_sim_big_chill_bully_counts(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    u32 big, chill;
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_KILL_BULLIES;
+    o->data.collectableData.toGet = 2;
+    o->data.collectableData.gotten = 0;
+
+#define KILL_BULLY(uid)                                                   \
+    do {                                                                  \
+        if (is_new_kill(BINGO_UPDATE_KILLED_BULLY, (uid))) {              \
+            bingo_update(BINGO_UPDATE_KILLED_BULLY);                      \
+        }                                                                 \
+    } while (0)
+
+    gCurrCourseNum = COURSE_LLL;
+    big = get_unique_id(BINGO_UPDATE_KILLED_BULLY, 0.0f, 307.0f, -4385.0f);
+    CHECK(big != (u32) -1);
+    KILL_BULLY(big);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 1);
+
+    gCurrCourseNum = COURSE_SL;
+    chill = get_unique_id(BINGO_UPDATE_KILLED_BULLY, 315.0f, 1331.0f, -4852.0f);
+    CHECK(chill != (u32) -1);
+    CHECK(chill != big);
+    KILL_BULLY(chill);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+
+    // Revisit: the respawned Chill Bully gets its old, dead slot back.
+    o->state = BINGO_STATE_NONE;
+    o->data.collectableData.toGet = 3;
+    gCurrCourseNum = COURSE_LLL;
+    KILL_BULLY(get_unique_id(BINGO_UPDATE_KILLED_BULLY, 0.0f, 307.0f, -4385.0f));
+    gCurrCourseNum = COURSE_SL;
+    chill = get_unique_id(BINGO_UPDATE_KILLED_BULLY, 315.0f, 1331.0f, -4852.0f);
+    KILL_BULLY(chill);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+#undef KILL_BULLY
+    bingo_tracking_collectables_reset();
+}
+
 static void test_sim_coins_multiple_levels_objective(void) {
     struct BingoObjective *o = &gBingoObjectives[3];
     struct MultiCourseCollectableData *d = &o->data.multiCourseCollectableData;
@@ -2193,6 +2240,7 @@ int main(void) {
     RUN_TEST(test_sim_stuck_in_ground_objective);
     RUN_TEST(test_sim_blj_cell0_alternating_courses);
     RUN_TEST(test_sim_chuckya_alternating_courses);
+    RUN_TEST(test_sim_big_chill_bully_counts);
     RUN_TEST(test_sim_coins_multiple_levels_objective);
     RUN_TEST(test_sim_1ups_multiple_levels_objective);
     RUN_TEST(test_sim_coinless_star);

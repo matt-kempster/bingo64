@@ -218,6 +218,12 @@ void bully_act_level_death(void) {
         } else {
             spawn_mist_particles();
 
+            // Big and Big Chill both count for the Bully tile (oBingoId is
+            // the spawn point, from bhv_big_bully_init).
+            if (is_new_kill(BINGO_UPDATE_KILLED_BULLY, o->oBingoId)) {
+                bingo_update(BINGO_UPDATE_KILLED_BULLY);
+            }
+
             if (o->oBullySubtype == BULLY_STYPE_CHILL) {
                 #ifdef RM2C_HAS_CUSTOM_STAR_POS
                 spawn_default_star(ChillBullyStarPos);
@@ -225,9 +231,6 @@ void bully_act_level_death(void) {
                 spawn_default_star(130.0f, 1600.0f, -4335.0f);
                 #endif
             } else {
-                if (is_new_kill(BINGO_UPDATE_KILLED_BULLY, o->oBingoId)) {
-                    bingo_update(BINGO_UPDATE_KILLED_BULLY);
-                }
                 #ifdef RM2C_HAS_CUSTOM_STAR_POS
                 spawn_default_star(BigBullyStarPos);
                 #else
