@@ -1306,6 +1306,54 @@ static void test_sim_blj_cell0_alternating_courses(void) {
     bingo_tracking_collectables_reset();
 }
 
+// Chuckya kills key on the spawn point (oHome, from the level macro). They
+// used to key on (0, 0, 0), the UID table's empty-slot marker, so each
+// course's Chuckya re-claimed the one slot and reset its kill: alternating
+// WDW and TTM re-counted the same two Chuckyas forever.
+static void test_sim_chuckya_alternating_courses(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    u32 wdw, ttm;
+    reset_sim();
+    bingo_tracking_collectables_reset();
+    o->type = BINGO_OBJECTIVE_KILL_CHUCKYAS;
+    o->data.collectableData.toGet = 3;
+    o->data.collectableData.gotten = 0;
+
+#define KILL_CHUCKYA(uid)                                                 \
+    do {                                                                  \
+        if (is_new_kill(BINGO_UPDATE_KILLED_CHUCKYA, (uid))) {            \
+            bingo_update(BINGO_UPDATE_KILLED_CHUCKYA);                    \
+        }                                                                 \
+    } while (0)
+
+    gCurrCourseNum = COURSE_WDW;
+    wdw = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, -2963.0f, 3840.0f, -3063.0f);
+    CHECK(wdw != (u32) -1);
+    KILL_CHUCKYA(wdw);
+    gCurrCourseNum = COURSE_TTM;
+    ttm = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, -2676.0f, -2145.0f, 2923.0f);
+    CHECK(ttm != (u32) -1);
+    CHECK(ttm != wdw);
+    KILL_CHUCKYA(ttm);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+
+    // Back and forth: each respawned Chuckya gets its old slot back, dead.
+    gCurrCourseNum = COURSE_WDW;
+    wdw = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, -2963.0f, 3840.0f, -3063.0f);
+    KILL_CHUCKYA(wdw);
+    gCurrCourseNum = COURSE_TTM;
+    ttm = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, -2676.0f, -2145.0f, 2923.0f);
+    KILL_CHUCKYA(ttm);
+    CHECK_EQ_INT(o->data.collectableData.gotten, 2);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    gCurrCourseNum = COURSE_THI;
+    KILL_CHUCKYA(get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, -1800.0f, 2233.0f, -322.0f));
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+#undef KILL_CHUCKYA
+    bingo_tracking_collectables_reset();
+}
+
 static void test_sim_coins_multiple_levels_objective(void) {
     struct BingoObjective *o = &gBingoObjectives[3];
     struct MultiCourseCollectableData *d = &o->data.multiCourseCollectableData;
@@ -2100,6 +2148,7 @@ int main(void) {
     RUN_TEST(test_sim_purple_switches_objective);
     RUN_TEST(test_sim_stuck_in_ground_objective);
     RUN_TEST(test_sim_blj_cell0_alternating_courses);
+    RUN_TEST(test_sim_chuckya_alternating_courses);
     RUN_TEST(test_sim_coins_multiple_levels_objective);
     RUN_TEST(test_sim_1ups_multiple_levels_objective);
     RUN_TEST(test_sim_coinless_star);

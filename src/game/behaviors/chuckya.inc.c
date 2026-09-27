@@ -112,10 +112,13 @@ void chuckya_act_0(void) {
 #endif
 
     if (o->oTimer == 0) {
-        // HACK: For some reason, oPosX/Y/Z do not work here.
-        // However, there is at most 1 Chuckya per course, so
-        // (0, 0, 0) works.
-        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, 0, 0, 0);
+        // Key on the spawn point (SET_HOME in bhvChuckya), not oPos: act 0
+        // re-enters with oTimer == 0 after every throw, wherever Chuckya
+        // wandered to. (It used to key on (0, 0, 0), which is the UID
+        // table's empty-slot marker, so every other course's Chuckya
+        // re-claimed the slot and reset its kill: alternating courses
+        // re-farmed the same kill.)
+        o->oBingoId = get_unique_id(BINGO_UPDATE_KILLED_CHUCKYA, o->oHomeX, o->oHomeY, o->oHomeZ);
         o->oChuckyaUnkFC = 0;
     }
 
