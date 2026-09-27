@@ -2982,11 +2982,26 @@ static void print_grid_control_row(void) {
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 }
 
+// Scissor the document to the content window, lowering its top to `top`
+// (a menu y) when something pinned covers the window's upper part.
+static void options_set_clip(s32 top) {
+    gDPPipeSync(gDisplayListHead++);
+    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, SCREEN_HEIGHT - top,
+                  SCREEN_WIDTH, SCREEN_HEIGHT - OPT_CONTENT_BOTTOM);
+}
+
 static void print_objective_grid(void) {
     s32 b, c;
+    s32 pinned = grid_controls_visible() && grid_ctrl_pinned();
     char text[16];
 
     grid_clamp_cursor();
+
+    // The pinned header occludes the bands: clip them at its backing's
+    // bottom edge instead of letting them show through it.
+    if (pinned) {
+        options_set_clip(grid_ctrl_y() - 3);
+    }
 
     print_grid_band_rules();
     if (sOptionsFocus == OPTIONS_FOCUS_GRID && sGridBand >= 0) {
@@ -3037,6 +3052,9 @@ static void print_objective_grid(void) {
 
     gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
 
+    if (pinned) {
+        options_set_clip(OPT_CONTENT_TOP);
+    }
     if (grid_controls_visible()) {
         print_grid_control_row();
     }
@@ -3120,9 +3138,7 @@ static void print_bingo_options(void) {
     }
 #endif
     // The scrolling document, clipped to the content window.
-    gDPPipeSync(gDisplayListHead++);
-    gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, SCREEN_HEIGHT - OPT_CONTENT_TOP,
-                  SCREEN_WIDTH, SCREEN_HEIGHT - OPT_CONTENT_BOTTOM);
+    options_set_clip(OPT_CONTENT_TOP);
     print_options_settings();
     print_objective_grid();
     print_options_credits();
