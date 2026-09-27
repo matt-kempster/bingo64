@@ -2,8 +2,7 @@
 """Cell-based course bias of the bingo64 board generator.
 
 Simulates setup_bingo_objectives() faithfully (class grid, mutation,
-harder/easier coin flip, weighted draws with budget drain including the
-want_sum==0 edge), then samples each objective's course the way its init
+harder/easier coin flip, weighted draws with budget drain), then samples each objective's course the way its init
 function does. Global-counter objectives (kills, amps, signs, poles,
 cannons, red coins, boxes) are attributed to courses proportional to the
 unique-kill supply counted from sm64.sql (verified against the tracker's
@@ -238,10 +237,10 @@ def draw_type(table, disabled, rng):
             i+=1
             t,w,u = table[i]
             if u!=0 and t not in disabled: s += w
-            if s>=want and (s>0 or want==0): break  # do-while(sum < want)
+            if s>want: break  # do-while(sum <= want): only eligible rows stop it
         t,w,u = table[i]
         if t not in disabled:
-            if u!=NL: table[i]=(t,w,u-1)   # want==0 can leak an out-of-budget row: u 0 -> -1 (infinite)
+            if u!=NL: table[i]=(t,w,u-1)
             return t
     # uniform over enabled
     en = [t for t in ALL_TYPES if t not in disabled]

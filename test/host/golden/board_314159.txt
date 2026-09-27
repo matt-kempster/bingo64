@@ -1,25 +1,25 @@
-00 type=25 class=0 icon=15 title="x4" toGet=4
-01 type=46 class=1 icon=45 title="x7" toGet=7
+00 type=54 class=0 icon=54 title="x4" toGet=4
+01 type=44 class=1 icon=43 title="x2" toGet=2
 02 type=08 class=1 icon=09 title="WFú4" course=2 star=3
 03 type=05 class=1 icon=07 title="BBHú1" course=5 star=0
-04 type=48 class=2 icon=47 title="x5" toGet=5
-05 type=19 class=1 icon=24 title="x1" toGet=0
-06 type=31 class=2 icon=28 title="x9" toGet=9
-07 type=00 class=1 icon=02 title="BitDWú" course=16 star=0
-08 type=27 class=0 icon=22 title="x5" toGet=5
-09 type=51 class=1 icon=50 title="x3" toGet=3
-10 type=37 class=1 icon=36 title="x5" toGet=5
-11 type=41 class=1 icon=40 title="x6" toGet=6
-12 type=24 class=3 icon=14 title="298" toGet=298
-13 type=01 class=1 icon=03 title="SSLú2" course=8 star=1 maxTime=1290
-14 type=68 class=1 icon=70 title="30x 3c" toGetTotal=3 toGetEachCourse=30
-15 type=17 class=1 icon=20 title="5x 2c" toGetTotal=2 toGetEachCourse=5
-16 type=00 class=0 icon=02 title="TTCú2" course=14 star=1
-17 type=46 class=1 icon=45 title="x8" toGet=8
-18 type=00 class=2 icon=02 title="RRú7" course=15 star=6
-19 type=21 class=1 icon=26 title="x4" toGet=4
-20 type=68 class=2 icon=70 title="50x 3c" toGetTotal=3 toGetEachCourse=50
+04 type=53 class=2 icon=52 title="x7" toGet=7
+05 type=15 class=1 icon=19 title="TTCú6" course=14 toGet=5
+06 type=48 class=2 icon=47 title="x3" toGet=3
+07 type=52 class=1 icon=51 title="x3" toGet=3
+08 type=27 class=0 icon=22 title="x4" toGet=4
+09 type=37 class=1 icon=36 title="x8" toGet=8
+10 type=55 class=1 icon=56 title="x14" toGet=14
+11 type=50 class=1 icon=49 title="x3" toGet=3
+12 type=39 class=3 icon=38 title="x16" toGet=16
+13 type=64 class=1 icon=66 title="x3" toGet=3
+14 type=48 class=1 icon=47 title="x5" toGet=5
+15 type=18 class=1 icon=23 title="BitDW" level=30
+16 type=67 class=0 icon=69 title="x1" toGet=1
+17 type=15 class=1 icon=19 title="BitDWú" course=16 toGet=0
+18 type=01 class=2 icon=03 title="SLú3" course=10 star=2 maxTime=450
+19 type=33 class=1 icon=31 title="x12" toGet=12
+20 type=13 class=2 icon=17 title="WF 3" course=2 toGet=3
 21 type=33 class=1 icon=31 title="x6" toGet=6
-22 type=59 class=1 icon=57 title="x4" toGet=4
-23 type=29 class=1 icon=29 title="x10" toGet=10
-24 type=12 class=0 icon=13 title="HMC 56" course=6 toGet=56
+22 type=12 class=1 icon=13 title="TTC 99" course=14 toGet=99
+23 type=32 class=1 icon=30 title="x17" toGet=17
+24 type=16 class=0 icon=53 title="CCM 130" course=4 toGet=130

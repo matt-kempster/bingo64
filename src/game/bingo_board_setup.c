@@ -297,6 +297,12 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
     }
     want_sum = random_u16() % sum;
 
+    // Pick the first entry whose running total passes want_sum (in
+    // [0, sum)). The running total only grows on eligible, in-budget,
+    // nonzero-weight entries, so the loop can only stop on one of those.
+    // (It used to stop at `sum >= want_sum`, which with want_sum == 0
+    // returned row 0 even when exhausted; the caller then took its
+    // budget from 0 to -1 == NO_LIMIT, making it unlimited.)
     i = -1;
     sum = 0;
     do {
@@ -305,7 +311,7 @@ struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class
             && bingo_objective_eligible(weights[i].objective)) {
             sum += weights[i].weight;
         }
-    } while (sum < want_sum);
+    } while (sum <= want_sum);
 
     return &weights[i];
 }
@@ -325,9 +331,8 @@ enum BingoObjectiveType get_random_enabled_objective_type(enum BingoObjectiveCla
             // this mask; fall through to uniform-over-enabled.
             break;
         }
-        // The draw is filtered, but the want_sum == 0 edge can still hand
-        // back an ineligible first row (the budget-leak known bug), so
-        // keep the check-and-retry.
+        // The draw only returns eligible, in-budget rows; the check is
+        // belt and braces.
         if (bingo_objective_eligible(candidate->objective)) {
             if (candidate->usesRemaining != NO_LIMIT) {
                 candidate->usesRemaining--;

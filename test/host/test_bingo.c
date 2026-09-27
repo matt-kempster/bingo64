@@ -36,6 +36,7 @@ struct ObjectiveWeight {
 };
 extern struct ObjectiveWeight sWeightsEasy[], sWeightsMedium[], sWeightsHard[], sWeightsCenter[];
 extern s32 sWeightsSizeEasy, sWeightsSizeMedium, sWeightsSizeHard, sWeightsSizeCenter;
+struct ObjectiveWeight *get_random_objective_type(enum BingoObjectiveClass class);
 
 #define MAX_WEIGHTS 64
 static struct ObjectiveWeight sSavedEasy[MAX_WEIGHTS], sSavedMedium[MAX_WEIGHTS],
@@ -576,17 +577,32 @@ static void test_invariant_sweep(void) {
 // Weight budget: a limited objective type should never show up on one board
 // more often than all its class budgets allow together.
 //
-// KNOWN BUG: get_random_objective_type can pick an entry whose
-// usesRemaining is already 0 (when the random want_sum is 0), and the
-// counter then drops to -1, which means "no limit". This test pins down
-// exactly how many boards go over budget, out of the 2000 seeds below.
-// The bug is still unfixed; which seeds trigger it shifts whenever the
-// weight tables change, and currently none of these 2000 seeds do.
-#define KNOWN_OVER_BUDGET_BOARDS 0
+// Regression: get_random_objective_type used to stop its running-total
+// scan at `sum >= want_sum`, so a want_sum of 0 returned row 0 even when
+// its usesRemaining was already 0; the caller then decremented it to -1,
+// which means NO_LIMIT, and the exhausted type became unlimited (seed 543
+// dealt 5 timed stars against a budget of 4 when this was found).
+static int board_over_budget(const s32 *budget) {
+    s32 counts[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+    int i;
+
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        counts[i] = 0;
+    }
+    for (i = 0; i < 25; i++) {
+        counts[gBingoObjectives[i].type]++;
+    }
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        if (counts[i] > budget[i]) {
+            printf("  type %d dealt %d times, budget %d\n", i, counts[i], budget[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static void test_weight_budget(void) {
     s32 budget[BINGO_OBJECTIVE_TOTAL_AMOUNT];
-    s32 counts[BINGO_OBJECTIVE_TOTAL_AMOUNT];
     u32 seed;
     int overBudgetBoards = 0;
     int i;
@@ -609,27 +625,54 @@ static void test_weight_budget(void) {
         budget[sSavedCenter[i].objective] += sSavedCenter[i].usesRemaining == -1 ? 25 : sSavedCenter[i].usesRemaining;
     }
 
+    // The original repro seed, then a broad sweep.
+    generate_board(543);
+    CHECK(!board_over_budget(budget));
     for (seed = 1; seed <= 2000; seed++) {
         generate_board(seed);
-        for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-            counts[i] = 0;
+        if (board_over_budget(budget)) {
+            printf("  (seed %u)\n", seed);
+            overBudgetBoards++;
         }
-        for (i = 0; i < 25; i++) {
-            counts[gBingoObjectives[i].type]++;
+    }
+    CHECK_EQ_INT(overBudgetBoards, 0);
+}
+
+// The draw itself: with row 0 of every class table exhausted, thousands of
+// draws (enough to hit want_sum == 0 many times over) must never return an
+// exhausted or zero-weight row.
+static void test_weighted_pick_skips_exhausted(void) {
+    struct ObjectiveWeight *tables[4] = { sWeightsEasy, sWeightsMedium, sWeightsHard, sWeightsCenter };
+    s32 sizes[4] = { sWeightsSizeEasy, sWeightsSizeMedium, sWeightsSizeHard, sWeightsSizeCenter };
+    enum BingoObjectiveClass classes[4] = { BINGO_CLASS_EASY, BINGO_CLASS_MEDIUM,
+                                            BINGO_CLASS_HARD, BINGO_CLASS_CENTER };
+    struct ObjectiveWeight *pick;
+    int t, n, bad = 0, row0 = 0;
+
+    generate_board(1);  // sane options/mask state
+    for (t = 0; t < 4; t++) {
+        save_or_restore_weights();
+        if (sizes[t] < 2) {
+            continue;
         }
-        for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
-            if (counts[i] > budget[i]) {
-                overBudgetBoards++;
-                break;
+        tables[t][0].usesRemaining = 0;
+        init_genrand(4242 + t);
+        for (n = 0; n < 20000; n++) {
+            pick = get_random_objective_type(classes[t]);
+            if (pick == NULL) {
+                continue;
+            }
+            if (pick == &tables[t][0]) {
+                row0++;
+            }
+            if (pick->usesRemaining == 0 || pick->weight == 0) {
+                bad++;
             }
         }
     }
-
-    if (KNOWN_OVER_BUDGET_BOARDS == -1) {
-        printf("  boards over budget: %d of 2000 (bless this number)\n", overBudgetBoards);
-    } else {
-        CHECK_EQ_INT(overBudgetBoards, KNOWN_OVER_BUDGET_BOARDS);
-    }
+    save_or_restore_weights();
+    CHECK_EQ_INT(row0, 0);
+    CHECK_EQ_INT(bad, 0);
 }
 
 static void test_repeated_generation_resets_budgets(void) {
@@ -2129,6 +2172,7 @@ int main(void) {
     RUN_TEST(test_weighting_expect);
     RUN_TEST(test_invariant_sweep);
     RUN_TEST(test_weight_budget);
+    RUN_TEST(test_weighted_pick_skips_exhausted);
     RUN_TEST(test_repeated_generation_resets_budgets);
     RUN_TEST(test_sim_single_star);
     RUN_TEST(test_sim_coin_objective);

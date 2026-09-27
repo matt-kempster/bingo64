@@ -120,9 +120,10 @@ cd test/host && UPDATE_GOLDENS=1 make test && make test
 cd test/emu && UPDATE_GOLDENS=1 make test-smoke   # re-shoot board screen
 ```
 
-Two blessed counts live in `test_bingo.c` and may need updating with a
+One blessed count lives in `test_bingo.c` and may need updating with a
 generation change: `EXPECTED_BOARDS_WITH_DUPLICATES` (dedup leftovers per
-10k seeds) and `KNOWN_OVER_BUDGET_BOARDS` (see the bug note there).
+10k seeds). The weight-budget test is strict (no board over any
+objective's budget across 2000 seeds) and never needs re-blessing.
 
 If the *input script* changes menu timing, the deterministic seed
 changes; update `EXPECTED_SEED` in `ram_test.py` from the failure
