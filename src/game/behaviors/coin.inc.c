@@ -335,6 +335,15 @@ void coin_inside_boo_act_0(void) {
         cur_obj_set_model(MODEL_BLUE_COIN);
         cur_obj_scale(0.7f);
         bingo_tag_blue_coin(o, parent);
+        // The five merry-go-round boos share one home (their manager), which
+        // would fold their five coins into one source. Key each coin on its
+        // boo's kill id instead, which the manager already keeps distinct.
+        if (obj_has_behavior(parent, bhvMerryGoRoundBoo) && parent->oBingoId != 0) {
+            u32 uid = get_unique_id_like(BINGO_UPDATE_BLUE_COIN, parent->oBingoId);
+            if (uid != (u32) -1) {
+                o->oBingoId = uid;
+            }
+        }
     }
 
     obj_copy_pos(o, parent);

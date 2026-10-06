@@ -98,10 +98,10 @@ SUPPLY = {
  "SHOOT_CANNONS": {"BOB":6,"CCM":3,"WMotR":2,"WF":1,"WDW":1,"TTM":1,"THI":1,"SSL":1,"SL":1,
                    "RR":1,"JRB":1,CASTLE:1},
  "RED_COIN":      {c:8 for c in COURSES},
- # switch + moving + enemy-drop blue coins; ground-pounded goombas (BOB, WF,
- # TTM, THI, ...) and BBH boos also drop them but are left out here.
- "BLUE_COIN":     {"HMC":9,"BBH":7,"TTC":7,"WF":7,"SSL":7,"DDD":6,"JRB":6,"RR":6,"WDW":6,
-                   "PSS":6,"TTM":3,"CCM":3,"THI":2,"LLL":1},
+ # switch + moving coins, Mr. I / piranha / pokey drops, the 11 BBH boos and
+ # THI's 11 huge goombas (the only goombas that drop one). 99 in all.
+ "BLUE_COIN":     {"BBH":18,"THI":13,"HMC":9,"TTC":7,"WF":7,"SSL":7,"DDD":6,"JRB":6,"RR":6,"WDW":6,
+                   "PSS":6,"TTM":3,"CCM":3,"LLL":2},
  "EXCLAMATION_MARK_BOX": {"TTC":13,"WDW":8,"HMC":2,"SSL":4,"WMotR":1,"BBH":2,"JRB":3,"THI":5,
                    "SL":5,"BOB":1,"RR":4,"BitDW":3,"BitFS":4,"VCutM":2,"CCM":3,"CotMC":1,
                    "BitS":1,"LLL":2,CASTLE:1,"PSS":1,"TTM":1},

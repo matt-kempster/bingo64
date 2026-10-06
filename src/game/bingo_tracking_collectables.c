@@ -78,8 +78,9 @@ struct UID {
 // oBingoId on MAX_WHOMPS above.
 #define MAX_CRUSHERS 16
 // Keyed per source, not per coin: 59 switch coins + 4 moving coins, then one
-// slot per dropping enemy (7 Mr. Is, 3 piranhas, 4 pokeys, BBH boos) and per
-// ground-poundable goomba (~80). See bingo_tag_blue_coin in object_helpers.c.
+// slot per dropping enemy (7 Mr. Is, 3 piranhas, 4 pokeys, 11 BBH boos) and
+// per huge goomba (THI, 11): 99 in all. See bingo_tag_blue_coin in
+// object_helpers.c.
 #define MAX_BLUE_COINS 200
 // 12 fading-warp pairs (BOB 2, SSL 2, WF/CCM/LLL/WDW/TTM/THI/SL/RR 1 each),
 // keyed (area, lower node id, higher node id) -- see bingo_track_warp_pad.
@@ -311,6 +312,16 @@ u32 get_unique_id(enum BingoObjectiveUpdate type, f32 posX, f32 posY, f32 posZ) 
     }
     // No empty slots somehow?!
     return -1;
+}
+
+u32 get_unique_id_like(enum BingoObjectiveUpdate type, u32 otherUid) {
+    struct UID *other;
+
+    if (otherUid == 0 || otherUid >= TOTAL_UIDS) {
+        return -1;
+    }
+    other = &sIDTable[otherUid];
+    return get_unique_id(type, other->pos[0], other->pos[1], other->pos[2]);
 }
 
 s32 is_new_kill(enum BingoObjectiveUpdate type, u32 uid) {

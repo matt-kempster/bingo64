@@ -1044,11 +1044,14 @@ s32 bingo_objective_red_coin_init(enum BingoObjectiveClass class) {
     }
 }
 
-// Blue coins: 12 switches (59 coins), 4 moving coins, Mr. I / piranha /
-// pokey / boo drops, and ground-pounded goombas. Each source counts once.
+// Blue coins, 99 sources, each counts once: 12 switches (59 coins), 4 moving
+// coins (CCM 1, TTM 3), 7 Mr. Is, 3 WF piranhas, 4 SSL pokeys, 11 BBH boos
+// (6 placed -- the act 1 ghost-hunt boos reuse five of those spots -- plus
+// the 5 merry-go-round boos), and the 11 HUGE goombas on THI's big island
+// when ground-pounded. Regular and tiny goombas never drop one.
 s32 bingo_objective_blue_coin_init(enum BingoObjectiveClass class) {
-    // ~160 sources in all; a BOB goomba sweep alone is 11, so the brackets
-    // sit a notch above red coins' (12-18 / 20-29).
+    // Biggest courses: BBH 18, THI 13, HMC 9. The brackets sit a notch above
+    // red coins' (12-18 / 20-29), so HARD always takes two or more courses.
     switch (class) {
         default:
             return random_range_inclusive(14, 20);
