@@ -14,15 +14,19 @@
 u32 gbCourseStars[25] = { 0 };
 u32 gbSecretStarFlags = 0;
 
+u8 sRandoStarFlags[COURSE_MAX] = { 0 };
+
 void bingo_tracking_star_reset(void) {
     s32 i;
     for (i = 0; i < 25; i++) {
         gbCourseStars[i] = 0;
     }
     gbSecretStarFlags = 0;
+    // Without this a rematch starts with the last race's random stars.
+    for (i = 0; i < COURSE_MAX; i++) {
+        sRandoStarFlags[i] = 0;
+    }
 }
-
-u8 sRandoStarFlags[COURSE_MAX] = { 0 };
 
 void bingo_set_star(s16 course, s16 star) {
     if (course == -1) {

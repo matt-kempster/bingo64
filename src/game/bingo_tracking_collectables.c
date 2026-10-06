@@ -28,11 +28,11 @@ struct UID {
 
 // 8 * (15 + 3 + 3 + 1 + 1) = 184 (Bowser, Cap Courses, SA, WMoTR)
 #define MAX_RED_COINS 200
-// There are 6 in the game
+// 8: BBH 4 (one is the big one), HMC 2, LLL 2
 #define MAX_MR_IS 10
 // There are 9 in the game
 #define MAX_SCUTTLEBUGS 15
-// There are 16 (not including the chill bully)
+// 17: LLL 12, BitFS 4, SL 1 (the Big Chill Bully)
 #define MAX_BULLIES 19
 // There are 5
 #define MAX_CHUCKYAS 5
@@ -51,8 +51,9 @@ struct UID {
 // There are 32 regular poles, 1 giant pole in WF,
 // 9 poles in DDD, 4 moving ones in BitFS.
 #define MAX_POLES 50
-// There are 17
-#define MAX_CANNONS 20
+// 20: BOB 6, CCM 3, WMotR 2, one each in WF/JRB/SSL/SL/WDW/TTM/THI/RR,
+// and the castle grounds one behind the 120-star grate.
+#define MAX_CANNONS 24
 // 4: WF 2 small + Whomp King, BitS 1 small
 #define MAX_WHOMPS 6
 // 24 distinct spots: BBH 14 (5 shared by the act-1 ghost-hunt boos and the
@@ -66,7 +67,7 @@ struct UID {
 #define MAX_CLAMS 12
 // 9 (plain and fire fly guys alike): THI 3, SSL 3, TTM 1, SL 1, RR 1
 #define MAX_FLY_GUYS 12
-// 7: SL 4, CCM 3
+// 5 killable: SL 4, CCM 1. CCM's two jumping ones can't be killed.
 #define MAX_MR_BLIZZARDS 12
 // 4: WDW 4
 #define MAX_SKEETERS 8
@@ -85,8 +86,8 @@ struct UID {
 // 12 fading-warp pairs (BOB 2, SSL 2, WF/CCM/LLL/WDW/TTM/THI/SL/RR 1 each),
 // keyed (area, lower node id, higher node id) -- see bingo_track_warp_pad.
 #define MAX_WARP_PADS 16
-// 5 placed shell sources (! boxes in LLL, SSL, SL; underwater in JRB, DDD)
-// plus the ordinary Koopas that drop one (BOB 1, THI 2).
+// 7: 5 placed shell sources (! boxes in LLL, SSL, SL; underwater in JRB, DDD)
+// plus the Koopas that drop one (BOB 1, THI 1; THI's tiny Koopa drops none).
 #define MAX_KOOPA_SHELLS 12
 // 13: BitFS 2, BitS 2, RR 2, TTC 2, BOB/CCM/HMC/LLL/SSL 1 each
 #define MAX_SPIN_HEARTS 16
@@ -332,6 +333,10 @@ s32 is_new_kill(enum BingoObjectiveUpdate type, u32 uid) {
     if (idxLength == 0) {
         return 1;
     }
+    // get_unique_id returns -1 when its range is full.
+    if (uid >= TOTAL_UIDS) {
+        return 0;
+    }
 
     killed = sIDTable[uid].killed;
     if (killed) {
@@ -349,6 +354,9 @@ s32 peek_would_be_new_kill(enum BingoObjectiveUpdate type, u32 uid) {
 
     if (idxLength == 0) {
         return 1;
+    }
+    if (uid >= TOTAL_UIDS) {
+        return 0;
     }
 
     killed = sIDTable[uid].killed;

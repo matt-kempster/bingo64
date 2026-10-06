@@ -9,7 +9,7 @@
 08 type=53 class=2 icon=52 title="x8" toGet=8
 09 type=38 class=1 icon=37 title="x12" toGet=12
 10 type=17 class=1 icon=20 title="7x 3c" toGetTotal=3 toGetEachCourse=7
-11 type=50 class=1 icon=49 title="x5" toGet=5
+11 type=50 class=1 icon=49 title="x4" toGet=4
 12 type=24 class=3 icon=14 title="210" toGet=210
 13 type=51 class=1 icon=50 title="x4" toGet=4
 14 type=00 class=1 icon=02 title="PSS 21s" course=19 star=1

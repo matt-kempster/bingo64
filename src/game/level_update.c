@@ -822,6 +822,9 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
                     #else
                     sSourceWarpNodeId = WARP_NODE_DEATH;
                     #endif
+                    // No warp floor here, so the fall is a death: falling
+                    // into a pit never passes through WARP_OP_DEATH.
+                    bingo_track_death(0);
                 }
                 sDelayedWarpTimer = 20;
                 play_transition(WARP_TRANSITION_FADE_INTO_CIRCLE, 0x14, 0x00, 0x00, 0x00);

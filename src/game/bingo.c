@@ -439,8 +439,9 @@ void bingo_track_death(u32 deathAction) {
             update = BINGO_UPDATE_DEATH_WHIRLPOOL;
             break;
         default:
-            // Only deaths reach here without a death action: falling
-            // out of the level (m->floor == NULL in update_mario_inputs).
+            // Deaths without a death action: falling into a pit (the
+            // WARP_OP_WARP_FLOOR case passes 0) or out of the level
+            // (m->floor == NULL in update_mario_inputs).
             update = BINGO_UPDATE_DEATH_FELL_OUT;
             break;
     }

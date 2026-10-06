@@ -8,7 +8,7 @@
 07 type=49 class=1 icon=48 title="x5" toGet=5
 08 type=58 class=0 icon=61 title="x3" toGet=3
 09 type=17 class=1 icon=20 title="6x 2c" toGetTotal=2 toGetEachCourse=6
-10 type=50 class=1 icon=49 title="x4" toGet=4
+10 type=50 class=1 icon=49 title="x3" toGet=3
 11 type=46 class=1 icon=45 title="x6" toGet=6
 12 type=12 class=3 icon=13 title="CotMC47" course=20 toGet=47
 13 type=54 class=1 icon=54 title="x5" toGet=5

@@ -154,7 +154,7 @@ retry:
             // coin rings, which is the whole point of that star. Behind
             // Chain Chomp's Gate: a red coin sits right over the post you
             // pound to free the Chomp (only a Bob-omb clip avoids it).
-            if (*star == 3 || *star == 4 || *star == 1) {
+            if (*star == 3 || *star == 4 || *star == 5) {
                 goto retry;
             }
             break;
@@ -585,7 +585,8 @@ void random_special_course_coins(enum BingoObjectiveClass class, enum CourseNum 
             *coins = random_range_inclusive((s32)(80 * min), (s32)(80 * max));
             break;
         case COURSE_BITS:
-            *coins = random_range_inclusive((s32)(76 * min), (s32)(76 * max));
+            // 72 placed, one on the unreachable "mystery" goomba.
+            *coins = random_range_inclusive((s32)(71 * min), (s32)(71 * max));
             break;
         case COURSE_PSS:
             *coins = random_range_inclusive((s32)(80 * min), (s32)(80 * max));
@@ -1031,7 +1032,10 @@ s32 bingo_objective_cannons_init(enum BingoObjectiveClass class) {
         default:
             return random_range_inclusive(6, 10);
         case BINGO_CLASS_CENTER:
-            return random_range_inclusive(11, 20);
+            // 20 exist, but the castle grounds one sits under the 120-star
+            // grate (unreachable on a fresh unlock-OFF file) and one in BOB
+            // is a water-bomb cannon in act 1, so never ask for them all.
+            return random_range_inclusive(11, 18);
     }
 }
 
@@ -1071,8 +1075,9 @@ s32 bingo_objective_warp_pads_init(enum BingoObjectiveClass class) {
     }
 }
 
-// Rideable shells: ! boxes in LLL, SSL, SL; underwater shells in JRB and DDD;
-// plus the shells knocked off the ordinary Koopas in BOB and THI.
+// Rideable shells, 7: ! boxes in LLL (acts 5-6 only), SSL, SL; underwater
+// shells in JRB and DDD; and the shells knocked off the Koopas in BOB (acts
+// 3-6) and on THI's huge island. THI's tiny Koopa is too small to drop one.
 s32 bingo_objective_koopa_shells_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -1201,7 +1206,8 @@ s32 bingo_objective_kill_fly_guys_init(enum BingoObjectiveClass class) {
 s32 bingo_objective_kill_mr_blizzards_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
-            return random_range_inclusive(3, 5);
+            // Only 5 can be killed (SL 4, CCM 1), so stop one short.
+            return random_range_inclusive(3, 4);
     }
 }
 

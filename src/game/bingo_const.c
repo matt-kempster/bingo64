@@ -13,13 +13,13 @@ s32 course_1ups[] = {
     2,      // COURSE_JRB
     6 - 1,  // COURSE_CCM, without the impossible 1up
     2,      // COURSE_BBH
-    4,      // COURSE_HMC
+    2,      // COURSE_HMC (2 placed; Monty Mole streak 1-ups are extra)
     8,      // COURSE_LLL
     9,      // COURSE_SSL
     1,      // COURSE_DDD
     4,      // COURSE_SL
     4,      // COURSE_WDW
-    11 - 1, // COURSE_TTM, without the 1 butterfly 1up
+    8,      // COURSE_TTM (8 placed; the butterfly and mole-streak 1-ups are extra)
     10 - 3, // COURSE_THI, without the 3 butterfly 1ups
     4,      // COURSE_TTC
     9,      // COURSE_RR
