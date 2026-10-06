@@ -6,6 +6,7 @@
 
 #ifndef TARGET_N64
 
+#include <stdio.h>
 #include <string.h>
 
 #include "area.h"
