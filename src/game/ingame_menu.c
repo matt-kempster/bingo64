@@ -3190,8 +3190,8 @@ s8 gHudFlash = 0;
 #define should_render_pause_options(m) TRUE
 #else
 u8 should_render_pause_options(struct MarioState *m) {
-    return (m->action & ACT_FLAG_PAUSE_EXIT)
-    ;
+    // != 0: the flag is bit 27, so the bare mask truncates to 0 in a u8.
+    return (m->action & ACT_FLAG_PAUSE_EXIT) != 0;
 }
 #endif
 
