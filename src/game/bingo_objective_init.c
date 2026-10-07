@@ -126,13 +126,29 @@ retry:
         // ground pound the blue coin thing
         goto retry;
     }
-    // should i outlaw chain chomps gate in BoB because it requires bomb clip?
+    if (*course == COURSE_BOB && *star == 5) {
+        // Behind Chain Chomp's Gate: can't pound the post, so it takes a
+        // Bob-omb clip.
+        goto retry;
+    }
     if (*course == COURSE_DDD && *star == 6) {
         // not that many coins, and have to use difficult shell cloning
         goto retry;
     }
-    // should I outlaw SL (igloo stuff) because you have to clip through it?
-    // should I outlaw THI wiggler cave stuff because you have to clip using Chuckya?
+    if (*course == COURSE_SL && *star == 5) {
+        // Into the Igloo: can't crawl in, so it takes a clip.
+        goto retry;
+    }
+    if (*course == COURSE_THI && (*star == 4 || *star == 5)) {
+        // Both Wiggler cave stars: can't pound the pillar top, so they take
+        // a Chuckya clip.
+        goto retry;
+    }
+    if ((*course == COURSE_WF || *course == COURSE_HMC) && *star == 6) {
+        // 100 coins without the blue coin switch (and, in WF, without the
+        // ground-pound-only Whomps) leaves 101 and 104: every coin there is.
+        goto retry;
+    }
     if (*course == COURSE_TTC && *star == 6) {
         // have to clone coins until you get 100 without blue coins
         goto retry;

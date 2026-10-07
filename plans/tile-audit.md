@@ -51,7 +51,8 @@ shells 7, ! boxes 65, red coins (no PSS), hat kinds in TTM 2.
 - 2 unlock OFF: Bowser 3 on a fresh file is "funny but maybe not horrible"; no design pass for now.
 - 3 Daredevil: excluding all of DDD is intentional (can't swim at 1 HP without dying). The JRB switch without breaks is still open.
 - 7 roof without cannon: a little sad, OK for now.
-- Still open: 4 tiny goombas, 5 100% coin sweeps, 6 Z-button stars.
+- 6 Z-button: make it easier. Dropped BOB Chain Chomp's Gate, SL Into the Igloo, both THI Wiggler cave stars, and the WF and HMC 100-coin stars from the pool.
+- Still open: 4 tiny goombas, 5 100% coin sweeps, the Daredevil JRB switch.
 
 ## Not verifiable from code
 

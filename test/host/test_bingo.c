@@ -1549,6 +1549,40 @@ static void test_sim_coinless_star(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
 
+// The Z-button pool never picks a star that needs a ground pound, a crawl,
+// or a clip to get around one (star names checked against sm64.sql: BOB 5 =
+// Behind Chain Chomp's Gate, SL 5 = Into the Igloo, THI 4/5 = the Wiggler
+// cave stars), nor a 100-coin star that needs the blue coin switch.
+static void test_zbc_star_pool(void) {
+    u32 seed;
+    int i;
+    int seen = 0;
+    for (seed = 1; seed <= 2000; seed++) {
+        generate_board(seed);
+        for (i = 0; i < 25; i++) {
+            struct BingoObjective *o = &gBingoObjectives[i];
+            s32 c, s;
+            if (o->type != BINGO_OBJECTIVE_STAR_Z_BUTTON_CHALLENGE) {
+                continue;
+            }
+            seen++;
+            c = o->data.starObjective.course;
+            s = o->data.starObjective.starIndex;
+            CHECK(!(c == COURSE_WF && s == 0));
+            CHECK(!(c == COURSE_BOB && s == 5));
+            CHECK(!(c == COURSE_SL && s == 5));
+            CHECK(!(c == COURSE_THI && (s == 4 || s == 5)));
+            CHECK(!((c == COURSE_WF || c == COURSE_HMC || c == COURSE_JRB
+                     || c == COURSE_DDD || c == COURSE_TTC) && s == 6));
+            if (gCurrentTestFailed) {
+                printf("  (seed %u, cell %d, course %d, star %d)\n", seed, i, c, s);
+                return;
+            }
+        }
+    }
+    CHECK(seen > 0);
+}
+
 // The coinless pool never picks a 100-coin or red-coin star, nor the
 // coin-line routes excluded in random_coinless_star.
 static void test_coinless_star_pool(void) {
@@ -2244,6 +2278,7 @@ int main(void) {
     RUN_TEST(test_sim_coins_multiple_levels_objective);
     RUN_TEST(test_sim_1ups_multiple_levels_objective);
     RUN_TEST(test_sim_coinless_star);
+    RUN_TEST(test_zbc_star_pool);
     RUN_TEST(test_coinless_star_pool);
     RUN_TEST(test_sim_abz_fail_and_reset);
     RUN_TEST(test_sim_timed_star);
