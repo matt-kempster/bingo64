@@ -221,6 +221,10 @@ static void goomba_act_walk(void) {
  */
 static void goomba_act_attacked_mario(void) {
     if (o->oGoombaSize == GOOMBA_SIZE_TINY) {
+        // A tiny goomba dies on touching Mario; bingo counts that as a kill.
+        if (is_new_kill(BINGO_UPDATE_KILLED_GOOMBA, o->oBingoId)) {
+            bingo_update(BINGO_UPDATE_KILLED_GOOMBA);
+        }
         mark_goomba_as_dead();
 #if !TINY_GOOMBA_DROP_COIN
         o->oNumLootCoins = 0;

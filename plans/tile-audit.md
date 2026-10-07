@@ -52,7 +52,10 @@ shells 7, ! boxes 65, red coins (no PSS), hat kinds in TTM 2.
 - 3 Daredevil: excluding all of DDD is intentional (can't swim at 1 HP without dying). The JRB switch without breaks is still open.
 - 7 roof without cannon: a little sad, OK for now.
 - 6 Z-button: make it easier. Dropped BOB Chain Chomp's Gate, SL Into the Igloo, both THI Wiggler cave stars, and the WF and HMC 100-coin stars from the pool.
-- Still open: 4 tiny goombas, 5 100% coin sweeps, the Daredevil JRB switch.
+- 4 tiny goombas (2026-10-07): should count as a kill. Done: the touch
+  death in goomba_act_attacked_mario now credits the Goomba tile.
+- 5 100% coin sweeps (2026-10-07): leave alone, it's fine.
+- Still open: the Daredevil JRB switch.
 
 ## Not verifiable from code
 
