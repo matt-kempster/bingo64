@@ -327,6 +327,7 @@ static const char *kTypeNames[BINGO_OBJECTIVE_TOTAL_AMOUNT] = {
     [BINGO_OBJECTIVE_STUCK_IN_GROUND] = "STUCK_IN_GROUND",
     [BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS] = "COINS_MULTIPLE_LEVELS",
     [BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS] = "1UPS_MULTIPLE_LEVELS",
+    [BINGO_OBJECTIVE_CARRY_KINDS] = "CARRY_KINDS",
 };
 
 // The course a cell is pinned to, or 0 if the objective is not
@@ -1279,6 +1280,27 @@ static void test_sim_caps_worn_objective(void) {
     CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
 }
 
+static void test_sim_carry_kinds_objective(void) {
+    struct BingoObjective *o = &gBingoObjectives[0];
+    char desc[300];
+    reset_sim();
+    o->type = BINGO_OBJECTIVE_CARRY_KINDS;
+    o->data.collectableFlagsData.toGet = 3;
+    o->data.collectableFlagsData.flags = 0;
+
+    bingo_update(BINGO_UPDATE_CARRIED_BOBOMB);
+    bingo_update(BINGO_UPDATE_CARRIED_BOBOMB);  // the same kind twice
+    bingo_update(BINGO_UPDATE_WORE_VANISH_CAP);  // a neighbouring flag range
+    describe_objective(o, desc);
+    CHECK(strstr(desc, "Pick up 3 kinds of thing. Remaining: 2") != NULL);
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+
+    bingo_update(BINGO_UPDATE_CARRIED_PENGUIN);  // the last flag in the range
+    CHECK_EQ_INT(o->state, BINGO_STATE_NONE);
+    bingo_update(BINGO_UPDATE_CARRIED_BOWSER);
+    CHECK_EQ_INT(o->state, BINGO_STATE_COMPLETE);
+}
+
 static void test_sim_purple_switches_objective(void) {
     struct BingoObjective *o = &gBingoObjectives[0];
     reset_sim();
@@ -1553,6 +1575,27 @@ static void test_sim_coinless_star(void) {
 // or a clip to get around one (star names checked against sm64.sql: BOB 5 =
 // Behind Chain Chomp's Gate, SL 5 = Into the Igloo, THI 4/5 = the Wiggler
 // cave stars), nor a 100-coin star that needs the blue coin switch.
+// Every dealt carry tile asks for 3..5 of the 9 kinds, with nothing ticked.
+static void test_carry_kinds_generated_target(void) {
+    u32 seed;
+    int i;
+    int seen = 0;
+    for (seed = 1; seed <= 500; seed++) {
+        generate_board(seed);
+        for (i = 0; i < 25; i++) {
+            struct BingoObjective *o = &gBingoObjectives[i];
+            if (o->type != BINGO_OBJECTIVE_CARRY_KINDS) {
+                continue;
+            }
+            seen++;
+            CHECK(o->data.collectableFlagsData.toGet >= 3);
+            CHECK(o->data.collectableFlagsData.toGet <= 5);
+            CHECK_EQ_INT(o->data.collectableFlagsData.flags, 0);
+        }
+    }
+    CHECK(seen > 50);
+}
+
 static void test_zbc_star_pool(void) {
     u32 seed;
     int i;
@@ -2270,6 +2313,8 @@ int main(void) {
     RUN_TEST(test_sim_koopa_shells_objective);
     RUN_TEST(test_sim_spin_hearts_objective);
     RUN_TEST(test_sim_caps_worn_objective);
+    RUN_TEST(test_sim_carry_kinds_objective);
+    RUN_TEST(test_carry_kinds_generated_target);
     RUN_TEST(test_sim_purple_switches_objective);
     RUN_TEST(test_sim_stuck_in_ground_objective);
     RUN_TEST(test_sim_blj_cell0_alternating_courses);

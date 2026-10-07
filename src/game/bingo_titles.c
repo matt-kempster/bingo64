@@ -156,6 +156,7 @@ void get_objective_title(struct BingoObjective *objective) {
         // TODO: Get these for free by being a collectable:
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
         case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+        case BINGO_OBJECTIVE_CARRY_KINDS:
         case BINGO_OBJECTIVE_BLJ:
         case BINGO_OBJECTIVE_RACING_STARS:
         case BINGO_OBJECTIVE_SECRETS_STARS:

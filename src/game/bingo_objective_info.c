@@ -108,6 +108,11 @@ ALIGNED8 static const u8 seg2_texture_1upcourses[] = {
 #include "textures/segment2/custom/segment2.1upcourses.rgba16.inc.c"
 };
 
+// Cork box (STROOP sprite, downsized).
+ALIGNED8 static const u8 seg2_texture_carry[] = {
+#include "textures/segment2/custom/segment2.carry.rgba16.inc.c"
+};
+
 ALIGNED8 static const u8 seg2_texture_bowser[] = {
 #include "textures/segment2/custom/segment2.bowser.rgba16.inc.c"
 };
@@ -372,6 +377,7 @@ struct BingoObjectiveInfo sBingoObjectiveInfo[] = {
     { BINGO_OBJECTIVE_STUCK_IN_GROUND, BINGO_ICON_STUCK_IN_GROUND, { TEXT_STUCK_IN_GROUND }, seg2_texture_stuck },
     { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, BINGO_ICON_COINS_MULTIPLE_LEVELS, { TEXT_COINS_MULTI_LEVELS }, seg2_texture_coinscourses },
     { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, BINGO_ICON_1UPS_MULTIPLE_LEVELS, { TEXT_1UPS_MULTI_LEVELS }, seg2_texture_1upcourses },
+    { BINGO_OBJECTIVE_CARRY_KINDS, BINGO_ICON_CARRY_KINDS, { TEXT_CARRY_KINDS }, seg2_texture_carry },
 };
 
 struct BingoObjectiveInfo *get_objective_info(enum BingoObjectiveType type) {

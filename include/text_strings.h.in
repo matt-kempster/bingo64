@@ -259,6 +259,7 @@
 #define TEXT_HUNDRED_COIN_STARS _("100 Coin Stars")
 #define TEXT_CASTLE_SECRET_STARS _("Castle Secret Stars")
 #define TEXT_CAPS_WORN _("Wear All 3 Caps")
+#define TEXT_CARRY_KINDS _("Pick Up Different Things")
 #define TEXT_PURPLE_SWITCHES _("Purple Switches")
 #define TEXT_STUCK_IN_GROUND _("Stuck in the Ground")
 #define TEXT_COINS_MULTI_LEVELS _("Coins in N Levels")

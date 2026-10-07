@@ -710,6 +710,11 @@ s32 update_objective(struct BingoObjective *objective, enum BingoObjectiveUpdate
                 objective, update,
                 BINGO_UPDATE_CAP_FLAGS_BEGIN, BINGO_UPDATE_CAP_FLAGS_END
             );
+        case BINGO_OBJECTIVE_CARRY_KINDS:
+            return objective_flags_collectable(
+                objective, update,
+                BINGO_UPDATE_CARRY_FLAGS_BEGIN, BINGO_UPDATE_CARRY_FLAGS_END
+            );
         case BINGO_OBJECTIVE_PURPLE_SWITCHES:
             return objective_generic_collectable(objective, update, BINGO_UPDATE_PURPLE_SWITCH);
         case BINGO_OBJECTIVE_STUCK_IN_GROUND:

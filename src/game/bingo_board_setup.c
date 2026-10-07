@@ -42,6 +42,7 @@ struct ObjectiveWeight sWeightsEasy[] = {
     { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
     { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_CARRY_KINDS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
@@ -115,6 +116,7 @@ struct ObjectiveWeight sWeightsMedium[] = {
     { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
     { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_CARRY_KINDS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     { BINGO_OBJECTIVE_OPEN_CANNONS, 4, 1 },
 };
@@ -162,6 +164,7 @@ struct ObjectiveWeight sWeightsHard[] = {
     { BINGO_OBJECTIVE_STUCK_IN_GROUND, 4, 1 },
     { BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS, 4, 1 },
     { BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS, 4, 1 },
+    { BINGO_OBJECTIVE_CARRY_KINDS, 4, 1 },
     // Progression (unlock OFF only; filtered out of the draw otherwise).
     // Toad and MIPS both sit behind the basement key (Bowser in the Dark
     // World) plus 12 / 15 stars, so they're hard-only.
@@ -435,6 +438,7 @@ s32 are_duplicates(struct BingoObjective *obj1, struct BingoObjective *obj2) {
             || type1 == BINGO_OBJECTIVE_STUCK_IN_GROUND
             || type1 == BINGO_OBJECTIVE_COINS_MULTIPLE_LEVELS
             || type1 == BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS
+            || type1 == BINGO_OBJECTIVE_CARRY_KINDS
             || bingo_objective_needs_unlock_off(type1)
         ) {
             return 1;

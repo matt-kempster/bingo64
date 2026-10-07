@@ -904,6 +904,25 @@ s32 bingo_objective_unique_deaths_init(enum BingoObjectiveClass class) {
     }
 }
 
+// 9 kinds exist (plans/kinds-audit.md); BoB alone has three (Bob-omb, cork
+// box, King Bob-omb) and TTM two more (Ukiki, crazy box).
+s32 bingo_objective_carry_kinds_init(struct BingoObjective *objective, enum BingoObjectiveClass class) {
+    s32 toGet;
+    switch (class) {
+        case BINGO_CLASS_EASY:
+            toGet = 3;
+            break;
+        case BINGO_CLASS_MEDIUM:
+            toGet = 4;
+            break;
+        default:
+            toGet = 5;
+            break;
+    }
+    objective->data.collectableFlagsData.toGet = toGet;
+    objective->data.collectableFlagsData.flags = 0;
+}
+
 s32 bingo_objective_blj_init(enum BingoObjectiveClass class) {
     switch (class) {
         default:
@@ -1557,6 +1576,8 @@ s32 bingo_objective_init_dispatch(
             return bingo_objective_coins_multiple_levels_init(objective, class);
         case BINGO_OBJECTIVE_1UPS_MULTIPLE_LEVELS:
             return bingo_objective_1ups_multiple_levels_init(objective, class);
+        case BINGO_OBJECTIVE_CARRY_KINDS:
+            return bingo_objective_carry_kinds_init(objective, class);
     }
     if (BINGO_OBJECTIVE_COLLECTABLE_MIN <= type && type <= BINGO_OBJECTIVE_COLLECTABLE_MAX) {
         collectables = bingo_objective_collectable_init_dispatch(class, type);

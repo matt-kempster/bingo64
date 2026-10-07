@@ -298,9 +298,38 @@ void mario_stop_riding_object(struct MarioState *m) {
     }
 }
 
+// Bingo: "pick up N kinds of thing". Every grab funnels through
+// mario_grab_used_object; being grabbed BY something never gets here.
+static void bingo_track_carry(struct Object *obj) {
+    static const struct {
+        const BehaviorScript *behavior;
+        enum BingoObjectiveUpdate update;
+    } sCarryKinds[] = {
+        { bhvBobomb, BINGO_UPDATE_CARRIED_BOBOMB },
+        { bhvBreakableBoxSmall, BINGO_UPDATE_CARRIED_CORK_BOX },
+        { bhvJumpingBox, BINGO_UPDATE_CARRIED_CRAZY_BOX },
+        { bhvKoopaShellUnderwater, BINGO_UPDATE_CARRIED_SHELL },
+        { bhvChuckya, BINGO_UPDATE_CARRIED_CHUCKYA },
+        { bhvKingBobomb, BINGO_UPDATE_CARRIED_KING_BOBOMB },
+        { bhvBowser, BINGO_UPDATE_CARRIED_BOWSER },
+        { bhvUkiki, BINGO_UPDATE_CARRIED_UKIKI },
+        { bhvMacroUkiki, BINGO_UPDATE_CARRIED_UKIKI },
+        { bhvSmallPenguin, BINGO_UPDATE_CARRIED_PENGUIN },
+    };
+    u32 i;
+
+    for (i = 0; i < ARRAY_COUNT(sCarryKinds); i++) {
+        if (obj->behavior == segmented_to_virtual(sCarryKinds[i].behavior)) {
+            bingo_update(sCarryKinds[i].update);
+            return;
+        }
+    }
+}
+
 void mario_grab_used_object(struct MarioState *m) {
     if (m->heldObj == NULL) {
         m->heldObj = m->usedObj;
+        bingo_track_carry(m->heldObj);
         obj_set_held_state(m->heldObj, bhvCarrySomething3);
     }
 }

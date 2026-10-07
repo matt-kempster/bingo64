@@ -667,6 +667,9 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_UNIQUE_DEATHS:
             strcpy(verb, "Die in");
             break;
+        case BINGO_OBJECTIVE_CARRY_KINDS:
+            strcpy(verb, "Pick up");
+            break;
         case BINGO_OBJECTIVE_POLES:
             strcpy(verb, "Grab");
             break;
@@ -686,6 +689,10 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
         case BINGO_OBJECTIVE_UNIQUE_DEATHS:
             strcpy(collectName, "ways");
+            break;
+        case BINGO_OBJECTIVE_CARRY_KINDS:
+            strcpy(collectName, "kinds of thing");
+            printUnique = 0;
             break;
         case BINGO_OBJECTIVE_SIGNPOST:
             strcpy(collectName, "Signposts");
@@ -791,6 +798,7 @@ void get_collectable_objective_desc(struct BingoObjective *obj, char *desc) {
     } else if (
         obj->type == BINGO_OBJECTIVE_LOSE_MARIO_HAT
         || obj->type == BINGO_OBJECTIVE_UNIQUE_DEATHS
+        || obj->type == BINGO_OBJECTIVE_CARRY_KINDS
     ) {
         flags = obj->data.collectableFlagsData.flags;
         while (flags) {
@@ -907,6 +915,11 @@ static const char *const sDeathKinds[] = {
 // Blown off by strong wind: the SL snowman's breath, the TTM Fwoosh.
 static const char *const sHatKinds[] = { "Klepto", "Snowman", "Fwoosh", "Ukiki" };
 static const char *const sCapKinds[] = { "Wing", "Metal", "Vanish" };
+// Order follows BINGO_UPDATE_CARRY_FLAGS_BEGIN..END.
+static const char *const sCarryKinds[] = {
+    "Bob-omb", "Cork box", "Crazy box", "Water shell", "Chuckya",
+    "King Bob-omb", "Bowser", "Ukiki", "Baby penguin",
+};
 
 s32 bingo_objective_kinds(struct BingoObjective *obj, const char *const **names) {
     switch (obj->type) {
@@ -919,6 +932,9 @@ s32 bingo_objective_kinds(struct BingoObjective *obj, const char *const **names)
         case BINGO_OBJECTIVE_CAPS_WORN:
             *names = sCapKinds;
             return ARRAY_COUNT(sCapKinds);
+        case BINGO_OBJECTIVE_CARRY_KINDS:
+            *names = sCarryKinds;
+            return ARRAY_COUNT(sCarryKinds);
         default:
             return 0;
     }
@@ -991,6 +1007,7 @@ void describe_objective(struct BingoObjective *objective, char *desc) {
             break;
         case BINGO_OBJECTIVE_LOSE_MARIO_HAT:
         case BINGO_OBJECTIVE_UNIQUE_DEATHS:
+        case BINGO_OBJECTIVE_CARRY_KINDS:
         case BINGO_OBJECTIVE_BLJ:
         case BINGO_OBJECTIVE_SIGNPOST:
         case BINGO_OBJECTIVE_POLES:

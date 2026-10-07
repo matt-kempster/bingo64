@@ -131,6 +131,10 @@ SUPPLY = {
  "PURPLE_SWITCHES":{"WDW":3,"BitDW":2,"BOB":1,"HMC":1,"JRB":1,"DDD":1,"TTM":1,"THI":1,"RR":1,"BitS":1},
  "STUCK_IN_GROUND":{"SL":1,"CCM":1,"SSL":1,"WMotR":1},
  "CAPS_WORN":     {"TotWC":1,"CotMC":1,"VCutM":1},
+ # Kinds per course (sm64.sql): Bob-omb, cork box, crazy box, underwater
+ # shell, Chuckya, King Bob-omb, Bowser, Ukiki, baby penguin.
+ "CARRY_KINDS":   {"TTM":4,"BOB":3,"SSL":3,"BitS":3,"RR":2,"BitFS":2,"WF":1,"JRB":1,"CCM":1,
+                   "BBH":1,"LLL":1,"DDD":1,"WDW":1,"THI":1,"TTC":1,"BitDW":1},
  "OPEN_CANNONS":  {c:1 for c in ["BOB","WF","JRB","CCM","SSL","SL","WDW","TTM","THI","RR"]},
  "TOAD_STARS":    {CASTLE:3},
  "MIPS":          {CASTLE:1},

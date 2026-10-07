@@ -134,3 +134,12 @@ cork box, King; TTM: Ukiki, crazy box), so N around 3-5 is plenty.
 5. **Carry: drop Heave-Ho and MIPS** (glitch-only / impossible with
    unlock ON)? Alternative for MIPS: unlock-OFF-only kind, but then the
    kind list differs by mode.
+
+## Matt's answers, 2026-10-07
+
+- **Carry: approved** ("reasonable and fun"). Built as BINGO_OBJECTIVE_CARRY_KINDS
+  with the 9 kinds; N = 3 / 4 / 5 (easy / medium / hard).
+- **Enemy kinds: tabled.** "Table the notion of 'kinds' here until we think of
+  something less ambiguous overall." Partial answers before that, for when it
+  comes back: King Bob-omb is NOT a Bob-omb; fire piranhas do count but the
+  text must say "Piranha or Fire Piranha"; Bowser: any fight; no Spiny kind.
