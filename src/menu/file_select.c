@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include "online_lobby.h"
 #include "game/bingo_daily.h"
+#include "pc/fs/fs.h"
 #include <time.h>
 #include "pc/network/network.h"
 #include "pc/controller/text_input.h"
@@ -768,13 +769,23 @@ static struct {
     char seed[16];
 } sDailySaved;
 
-static void daily_today(struct BingoDaily *daily) {
-    u32 day = (u32) (time(NULL) / 86400);
+static u32 daily_day(void) {
     // Debug: pin the day for screenshot runs (test/pc).
     if (getenv("BINGO64_DAY") != NULL) {
-        day = (u32) strtoul(getenv("BINGO64_DAY"), NULL, 10);
+        return (u32) strtoul(getenv("BINGO64_DAY"), NULL, 10);
     }
-    bingo_daily_for_day(day, daily);
+    return (u32) (time(NULL) / 86400);
+}
+
+static void daily_today(struct BingoDaily *daily) {
+    bingo_daily_for_day(daily_day(), daily);
+}
+
+// Results so far, re-read from the file when the 1P screen opens.
+static struct BingoDailyStats sDailyStats;
+
+static void daily_refresh_stats(void) {
+    bingo_daily_load(fs_get_write_path(BINGO_DAILY_FILENAME), daily_day(), &sDailyStats);
 }
 
 static void daily_apply(void) {
@@ -798,6 +809,8 @@ static void daily_apply(void) {
     gBingoNonstop = daily.nonstop;
     snprintf(seed, sizeof(seed), "%u", daily.seed);
     bingo_seed_set_from_ascii(seed);
+    // hud.c records the finish against this day.
+    gBingoDailyDay = daily_day();
 }
 
 static void daily_restore(void) {
@@ -813,6 +826,7 @@ static void daily_restore(void) {
     gbBingoMode = sDailySaved.mode;
     bingo_seed_set_from_ascii(sDailySaved.seed);
     sDailySaved.valid = 0;
+    gBingoDailyDay = 0;
 }
 
 // The 1P setup screen: the green door grown fullscreen, with the seed
@@ -834,6 +848,7 @@ static void onep_screen_loop(void) {
         spawn_submenu_button(MENU_BUTTON_1P_DAILY,
                              MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, door, 0, -320,
                              0.11111111f);
+        daily_refresh_stats();
     }
 
     if (sMainMenuButtons[MENU_BUTTON_1P_START] != NULL
@@ -2565,13 +2580,30 @@ static void draw_1p_setup(void) {
     net_print_ascii_centered(160, 40, "DAILY");
     net_print_ascii_centered(206, 40, "START");
     {
-        // What DAILY plays today, e.g. "TODAY  BLACKOUT VANILLA".
+        // What DAILY plays today and how the player is doing, e.g.
+        // "TODAY  BLACKOUT VANILLA   STREAK 3", or once finished
+        // "DONE 20:34  BLACKOUT VANILLA   STREAK 4".
         struct BingoDaily daily;
         char rules[40];
-        char line[56];
+        char line[64];
+        s32 len;
         daily_today(&daily);
         bingo_daily_describe(&daily, rules, sizeof(rules));
-        snprintf(line, sizeof(line), "TODAY  %s", rules);
+        if (sDailyStats.todayFrames >= 0) {
+            s32 secs = sDailyStats.todayFrames / 30;
+            if (secs >= 3600) {
+                len = snprintf(line, sizeof(line), "DONE %d:%02d:%02d  %s", secs / 3600,
+                               secs / 60 % 60, secs % 60, rules);
+            } else {
+                len = snprintf(line, sizeof(line), "DONE %d:%02d  %s", secs / 60, secs % 60,
+                               rules);
+            }
+        } else {
+            len = snprintf(line, sizeof(line), "TODAY  %s", rules);
+        }
+        if (sDailyStats.streak > 0 && len < (s32) sizeof(line)) {
+            snprintf(line + len, sizeof(line) - len, "   STREAK %d", sDailyStats.streak);
+        }
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
         net_print_ascii_centered(160, 26, line);
         gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);

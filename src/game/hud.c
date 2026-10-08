@@ -28,6 +28,8 @@
 #ifdef EXT_OPTIONS_MENU
 #ifndef TARGET_N64
 #include "pc/configfile.h"
+#include "pc/fs/fs.h"
+#include "bingo_daily.h"
 #else
 int configHUD = TRUE;
 #endif
@@ -659,6 +661,17 @@ void render_hud(void) {
                 bingo_race_verdict_on_l();
             }
         }
+#ifndef TARGET_N64
+        // A daily board (file select's DAILY button) is logged the moment
+        // it is won; bingo_daily_record ignores a day already in the file.
+        if (gBingoDailyDay != 0 && bingo_race_won()) {
+            struct BingoDaily daily;
+            bingo_daily_for_day(gBingoDailyDay, &daily);
+            bingo_daily_record(fs_get_write_path(BINGO_DAILY_FILENAME), gBingoDailyDay, &daily,
+                               gbGlobalBingoTimer);
+            gBingoDailyDay = 0;
+        }
+#endif
         if (gPlayer1Controller->buttonDown & L_TRIG || gForceDrawBingoScreen == 1) {
             draw_bingo_screen();
         } else {

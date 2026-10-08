@@ -1598,47 +1598,103 @@ static void test_carry_kinds_generated_target(void) {
 
 #include "bingo_daily.h"
 
-// 2026-10-04 was a Sunday: day 20730 since 1970-01-01.
 static void test_daily_board(void) {
     struct BingoDaily a, b;
     char text[40];
     u32 day;
     int modes[BINGO_MODE_COUNT] = { 0 };
+    int presets[BINGO_PRESET_COUNT] = { 0 };
     int nonstop = 0;
 
-    bingo_daily_for_day(20730, &a);
-    CHECK_EQ_INT(a.mode, BINGO_MODE_BLACKOUT);
-    CHECK_EQ_INT(a.preset, BINGO_PRESET_VANILLA);
-    bingo_daily_describe(&a, text, sizeof(text));
-    CHECK(strcmp(text, "BLACKOUT VANILLA") == 0);
-
-    bingo_daily_for_day(20733, &a);  // Wednesday
-    bingo_daily_describe(&a, text, sizeof(text));
-    CHECK(strcmp(text, "1 LINE SRL") == 0);
-    bingo_daily_for_day(20734, &a);  // Thursday
-    bingo_daily_describe(&a, text, sizeof(text));
-    CHECK(strcmp(text, "1 LINE VANILLA NONSTOP") == 0);
-
-    // Same day, same board; the next week repeats the rules, not the seed.
+    // Same day, same board.
+    bingo_daily_for_day(20734, &a);
     bingo_daily_for_day(20734, &b);
     CHECK_EQ_INT(a.seed, b.seed);
-    bingo_daily_for_day(20741, &b);
     CHECK_EQ_INT(a.mode, b.mode);
-    CHECK(a.seed != b.seed);
+    CHECK_EQ_INT(a.preset, b.preset);
+    CHECK_EQ_INT(a.nonstop, b.nonstop);
 
-    for (day = 20000; day < 20700; day++) {
+    a.mode = BINGO_MODE_LINE_2;
+    a.preset = BINGO_PRESET_SRL;
+    a.nonstop = 1;
+    bingo_daily_describe(&a, text, sizeof(text));
+    CHECK(strcmp(text, "2 LINES SRL NONSTOP") == 0);
+
+    for (day = 20000; day < 21400; day++) {
         bingo_daily_for_day(day, &a);
         CHECK(a.seed >= 1 && a.seed <= 999999999);
         // Solo-playable modes only.
         CHECK(a.mode != BINGO_MODE_LOCKOUT && a.mode != BINGO_MODE_CALLS);
         CHECK(a.preset < BINGO_PRESET_COUNT);
         modes[a.mode]++;
+        presets[a.preset]++;
         nonstop += a.nonstop;
         bingo_daily_for_day(day + 1, &b);
         CHECK(a.seed != b.seed);
     }
-    CHECK(modes[BINGO_MODE_BLACKOUT] == 100);
-    CHECK(nonstop == 200);
+    // 1400 days: every mode and deck shows up, in roughly its share
+    // (6/14, 4/14, 2/14, 2/14; half vanilla; a quarter nonstop).
+    CHECK(modes[BINGO_MODE_LINE_1] > 500 && modes[BINGO_MODE_LINE_1] < 700);
+    CHECK(modes[BINGO_MODE_LINE_2] > 320 && modes[BINGO_MODE_LINE_2] < 480);
+    CHECK(modes[BINGO_MODE_LINE_3] > 140 && modes[BINGO_MODE_LINE_3] < 260);
+    CHECK(modes[BINGO_MODE_BLACKOUT] > 140 && modes[BINGO_MODE_BLACKOUT] < 260);
+    CHECK(presets[BINGO_PRESET_VANILLA] > 620 && presets[BINGO_PRESET_VANILLA] < 780);
+    CHECK(presets[BINGO_PRESET_SRL] > 280 && presets[BINGO_PRESET_SRL] < 420);
+    CHECK(nonstop > 280 && nonstop < 420);
+}
+
+static void test_daily_streaks(void) {
+    struct BingoDailyStats st;
+    struct BingoDaily d;
+    const char *path = "build/daily_test.txt";
+    // Unsorted, with a duplicate: runs are 100-102 and 105-106.
+    u32 days[] = { 105, 100, 102, 101, 106, 101 };
+    s32 frames[] = { 50, 10, 30, 20, 60, 99 };
+
+    bingo_daily_stats(days, frames, 6, 106, &st);
+    CHECK_EQ_INT(st.total, 5);
+    CHECK_EQ_INT(st.streak, 2);
+    CHECK_EQ_INT(st.best, 3);
+    CHECK_EQ_INT(st.todayFrames, 60);
+
+    // Today still open: yesterday's run is alive.
+    bingo_daily_stats(days, frames, 6, 107, &st);
+    CHECK_EQ_INT(st.streak, 2);
+    CHECK_EQ_INT(st.todayFrames, -1);
+    // A missed day ends it.
+    bingo_daily_stats(days, frames, 6, 108, &st);
+    CHECK_EQ_INT(st.streak, 0);
+    CHECK_EQ_INT(st.best, 3);
+    bingo_daily_stats(days, frames, 0, 108, &st);
+    CHECK_EQ_INT(st.total, 0);
+    CHECK_EQ_INT(st.streak, 0);
+
+    // The file: a missing one is empty; a day is written once.
+    remove(path);
+    bingo_daily_load(path, 20734, &st);
+    CHECK_EQ_INT(st.total, 0);
+    bingo_daily_for_day(20733, &d);
+    CHECK_EQ_INT(bingo_daily_record(path, 20733, &d, 1000), 1);
+    bingo_daily_for_day(20734, &d);
+    CHECK_EQ_INT(bingo_daily_record(path, 20734, &d, 36000), 1);
+    CHECK_EQ_INT(bingo_daily_record(path, 20734, &d, 5), 0);  // a replay
+    bingo_daily_load(path, 20734, &st);
+    CHECK_EQ_INT(st.total, 2);
+    CHECK_EQ_INT(st.streak, 2);
+    CHECK_EQ_INT(st.todayFrames, 36000);
+    {
+        // 20734 days after 1970-01-01 is 2026-10-08.
+        char line[160];
+        FILE *f = fopen(path, "r");
+        CHECK(f != NULL);
+        if (f != NULL) {
+            if (fgets(line, sizeof(line), f) == NULL) { line[0] = 0; }
+            if (fgets(line, sizeof(line), f) == NULL) { line[0] = 0; }
+            fclose(f);
+            CHECK(strncmp(line, "20734 2026-10-08 ", 17) == 0);
+        }
+    }
+    remove(path);
 }
 
 static void test_zbc_star_pool(void) {
@@ -2361,6 +2417,7 @@ int main(void) {
     RUN_TEST(test_sim_carry_kinds_objective);
     RUN_TEST(test_carry_kinds_generated_target);
     RUN_TEST(test_daily_board);
+    RUN_TEST(test_daily_streaks);
     RUN_TEST(test_sim_purple_switches_objective);
     RUN_TEST(test_sim_stuck_in_ground_objective);
     RUN_TEST(test_sim_blj_cell0_alternating_courses);
