@@ -44,6 +44,8 @@
 #ifndef TARGET_N64
 #include <stdio.h>
 #include "online_lobby.h"
+#include "game/bingo_daily.h"
+#include <time.h>
 #include "pc/network/network.h"
 #include "pc/controller/text_input.h"
 #endif
@@ -754,6 +756,65 @@ static void seed_typing_finish(void) {
 
 void load_main_menu_save_file(struct Object *fileButton, s32 fileNum);
 
+// The daily board (game/bingo_daily.h). Playing it borrows the seed and
+// settings globals for one game; the player's own are put back the next
+// time the menu loads.
+static struct {
+    u8 valid;
+    u8 disabled[BINGO_OBJECTIVE_TOTAL_AMOUNT];
+    u8 unlocked;
+    u8 nonstop;
+    u8 mode;
+    char seed[16];
+} sDailySaved;
+
+static void daily_today(struct BingoDaily *daily) {
+    u32 day = (u32) (time(NULL) / 86400);
+    // Debug: pin the day for screenshot runs (test/pc).
+    if (getenv("BINGO64_DAY") != NULL) {
+        day = (u32) strtoul(getenv("BINGO64_DAY"), NULL, 10);
+    }
+    bingo_daily_for_day(day, daily);
+}
+
+static void daily_apply(void) {
+    struct BingoDaily daily;
+    char seed[16];
+    s32 i;
+
+    if (!sDailySaved.valid) {
+        for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+            sDailySaved.disabled[i] = gBingoObjectivesDisabled[i];
+        }
+        sDailySaved.unlocked = gBingoFullGameUnlocked;
+        sDailySaved.nonstop = gBingoNonstop;
+        sDailySaved.mode = (u8) gbBingoMode;
+        bingo_seed_to_ascii(sDailySaved.seed, sizeof(sDailySaved.seed));
+        sDailySaved.valid = 1;
+    }
+    daily_today(&daily);
+    bingo_preset_apply(daily.preset);
+    gbBingoMode = daily.mode;
+    gBingoNonstop = daily.nonstop;
+    snprintf(seed, sizeof(seed), "%u", daily.seed);
+    bingo_seed_set_from_ascii(seed);
+}
+
+static void daily_restore(void) {
+    s32 i;
+    if (!sDailySaved.valid) {
+        return;
+    }
+    for (i = 0; i < BINGO_OBJECTIVE_TOTAL_AMOUNT; i++) {
+        gBingoObjectivesDisabled[i] = sDailySaved.disabled[i];
+    }
+    gBingoFullGameUnlocked = sDailySaved.unlocked;
+    gBingoNonstop = sDailySaved.nonstop;
+    gbBingoMode = sDailySaved.mode;
+    bingo_seed_set_from_ascii(sDailySaved.seed);
+    sDailySaved.valid = 0;
+}
+
 // The 1P setup screen: the green door grown fullscreen, with the seed
 // display (click to type) and small START / OPTIONS buttons.
 static void onep_screen_loop(void) {
@@ -770,6 +831,9 @@ static void onep_screen_loop(void) {
         spawn_submenu_button(MENU_BUTTON_1P_OPTIONS,
                              MODEL_MAIN_MENU_BLUE_COPY_BUTTON, door, 330, -320,
                              0.11111111f);
+        spawn_submenu_button(MENU_BUTTON_1P_DAILY,
+                             MODEL_MAIN_MENU_GREEN_SCORE_BUTTON, door, 0, -320,
+                             0.11111111f);
     }
 
     if (sMainMenuButtons[MENU_BUTTON_1P_START] != NULL
@@ -781,6 +845,16 @@ static void onep_screen_loop(void) {
             // level script sees the file number, so leave a clean frame.
             delete_submenu_button(MENU_BUTTON_1P_START);
             delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+            delete_submenu_button(MENU_BUTTON_1P_DAILY);
+            load_main_menu_save_file(door, 1);
+        } else if (check_clicked_submenu_button(
+                       sMainMenuButtons[MENU_BUTTON_1P_DAILY])) {
+            // Today's board: same seed and rules for everyone.
+            play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
+            daily_apply();
+            delete_submenu_button(MENU_BUTTON_1P_START);
+            delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+            delete_submenu_button(MENU_BUTTON_1P_DAILY);
             load_main_menu_save_file(door, 1);
         } else if (check_clicked_submenu_button(
                        sMainMenuButtons[MENU_BUTTON_1P_OPTIONS])) {
@@ -797,6 +871,7 @@ static void onep_screen_loop(void) {
     if (s1PExitRequest) {
         delete_submenu_button(MENU_BUTTON_1P_START);
         delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+        delete_submenu_button(MENU_BUTTON_1P_DAILY);
     }
     exit_submenu_screen(door, MENU_BUTTON_NONE, &s1PExitRequest);
 }
@@ -1064,6 +1139,8 @@ void bhv_menu_button_manager_init(void) {
 
     sMainMenuButtons[MENU_BUTTON_1P_START] = NULL;
     sMainMenuButtons[MENU_BUTTON_1P_OPTIONS] = NULL;
+    sMainMenuButtons[MENU_BUTTON_1P_DAILY] = NULL;
+    daily_restore();
     sMainMenuButtons[MENU_BUTTON_LOBBY_CONNECT] = NULL;
     sMainMenuButtons[MENU_BUTTON_LOBBY_READY] = NULL;
     sMainMenuButtons[MENU_BUTTON_LOBBY_OPTIONS] = NULL;
@@ -1165,6 +1242,7 @@ void bhv_menu_button_manager_loop(void) {
         // the fade-out, and a frozen mid-state button row reads as a glitch.
         delete_submenu_button(MENU_BUTTON_1P_START);
         delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+        delete_submenu_button(MENU_BUTTON_1P_DAILY);
         for (d = 0; d < LOBBY_BTN_COUNT; d++) {
             delete_submenu_button(MENU_BUTTON_LOBBY_MIN + d);
         }
@@ -2279,6 +2357,7 @@ static void handle_cursor_button_input(void) {
                 play_sound(SOUND_MENU_STAR_SOUND_OKEY_DOKEY, gGlobalSoundSource);
                 delete_submenu_button(MENU_BUTTON_1P_START);
                 delete_submenu_button(MENU_BUTTON_1P_OPTIONS);
+                delete_submenu_button(MENU_BUTTON_1P_DAILY);
                 load_main_menu_save_file(door, 1);
             }
         } else if (gPlayer1Controller->buttonPressed & Z_BUTTON_DEF(A_BUTTON)) {
@@ -2483,7 +2562,20 @@ static void draw_1p_setup(void) {
     // visible gap so the text doesn't ride up onto the button faces).
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
     net_print_ascii_centered(114, 40, "OPTIONS");
+    net_print_ascii_centered(160, 40, "DAILY");
     net_print_ascii_centered(206, 40, "START");
+    {
+        // What DAILY plays today, e.g. "TODAY  BLACKOUT VANILLA".
+        struct BingoDaily daily;
+        char rules[40];
+        char line[56];
+        daily_today(&daily);
+        bingo_daily_describe(&daily, rules, sizeof(rules));
+        snprintf(line, sizeof(line), "TODAY  %s", rules);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 140, MIN(sTextBaseAlpha, 200));
+        net_print_ascii_centered(160, 26, line);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+    }
 
     if (gSeedTypingActive) {
         // The digits being typed, in the HUD font.

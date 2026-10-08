@@ -1596,6 +1596,51 @@ static void test_carry_kinds_generated_target(void) {
     CHECK(seen > 50);
 }
 
+#include "bingo_daily.h"
+
+// 2026-10-04 was a Sunday: day 20730 since 1970-01-01.
+static void test_daily_board(void) {
+    struct BingoDaily a, b;
+    char text[40];
+    u32 day;
+    int modes[BINGO_MODE_COUNT] = { 0 };
+    int nonstop = 0;
+
+    bingo_daily_for_day(20730, &a);
+    CHECK_EQ_INT(a.mode, BINGO_MODE_BLACKOUT);
+    CHECK_EQ_INT(a.preset, BINGO_PRESET_VANILLA);
+    bingo_daily_describe(&a, text, sizeof(text));
+    CHECK(strcmp(text, "BLACKOUT VANILLA") == 0);
+
+    bingo_daily_for_day(20733, &a);  // Wednesday
+    bingo_daily_describe(&a, text, sizeof(text));
+    CHECK(strcmp(text, "1 LINE SRL") == 0);
+    bingo_daily_for_day(20734, &a);  // Thursday
+    bingo_daily_describe(&a, text, sizeof(text));
+    CHECK(strcmp(text, "1 LINE VANILLA NONSTOP") == 0);
+
+    // Same day, same board; the next week repeats the rules, not the seed.
+    bingo_daily_for_day(20734, &b);
+    CHECK_EQ_INT(a.seed, b.seed);
+    bingo_daily_for_day(20741, &b);
+    CHECK_EQ_INT(a.mode, b.mode);
+    CHECK(a.seed != b.seed);
+
+    for (day = 20000; day < 20700; day++) {
+        bingo_daily_for_day(day, &a);
+        CHECK(a.seed >= 1 && a.seed <= 999999999);
+        // Solo-playable modes only.
+        CHECK(a.mode != BINGO_MODE_LOCKOUT && a.mode != BINGO_MODE_CALLS);
+        CHECK(a.preset < BINGO_PRESET_COUNT);
+        modes[a.mode]++;
+        nonstop += a.nonstop;
+        bingo_daily_for_day(day + 1, &b);
+        CHECK(a.seed != b.seed);
+    }
+    CHECK(modes[BINGO_MODE_BLACKOUT] == 100);
+    CHECK(nonstop == 200);
+}
+
 static void test_zbc_star_pool(void) {
     u32 seed;
     int i;
@@ -2315,6 +2360,7 @@ int main(void) {
     RUN_TEST(test_sim_caps_worn_objective);
     RUN_TEST(test_sim_carry_kinds_objective);
     RUN_TEST(test_carry_kinds_generated_target);
+    RUN_TEST(test_daily_board);
     RUN_TEST(test_sim_purple_switches_objective);
     RUN_TEST(test_sim_stuck_in_ground_objective);
     RUN_TEST(test_sim_blj_cell0_alternating_courses);

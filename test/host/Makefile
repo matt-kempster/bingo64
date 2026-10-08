@@ -25,7 +25,8 @@ GAME_SRCS := \
 	bingo_titles.c \
 	bingo_descriptions.c \
 	bingo_tracking_collectables.c \
-	bingo_tracking_star.c
+	bingo_tracking_star.c \
+	bingo_daily.c
 
 TEST_SRCS := glue.c test_bingo.c
 

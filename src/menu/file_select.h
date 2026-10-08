@@ -63,6 +63,7 @@ enum MenuButtonTypes {
     // (vanilla score-file-button style) and deleted on exit.
     MENU_BUTTON_1P_START,      // 1P setup: start the game
     MENU_BUTTON_1P_OPTIONS,    // 1P setup: open the options screen
+    MENU_BUTTON_1P_DAILY,      // 1P setup: play today's board
     MENU_BUTTON_LOBBY_CONNECT,
     MENU_BUTTON_LOBBY_READY,
     MENU_BUTTON_LOBBY_OPTIONS,
