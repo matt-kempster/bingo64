@@ -470,10 +470,13 @@ s32 bingo_objective_star_daredevil_init(
                 switch (random_u16() % 3) {
                     case 0:
                         star = 2;
+                        break;
                     case 1:
                         star = 4;
+                        break;
                     case 2:
                         star = 5;
+                        break;
                 }
             } else {
                 star = 6;  // 100 coins
