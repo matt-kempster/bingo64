@@ -13,10 +13,14 @@ rsync -a "$WT/bin/" "$BW/bin/"
 rsync -a "$WT/data/" "$BW/data/"
 rsync -a "$WT/include/" "$BW/include/"
 rsync -a "$WT/platform/" "$BW/platform/"  # icon.ico + info.rc
-# Committed art (custom icons etc.) must reach the build checkout too: it is
-# a stale clone, so anything committed since it was cloned only exists here.
-git -C "$WT" ls-files actors levels textures | grep '\.png$' | \
-    rsync -a --files-from=- "$WT" "$BW"
+# Committed actors/levels/textures (art AND the .c/.h beside it: level
+# scripts place objects, actors hold models) must reach the build checkout
+# too: it is a stale clone, so anything committed since it was cloned only
+# exists here. -c without -t: unchanged files are skipped, changed ones land
+# with a fresh mtime so make rebuilds them (rsync -a would keep the older
+# source mtime and make would keep the stale objects).
+git -C "$WT" ls-files actors levels textures | \
+    rsync -rlc --files-from=- "$WT" "$BW"
 echo "$WT" > "$BW/.bingo64_src"  # make_release.sh reads the art list from here
 # tools/ + server/ ride along for release assembly (make_release.sh
 # packs server/relay.py and builds the extractor from tools/).

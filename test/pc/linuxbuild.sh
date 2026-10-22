@@ -14,10 +14,14 @@ rsync -a "$WT/src/" "$BL/src/"
 rsync -a "$WT/bin/" "$BL/bin/"
 rsync -a "$WT/data/" "$BL/data/"
 rsync -a "$WT/include/" "$BL/include/"
-# Committed art (custom icons etc.) must reach the build checkout too: it is
-# a stale clone, so anything committed since it was cloned only exists here.
-git -C "$WT" ls-files actors levels textures | grep '\.png$' | \
-    rsync -a --files-from=- "$WT" "$BL"
+# Committed actors/levels/textures (art AND the .c/.h beside it: level
+# scripts place objects, actors hold models) must reach the build checkout
+# too: it is a stale clone, so anything committed since it was cloned only
+# exists here. -c without -t: unchanged files are skipped, changed ones land
+# with a fresh mtime so make rebuilds them (rsync -a would keep the older
+# source mtime and make would keep the stale objects).
+git -C "$WT" ls-files actors levels textures | \
+    rsync -rlc --files-from=- "$WT" "$BL"
 echo "$WT" > "$BL/.bingo64_src"  # make_release.sh reads the art list from here
 rsync -a "$WT/Makefile" "$WT/defines.mk" "$BL/"
 cd "$BL"
